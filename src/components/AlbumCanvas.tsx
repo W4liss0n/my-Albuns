@@ -386,7 +386,7 @@ export function AlbumCanvas(props: AlbumCanvasProps) {
         app.canvas.className = "pixi-canvas";
         app.canvas.setAttribute(
           "aria-label",
-          "Canvas contínuo do Álbum. Use a roda para navegar e Alt mais roda para ajustar a Foto.",
+          "Área de edição contínua do álbum. Use a roda para navegar e Alt mais roda para ajustar a foto.",
         );
         app.canvas.tabIndex = 0;
         hostRef.current.appendChild(app.canvas);
@@ -438,7 +438,7 @@ export function AlbumCanvas(props: AlbumCanvasProps) {
             code: "canvas_initialization_failed",
             renderer: "não confirmado",
             reason:
-              "Não foi possível inicializar o Canvas WebGL2 do editor.",
+              "Não foi possível iniciar a área de edição.",
             limits: null,
           };
           logger.write({
@@ -513,9 +513,9 @@ export function AlbumCanvas(props: AlbumCanvasProps) {
     return (
       <EmptyState
         className="canvas-empty"
-        description="Não há conteúdo de composição disponível neste Projeto."
+        description="Não há conteúdo de composição disponível neste projeto."
         icon={<AppIcon icon={Layers3} size={18} />}
-        title="Nenhuma Lâmina disponível"
+        title="Nenhuma lâmina disponível"
       />
     );
   }
@@ -532,17 +532,17 @@ export function AlbumCanvas(props: AlbumCanvasProps) {
         onContextMenu={handleSheetContextMenu}
       >
         {decorative.preview && props.mediaDrag && <span
-          className="canvas-decorative-drop-label" role="status" aria-label="Aplicação do Decorativo"
+          className="canvas-decorative-drop-label" role="status" aria-label="Aplicação do decorativo"
           style={{ left: Math.max(8, Math.min((hostRef.current?.clientWidth ?? 0) - 210, props.mediaDrag.x - (hostRef.current?.getBoundingClientRect().left ?? 0) + 14)),
             top: Math.max(8, Math.min((hostRef.current?.clientHeight ?? 0) - 36, props.mediaDrag.y - (hostRef.current?.getBoundingClientRect().top ?? 0) + 14)) }}>
-          {decorative.preview.role === "background" ? "Fundo" : "Overlay"} · {decorative.preview.scope === "bothSides" ? "Ambos os lados" : decorative.preview.scope === "left" ? "Lado esquerdo" : "Lado direito"}
+          {decorative.preview.role === "background" ? "Fundo" : "Sobreposição"} · {decorative.preview.scope === "bothSides" ? "Ambos os lados" : decorative.preview.scope === "left" ? "Lado esquerdo" : "Lado direito"}
         </span>}
         {graphicsState === "initializing" && (
-          <span className="canvas-loading">Iniciando WebGL2…</span>
+          <span className="canvas-loading">Abrindo editor…</span>
         )}
         {graphicsState === "recovering" && (
           <span className="canvas-loading" role="status">
-            Restaurando o contexto gráfico…
+            Restaurando editor…
           </span>
         )}
         {graphicsState === "failed" && (

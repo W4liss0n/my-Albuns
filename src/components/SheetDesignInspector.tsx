@@ -75,14 +75,14 @@ export function SheetDesignInspector({
         key={`background:${sheet.sheetId}:${scope}`}
         disabled={disabled}
         onChange={(change) => { void apply(change); }}
-        role="Background"
+        role="Fundo"
         values={backgroundValues}
         mediaPreviewUrls={mediaPreviewUrls}
       />
       <SheetVisualRole
         disabled={disabled}
         onChange={(change) => { void apply(change); }}
-        role="Overlay"
+        role="Sobreposição"
         values={overlayValues}
         mediaPreviewUrls={mediaPreviewUrls}
       />
@@ -94,13 +94,13 @@ export function SheetDesignInspector({
           onClick={saveLayout?.onSave}
           title={
             sheet.frames.length === 0
-              ? "Adicione ao menos um Frame para salvar um Layout."
-              : "Salvar a disposição dos Frames em Personalizados."
+              ? "Adicione ao menos um quadro para salvar um layout."
+              : "Salvar a disposição dos quadros em Personalizados."
           }
           type="button"
           variant="secondary"
         >
-          Salvar disposição como Layout
+          Salvar disposição como layout
         </ActionButton>
         {saveLayout?.feedback}
       </div>
@@ -134,7 +134,7 @@ function SheetScopePreview({
 
   return (
     <div
-      aria-label={`Selecionar escopo da Lâmina ${String(sheet.number).padStart(2, "0")}`}
+      aria-label={`Aplicar na lâmina ${String(sheet.number).padStart(2, "0")}`}
       className="sheet-design-preview"
       data-active-sides={sheet.activeSides}
       data-hovered-scope={hoveredScope ?? undefined}
@@ -193,11 +193,11 @@ type VisualValue = (
 function SheetVisualRole({ mediaPreviewUrls, disabled, role, values, onChange }: {
   mediaPreviewUrls: Readonly<Record<string, string>>;
   disabled: boolean;
-  role: "Background" | "Overlay";
+  role: "Fundo" | "Sobreposição";
   values: readonly VisualValue[];
   onChange(change: SheetVisualChange): void;
 }) {
-  const decorativeRole = role === "Background" ? "background" : "overlay";
+  const decorativeRole = role === "Fundo" ? "background" : "overlay";
   return (
     <section className="sheet-design-role" aria-label={role}>
       <h3>{role}</h3>
@@ -208,16 +208,16 @@ function SheetVisualRole({ mediaPreviewUrls, disabled, role, values, onChange }:
             <span className="sheet-design-value__copy">
               {value.side ? <small>{value.side}</small> : null}
               <strong>{value.label}</strong>
-              <small>{value.custom ? "Definido nesta lâmina" : "Usando o design do álbum"}</small>
+              <small>{value.custom ? "Personalizado nesta lâmina" : "Usando o padrão do álbum"}</small>
             </span>
           </div>
         ))}
       </div>
       <div className="sheet-design-role__actions">
-        {role === "Background" ? (
+        {role === "Fundo" ? (
           <div className="sheet-design-color">
             <span>Cor</span>
-            <ColorPropertyControl label="do Background da Lâmina" defaultRgb="#FFFFFF"
+            <ColorPropertyControl label="do fundo da lâmina" defaultRgb="#FFFFFF"
               disabled={disabled} rgb={sharedBackgroundColor(values)}
               onCommit={(rgb) => onChange({ kind: "backgroundColor", rgb })} />
           </div>
@@ -230,7 +230,7 @@ function SheetVisualRole({ mediaPreviewUrls, disabled, role, values, onChange }:
       {values.some((value) => value.custom) && (
         <ActionButton className="sheet-design-role__restore" density="compact" disabled={disabled}
           type="button" variant="quiet" onClick={() => onChange({ kind: "restoreAlbum", role: decorativeRole })}>
-          Voltar ao design do álbum
+          Usar padrão do álbum
         </ActionButton>
       )}
     </section>
@@ -296,7 +296,7 @@ function visualValueAtSide(
       .find(({ drawRect, clipRect }) => containsX(clipRect ?? drawRect, sampleX));
     return overlay
       ? { custom, kind: "media", label: overlay.name, mediaId: overlay.mediaId }
-      : { custom, kind: "none", label: "Sem overlay" };
+      : { custom, kind: "none", label: "Sem sobreposição" };
   }
 
   const background = [...sheet.backgrounds]

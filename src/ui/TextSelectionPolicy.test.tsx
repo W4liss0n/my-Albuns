@@ -8,7 +8,7 @@ const uiStyles = readFileSync("src/ui/ui.css", "utf8") as string;
 test("keeps application chrome inert while editable and declared copyable text stays selectable", () => {
   render(
     <main className="ui-chrome-selection-scope" data-testid="shell">
-      <span data-testid="chrome-label">Grade de Lâminas</span>
+      <span data-testid="chrome-label">Grade de lâminas</span>
       <input aria-label="Valor numérico" defaultValue="42" type="number" />
       <textarea aria-label="Observações" defaultValue="texto" />
       <div contentEditable suppressContentEditableWarning>

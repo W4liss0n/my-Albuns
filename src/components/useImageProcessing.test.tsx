@@ -42,7 +42,7 @@ test("a retired Project cannot overwrite progress or warnings of its replacement
     });
   });
   await act(async () => {
-    publishOld({ completedFiles: 5, totalFiles: 5, problem: { fileName: "Antiga.jpg", reason: "Cache antigo" } });
+    publishOld({ completedFiles: 5, totalFiles: 5, problem: { fileName: "Antiga.jpg", reason: "prévias temporárias antigo" } });
     finishOld();
     await old;
   });
@@ -55,7 +55,7 @@ test("a retired Project cannot overwrite progress or warnings of its replacement
 test("keeps problems from completed image actions until they are dismissed", async () => {
   const operationContext = {};
   const view = renderHook(() => useImageProcessing("project", operationContext));
-  const problem = { fileName: "Foto.jpg", reason: "Cache indisponível" };
+  const problem = { fileName: "Foto.jpg", reason: "prévias temporárias indisponível" };
   await act(async () => {
     await view.result.current.run(async (publish) => {
       publish({ completedFiles: 1, totalFiles: 1, problem });

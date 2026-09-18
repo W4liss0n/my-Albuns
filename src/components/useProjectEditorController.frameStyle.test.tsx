@@ -23,13 +23,13 @@ function harness() {
   const first = structuredClone(corpus.states["single-opacity"]);
   const second = structuredClone(corpus.states["single-border"]);
   const pending = deferred<EditorProjection>();
-  const unsupported = async (): Promise<never> => { throw new Error("Unsupported in this Frame style test."); };
+  const unsupported = async (): Promise<never> => { throw new Error("Unsupported in this quadro style test."); };
   const apply = vi.fn<ProjectCorePort["apply"]>().mockImplementationOnce(() => pending.promise).mockResolvedValue(second);
   const preview = vi.fn<ProjectCorePort["previewFrameStyle"]>(async (edit) => {
     const sample = corpus.previews.find((item) => item.from === "album" &&
       item.edit.frameIds.join() === edit.frameIds.join() &&
       JSON.stringify(item.edit.change) === JSON.stringify(edit.change));
-    if (!sample) throw new Error("Missing Core Frame-style preview sample.");
+    if (!sample) throw new Error("Missing Core quadro-style preview sample.");
     return structuredClone(sample.frames);
   });
   const save = vi.fn<ProjectCorePort["save"]>(async (revision) => ({ outcome: { kind: "saved", revision },
@@ -43,7 +43,7 @@ function harness() {
     queryLayouts: async () => { throw new Error("Layouts are not configured in this fixture."); },
     previewLayout: async () => { throw new Error("Layouts are not configured in this fixture."); },
     previewDecorativeDrop: async () => { throw new Error("Decorative preview is not configured in this fixture."); },
-    previewPhotoZoom: async () => { throw new Error("Photo Zoom preview is not configured in this fixture."); },
+    previewPhotoZoom: async () => { throw new Error("Photo zoom preview is not configured in this fixture."); },
     previewFrameStyle: preview, previewPhotoAngle: unsupported, previewFrameGeometry: unsupported, saveAs: unsupported,
     validateAlbumInformation: unsupported, importMedia: unsupported, resolvePhotoDropTarget: unsupported, replaceImage: unsupported, relink: unsupported,
   };

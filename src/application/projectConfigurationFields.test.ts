@@ -22,8 +22,8 @@ test("presents shared Project configuration validation by field", () => {
       sheetWidthPresentation: "openSheet",
     }),
   ).toEqual({
-    sheetWidth: ["A largura da Lâmina deve ser maior que zero."],
-    bleed: ["A Sangria deve manter uma Área de corte positiva."],
+    sheetWidth: ["A largura da lâmina deve ser maior que zero."],
+    bleed: ["Reduza a sangria para manter uma área de corte."],
   });
   expect(invalidPhysicalMeasurementMessage("cm")).toBe(
     "Informe uma medida válida em cm.",
@@ -46,13 +46,13 @@ test("presents deferred content transformations on their owning fields", () => {
     ),
   ).toEqual({
     sheetWidth: [
-      "A composição existente exige o fluxo de mudança dimensional segura.",
+      "Não é possível aplicar esse tamanho à composição atual.",
     ],
     firstSheet: [
-      "A primeira Lâmina contém composição e exige o fluxo completo de conversão.",
+      "Revise o conteúdo da primeira lâmina antes de alterar seu tipo.",
     ],
     lastSheet: [
-      "A última Lâmina contém composição e exige o fluxo completo de conversão.",
+      "Revise o conteúdo da última lâmina antes de alterar seu tipo.",
     ],
   });
 });
@@ -69,10 +69,10 @@ test("presents raster ranges in the selected physical Unit and current DPI", () 
     ),
   ).toEqual({
     sheetWidth: [
-      "Para 300 DPI, informe a largura da Lâmina entre 0.0086 cm e 554.8672 cm.",
+      "Para 300 DPI, informe a largura da lâmina entre 0.0086 cm e 554.8672 cm.",
     ],
     sheetHeight: [
-      "Para 300 DPI, informe a altura da Lâmina entre 0.0043 cm e 554.8672 cm.",
+      "Para 300 DPI, informe a altura da lâmina entre 0.0043 cm e 554.8672 cm.",
     ],
   });
 
@@ -86,7 +86,7 @@ test("presents raster ranges in the selected physical Unit and current DPI", () 
       },
     ).sheetHeight,
   ).toEqual([
-    "Para 300 DPI, informe a altura da Lâmina entre aproximadamente 0.002 pol e 218.452 pol.",
+    "Para 300 DPI, informe a altura da lâmina entre aproximadamente 0.002 pol e 218.452 pol.",
   ]);
 });
 
@@ -101,7 +101,7 @@ test("presents the creation width as a closed Sheet measurement", () => {
       },
     ).sheetWidth,
   ).toEqual([
-    "Para 300 DPI, informe a largura da Lâmina fechada entre 0.0043 cm e 277.4336 cm.",
+    "Para 300 DPI, informe a largura da lâmina fechada entre 0.0043 cm e 277.4336 cm.",
   ]);
 });
 
@@ -120,7 +120,7 @@ test("formats the supplied Core limits without reconstructing the raster rule", 
     ["sheetWidthRasterOutOfRange", "sheetHeightRasterOutOfRange"],
     { rasterLimits, dpi: 300, displayUnit: "mm", sheetWidthPresentation: "closedSheet" },
   )).toEqual({
-    sheetWidth: ["Para 300 DPI, informe a largura da Lâmina fechada entre 1 mm e 2 mm."],
-    sheetHeight: ["Para 300 DPI, informe a altura da Lâmina entre 0.5 mm e 0.9 mm."],
+    sheetWidth: ["Para 300 DPI, informe a largura da lâmina fechada entre 1 mm e 2 mm."],
+    sheetHeight: ["Para 300 DPI, informe a altura da lâmina entre 0.5 mm e 0.9 mm."],
   });
 });

@@ -406,7 +406,7 @@ pub(crate) async fn close_batch_export(
         .state::<crate::storage_recovery::StorageRecoveries>()
         .is_cleaning()
     {
-        return Err("Aguarde a limpeza do Cache terminar.".into());
+        return Err("Aguarde a limpeza das prévias temporárias terminar.".into());
     }
     let state = app.state::<BatchWindowState>();
     let _serial = state.window_serial.lock().await;

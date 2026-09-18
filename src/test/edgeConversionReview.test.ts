@@ -14,7 +14,7 @@ test.each([0, 2])("presents the Core's loss facts for edge %s without deriving t
     side: index === 0 ? "left" : "right", background, overlay };
   sheet.edgeConversionLoss = loss;
   expect(edgeConversionLoss(sheets, sheet.id)).toBe(loss);
-  expect(edgeConversionLossDescription(loss)).toContain("Background e Overlay personalizados");
+  expect(edgeConversionLossDescription(loss)).toContain("Fundo e sobreposição personalizados");
   expect(edgeConversionLossDescription(loss)).toContain(index === 0 ? "esquerda" : "direita");
   sheet.edgeConversionLoss = null;
   sheet.visuals = { background: { kind: "perSide", left: background, right: background }, overlay: { kind: "default" } };

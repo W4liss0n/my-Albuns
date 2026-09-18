@@ -17,7 +17,7 @@ use crate::{
     project_recovery::RecoveryCoordinator,
 };
 
-const SESSION_UNAVAILABLE_MESSAGE: &str = "A Sessão do Projeto ficou indisponível.";
+const SESSION_UNAVAILABLE_MESSAGE: &str = "A Sessão do projeto ficou indisponível.";
 
 /// Owns the single productive editable Project of this Host process.
 ///
@@ -373,7 +373,7 @@ impl ProjectHost {
         let mut project = self.project()?;
         let outcome = project
             .apply_with_outcome(intent)
-            .map_err(|error| error.to_string())?;
+            .map_err(crate::project_error_message::project_error_message)?;
         self.schedule_recovery(&project);
         Ok(outcome)
     }
@@ -402,12 +402,12 @@ impl ProjectHost {
         let mut project = self.project()?;
         if project.project_id().hyphenated().to_string() != expected_project_id {
             return Err(
-                "O Projeto mudou durante a importação. Selecione as imagens novamente.".into(),
+                "O projeto mudou durante a importação. Selecione as imagens novamente.".into(),
             );
         }
         let outcome = project
             .import_media(proposal.kind, proposal.commands)
-            .map_err(|error| error.to_string())?;
+            .map_err(crate::project_error_message::project_error_message)?;
         let photos_by_path = project
             .project()
             .media()
@@ -491,11 +491,11 @@ impl ProjectHost {
                 media_id,
                 proposal.replacement_path().to_path_buf(),
             ))
-            .map_err(|error| error.to_string())?;
+            .map_err(crate::project_error_message::project_error_message)?;
         if let Some(source_metadata) = source_metadata {
             project
                 .observe_photo_source(media_id, source_metadata)
-                .map_err(|error| error.to_string())?;
+                .map_err(crate::project_error_message::project_error_message)?;
         }
         let projection = project.projection();
         self.schedule_recovery(&project);
@@ -510,7 +510,7 @@ impl ProjectHost {
     ) -> Result<PhotoDropTarget, String> {
         self.project()?
             .photo_drop_target(sheet_id, x_um, y_um)
-            .map_err(|error| error.to_string())
+            .map_err(crate::project_error_message::project_error_message)
     }
 
     pub(crate) fn preview_photo_zoom(
@@ -519,7 +519,7 @@ impl ProjectHost {
     ) -> Result<Vec<myalbuns_core::ComposedFrame>, String> {
         self.project()?
             .preview_photo_zoom(edit)
-            .map_err(|error| error.to_string())
+            .map_err(crate::project_error_message::project_error_message)
     }
 
     pub(crate) fn preview_photo_angle(
@@ -528,7 +528,7 @@ impl ProjectHost {
     ) -> Result<Vec<myalbuns_core::ComposedFrame>, String> {
         self.project()?
             .preview_photo_angle(edit)
-            .map_err(|error| error.to_string())
+            .map_err(crate::project_error_message::project_error_message)
     }
 
     pub(crate) fn preview_decorative_drop(
@@ -537,7 +537,7 @@ impl ProjectHost {
     ) -> Result<Option<myalbuns_core::DecorativeDropPreview>, String> {
         self.project()?
             .preview_decorative_drop(request)
-            .map_err(|error| error.to_string())
+            .map_err(crate::project_error_message::project_error_message)
     }
 
     pub(crate) fn capture_custom_layout(
@@ -546,7 +546,7 @@ impl ProjectHost {
     ) -> Result<myalbuns_core::LayoutDefinition, String> {
         self.project()?
             .capture_custom_layout(sheet_id)
-            .map_err(|error| error.to_string())
+            .map_err(crate::project_error_message::project_error_message)
     }
 
     pub(crate) fn refresh_layout_catalog(
@@ -561,7 +561,7 @@ impl ProjectHost {
             .session_mut()?
             .project
             .refresh_layout_catalog(snapshot)
-            .map_err(|error| error.to_string())
+            .map_err(crate::project_error_message::project_error_message)
     }
 
     pub(crate) fn query_layouts(
@@ -571,7 +571,7 @@ impl ProjectHost {
     ) -> Result<myalbuns_core::LayoutQueryResult, String> {
         self.project()?
             .query_layouts_with_frame_request(sheet_id, frame_request)
-            .map_err(|error| error.to_string())
+            .map_err(crate::project_error_message::project_error_message)
     }
 
     pub(crate) fn preview_layout(
@@ -580,7 +580,7 @@ impl ProjectHost {
     ) -> Result<Vec<myalbuns_core::ComposedFrame>, String> {
         self.project()?
             .preview_layout(selection)
-            .map_err(|error| error.to_string())
+            .map_err(crate::project_error_message::project_error_message)
     }
 
     pub(crate) fn preview_frame_style(
@@ -589,7 +589,7 @@ impl ProjectHost {
     ) -> Result<Vec<myalbuns_core::ComposedFrame>, String> {
         self.project()?
             .preview_frame_style(edit)
-            .map_err(|error| error.to_string())
+            .map_err(crate::project_error_message::project_error_message)
     }
 
     pub(crate) fn preview_frame_geometry(
@@ -598,7 +598,7 @@ impl ProjectHost {
     ) -> Result<myalbuns_core::FrameGeometryPreview, String> {
         self.project()?
             .preview_frame_geometry(edit)
-            .map_err(|error| error.to_string())
+            .map_err(crate::project_error_message::project_error_message)
     }
 
     pub(crate) fn observe_photo_source(
@@ -607,25 +607,25 @@ impl ProjectHost {
         metadata: PhotoSourceMetadata,
     ) -> Result<(), String> {
         if binding.kind != myalbuns_core::MediaKind::Photo {
-            return Err("A ocorrência observada não é uma Foto.".into());
+            return Err("A ocorrência observada não é uma foto.".into());
         }
         let media_id: MediaId = binding
             .media_id
             .parse()
-            .map_err(|error| format!("A ocorrência de Foto é inválida: {error}"))?;
+            .map_err(|error| format!("A ocorrência de foto é inválida: {error}"))?;
         let mut project = self.project()?;
         let current = project
             .project()
             .media()
             .iter()
             .find(|media| media.id() == media_id.into_uuid())
-            .ok_or_else(|| format!("A ocorrência de Foto não existe: {media_id}"))?;
+            .ok_or_else(|| format!("A ocorrência de foto não existe: {media_id}"))?;
         if current.kind() != binding.kind || current.path() != binding.logical_path.as_path() {
-            return Err("O vínculo da Foto mudou durante a observação.".into());
+            return Err("O vínculo da foto mudou durante a observação.".into());
         }
         project
             .observe_photo_source(media_id, metadata)
-            .map_err(|error| error.to_string())
+            .map_err(crate::project_error_message::project_error_message)
     }
 
     pub(crate) fn validate_album_information(
@@ -944,7 +944,7 @@ impl ProjectHost {
             .bindings
             .into_iter()
             .find(|binding| binding.media_id == media_id)
-            .ok_or_else(|| "A ocorrência de mídia não pertence ao Projeto atual.".into())
+            .ok_or_else(|| "A ocorrência de mídia não pertence ao projeto atual.".into())
     }
 
     #[cfg(test)]
@@ -965,7 +965,7 @@ impl ProjectHost {
         let path = project.project_path();
         let parent = path
             .parent()
-            .ok_or("O Projeto não tem uma pasta de destino.")?;
+            .ok_or("O projeto não tem uma pasta de destino.")?;
         Ok(parent
             .join(crate::export_commands::export_name(
                 &project.projection().state.project_name,
@@ -2014,7 +2014,7 @@ mod tests {
                     .sheets[0]
                     .sheet_id,
             )
-            .expect("the neutral Exportação is frozen");
+            .expect("the neutral exportação is frozen");
 
         assert!(frozen.snapshot.validate().is_ok());
         assert!(frozen.sources.is_empty());
@@ -2051,13 +2051,13 @@ mod tests {
             .expect("the current unsaved DPI is applied")
             .projection;
         let persisted_before =
-            std::fs::read(&fixture.project_path).expect("the Projeto baseline is readable");
+            std::fs::read(&fixture.project_path).expect("the projeto baseline is readable");
         let sheet_id = dirty.composition.sheets[1].sheet_id.clone();
 
         let frozen = fixture
             .host
             .freeze_sheet_export(&sheet_id)
-            .expect("the noninitial visible Lâmina is frozen atomically");
+            .expect("the noninitial visible lâmina is frozen atomically");
 
         assert_eq!(frozen.snapshot.revision, dirty.state.revision);
         assert_eq!(frozen.snapshot.dpi, 240);
@@ -2065,7 +2065,7 @@ mod tests {
             frozen
                 .snapshot
                 .output_unit(&sheet_id)
-                .expect("the selected Lâmina remains in the frozen snapshot")
+                .expect("the selected lâmina remains in the frozen snapshot")
                 .sheet
                 .sheet_id,
             sheet_id
@@ -2074,11 +2074,11 @@ mod tests {
             fixture
                 .host
                 .projection()
-                .expect("the Projeto remains readable"),
+                .expect("the projeto remains readable"),
             dirty
         );
         assert_eq!(
-            std::fs::read(&fixture.project_path).expect("the Projeto remains persisted"),
+            std::fs::read(&fixture.project_path).expect("the projeto remains persisted"),
             persisted_before
         );
 
@@ -2093,7 +2093,7 @@ mod tests {
         fixture
             .host
             .apply_with_outcome(ProjectIntent::SetDpi { dpi: 180 })
-            .expect("the live Projeto may advance after freezing");
+            .expect("the live projeto may advance after freezing");
         assert_eq!(frozen.snapshot.dpi, 240);
         assert_eq!(frozen.snapshot.revision, dirty.state.revision);
     }
@@ -2126,7 +2126,7 @@ mod tests {
                 .expect("the transparent shared original is written");
             RgbImage::from_pixel(48, 32, Rgb([10, 20, 240]))
                 .save_with_format(&right_path, ImageFormat::Jpeg)
-                .expect("the right Background original is written");
+                .expect("the right fundo original is written");
             RgbImage::from_pixel(300, 200, Rgb([30, 210, 70]))
                 .save_with_format(&photo_path, ImageFormat::Jpeg)
                 .expect("the linked Photo Original is written");
@@ -2165,7 +2165,7 @@ mod tests {
             } = fixture_with_initial(personalized);
             let sheet_id = host
                 .projection()
-                .expect("the new Projeto projection is available")
+                .expect("the new projeto projection is available")
                 .composition
                 .sheets[1]
                 .sheet_id
@@ -2193,7 +2193,7 @@ mod tests {
                 .expect("the imported Photo receives the first compatible Layout");
             let affected_frame_id = placed
                 .affected_frame_id
-                .expect("the added Frame is returned to the UI boundary");
+                .expect("the added quadro is returned to the UI boundary");
             let layouts = host.query_layouts(&sheet_id, None).unwrap();
             let selection = myalbuns_core::LayoutSelection {
                 query_id: layouts.query_id,
@@ -2310,14 +2310,14 @@ mod tests {
             );
             let host = open_project(&project_path, &identity_lease_root);
             let persisted_before =
-                std::fs::read(&project_path).expect("the reopened Projeto is readable");
+                std::fs::read(&project_path).expect("the reopened projeto is readable");
             let dirty = host
                 .apply_with_outcome(ProjectIntent::SetDpi { dpi: 25 })
                 .expect("the current unsaved DPI is applied")
                 .projection;
             assert_ne!(
                 dirty.composition.sheets[0].active_sides, dirty.composition.sheets[1].active_sides,
-                "the initial and visible noninitial Lâminas must be semantically distinguishable"
+                "the initial and visible noninitial lâminas must be semantically distinguishable"
             );
             let reopened_frame = &dirty.composition.sheets[1].frames[0];
             assert_eq!(reopened_frame.clip_rect, saved_frames[0].clip_rect);
@@ -2325,7 +2325,7 @@ mod tests {
             let reopened_photo = reopened_frame
                 .photo
                 .as_ref()
-                .expect("the saved Frame still contains its linked Photo");
+                .expect("the saved quadro still contains its linked Photo");
             assert_eq!(reopened_photo.media_id, imported_media_id);
             assert!((reopened_photo.placement.current_pan.x - 0.4).abs() < 0.000_001);
             assert!((reopened_photo.placement.current_pan.y - 0.2).abs() < 0.000_001);
@@ -2337,7 +2337,7 @@ mod tests {
             );
             let frozen = host
                 .freeze_sheet_export(&sheet_id)
-                .expect("the visible noninitial Lâmina is frozen by the Host");
+                .expect("the visible noninitial lâmina is frozen by the Host");
             let expected_dpi = frozen.snapshot.dpi;
             let expected_revision = frozen.snapshot.revision;
             let output_path = project_root.path().join(format!(
@@ -2360,27 +2360,28 @@ mod tests {
                     format: myalbuns_core::ExportFormat::Jpeg { quality: 100 },
                 },
             )
-            .expect("the Host snapshot owns the exact Exportação dependencies");
+            .expect("the Host snapshot owns the exact exportação dependencies");
             let empty_cache = project_root.path().join("empty-cache");
-            std::fs::create_dir(&empty_cache).expect("the empty Cache proof root exists");
+            std::fs::create_dir(&empty_cache)
+                .expect("the empty prévias temporárias proof root exists");
             assert!(
                 std::fs::read_dir(&empty_cache)
-                    .expect("the Cache proof root is readable")
+                    .expect("the prévias temporárias proof root is readable")
                     .next()
                     .is_none(),
-                "the Exportação starts with an explicitly empty Cache root"
+                "the exportação starts with an explicitly empty prévias temporárias root"
             );
             assert!(
                 planned
                     .required_paths()
                     .iter()
                     .all(|path| !path.starts_with(&empty_cache)),
-                "the Exportação plan contains Originals and Destino, never Cache paths"
+                "the exportação plan contains Originals and destino, never prévias temporárias paths"
             );
             let operation_paths = planned.required_paths();
             let root_bindings = path_io::capture_root_bindings(operation_paths)
                 .await
-                .expect("the Exportação roots are captured once");
+                .expect("the exportação roots are captured once");
             let log_directory = project_root.path().join("processor-logs");
             std::fs::create_dir(&log_directory).expect("the Processador log directory exists");
             let mut transport = RealProcessTransport::stable(executable, log_directory);
@@ -2393,7 +2394,7 @@ mod tests {
                 &InvocationContext::new(request_id, Some(dirty.state.project_id.clone())),
             )
             .await
-            .expect("the real Processador completes Publicação of the frozen visible Lâmina");
+            .expect("the real Processador completes Publicação of the frozen visible lâmina");
 
             assert_eq!(published.completion.dpi, expected_dpi);
             assert_eq!(published.completion.source_count, 3);
@@ -2403,7 +2404,7 @@ mod tests {
                     published.completion.height_px
                 ),
                 (591, 295),
-                "the Exportação targets the visible internal Lâmina dupla; the initial right-side Lâmina de página única would be 295 × 295"
+                "the exportação targets the visible internal lâmina dupla; the initial right-side lâmina de página única would be 295 × 295"
             );
             assert_eq!(expected_revision, dirty.state.revision);
             let rendered =
@@ -2420,11 +2421,11 @@ mod tests {
             let right = rendered.get_pixel(rendered.width() - 3, rendered.height() / 2);
             assert!(
                 left[0] > left[2] * 2,
-                "the left Background and translucent Overlay remain visibly red"
+                "the left fundo and translucent sobreposição remain visibly red"
             );
             assert!(
                 right[0] > right[1] * 3 && right[2] > right[1] * 3,
-                "the red translucent Overlay is composed over the blue right Background"
+                "the red translucent sobreposição is composed over the blue right fundo"
             );
             if !lock_layout {
                 let outside_resized_frame = rendered.get_pixel(
@@ -2436,7 +2437,7 @@ mod tests {
                     (0..3).all(
                         |channel| outside_resized_frame[channel].abs_diff(left[channel]) <= 12
                     ),
-                    "the area removed by resize contains the Background and Overlay, not the previous Photo"
+                    "the area removed by resize contains the fundo and sobreposição, not the previous Photo"
                 );
             }
             let decoded_original = image::open(&photo_path)
@@ -2466,18 +2467,18 @@ mod tests {
                 );
             }
             assert_eq!(
-                std::fs::read(&photo_path).expect("the Original remains readable after Exportação"),
+                std::fs::read(&photo_path).expect("the Original remains readable after exportação"),
                 original_photo_bytes,
-                "import, composition, save, reopen and Exportação never modify the Original"
+                "import, composition, save, reopen and exportação never modify the Original"
             );
             assert_eq!(
-                host.projection().expect("the Projeto remains available"),
+                host.projection().expect("the projeto remains available"),
                 dirty
             );
             assert_eq!(
-                std::fs::read(&project_path).expect("the Projeto remains readable"),
+                std::fs::read(&project_path).expect("the projeto remains readable"),
                 persisted_before,
-                "Exportação does not save or mutate the Projeto"
+                "Exportação does not save or mutate the projeto"
             );
 
             let missing_destination = project_root.path().join("missing-export");
@@ -2529,7 +2530,9 @@ mod tests {
                 ),
             )
             .await
-            .expect_err("Cache cannot turn a missing Original into a successful Exportação");
+            .expect_err(
+                "Prévias temporárias cannot turn a missing Original into a successful exportação",
+            );
             assert_eq!(
                 missing_failure.stage,
                 export_pipeline::ExportFailureStage::Prepare
@@ -3008,7 +3011,7 @@ mod tests {
         let replaced = fixture.host.relink_media(proposal).unwrap();
         assert_eq!(
             replaced.state.album.sheets, before.state.album.sheets,
-            "Frames and Photo transforms must be retained"
+            "Quadros and Photo transforms must be retained"
         );
         assert_eq!(
             replaced.media_usage, before.media_usage,
@@ -3157,7 +3160,7 @@ mod tests {
         assert_eq!(
             stable.update().unwrap().invalidated_media_ids(),
             std::slice::from_ref(&selected.media_id),
-            "Cache reacts by occurrence even when every path aliases one physical file"
+            "Prévias temporárias reacts by occurrence even when every path aliases one physical file"
         );
     }
 }

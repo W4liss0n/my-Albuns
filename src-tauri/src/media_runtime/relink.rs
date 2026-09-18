@@ -24,16 +24,16 @@ impl MediaResolver {
             .collect();
         let directory = roots
             .resolve_existing(folder, ExpectedObject::Directory)
-            .map_err(|error| format!("Não foi possível verificar a pasta: {error}"))?;
-        let entries = std::fs::read_dir(directory.operational_path())
-            .map_err(|error| format!("Não foi possível verificar a pasta: {error}"))?;
+            .map_err(folder_inspection_failure)?;
+        let entries =
+            std::fs::read_dir(directory.operational_path()).map_err(folder_inspection_failure)?;
         for entry in entries {
-            let entry = entry.map_err(|error| error.to_string())?;
+            let entry = entry.map_err(folder_inspection_failure)?;
             let Some(found) = matches.get_mut(&entry.file_name()) else {
                 continue;
             };
             let metadata =
-                std::fs::symlink_metadata(entry.path()).map_err(|error| error.to_string())?;
+                std::fs::symlink_metadata(entry.path()).map_err(folder_inspection_failure)?;
             if is_link(&metadata) {
                 return Err("A imagem encontrada é um atalho ou redirecionamento. Escolha a pasta que contém o arquivo original.".into());
             }
@@ -49,6 +49,13 @@ impl MediaResolver {
             })
             .collect())
     }
+}
+
+fn folder_inspection_failure(error: impl std::fmt::Display) -> String {
+    super::media_inspection_failure(
+        error,
+        "Não foi possível verificar todos os arquivos da pasta. Confira se ela está disponível e se você tem permissão para acessá-la.",
+    )
 }
 
 fn is_link(metadata: &std::fs::Metadata) -> bool {

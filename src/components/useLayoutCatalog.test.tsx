@@ -69,13 +69,13 @@ test.each([false, true])("saving captures geometry after the queued edit; edit f
   });
   expect(h.saveCustomLayout).not.toHaveBeenCalled();
   await act(async () => {
-    if (fails) gate.reject(new Error("Falha ao mover Frame")); else gate.resolve(changed);
+    if (fails) gate.reject(new Error("Falha ao mover quadro")); else gate.resolve(changed);
     await saved;
     await h.view.result.current.runner.waitForIdle();
   });
   if (fails) {
     expect(h.saveCustomLayout).not.toHaveBeenCalled();
-    expect(h.onError).toHaveBeenCalledWith("Falha ao mover Frame");
+    expect(h.onError).toHaveBeenCalledWith("Falha ao mover quadro");
     expect(h.view.result.current.catalog.notice).toBeNull();
   } else {
     expect(h.capturedRevisions).toEqual([changed.state.revision]);
@@ -90,7 +90,7 @@ test("duplicate saves keep the catalog revision and retain the pending reveal un
   h.saveCustomLayout.mockResolvedValue({ catalogRevision: 7, layoutId, created: false });
   await act(async () => { await h.view.result.current.catalog.save("sheet-001"); });
   expect(h.view.result.current.catalog.revision).toBe(7);
-  expect(h.view.result.current.catalog.notice).toBe("Este Layout já está em Personalizados.");
+  expect(h.view.result.current.catalog.notice).toBe("Este layout já está em Personalizados.");
   expect(h.present).not.toHaveBeenCalled();
   h.view.rerender();
   expect(h.view.result.current.catalog.revealId).toBe(layoutId);

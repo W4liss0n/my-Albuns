@@ -42,7 +42,7 @@ export function SheetContextMenu({
   }
 
   return (
-    <ContextMenuSurface label={`Ações da Lâmina ${String(sheetNumber).padStart(2, "0")}`}
+    <ContextMenuSurface label={`Ações da lâmina ${String(sheetNumber).padStart(2, "0")}`}
       position={position} onDismiss={onDismiss}>
         <button
           disabled={!availability.canAddBefore}

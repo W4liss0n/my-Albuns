@@ -17,7 +17,7 @@ function menuFixture(onSave = vi.fn()): readonly ApplicationMenuGroup[] {
           availability: "placeholder",
           feature: "open-project-from-project-window",
           id: "open",
-          label: "Abrir Projeto…",
+          label: "Abrir projeto…",
           type: "command",
         },
         { id: "file-separator", type: "separator" },
@@ -71,7 +71,7 @@ test("distinguishes implemented commands from explicit placeholders", async () =
   await user.click(screen.getByRole("menuitem", { name: "Arquivo" }));
 
   const placeholder = screen.getByRole("menuitem", {
-    name: "Abrir Projeto…",
+    name: "Abrir projeto…",
   });
   expect(placeholder).toBeDisabled();
   expect(placeholder).toHaveAttribute(

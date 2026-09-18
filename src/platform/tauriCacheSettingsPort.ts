@@ -2,7 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import type { CacheSettingsPort } from "../application/cacheSettings";
 import { isIpcRecord } from "./ipcGuards";
 
-const invalid = () => new Error("O serviço de Cache retornou uma resposta inválida.");
+const invalid = () => new Error("O serviço de prévias temporárias retornou uma resposta inválida.");
 const bytes = (value: unknown): value is number => typeof value === "number" && Number.isSafeInteger(value) && value >= 0;
 function freed(value: unknown): { freedBytes: number } {
   if (!isIpcRecord(value) || !bytes(value.freedBytes)) throw invalid();

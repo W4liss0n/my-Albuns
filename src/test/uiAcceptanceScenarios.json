@@ -14,7 +14,7 @@
     {
       "id": "album-dimensional-confirmation",
       "title": "Mudança dimensional — confirmação do recorte",
-      "implementationPath": "/project-dialog.html?state=%7B%22kind%22%3A%22albumInformationConfirmation%22%2C%22busy%22%3Afalse%2C%22details%22%3A%5B%7B%22label%22%3A%22Largura%20da%20L%C3%A2mina%22%2C%22value%22%3A%22600%20mm%20%E2%86%92%20630%20mm%22%7D%2C%7B%22label%22%3A%22Resolu%C3%A7%C3%A3o%20resultante%22%2C%22value%22%3A%22L%C3%A2mina%207.441%20%C3%97%203.543%20px%20%C2%B7%20P%C3%A1gina%203.720%20%C3%97%203.543%20px%22%7D%2C%7B%22label%22%3A%22Composi%C3%A7%C3%A3o%22%2C%22value%22%3A%22As%20fotos%20manter%C3%A3o%20a%20propor%C3%A7%C3%A3o.%20O%20recorte%20poder%C3%A1%20ser%20ajustado.%22%7D%5D%7D",
+      "implementationPath": "/project-dialog.html?state=%7B%22kind%22%3A%22albumInformationConfirmation%22%2C%22busy%22%3Afalse%2C%22details%22%3A%5B%7B%22label%22%3A%22Largura%20da%20l%C3%A2mina%22%2C%22value%22%3A%22600%20mm%20%E2%86%92%20630%20mm%22%7D%2C%7B%22label%22%3A%22Resolu%C3%A7%C3%A3o%20resultante%22%2C%22value%22%3A%22L%C3%A2mina%207.441%20%C3%97%203.543%20px%20%C2%B7%20P%C3%A1gina%203.720%20%C3%97%203.543%20px%22%7D%2C%7B%22label%22%3A%22Composi%C3%A7%C3%A3o%22%2C%22value%22%3A%22As%20fotos%20manter%C3%A3o%20a%20propor%C3%A7%C3%A3o.%20O%20recorte%20poder%C3%A1%20ser%20ajustado.%22%7D%5D%7D",
       "comparison": {
         "kind": "implementation-only",
         "surface": "owned-confirmation-dialog",
@@ -130,7 +130,7 @@
       "viewport": { "width": 800, "height": 650 },
       "readySelector": ".batch-configuration",
       "actions": [
-        { "type": "input", "selector": "input[aria-label='Pasta dos Projetos']", "value": "D:\\Projetos\\Formatura 2026" },
+        { "type": "input", "selector": "input[aria-label='Pasta dos projetos']", "value": "D:\\Projetos\\Formatura 2026" },
         { "type": "assert", "selector": ".ui-dialog-window__footer .ui-action-button:last-child:not(:disabled)" }
       ]
     },
@@ -142,7 +142,7 @@
       "viewport": { "width": 800, "height": 650 },
       "readySelector": ".batch-configuration",
       "actions": [
-        { "type": "input", "selector": "input[aria-label='Pasta dos Projetos']", "value": "D:\\Projetos\\Formatura 2026" },
+        { "type": "input", "selector": "input[aria-label='Pasta dos projetos']", "value": "D:\\Projetos\\Formatura 2026" },
         { "type": "click", "selector": "input[name='batch-destination']:not(:checked)" },
         { "type": "input", "selector": "input[aria-label='Pasta de destino']", "value": "E:\\Exportações\\Formatura 2026" },
         { "type": "assert", "selector": ".ui-dialog-window__footer .ui-action-button:last-child:not(:disabled)" }
@@ -163,7 +163,7 @@
       "comparison": { "kind": "implementation-only", "surface": "batch-export-window", "implementationCaptureSelector": ".ui-owned-window-shell", "reason": "Decisão posterior aceita: conflito sem lista de arquivos, com Ignorar, Substituir e Cancelar, reutilizando a confirmação comum." },
       "viewport": { "width": 800, "height": 420 },
       "readySelector": ".ui-standard-message",
-      "actions": [{ "type": "click-text", "text": "Continuar Exportação" }]
+      "actions": [{ "type": "click-text", "text": "Continuar exportação" }]
     },
     {
       "id": "batch-export-progress",
@@ -619,11 +619,11 @@
         "reason": "A referência visual vigente representa a Tela de Boas-vindas populada e não define o estado sem Projetos recentes."
       },
       "viewport": { "width": 1280, "height": 720 },
-      "readySelector": ".global-shell:has(.global-empty-state[role=\"status\"][aria-label=\"Nenhum Projeto recente\"]):not(:has(.global-recent-list)):not(:has(.global-project-thumbnail)):not(:has(.ui-empty-state__icon))",
+      "readySelector": ".global-shell:has(.global-empty-state[role=\"status\"][aria-label=\"Nenhum projeto recente\"]):not(:has(.global-recent-list)):not(:has(.global-project-thumbnail)):not(:has(.ui-empty-state__icon))",
       "actions": [
         {
           "type": "assert",
-          "selector": ".global-empty-state[role=\"status\"][aria-label=\"Nenhum Projeto recente\"]"
+          "selector": ".global-empty-state[role=\"status\"][aria-label=\"Nenhum projeto recente\"]"
         },
         {
           "type": "assert",
@@ -692,7 +692,7 @@
     {
       "id": "edge-conversion-confirmation",
       "title": "Conversão de extremidade — descarte de aplicações locais",
-      "implementationPath": "/project-dialog.html?state=%7B%22kind%22%3A%22edgeConversionConfirmation%22%2C%22message%22%3A%22Background%20e%20Overlay%20personalizados%20da%20p%C3%A1gina%20esquerda%20da%20L%C3%A2mina%201%20ser%C3%A3o%20removidos.%22%7D",
+      "implementationPath": "/project-dialog.html?state=%7B%22kind%22%3A%22edgeConversionConfirmation%22%2C%22message%22%3A%22Fundo%20e%20sobreposi%C3%A7%C3%A3o%20personalizados%20da%20p%C3%A1gina%20esquerda%20da%20l%C3%A2mina%201%20ser%C3%A3o%20removidos.%22%7D",
       "comparison": {
         "kind": "implementation-only",
         "surface": "owned-confirmation-dialog",
@@ -709,7 +709,7 @@
     {
       "id": "album-information-conversion-losses",
       "title": "Informações do Álbum — conversão das duas extremidades",
-      "implementationPath": "/project-dialog.html?state=%7B%22kind%22%3A%22albumInformationConfirmation%22%2C%22busy%22%3Afalse%2C%22details%22%3A%5B%7B%22label%22%3A%22Primeira%20L%C3%A2mina%22%2C%22value%22%3A%22L%C3%A2mina%20dupla%20%E2%86%92%20P%C3%A1gina%20%C3%BAnica%22%7D%2C%7B%22label%22%3A%22%C3%9Altima%20L%C3%A2mina%22%2C%22value%22%3A%22L%C3%A2mina%20dupla%20%E2%86%92%20P%C3%A1gina%20%C3%BAnica%22%7D%2C%7B%22label%22%3A%22Remo%C3%A7%C3%A3o%20na%20L%C3%A2mina%201%22%2C%22value%22%3A%22O%20Background%20personalizado%20da%20p%C3%A1gina%20esquerda%20da%20L%C3%A2mina%201%20ser%C3%A1%20removido.%22%7D%2C%7B%22label%22%3A%22Remo%C3%A7%C3%A3o%20na%20L%C3%A2mina%2018%22%2C%22value%22%3A%22O%20Overlay%20personalizado%20da%20p%C3%A1gina%20direita%20da%20L%C3%A2mina%2018%20ser%C3%A1%20removido.%22%7D%5D%7D",
+      "implementationPath": "/project-dialog.html?state=%7B%22kind%22%3A%22albumInformationConfirmation%22%2C%22busy%22%3Afalse%2C%22details%22%3A%5B%7B%22label%22%3A%22Primeira%20l%C3%A2mina%22%2C%22value%22%3A%22L%C3%A2mina%20dupla%20%E2%86%92%20P%C3%A1gina%20%C3%BAnica%22%7D%2C%7B%22label%22%3A%22%C3%9Altima%20l%C3%A2mina%22%2C%22value%22%3A%22L%C3%A2mina%20dupla%20%E2%86%92%20P%C3%A1gina%20%C3%BAnica%22%7D%2C%7B%22label%22%3A%22Remo%C3%A7%C3%A3o%20na%20l%C3%A2mina%201%22%2C%22value%22%3A%22O%20Background%20personalizado%20da%20p%C3%A1gina%20esquerda%20da%20L%C3%A2mina%201%20ser%C3%A1%20removido.%22%7D%2C%7B%22label%22%3A%22Remo%C3%A7%C3%A3o%20na%20l%C3%A2mina%2018%22%2C%22value%22%3A%22O%20Overlay%20personalizado%20da%20p%C3%A1gina%20direita%20da%20L%C3%A2mina%2018%20ser%C3%A1%20removido.%22%7D%5D%7D",
       "comparison": {
         "kind": "implementation-only",
         "surface": "owned-confirmation-dialog",
@@ -726,7 +726,7 @@
     {
       "id": "album-information-confirmation-single-change",
       "title": "Diálogo de Informações do Álbum — uma alteração",
-      "implementationPath": "/project-dialog.html?state=%7B%22kind%22%3A%22albumInformationConfirmation%22%2C%22busy%22%3Afalse%2C%22details%22%3A%5B%7B%22label%22%3A%22Primeira%20L%C3%A2mina%22%2C%22value%22%3A%22P%C3%A1gina%20%C3%BAnica%20%E2%86%92%20L%C3%A2mina%20dupla%22%7D%5D%7D",
+      "implementationPath": "/project-dialog.html?state=%7B%22kind%22%3A%22albumInformationConfirmation%22%2C%22busy%22%3Afalse%2C%22details%22%3A%5B%7B%22label%22%3A%22Primeira%20l%C3%A2mina%22%2C%22value%22%3A%22P%C3%A1gina%20%C3%BAnica%20%E2%86%92%20L%C3%A2mina%20dupla%22%7D%5D%7D",
       "comparison": {
         "kind": "implementation-only",
         "surface": "owned-confirmation-dialog",
@@ -740,7 +740,7 @@
     {
       "id": "project-operation-failure",
       "title": "Diálogo do Projeto — operação não concluída",
-      "implementationPath": "/project-dialog.html?state=%7B%22kind%22%3A%22projectOperationFailure%22%2C%22message%22%3A%22O%20Projeto%20n%C3%A3o%20p%C3%B4de%20ser%20salvo.%22%7D",
+      "implementationPath": "/project-dialog.html?state=%7B%22kind%22%3A%22projectOperationFailure%22%2C%22message%22%3A%22O%20projeto%20n%C3%A3o%20p%C3%B4de%20ser%20salvo.%22%7D",
       "comparison": {
         "kind": "implementation-only",
         "surface": "owned-message-dialog",
@@ -754,7 +754,7 @@
     {
       "id": "export-success",
       "title": "Diálogo de Exportação — concluída",
-      "implementationPath": "/project-dialog.html?state=%7B%22kind%22%3A%22exportSuccess%22%2C%22message%22%3A%22A%20Exporta%C3%A7%C3%A3o%20foi%20conclu%C3%ADda%20com%20sucesso.%22%7D",
+      "implementationPath": "/project-dialog.html?state=%7B%22kind%22%3A%22exportSuccess%22%2C%22message%22%3A%22A%20exporta%C3%A7%C3%A3o%20foi%20conclu%C3%ADda%20com%20sucesso.%22%7D",
       "comparison": {
         "kind": "implementation-only",
         "surface": "owned-message-dialog",
@@ -768,7 +768,7 @@
     {
       "id": "album-information-confirmation-busy",
       "title": "Diálogo de Informações do Álbum — aplicação em andamento",
-      "implementationPath": "/project-dialog.html?state=%7B%22kind%22%3A%22albumInformationConfirmation%22%2C%22busy%22%3Atrue%2C%22details%22%3A%5B%7B%22label%22%3A%22Primeira%20L%C3%A2mina%22%2C%22value%22%3A%22P%C3%A1gina%20%C3%BAnica%20%E2%86%92%20L%C3%A2mina%20dupla%22%7D%5D%7D",
+      "implementationPath": "/project-dialog.html?state=%7B%22kind%22%3A%22albumInformationConfirmation%22%2C%22busy%22%3Atrue%2C%22details%22%3A%5B%7B%22label%22%3A%22Primeira%20l%C3%A2mina%22%2C%22value%22%3A%22P%C3%A1gina%20%C3%BAnica%20%E2%86%92%20L%C3%A2mina%20dupla%22%7D%5D%7D",
       "comparison": {
         "kind": "implementation-only",
         "surface": "owned-confirmation-dialog",
@@ -810,7 +810,7 @@
     {
       "id": "project-close-failure",
       "title": "Diálogo do Projeto — falha ao fechar",
-      "implementationPath": "/project-dialog.html?state=%7B%22kind%22%3A%22projectCloseFailure%22%2C%22message%22%3A%22O%20Projeto%20n%C3%A3o%20p%C3%B4de%20ser%20fechado.%22%7D",
+      "implementationPath": "/project-dialog.html?state=%7B%22kind%22%3A%22projectCloseFailure%22%2C%22message%22%3A%22O%20projeto%20n%C3%A3o%20p%C3%B4de%20ser%20fechado.%22%7D",
       "comparison": {
         "kind": "implementation-only",
         "surface": "owned-message-dialog",
@@ -900,7 +900,7 @@
     {
       "id": "export-failure-retryable",
       "title": "Diálogo de Exportação — falha recuperável",
-      "implementationPath": "/project-dialog.html?state=%7B%22kind%22%3A%22exportFailure%22%2C%22cancelled%22%3Afalse%2C%22message%22%3A%22N%C3%A3o%20foi%20poss%C3%ADvel%20publicar%20a%20Exporta%C3%A7%C3%A3o.%22%2C%22retryDisabled%22%3Afalse%7D",
+      "implementationPath": "/project-dialog.html?state=%7B%22kind%22%3A%22exportFailure%22%2C%22cancelled%22%3Afalse%2C%22message%22%3A%22N%C3%A3o%20foi%20poss%C3%ADvel%20publicar%20a%20exporta%C3%A7%C3%A3o.%22%2C%22retryDisabled%22%3Afalse%7D",
       "comparison": {
         "kind": "implementation-only",
         "surface": "owned-message-dialog",
@@ -914,7 +914,7 @@
     {
       "id": "export-failure-cancelled",
       "title": "Diálogo de Exportação — cancelada",
-      "implementationPath": "/project-dialog.html?state=%7B%22kind%22%3A%22exportFailure%22%2C%22cancelled%22%3Atrue%2C%22message%22%3A%22A%20Exporta%C3%A7%C3%A3o%20foi%20cancelada.%22%2C%22retryDisabled%22%3Atrue%7D",
+      "implementationPath": "/project-dialog.html?state=%7B%22kind%22%3A%22exportFailure%22%2C%22cancelled%22%3Atrue%2C%22message%22%3A%22A%20exporta%C3%A7%C3%A3o%20foi%20cancelada.%22%2C%22retryDisabled%22%3Atrue%7D",
       "comparison": {
         "kind": "implementation-only",
         "surface": "owned-message-dialog",
@@ -947,7 +947,7 @@
       "viewport": { "width": 1440, "height": 900 },
       "readySelector": "[aria-label=\"Continuar\"]",
       "actions": [
-        { "type": "click", "selector": "[aria-label=\"Novo Projeto\"]" }
+        { "type": "click", "selector": "[aria-label=\"Novo projeto\"]" }
       ]
     },
     {
@@ -957,9 +957,9 @@
       "referencePath": "/docs/references/ui-programa-diagramacao/Criar%20projeto.dc.html",
       "comparison": { "kind": "paired", "surface": "new-project-window" },
       "viewport": { "width": 1440, "height": 900 },
-      "readySelector": "[aria-label=\"Criar Projeto\"]",
+      "readySelector": "[aria-label=\"Criar projeto\"]",
       "actions": [
-        { "type": "click", "selector": "[aria-label=\"Novo Projeto\"]" },
+        { "type": "click", "selector": "[aria-label=\"Novo projeto\"]" },
         { "type": "click", "selector": "[aria-label=\"Continuar\"]" }
       ],
       "referenceActions": [
@@ -979,7 +979,7 @@
       "viewport": { "width": 1280, "height": 720 },
       "readySelector": ".new-project-steps li[aria-current=\"step\"]:focus",
       "actions": [
-        { "type": "focus", "selector": "[aria-label=\"Novo Projeto\"]" },
+        { "type": "focus", "selector": "[aria-label=\"Novo projeto\"]" },
         { "type": "key", "key": "Enter" }
       ]
     },
@@ -995,7 +995,7 @@
         "referenceCaptureSelector": "body"
       },
       "viewport": { "width": 1440, "height": 900 },
-      "readySelector": ".app-shell:has(.workspace-grid canvas.pixi-canvas):has(#contextual-panel button[aria-label=\"Informações do Álbum\"][aria-expanded=\"true\"])",
+      "readySelector": ".app-shell:has(.workspace-grid canvas.pixi-canvas):has(#contextual-panel button[aria-label=\"Informações do álbum\"][aria-expanded=\"true\"])",
       "referenceReadySelector": "[data-l=\"2\"]",
       "actions": [],
       "referenceActions": []
@@ -1011,7 +1011,7 @@
         "reason": "A referência visual vigente antecede o estado explícito de Cache indisponível e seu fallback compartilhado com Canvas e Grade."
       },
       "viewport": { "width": 1440, "height": 900 },
-      "readySelector": "[aria-label=\"Overlay de ambos os lados\"][data-preview-state=\"unavailable\"]",
+      "readySelector": "[aria-label=\"Sobreposição de ambos os lados\"][data-preview-state=\"unavailable\"]",
       "actions": []
     },
     {
@@ -1092,7 +1092,7 @@
         "reason": "A referência visual vigente não representa o Modo de edição da Lâmina e seu Painel contextual definidos nas decisões aceitas posteriores."
       },
       "viewport": { "width": 1440, "height": 900 },
-      "readySelector": "#contextual-panel button[aria-label=\"Design da Lâmina\"][aria-expanded=\"true\"]",
+      "readySelector": "#contextual-panel button[aria-label=\"Design da lâmina\"][aria-expanded=\"true\"]",
       "actions": [
         { "type": "focus", "selector": ".workspace-grid canvas.pixi-canvas" },
         { "type": "key", "key": "Enter" }
@@ -1109,7 +1109,7 @@
         "reason": "A referência visual vigente não representa a composição integrada de Frame e Foto exercitada aqui pelo App real com projeção e portas determinísticas de aceitação."
       },
       "viewport": { "width": 1440, "height": 900 },
-      "readySelector": "#contextual-panel [aria-label=\"Zoom da Foto\"]",
+      "readySelector": "#contextual-panel [aria-label=\"Zoom da foto\"]",
       "actions": [
         { "type": "focus", "selector": ".workspace-grid canvas.pixi-canvas" },
         { "type": "key", "key": "Enter" },
@@ -1127,7 +1127,7 @@
         "reason": "A referência visual vigente não representa a composição integrada de Frame placeholder exercitada aqui pelo App real com projeção e portas determinísticas de aceitação."
       },
       "viewport": { "width": 1440, "height": 900 },
-      "readySelector": "#contextual-panel:has(.context-heading):not(:has([aria-label=\"Zoom da Foto\"])) .context-heading h2",
+      "readySelector": "#contextual-panel:has(.context-heading):not(:has([aria-label=\"Zoom da foto\"])) .context-heading h2",
       "actions": [
         { "type": "focus", "selector": ".workspace-grid canvas.pixi-canvas" },
         { "type": "key", "key": "Enter" },
@@ -1182,7 +1182,7 @@
         "reason": "A referência visual vigente não representa o menu contextual estrutural nem as restrições físicas aceitas posteriormente."
       },
       "viewport": { "width": 1440, "height": 900 },
-      "readySelector": ".app-shell:has(.canvas-host[data-centered-sheet-id=\"sheet-001\"][data-viewport-offset-x=\"0\"]):has([role=\"menu\"][aria-label=\"Ações da Lâmina 01\"] button:nth-of-type(1):disabled):has([role=\"menu\"][aria-label=\"Ações da Lâmina 01\"] button:nth-of-type(4):disabled)",
+      "readySelector": ".app-shell:has(.canvas-host[data-centered-sheet-id=\"sheet-001\"][data-viewport-offset-x=\"0\"]):has([role=\"menu\"][aria-label=\"Ações da lâmina 01\"] button:nth-of-type(1):disabled):has([role=\"menu\"][aria-label=\"Ações da lâmina 01\"] button:nth-of-type(4):disabled)",
       "actions": [
         { "type": "context-click", "selector": "[data-reorder-surface=\"bar\"] [data-sheet-id=\"sheet-001\"]", "offsetX": -40 }
       ]
@@ -1216,7 +1216,7 @@
         "reason": "A referência visual vigente não representa o menu contextual estrutural nem a separação posterior entre seu alvo explícito e a Lâmina centralizada."
       },
       "viewport": { "width": 1440, "height": 600 },
-      "readySelector": ".app-shell:has(.canvas-host[data-centered-sheet-id=\"sheet-002\"]):has([role=\"menu\"][aria-label=\"Ações da Lâmina 02\"])",
+      "readySelector": ".app-shell:has(.canvas-host[data-centered-sheet-id=\"sheet-002\"]):has([role=\"menu\"][aria-label=\"Ações da lâmina 02\"])",
       "actions": [
         { "type": "assert", "selector": ".canvas-host[data-centered-sheet-id=\"sheet-002\"]" },
         { "type": "context-click", "selector": ".canvas-host canvas" }
@@ -1255,10 +1255,10 @@
         "reason": "A referência visual vigente não representa o ownership do gesto externo ao menu contextual aceito posteriormente."
       },
       "viewport": { "width": 1440, "height": 600 },
-      "readySelector": ".app-shell:has(.canvas-host[data-centered-sheet-id=\"sheet-002\"]):not(:has([role=\"menu\"][aria-label^=\"Ações da Lâmina\"]))",
+      "readySelector": ".app-shell:has(.canvas-host[data-centered-sheet-id=\"sheet-002\"]):not(:has([role=\"menu\"][aria-label^=\"Ações da lâmina\"]))",
       "actions": [
         { "type": "context-click", "selector": "[data-reorder-surface=\"bar\"] [data-sheet-id=\"sheet-002\"]", "offsetX": -40 },
-        { "type": "assert", "selector": "[role=\"menu\"][aria-label=\"Ações da Lâmina 02\"]" },
+        { "type": "assert", "selector": "[role=\"menu\"][aria-label=\"Ações da lâmina 02\"]" },
         { "type": "pointer-click", "selector": "[data-reorder-surface=\"bar\"] [data-sheet-id=\"sheet-001\"]", "offsetX": -40 },
         { "type": "assert", "selector": ".canvas-host[data-centered-sheet-id=\"sheet-002\"]" }
       ]
@@ -1274,12 +1274,12 @@
         "reason": "A referência visual vigente não representa o ownership do gesto externo ao menu contextual aceito posteriormente."
       },
       "viewport": { "width": 1440, "height": 900 },
-      "readySelector": ".app-shell:has(.canvas-host[data-centered-sheet-id=\"sheet-001\"]):not(:has([role=\"menu\"][aria-label^=\"Ações da Lâmina\"]))",
+      "readySelector": ".app-shell:has(.canvas-host[data-centered-sheet-id=\"sheet-001\"]):not(:has([role=\"menu\"][aria-label^=\"Ações da lâmina\"]))",
       "actions": [
         { "type": "wheel", "selector": ".inspector", "deltaY": 1100 },
         { "type": "assert", "selector": "[data-reorder-surface=\"grid\"] [data-sheet-id=\"sheet-002\"]" },
         { "type": "context-click", "selector": "[data-reorder-surface=\"grid\"] [data-sheet-id=\"sheet-002\"]" },
-        { "type": "assert", "selector": "[role=\"menu\"][aria-label=\"Ações da Lâmina 02\"]" },
+        { "type": "assert", "selector": "[role=\"menu\"][aria-label=\"Ações da lâmina 02\"]" },
         { "type": "pointer-click", "selector": "[data-reorder-surface=\"grid\"] [data-sheet-id=\"sheet-001\"]" },
         { "type": "assert", "selector": ".canvas-host[data-centered-sheet-id=\"sheet-001\"]" }
       ]
@@ -1501,7 +1501,7 @@
       "implementationPath": "/media-panel-preview.html?acceptance=editor",
       "comparison": {"kind":"implementation-only","surface":"media-panel","implementationCaptureSelector":".media-panel-preview[data-acceptance-surface=\"editor\"] > .media-panel","reason":"A decisão aceita no design 0031 compartilha um único tamanho entre Fotos e Decorativos, inclusive na restauração do padrão."},
       "viewport": { "width": 1440, "height": 900 },
-      "readySelector": ".media-grid[aria-label=\"Grade de Decorativos\"][style*=\"124px\"]",
+      "readySelector": ".media-grid[aria-label=\"Grade de decorativos\"][style*=\"124px\"]",
       "actions": [
         {"type":"click","selector":"button[aria-label=\"Filtro, ordem e tamanho\"]"},
         {"type":"focus","selector":"input[aria-label=\"Tamanho das miniaturas\"]"},
@@ -1536,7 +1536,7 @@
       "implementationPath": "/media-panel-preview.html?acceptance=editor",
       "comparison": {"kind":"implementation-only","surface":"media-panel","implementationCaptureSelector":".media-panel-preview[data-acceptance-surface=\"editor\"] > .media-panel","reason":"A decisão aceita no design 0031 compartilha um único tamanho entre Fotos e Decorativos, inclusive na restauração do padrão."},
       "viewport": { "width": 1440, "height": 900 },
-      "readySelector": ".media-grid[aria-label=\"Grade de Fotos\"][style*=\"110px\"]",
+      "readySelector": ".media-grid[aria-label=\"Grade de fotos\"][style*=\"110px\"]",
       "actions": [
         {"type":"click","selector":"button[aria-label=\"Decorativos\"]"},
         {"type":"click","selector":"button[aria-label=\"Filtro, ordem e tamanho\"]"},
@@ -1565,7 +1565,7 @@
       "implementationPath": "/media-panel-preview.html?acceptance=editor",
       "comparison": {"kind":"implementation-only","surface":"media-panel","implementationCaptureSelector":".media-panel-preview[data-acceptance-surface=\"editor\"] > .media-panel","reason":"A decisão aceita no design 0031 compartilha um único tamanho entre Fotos e Decorativos, inclusive na restauração do padrão."},
       "viewport": { "width": 1440, "height": 900 },
-      "readySelector": ".media-grid[aria-label=\"Grade de Fotos\"][style*=\"84px\"]",
+      "readySelector": ".media-grid[aria-label=\"Grade de fotos\"][style*=\"84px\"]",
       "actions": [
         {"type":"click","selector":"button[aria-label=\"Filtro, ordem e tamanho\"]"},
         {"type":"focus","selector":"input[aria-label=\"Tamanho das miniaturas\"]"},
@@ -1974,9 +1974,9 @@
         "reason": "A referência visual vigente não representa a ViewportTransform transitória nem os gestos de Zoom aceitos posteriormente para o Modo de edição."
       },
       "viewport": { "width": 1440, "height": 900 },
-      "readySelector": "[aria-label=\"Canvas do protótipo\"][data-last-zoom-input=\"keyboard-in\"][data-zoom-state=\"raised\"][data-zoom-anchor=\"center\"]",
+      "readySelector": "[aria-label=\"Área de edição do protótipo\"][data-last-zoom-input=\"keyboard-in\"][data-zoom-state=\"raised\"][data-zoom-anchor=\"center\"]",
       "actions": [
-        { "type": "focus", "selector": "[aria-label=\"Canvas do protótipo\"]" },
+        { "type": "focus", "selector": "[aria-label=\"Área de edição do protótipo\"]" },
         { "type": "key", "key": "Plus", "modifiers": ["Control"] }
       ]
     },
@@ -1991,9 +1991,9 @@
         "reason": "A referência visual vigente não representa a ViewportTransform transitória nem os gestos de Zoom aceitos posteriormente para o Modo de edição."
       },
       "viewport": { "width": 1440, "height": 900 },
-      "readySelector": "[aria-label=\"Canvas do protótipo\"][data-last-zoom-input=\"keyboard-out\"][data-zoom-state=\"raised\"][data-zoom-anchor=\"center\"]",
+      "readySelector": "[aria-label=\"Área de edição do protótipo\"][data-last-zoom-input=\"keyboard-out\"][data-zoom-state=\"raised\"][data-zoom-anchor=\"center\"]",
       "actions": [
-        { "type": "focus", "selector": "[aria-label=\"Canvas do protótipo\"]" },
+        { "type": "focus", "selector": "[aria-label=\"Área de edição do protótipo\"]" },
         { "type": "key", "key": "Plus", "modifiers": ["Control"] },
         { "type": "key", "key": "Plus", "modifiers": ["Control"] },
         { "type": "key", "key": "Minus", "modifiers": ["Control"] }
@@ -2010,7 +2010,7 @@
         "reason": "A referência visual vigente não representa a ViewportTransform transitória nem a âncora sob o cursor aceita posteriormente."
       },
       "viewport": { "width": 1440, "height": 900 },
-      "readySelector": "[aria-label=\"Canvas do protótipo\"][data-last-zoom-input=\"wheel-in\"][data-zoom-state=\"raised\"][data-zoom-anchor=\"cursor\"]:not([data-zoom-origin-x=\"50\"]):not([data-zoom-origin-y=\"50\"])",
+      "readySelector": "[aria-label=\"Área de edição do protótipo\"][data-last-zoom-input=\"wheel-in\"][data-zoom-state=\"raised\"][data-zoom-anchor=\"cursor\"]:not([data-zoom-origin-x=\"50\"]):not([data-zoom-origin-y=\"50\"])",
       "actions": [
         { "type": "wheel", "selector": "[data-frame-gesture-target=\"resize\"]", "deltaY": -120, "modifiers": ["Control"] }
       ]
@@ -2026,9 +2026,9 @@
         "reason": "A referência visual vigente não representa a ViewportTransform transitória nem o reset aceito posteriormente para o Modo de edição."
       },
       "viewport": { "width": 1440, "height": 900 },
-      "readySelector": "[aria-label=\"Canvas do protótipo\"][data-last-zoom-input=\"reset\"][data-zoom-state=\"fit\"][data-zoom-anchor=\"center\"]",
+      "readySelector": "[aria-label=\"Área de edição do protótipo\"][data-last-zoom-input=\"reset\"][data-zoom-state=\"fit\"][data-zoom-anchor=\"center\"]",
       "actions": [
-        { "type": "focus", "selector": "[aria-label=\"Canvas do protótipo\"]" },
+        { "type": "focus", "selector": "[aria-label=\"Área de edição do protótipo\"]" },
         { "type": "key", "key": "Plus", "modifiers": ["Control"] },
         { "type": "key", "key": "Plus", "modifiers": ["Control"] },
         { "type": "key", "key": "Digit0", "modifiers": ["Control"] }
@@ -2045,9 +2045,9 @@
         "reason": "A referência visual vigente não representa o teto calibrado posteriormente para a ViewportTransform do Modo de edição."
       },
       "viewport": { "width": 1440, "height": 900 },
-      "readySelector": "[aria-label=\"Canvas do protótipo\"][data-last-zoom-input=\"keyboard-in\"][data-zoom-level=\"4\"][data-zoom-state=\"cap\"]",
+      "readySelector": "[aria-label=\"Área de edição do protótipo\"][data-last-zoom-input=\"keyboard-in\"][data-zoom-level=\"4\"][data-zoom-state=\"cap\"]",
       "actions": [
-        { "type": "focus", "selector": "[aria-label=\"Canvas do protótipo\"]" },
+        { "type": "focus", "selector": "[aria-label=\"Área de edição do protótipo\"]" },
         { "type": "key", "key": "Plus", "modifiers": ["Control"] },
         { "type": "key", "key": "Plus", "modifiers": ["Control"] },
         { "type": "key", "key": "Plus", "modifiers": ["Control"] },
@@ -2213,7 +2213,7 @@
         "reason": "A referência visual vigente não representa a seleção múltipla nem a projeção de valores divergentes aceitas posteriormente."
       },
       "viewport": { "width": 1440, "height": 900 },
-      "readySelector": "[aria-label=\"Inspector de Frames\"][data-selection-count=\"2\"]:has([data-mixed-value=\"numeric\"]):has([data-mixed-value=\"color\"]):has([aria-checked=\"mixed\"])",
+      "readySelector": "[aria-label=\"Inspector de quadros\"][data-selection-count=\"2\"]:has([data-mixed-value=\"numeric\"]):has([data-mixed-value=\"color\"]):has([aria-checked=\"mixed\"])",
       "actions": [
         { "type": "click", "selector": "[data-frame-id=\"frame-001\"]" },
         { "type": "click", "selector": "[data-frame-id=\"frame-002\"]", "modifiers": ["Control"] }
@@ -2234,7 +2234,7 @@
       "actions": [
         { "type": "click", "selector": "[data-frame-id=\"frame-001\"]" },
         { "type": "click", "selector": "[data-frame-id=\"frame-002\"]", "modifiers": ["Control"] },
-        { "type": "input", "selector": "[aria-label=\"Opacidade dos Frames\"]", "value": "80" }
+        { "type": "input", "selector": "[aria-label=\"Opacidade dos quadros\"]", "value": "80" }
       ]
     },
     {
@@ -2365,7 +2365,7 @@
     {
       "id": "photo-import-problems-partial",
       "title": "Problemas no processamento — sucesso parcial",
-      "implementationPath": "/project-dialog.html?state=%7B%22kind%22%3A%22imageProcessingProblems%22%2C%22importedCount%22%3A2%2C%22problems%22%3A%5B%7B%22fileName%22%3A%22DSC_0148.jpg%22%2C%22reason%22%3A%22O%20JPEG%20est%C3%A1%20corrompido%20ou%20n%C3%A3o%20p%C3%B4de%20ser%20decodificado.%22%7D%2C%7B%22fileName%22%3A%22DSC_0152.jpeg%22%2C%22reason%22%3A%22O%20Arquivo%20escolhido%20n%C3%A3o%20est%C3%A1%20dispon%C3%ADvel.%22%7D%5D%7D",
+      "implementationPath": "/project-dialog.html?state=%7B%22kind%22%3A%22imageProcessingProblems%22%2C%22importedCount%22%3A2%2C%22problems%22%3A%5B%7B%22fileName%22%3A%22DSC_0148.jpg%22%2C%22reason%22%3A%22O%20JPEG%20est%C3%A1%20corrompido%20ou%20n%C3%A3o%20p%C3%B4de%20ser%20decodificado.%22%7D%2C%7B%22fileName%22%3A%22DSC_0152.jpeg%22%2C%22reason%22%3A%22O%20arquivo%20escolhido%20n%C3%A3o%20est%C3%A1%20dispon%C3%ADvel.%22%7D%5D%7D",
       "comparison": {
         "kind": "implementation-only",
         "surface": "owned-problems-dialog",
@@ -2382,7 +2382,7 @@
     {
       "id": "photo-import-problems-rejected",
       "title": "Problemas no processamento — todos rejeitados e lista longa",
-      "implementationPath": "/project-dialog.html?state=%7B%22kind%22%3A%22imageProcessingProblems%22%2C%22importedCount%22%3A0%2C%22problems%22%3A%5B%7B%22fileName%22%3A%22Foto%20da%20turma%20%E2%80%94%20c%C3%B3pia%20com%20nome%20muito%20longo%20para%20testar%20a%20leitura%20de%20arquivos%20originais%20selecionados.jpg%22%2C%22reason%22%3A%22O%20Arquivo%20escolhido%20n%C3%A3o%20est%C3%A1%20dispon%C3%ADvel.%20Verifique%20o%20acesso%20ao%20local%20e%20selecione%20o%20arquivo%20novamente.%22%7D%2C%7B%22fileName%22%3A%22DSC_0001.jpeg%22%2C%22reason%22%3A%22O%20JPEG%20est%C3%A1%20corrompido%20ou%20n%C3%A3o%20p%C3%B4de%20ser%20decodificado.%22%7D%2C%7B%22fileName%22%3A%22DSC_0002.jpeg%22%2C%22reason%22%3A%22O%20JPEG%20est%C3%A1%20corrompido%20ou%20n%C3%A3o%20p%C3%B4de%20ser%20decodificado.%22%7D%2C%7B%22fileName%22%3A%22DSC_0003.jpeg%22%2C%22reason%22%3A%22O%20JPEG%20est%C3%A1%20corrompido%20ou%20n%C3%A3o%20p%C3%B4de%20ser%20decodificado.%22%7D%2C%7B%22fileName%22%3A%22DSC_0004.jpeg%22%2C%22reason%22%3A%22O%20JPEG%20est%C3%A1%20corrompido%20ou%20n%C3%A3o%20p%C3%B4de%20ser%20decodificado.%22%7D%2C%7B%22fileName%22%3A%22DSC_0005.jpeg%22%2C%22reason%22%3A%22O%20JPEG%20est%C3%A1%20corrompido%20ou%20n%C3%A3o%20p%C3%B4de%20ser%20decodificado.%22%7D%2C%7B%22fileName%22%3A%22DSC_0006.jpeg%22%2C%22reason%22%3A%22O%20JPEG%20est%C3%A1%20corrompido%20ou%20n%C3%A3o%20p%C3%B4de%20ser%20decodificado.%22%7D%2C%7B%22fileName%22%3A%22DSC_0007.jpeg%22%2C%22reason%22%3A%22O%20JPEG%20est%C3%A1%20corrompido%20ou%20n%C3%A3o%20p%C3%B4de%20ser%20decodificado.%22%7D%2C%7B%22fileName%22%3A%22DSC_0008.jpeg%22%2C%22reason%22%3A%22O%20JPEG%20est%C3%A1%20corrompido%20ou%20n%C3%A3o%20p%C3%B4de%20ser%20decodificado.%22%7D%2C%7B%22fileName%22%3A%22DSC_0009.jpeg%22%2C%22reason%22%3A%22O%20JPEG%20est%C3%A1%20corrompido%20ou%20n%C3%A3o%20p%C3%B4de%20ser%20decodificado.%22%7D%2C%7B%22fileName%22%3A%22DSC_0010.jpeg%22%2C%22reason%22%3A%22O%20JPEG%20est%C3%A1%20corrompido%20ou%20n%C3%A3o%20p%C3%B4de%20ser%20decodificado.%22%7D%2C%7B%22fileName%22%3A%22DSC_0011.jpeg%22%2C%22reason%22%3A%22O%20JPEG%20est%C3%A1%20corrompido%20ou%20n%C3%A3o%20p%C3%B4de%20ser%20decodificado.%22%7D%5D%7D",
+      "implementationPath": "/project-dialog.html?state=%7B%22kind%22%3A%22imageProcessingProblems%22%2C%22importedCount%22%3A0%2C%22problems%22%3A%5B%7B%22fileName%22%3A%22Foto%20da%20turma%20%E2%80%94%20c%C3%B3pia%20com%20nome%20muito%20longo%20para%20testar%20a%20leitura%20de%20arquivos%20originais%20selecionados.jpg%22%2C%22reason%22%3A%22O%20arquivo%20escolhido%20n%C3%A3o%20est%C3%A1%20dispon%C3%ADvel.%20Verifique%20o%20acesso%20ao%20local%20e%20selecione%20o%20arquivo%20novamente.%22%7D%2C%7B%22fileName%22%3A%22DSC_0001.jpeg%22%2C%22reason%22%3A%22O%20JPEG%20est%C3%A1%20corrompido%20ou%20n%C3%A3o%20p%C3%B4de%20ser%20decodificado.%22%7D%2C%7B%22fileName%22%3A%22DSC_0002.jpeg%22%2C%22reason%22%3A%22O%20JPEG%20est%C3%A1%20corrompido%20ou%20n%C3%A3o%20p%C3%B4de%20ser%20decodificado.%22%7D%2C%7B%22fileName%22%3A%22DSC_0003.jpeg%22%2C%22reason%22%3A%22O%20JPEG%20est%C3%A1%20corrompido%20ou%20n%C3%A3o%20p%C3%B4de%20ser%20decodificado.%22%7D%2C%7B%22fileName%22%3A%22DSC_0004.jpeg%22%2C%22reason%22%3A%22O%20JPEG%20est%C3%A1%20corrompido%20ou%20n%C3%A3o%20p%C3%B4de%20ser%20decodificado.%22%7D%2C%7B%22fileName%22%3A%22DSC_0005.jpeg%22%2C%22reason%22%3A%22O%20JPEG%20est%C3%A1%20corrompido%20ou%20n%C3%A3o%20p%C3%B4de%20ser%20decodificado.%22%7D%2C%7B%22fileName%22%3A%22DSC_0006.jpeg%22%2C%22reason%22%3A%22O%20JPEG%20est%C3%A1%20corrompido%20ou%20n%C3%A3o%20p%C3%B4de%20ser%20decodificado.%22%7D%2C%7B%22fileName%22%3A%22DSC_0007.jpeg%22%2C%22reason%22%3A%22O%20JPEG%20est%C3%A1%20corrompido%20ou%20n%C3%A3o%20p%C3%B4de%20ser%20decodificado.%22%7D%2C%7B%22fileName%22%3A%22DSC_0008.jpeg%22%2C%22reason%22%3A%22O%20JPEG%20est%C3%A1%20corrompido%20ou%20n%C3%A3o%20p%C3%B4de%20ser%20decodificado.%22%7D%2C%7B%22fileName%22%3A%22DSC_0009.jpeg%22%2C%22reason%22%3A%22O%20JPEG%20est%C3%A1%20corrompido%20ou%20n%C3%A3o%20p%C3%B4de%20ser%20decodificado.%22%7D%2C%7B%22fileName%22%3A%22DSC_0010.jpeg%22%2C%22reason%22%3A%22O%20JPEG%20est%C3%A1%20corrompido%20ou%20n%C3%A3o%20p%C3%B4de%20ser%20decodificado.%22%7D%2C%7B%22fileName%22%3A%22DSC_0011.jpeg%22%2C%22reason%22%3A%22O%20JPEG%20est%C3%A1%20corrompido%20ou%20n%C3%A3o%20p%C3%B4de%20ser%20decodificado.%22%7D%5D%7D",
       "comparison": {
         "kind": "implementation-only",
         "surface": "owned-problems-dialog",
@@ -2436,7 +2436,7 @@
         "width": 1440,
         "height": 900
       },
-      "readySelector": "body[data-stack-selection=\"stack-frame-2\"]:has([role=\"menu\"][aria-label=\"Organizar Frames\"])",
+      "readySelector": "body[data-stack-selection=\"stack-frame-2\"]:has([role=\"menu\"][aria-label=\"Organizar quadros\"])",
       "actions": [
         {
           "type": "context-click",
@@ -2458,7 +2458,7 @@
         "width": 1440,
         "height": 900
       },
-      "readySelector": "body[data-stack-selection=\"stack-frame-1,stack-frame-2\"]:has([role=\"menu\"][aria-label=\"Organizar Frames\"])",
+      "readySelector": "body[data-stack-selection=\"stack-frame-1,stack-frame-2\"]:has([role=\"menu\"][aria-label=\"Organizar quadros\"])",
       "actions": [
         {
           "type": "context-click",
@@ -2654,7 +2654,7 @@
         "width": 1440,
         "height": 900
       },
-      "readySelector": "body[data-stack-selection=\"stack-frame-1,stack-frame-2\"]:not(:has([role=\"menu\"][aria-label=\"Organizar Frames\"]))",
+      "readySelector": "body[data-stack-selection=\"stack-frame-1,stack-frame-2\"]:not(:has([role=\"menu\"][aria-label=\"Organizar quadros\"]))",
       "actions": [
         {
           "type": "context-click",
@@ -2662,7 +2662,7 @@
         },
         {
           "type": "assert",
-          "selector": "[role=\"menu\"][aria-label=\"Organizar Frames\"]"
+          "selector": "[role=\"menu\"][aria-label=\"Organizar quadros\"]"
         },
         {
           "type": "context-click",
@@ -2706,7 +2706,7 @@
         "width": 1440,
         "height": 900
       },
-      "readySelector": "[role=\"menu\"][aria-label=\"Área vazia do Canvas\"]",
+      "readySelector": "[role=\"menu\"][aria-label=\"Área vazia da área de edição\"]",
       "actions": [
         {
           "type": "context-click",
@@ -2728,7 +2728,7 @@
         "width": 1440,
         "height": 900
       },
-      "readySelector": "[role=\"menu\"][aria-label=\"Área vazia do Canvas\"]",
+      "readySelector": "[role=\"menu\"][aria-label=\"Área vazia da área de edição\"]",
       "actions": [
         {
           "type": "context-click",
@@ -2759,7 +2759,7 @@
         },
         {
           "type": "click-text",
-          "text": "Adicionar Frame"
+          "text": "Adicionar quadro"
         }
       ]
     },
@@ -2785,7 +2785,7 @@
         },
         {
           "type": "click-text",
-          "text": "Adicionar Frame"
+          "text": "Adicionar quadro"
         }
       ]
     },
@@ -2811,7 +2811,7 @@
         },
         {
           "type": "click-text",
-          "text": "Adicionar Frame"
+          "text": "Adicionar quadro"
         }
       ]
     },
@@ -2837,7 +2837,7 @@
         },
         {
           "type": "click-text",
-          "text": "Adicionar Frame"
+          "text": "Adicionar quadro"
         }
       ]
     },
@@ -2863,7 +2863,7 @@
         },
         {
           "type": "click-text",
-          "text": "Adicionar Frame"
+          "text": "Adicionar quadro"
         },
         {
           "type": "click-text",
@@ -2897,7 +2897,7 @@
         },
         {
           "type": "click-text",
-          "text": "Adicionar Frame"
+          "text": "Adicionar quadro"
         },
         {
           "type": "click-text",
@@ -2935,7 +2935,7 @@
         "width": 1440,
         "height": 900
       },
-      "readySelector": "body[data-frame-deletion-count=\"4\"][data-frame-deletion-selection=\"delete-frame-1,delete-frame-2\"]:has([role=\"menu\"][aria-label=\"Organizar Frames\"])",
+      "readySelector": "body[data-frame-deletion-count=\"4\"][data-frame-deletion-selection=\"delete-frame-1,delete-frame-2\"]:has([role=\"menu\"][aria-label=\"Organizar quadros\"])",
       "actions": [
         {
           "type": "context-click",
@@ -3165,7 +3165,7 @@
         "width": 1440,
         "height": 900
       },
-      "readySelector": "body[data-frame-swap-photos=\"00000000-0000-4000-8000-000000000001,00000000-0000-4000-8000-000000000002,empty,empty\"][data-frame-swap-selection=\"swap-frame-0,swap-frame-1\"]:has([role=\"menu\"][aria-label=\"Organizar Frames\"])",
+      "readySelector": "body[data-frame-swap-photos=\"00000000-0000-4000-8000-000000000001,00000000-0000-4000-8000-000000000002,empty,empty\"][data-frame-swap-selection=\"swap-frame-0,swap-frame-1\"]:has([role=\"menu\"][aria-label=\"Organizar quadros\"])",
       "actions": [
         {
           "type": "context-click",
@@ -3197,7 +3197,7 @@
         },
         {
           "type": "click-text",
-          "text": "Trocar conteúdo dos Frames"
+          "text": "Trocar conteúdo dos quadros"
         }
       ]
     },
@@ -3225,7 +3225,7 @@
         },
         {
           "type": "click-text",
-          "text": "Trocar conteúdo dos Frames"
+          "text": "Trocar conteúdo dos quadros"
         }
       ]
     },
@@ -3251,7 +3251,7 @@
         },
         {
           "type": "click-text",
-          "text": "Trocar conteúdo dos Frames"
+          "text": "Trocar conteúdo dos quadros"
         }
       ]
     },
@@ -3269,7 +3269,7 @@
         "width": 1440,
         "height": 900
       },
-      "readySelector": "body[data-frame-swap-photos=\"00000000-0000-4000-8000-000000000001,00000000-0000-4000-8000-000000000002,empty,empty\"][data-frame-swap-selection=\"swap-frame-2,swap-frame-3\"]:has([role=\"menuitem\"][aria-label=\"Trocar conteúdo dos Frames\"][disabled])",
+      "readySelector": "body[data-frame-swap-photos=\"00000000-0000-4000-8000-000000000001,00000000-0000-4000-8000-000000000002,empty,empty\"][data-frame-swap-selection=\"swap-frame-2,swap-frame-3\"]:has([role=\"menuitem\"][aria-label=\"Trocar conteúdo dos quadros\"][disabled])",
       "actions": [
         {
           "type": "click-text",
@@ -3299,7 +3299,7 @@
         },
         {
           "type": "click-text",
-          "text": "Trocar conteúdo dos Frames"
+          "text": "Trocar conteúdo dos quadros"
         },
         {
           "type": "click-text",
@@ -3333,7 +3333,7 @@
         },
         {
           "type": "click-text",
-          "text": "Trocar conteúdo dos Frames"
+          "text": "Trocar conteúdo dos quadros"
         },
         {
           "type": "click-text",
@@ -4442,11 +4442,11 @@
       "actions": [
         {
           "type": "click",
-          "selector": "[aria-label=\"Trocar lados da Lâmina 01\"]"
+          "selector": "[aria-label=\"Trocar lados da lâmina 01\"]"
         },
         {
           "type": "hover",
-          "selector": "[aria-label=\"Trocar lados da Lâmina 01\"]"
+          "selector": "[aria-label=\"Trocar lados da lâmina 01\"]"
         }
       ]
     },
@@ -4468,7 +4468,7 @@
       "actions": [
         {
           "type": "hover",
-          "selector": "[aria-label=\"Trocar lados da Lâmina 01\"]"
+          "selector": "[aria-label=\"Trocar lados da lâmina 01\"]"
         }
       ]
     },
@@ -4490,7 +4490,7 @@
       "actions": [
         {
           "type": "click",
-          "selector": "[aria-label=\"Trocar lados da Lâmina 01\"]"
+          "selector": "[aria-label=\"Trocar lados da lâmina 01\"]"
         },
         {
           "type": "click-text",
@@ -4502,7 +4502,7 @@
         },
         {
           "type": "hover",
-          "selector": "[aria-label=\"Trocar lados da Lâmina 01\"]"
+          "selector": "[aria-label=\"Trocar lados da lâmina 01\"]"
         }
       ]
     },
@@ -4524,7 +4524,7 @@
       "actions": [
         {
           "type": "click",
-          "selector": "[aria-label=\"Trocar lados da Lâmina 01\"]"
+          "selector": "[aria-label=\"Trocar lados da lâmina 01\"]"
         },
         {
           "type": "click-text",
@@ -4544,7 +4544,7 @@
         },
         {
           "type": "hover",
-          "selector": "[aria-label=\"Trocar lados da Lâmina 01\"]"
+          "selector": "[aria-label=\"Trocar lados da lâmina 01\"]"
         }
       ]
     },
@@ -4566,7 +4566,7 @@
       "actions": [
         {
           "type": "focus",
-          "selector": "[aria-label=\"Trocar lados da Lâmina 01\"]"
+          "selector": "[aria-label=\"Trocar lados da lâmina 01\"]"
         },
         {
           "type": "key",
@@ -4596,11 +4596,11 @@
         },
         {
           "type": "click",
-          "selector": "[aria-label=\"Trocar lados da Lâmina 01\"]"
+          "selector": "[aria-label=\"Trocar lados da lâmina 01\"]"
         },
         {
           "type": "hover",
-          "selector": "[aria-label=\"Trocar lados da Lâmina 01\"]"
+          "selector": "[aria-label=\"Trocar lados da lâmina 01\"]"
         }
       ]
     },
@@ -4622,15 +4622,15 @@
       "actions": [
         {
           "type": "assert",
-          "selector": "[aria-label=\"Trocar lados da Lâmina 01\"]:disabled"
+          "selector": "[aria-label=\"Trocar lados da lâmina 01\"]:disabled"
         },
         {
           "type": "pointer-click",
-          "selector": "[aria-label=\"Trocar lados da Lâmina 01\"]"
+          "selector": "[aria-label=\"Trocar lados da lâmina 01\"]"
         },
         {
           "type": "hover",
-          "selector": "[aria-label=\"Trocar lados da Lâmina 01\"]"
+          "selector": "[aria-label=\"Trocar lados da lâmina 01\"]"
         }
       ]
     },
@@ -4652,15 +4652,15 @@
       "actions": [
         {
           "type": "assert",
-          "selector": "[aria-label=\"Trocar lados da Lâmina 02\"]:disabled"
+          "selector": "[aria-label=\"Trocar lados da lâmina 02\"]:disabled"
         },
         {
           "type": "pointer-click",
-          "selector": "[aria-label=\"Trocar lados da Lâmina 02\"]"
+          "selector": "[aria-label=\"Trocar lados da lâmina 02\"]"
         },
         {
           "type": "hover",
-          "selector": "[aria-label=\"Trocar lados da Lâmina 02\"]"
+          "selector": "[aria-label=\"Trocar lados da lâmina 02\"]"
         }
       ]
     },
@@ -4682,11 +4682,11 @@
       "actions": [
         {
           "type": "click",
-          "selector": "[aria-label=\"Trocar lados da Lâmina 01\"]"
+          "selector": "[aria-label=\"Trocar lados da lâmina 01\"]"
         },
         {
           "type": "hover",
-          "selector": "[aria-label=\"Trocar lados da Lâmina 01\"]"
+          "selector": "[aria-label=\"Trocar lados da lâmina 01\"]"
         }
       ]
     },
@@ -4708,11 +4708,11 @@
       "actions": [
         {
           "type": "click",
-          "selector": "[aria-label=\"Trocar lados da Lâmina 01\"]"
+          "selector": "[aria-label=\"Trocar lados da lâmina 01\"]"
         },
         {
           "type": "hover",
-          "selector": "[aria-label=\"Trocar lados da Lâmina 01\"]"
+          "selector": "[aria-label=\"Trocar lados da lâmina 01\"]"
         }
       ]
     },
@@ -4733,11 +4733,11 @@
       "actions": [
         {
           "type": "click",
-          "selector": "[aria-label=\"Trocar lados da Lâmina 01\"]"
+          "selector": "[aria-label=\"Trocar lados da lâmina 01\"]"
         },
         {
           "type": "hover",
-          "selector": "[aria-label=\"Trocar lados da Lâmina 01\"]"
+          "selector": "[aria-label=\"Trocar lados da lâmina 01\"]"
         }
       ]
     },
@@ -4758,11 +4758,11 @@
       "actions": [
         {
           "type": "click",
-          "selector": "[aria-label=\"Trocar lados da Lâmina 01\"]"
+          "selector": "[aria-label=\"Trocar lados da lâmina 01\"]"
         },
         {
           "type": "hover",
-          "selector": "[aria-label=\"Trocar lados da Lâmina 01\"]"
+          "selector": "[aria-label=\"Trocar lados da lâmina 01\"]"
         }
       ]
     },
@@ -4784,11 +4784,11 @@
       "actions": [
         {
           "type": "hover",
-          "selector": "[aria-label=\"Trocar lados da Lâmina 01\"]"
+          "selector": "[aria-label=\"Trocar lados da lâmina 01\"]"
         },
         {
           "type": "focus",
-          "selector": "[aria-label=\"Trocar lados da Lâmina 01\"]"
+          "selector": "[aria-label=\"Trocar lados da lâmina 01\"]"
         },
         {
           "type": "key",
@@ -4822,8 +4822,8 @@
       "viewport": { "width": 1440, "height": 800 },
       "readySelector": ".sheet-tile [data-preview-photo-id][filter]",
       "actions": [
-        { "type": "click-text", "text": "Informações do Álbum" },
-        { "type": "click-text", "text": "Design do Álbum" }
+        { "type": "click-text", "text": "Informações do álbum" },
+        { "type": "click-text", "text": "Design do álbum" }
       ]
     },
     {
@@ -4912,7 +4912,7 @@
       "implementationPath": "/workspace-preview.html?frame=orientation&mode=normal",
       "comparison": { "kind": "implementation-only", "surface": "photo-orientation", "reason": "O Painel segue a referência vigente e o contexto de Frame/Fotos do design 0001. Os controles de Giro e Espelhamento usam as projeções verificadas pelo ProjectCore e uma imagem de quadrantes para conferir sua ordem." },
       "viewport": { "width": 1440, "height": 800 },
-      "readySelector": "body[data-photo-orientation=\"single-both\"] [aria-label=\"Giro das Fotos\"]",
+      "readySelector": "body[data-photo-orientation=\"single-both\"] [aria-label=\"Giro das fotos\"]",
       "actions": [
         { "type": "click", "selector": "[aria-label=\"Girar 90° à esquerda\"]" },
         { "type": "click", "selector": ".photo-mirror-control" },
@@ -5104,7 +5104,7 @@
         "width": 1440,
         "height": 800
       },
-      "readySelector": "[aria-label=\"Ângulo da Foto\"][data-mixed=\"true\"]",
+      "readySelector": "[aria-label=\"Ângulo da foto\"][data-mixed=\"true\"]",
       "actions": []
     },
     {
@@ -5150,11 +5150,11 @@
       "actions": [
         {
           "type": "pointer-click",
-          "selector": "[aria-label=\"Ângulo da Foto\"]"
+          "selector": "[aria-label=\"Ângulo da foto\"]"
         },
         {
           "type": "pointer-click",
-          "selector": "[aria-label=\"Ângulo da Foto\"]"
+          "selector": "[aria-label=\"Ângulo da foto\"]"
         }
       ]
     },
@@ -5175,11 +5175,11 @@
       "actions": [
         {
           "type": "pointer-click",
-          "selector": "[aria-label=\"Ângulo da Foto\"]"
+          "selector": "[aria-label=\"Ângulo da foto\"]"
         },
         {
           "type": "pointer-click",
-          "selector": "[aria-label=\"Ângulo da Foto\"]"
+          "selector": "[aria-label=\"Ângulo da foto\"]"
         }
       ]
     },
@@ -5200,7 +5200,7 @@
       "actions": [
         {
           "type": "focus",
-          "selector": "[aria-label=\"Ângulo da Foto\"]"
+          "selector": "[aria-label=\"Ângulo da foto\"]"
         },
         {
           "type": "key",
@@ -5267,7 +5267,7 @@
         "width": 1800,
         "height": 1000
       },
-      "readySelector": "[aria-label=\"Ângulo da Foto\"][data-mixed=\"true\"]",
+      "readySelector": "[aria-label=\"Ângulo da foto\"][data-mixed=\"true\"]",
       "actions": []
     },
     {
@@ -5358,7 +5358,7 @@
         },
         {
           "type": "input",
-          "selector": "[aria-label=\"Espessura da Borda em mm\"]",
+          "selector": "[aria-label=\"Espessura da borda em mm\"]",
           "value": "5"
         },
         {
@@ -5388,11 +5388,11 @@
         },
         {
           "type": "click",
-          "selector": "[aria-label=\"Cor da Borda\"]"
+          "selector": "[aria-label=\"Cor da borda\"]"
         },
         {
           "type": "input",
-          "selector": "[aria-label=\"Cor hexadecimal da Borda\"]",
+          "selector": "[aria-label=\"Código da cor da borda\"]",
           "value": "#205070"
         },
         {
@@ -5414,7 +5414,7 @@
         "width": 1440,
         "height": 800
       },
-      "readySelector": "body[data-frame-style=\"single-border\"][data-frame-style-history=\"0,0\"]:not(:has([role=\"dialog\"][aria-label=\"Escolher cor da Borda\"]))",
+      "readySelector": "body[data-frame-style=\"single-border\"][data-frame-style-history=\"0,0\"]:not(:has([role=\"dialog\"][aria-label=\"Escolher cor da borda\"]))",
       "actions": [
         {
           "type": "assert",
@@ -5422,11 +5422,11 @@
         },
         {
           "type": "click",
-          "selector": "[aria-label=\"Cor da Borda\"]"
+          "selector": "[aria-label=\"Cor da borda\"]"
         },
         {
           "type": "input",
-          "selector": "[aria-label=\"Cor hexadecimal da Borda\"]",
+          "selector": "[aria-label=\"Código da cor da borda\"]",
           "value": "#205070"
         },
         {
@@ -5448,7 +5448,7 @@
         "width": 1440,
         "height": 800
       },
-      "readySelector": "[aria-label=\"Cor da Borda\"][data-mixed=\"true\"]",
+      "readySelector": "[aria-label=\"Cor da borda\"][data-mixed=\"true\"]",
       "actions": [
         {
           "type": "assert",
@@ -5549,7 +5549,7 @@
         },
         {
           "type": "click-text",
-          "text": "Voltar ao design do álbum"
+          "text": "Usar padrão do álbum"
         }
       ]
     },
@@ -5701,11 +5701,11 @@
         },
         {
           "type": "click-text",
-          "text": "Informações do Álbum"
+          "text": "Informações do álbum"
         },
         {
           "type": "click-text",
-          "text": "Design do Álbum"
+          "text": "Design do álbum"
         }
       ]
     },
@@ -5794,7 +5794,7 @@
         },
         {
           "type": "click",
-          "selector": "button[aria-label=\"Layouts da Lâmina 01\"]"
+          "selector": "button[aria-label=\"Layouts da lâmina 01\"]"
         },
         {
           "type": "hover",
@@ -5823,7 +5823,7 @@
         },
         {
           "type": "click",
-          "selector": "button[aria-label=\"Layouts da Lâmina 01\"]"
+          "selector": "button[aria-label=\"Layouts da lâmina 01\"]"
         },
         {
           "type": "hover",
@@ -5852,7 +5852,7 @@
         },
         {
           "type": "click",
-          "selector": "button[aria-label=\"Layouts da Lâmina 01\"]"
+          "selector": "button[aria-label=\"Layouts da lâmina 01\"]"
         },
         {
           "type": "hover",
@@ -5918,7 +5918,7 @@
         },
         {
           "type": "click",
-          "selector": "button[aria-label=\"Layouts da Lâmina 01\"]"
+          "selector": "button[aria-label=\"Layouts da lâmina 01\"]"
         },
         {
           "type": "assert",
@@ -6085,7 +6085,7 @@
         },
         {
           "type": "click",
-          "selector": "button[aria-label=\"Design da Lâmina\"]"
+          "selector": "button[aria-label=\"Design da lâmina\"]"
         }
       ]
     },
@@ -6114,7 +6114,7 @@
         },
         {
           "type": "click",
-          "selector": "button[role=\"menuitem\"][aria-label=\"Salvar disposição como Layout\"]"
+          "selector": "button[role=\"menuitem\"][aria-label=\"Salvar disposição como layout\"]"
         }
       ]
     },
@@ -6178,7 +6178,7 @@
         },
         {
           "type": "click",
-          "selector": "button[aria-label=\"Layouts da Lâmina 01\"]"
+          "selector": "button[aria-label=\"Layouts da lâmina 01\"]"
         },
         {
           "type": "assert",
@@ -6222,7 +6222,7 @@
         },
         {
           "type": "click",
-          "selector": "button[aria-label=\"Layouts da Lâmina 01\"]"
+          "selector": "button[aria-label=\"Layouts da lâmina 01\"]"
         },
         {
           "type": "assert",
@@ -6259,7 +6259,7 @@
         },
         {
           "type": "click",
-          "selector": "button[aria-label=\"Layouts da Lâmina 01\"]"
+          "selector": "button[aria-label=\"Layouts da lâmina 01\"]"
         },
         {
           "type": "assert",
@@ -6300,7 +6300,7 @@
         },
         {
           "type": "click",
-          "selector": "button[aria-label=\"Layouts da Lâmina 01\"]"
+          "selector": "button[aria-label=\"Layouts da lâmina 01\"]"
         },
         {
           "type": "assert",
@@ -6333,7 +6333,7 @@
         },
         {
           "type": "click",
-          "selector": "button[aria-label=\"Layouts da Lâmina 01\"]"
+          "selector": "button[aria-label=\"Layouts da lâmina 01\"]"
         },
         {
           "type": "assert",
@@ -6371,7 +6371,7 @@
         },
         {
           "type": "click",
-          "selector": "button[aria-label=\"Layouts da Lâmina 02\"]"
+          "selector": "button[aria-label=\"Layouts da lâmina 02\"]"
         }
       ]
     },
@@ -6396,7 +6396,7 @@
         },
         {
           "type": "click",
-          "selector": "button[aria-label=\"Layouts da Lâmina 01\"]"
+          "selector": "button[aria-label=\"Layouts da lâmina 01\"]"
         },
         {
           "type": "assert",
@@ -6425,7 +6425,7 @@
         },
         {
           "type": "click",
-          "selector": "button[aria-label=\"Layouts da Lâmina 01\"]"
+          "selector": "button[aria-label=\"Layouts da lâmina 01\"]"
         },
         {
           "type": "assert",
@@ -6462,7 +6462,7 @@
         },
         {
           "type": "click",
-          "selector": "button[aria-label=\"Layouts da Lâmina 01\"]"
+          "selector": "button[aria-label=\"Layouts da lâmina 01\"]"
         },
         {
           "type": "assert",
@@ -6503,7 +6503,7 @@
         },
         {
           "type": "click",
-          "selector": "button[aria-label=\"Layouts da Lâmina 01\"]"
+          "selector": "button[aria-label=\"Layouts da lâmina 01\"]"
         },
         {
           "type": "assert",
@@ -6548,7 +6548,7 @@
         },
         {
           "type": "click",
-          "selector": "button[aria-label=\"Layouts da Lâmina 01\"]"
+          "selector": "button[aria-label=\"Layouts da lâmina 01\"]"
         },
         {
           "type": "assert",
@@ -6581,7 +6581,7 @@
         },
         {
           "type": "click",
-          "selector": "button[aria-label=\"Layouts da Lâmina 01\"]"
+          "selector": "button[aria-label=\"Layouts da lâmina 01\"]"
         },
         {
           "type": "assert",
@@ -6614,7 +6614,7 @@
         },
         {
           "type": "click",
-          "selector": "button[aria-label=\"Layouts da Lâmina 01\"]"
+          "selector": "button[aria-label=\"Layouts da lâmina 01\"]"
         },
         {
           "type": "assert",
@@ -6630,7 +6630,7 @@
         },
         {
           "type": "click",
-          "selector": "button[aria-label=\"Aplicar e travar Layout 1\"]"
+          "selector": "button[aria-label=\"Aplicar e travar layout 1\"]"
         }
       ]
     },
@@ -6655,7 +6655,7 @@
         },
         {
           "type": "click",
-          "selector": "button[aria-label=\"Layouts da Lâmina 01\"]"
+          "selector": "button[aria-label=\"Layouts da lâmina 01\"]"
         },
         {
           "type": "assert",
@@ -6671,7 +6671,7 @@
         },
         {
           "type": "click",
-          "selector": "button[aria-label=\"Aplicar e travar Layout 1\"]"
+          "selector": "button[aria-label=\"Aplicar e travar layout 1\"]"
         },
         {
           "type": "assert",
@@ -6679,7 +6679,7 @@
         },
         {
           "type": "click",
-          "selector": "button[aria-label=\"Destravar Layout da Lâmina 01\"]"
+          "selector": "button[aria-label=\"Destravar layout da lâmina 01\"]"
         }
       ]
     },
@@ -6704,7 +6704,7 @@
         },
         {
           "type": "click",
-          "selector": "button[aria-label=\"Layouts da Lâmina 01\"]"
+          "selector": "button[aria-label=\"Layouts da lâmina 01\"]"
         },
         {
           "type": "assert",
@@ -6720,7 +6720,7 @@
         },
         {
           "type": "click",
-          "selector": "button[aria-label=\"Aplicar e travar Layout 1\"]"
+          "selector": "button[aria-label=\"Aplicar e travar layout 1\"]"
         },
         {
           "type": "assert",
@@ -6736,11 +6736,11 @@
         },
         {
           "type": "assert",
-          "selector": "button[aria-label=\"Layouts da Lâmina 01\"]:not(:disabled)"
+          "selector": "button[aria-label=\"Layouts da lâmina 01\"]:not(:disabled)"
         },
         {
           "type": "click",
-          "selector": "button[aria-label=\"Layouts da Lâmina 01\"]"
+          "selector": "button[aria-label=\"Layouts da lâmina 01\"]"
         }
       ]
     },
@@ -6765,7 +6765,7 @@
         },
         {
           "type": "click",
-          "selector": "button[aria-label=\"Layouts da Lâmina 01\"]"
+          "selector": "button[aria-label=\"Layouts da lâmina 01\"]"
         },
         {
           "type": "assert",
@@ -6773,7 +6773,7 @@
         },
         {
           "type": "focus",
-          "selector": "select[aria-label=\"Quantidade de Frames\"]"
+          "selector": "select[aria-label=\"Quantidade de quadros\"]"
         },
         {
           "type": "key",
@@ -6818,7 +6818,7 @@
         },
         {
           "type": "click",
-          "selector": "button[aria-label=\"Layouts da Lâmina 01\"]"
+          "selector": "button[aria-label=\"Layouts da lâmina 01\"]"
         },
         {
           "type": "assert",
@@ -6826,7 +6826,7 @@
         },
         {
           "type": "focus",
-          "selector": "select[aria-label=\"Quantidade de Frames\"]"
+          "selector": "select[aria-label=\"Quantidade de quadros\"]"
         },
         {
           "type": "key",
@@ -6850,7 +6850,7 @@
         },
         {
           "type": "click",
-          "selector": "button[aria-label=\"Aplicar e travar Layout 1\"]"
+          "selector": "button[aria-label=\"Aplicar e travar layout 1\"]"
         }
       ]
     },
@@ -6867,7 +6867,7 @@
         "width": 1440,
         "height": 800
       },
-      "readySelector": ".layout-panel__preview:not(:disabled):has(svg[aria-label=\"Layout com 2 Frames\"])",
+      "readySelector": ".layout-panel__preview:not(:disabled):has(svg[aria-label=\"Layout com 2 quadros\"])",
       "actions": [
         {
           "type": "assert",
@@ -6875,7 +6875,7 @@
         },
         {
           "type": "click",
-          "selector": "button[aria-label=\"Layouts da Lâmina 01\"]"
+          "selector": "button[aria-label=\"Layouts da lâmina 01\"]"
         },
         {
           "type": "assert",
@@ -6883,7 +6883,7 @@
         },
         {
           "type": "focus",
-          "selector": "select[aria-label=\"Quantidade de Frames\"]"
+          "selector": "select[aria-label=\"Quantidade de quadros\"]"
         },
         {
           "type": "key",
@@ -6907,7 +6907,7 @@
         },
         {
           "type": "click",
-          "selector": "button[aria-label=\"Aplicar e travar Layout 1\"]"
+          "selector": "button[aria-label=\"Aplicar e travar layout 1\"]"
         },
         {
           "type": "assert",
@@ -6915,19 +6915,19 @@
         },
         {
           "type": "assert",
-          "selector": "select[aria-label=\"Quantidade de Frames\"]:disabled"
+          "selector": "select[aria-label=\"Quantidade de quadros\"]:disabled"
         },
         {
           "type": "click",
-          "selector": "button[aria-label=\"Destravar Layout da Lâmina 01\"]"
+          "selector": "button[aria-label=\"Destravar layout da lâmina 01\"]"
         },
         {
           "type": "assert",
-          "selector": "select[aria-label=\"Quantidade de Frames\"]:not(:disabled):has(option[value=\"2\"]):not(:has(option[value=\"1\"]))"
+          "selector": "select[aria-label=\"Quantidade de quadros\"]:not(:disabled):has(option[value=\"2\"]):not(:has(option[value=\"1\"]))"
         },
         {
           "type": "focus",
-          "selector": "select[aria-label=\"Quantidade de Frames\"]"
+          "selector": "select[aria-label=\"Quantidade de quadros\"]"
         },
         {
           "type": "key",
@@ -6947,7 +6947,7 @@
         },
         {
           "type": "assert",
-          "selector": ".layout-panel__preview:not(:disabled):has(svg[aria-label=\"Layout com 2 Frames\"])"
+          "selector": ".layout-panel__preview:not(:disabled):has(svg[aria-label=\"Layout com 2 quadros\"])"
         },
         {
           "type": "hover",
@@ -6972,7 +6972,7 @@
         "width": 1440,
         "height": 800
       },
-      "readySelector": ".layout-panel__preview:not(:disabled):has(svg[aria-label=\"Layout com 2 Frames\"])",
+      "readySelector": ".layout-panel__preview:not(:disabled):has(svg[aria-label=\"Layout com 2 quadros\"])",
       "actions": [
         {
           "type": "assert",
@@ -6980,7 +6980,7 @@
         },
         {
           "type": "click",
-          "selector": "button[aria-label=\"Layouts da Lâmina 01\"]"
+          "selector": "button[aria-label=\"Layouts da lâmina 01\"]"
         },
         {
           "type": "assert",
@@ -6988,7 +6988,7 @@
         },
         {
           "type": "focus",
-          "selector": "select[aria-label=\"Quantidade de Frames\"]"
+          "selector": "select[aria-label=\"Quantidade de quadros\"]"
         },
         {
           "type": "key",
@@ -7012,7 +7012,7 @@
         },
         {
           "type": "click",
-          "selector": "button[aria-label=\"Aplicar e travar Layout 1\"]"
+          "selector": "button[aria-label=\"Aplicar e travar layout 1\"]"
         },
         {
           "type": "assert",
@@ -7020,19 +7020,19 @@
         },
         {
           "type": "assert",
-          "selector": "select[aria-label=\"Quantidade de Frames\"]:disabled"
+          "selector": "select[aria-label=\"Quantidade de quadros\"]:disabled"
         },
         {
           "type": "click",
-          "selector": "button[aria-label=\"Destravar Layout da Lâmina 01\"]"
+          "selector": "button[aria-label=\"Destravar layout da lâmina 01\"]"
         },
         {
           "type": "assert",
-          "selector": "select[aria-label=\"Quantidade de Frames\"]:not(:disabled):has(option[value=\"2\"]):not(:has(option[value=\"1\"]))"
+          "selector": "select[aria-label=\"Quantidade de quadros\"]:not(:disabled):has(option[value=\"2\"]):not(:has(option[value=\"1\"]))"
         },
         {
           "type": "focus",
-          "selector": "select[aria-label=\"Quantidade de Frames\"]"
+          "selector": "select[aria-label=\"Quantidade de quadros\"]"
         },
         {
           "type": "key",
@@ -7056,15 +7056,15 @@
         },
         {
           "type": "assert",
-          "selector": ".layout-panel__preview:not(:disabled):has(svg[aria-label=\"Layout com 2 Frames\"])"
+          "selector": ".layout-panel__preview:not(:disabled):has(svg[aria-label=\"Layout com 2 quadros\"])"
         },
         {
           "type": "click",
-          "selector": ".layout-panel__preview:not(:disabled):has(svg[aria-label=\"Layout com 2 Frames\"])"
+          "selector": ".layout-panel__preview:not(:disabled):has(svg[aria-label=\"Layout com 2 quadros\"])"
         },
         {
           "type": "assert",
-          "selector": ".layout-panel__preview[aria-label=\"Aplicar Layout 1 — último aplicado\"]"
+          "selector": ".layout-panel__preview[aria-label=\"Aplicar layout 1 — último aplicado\"]"
         },
         {
           "type": "hover",
@@ -7085,7 +7085,7 @@
         "width": 1440,
         "height": 800
       },
-      "readySelector": ".layout-panel__candidate--locked:has(svg[aria-label=\"Layout com 2 Frames\"])",
+      "readySelector": ".layout-panel__candidate--locked:has(svg[aria-label=\"Layout com 2 quadros\"])",
       "actions": [
         {
           "type": "assert",
@@ -7093,7 +7093,7 @@
         },
         {
           "type": "click",
-          "selector": "button[aria-label=\"Layouts da Lâmina 01\"]"
+          "selector": "button[aria-label=\"Layouts da lâmina 01\"]"
         },
         {
           "type": "assert",
@@ -7101,7 +7101,7 @@
         },
         {
           "type": "focus",
-          "selector": "select[aria-label=\"Quantidade de Frames\"]"
+          "selector": "select[aria-label=\"Quantidade de quadros\"]"
         },
         {
           "type": "key",
@@ -7125,7 +7125,7 @@
         },
         {
           "type": "click",
-          "selector": "button[aria-label=\"Aplicar e travar Layout 1\"]"
+          "selector": "button[aria-label=\"Aplicar e travar layout 1\"]"
         },
         {
           "type": "assert",
@@ -7133,19 +7133,19 @@
         },
         {
           "type": "assert",
-          "selector": "select[aria-label=\"Quantidade de Frames\"]:disabled"
+          "selector": "select[aria-label=\"Quantidade de quadros\"]:disabled"
         },
         {
           "type": "click",
-          "selector": "button[aria-label=\"Destravar Layout da Lâmina 01\"]"
+          "selector": "button[aria-label=\"Destravar layout da lâmina 01\"]"
         },
         {
           "type": "assert",
-          "selector": "select[aria-label=\"Quantidade de Frames\"]:not(:disabled):has(option[value=\"2\"]):not(:has(option[value=\"1\"]))"
+          "selector": "select[aria-label=\"Quantidade de quadros\"]:not(:disabled):has(option[value=\"2\"]):not(:has(option[value=\"1\"]))"
         },
         {
           "type": "focus",
-          "selector": "select[aria-label=\"Quantidade de Frames\"]"
+          "selector": "select[aria-label=\"Quantidade de quadros\"]"
         },
         {
           "type": "key",
@@ -7169,11 +7169,11 @@
         },
         {
           "type": "assert",
-          "selector": ".layout-panel__preview:not(:disabled):has(svg[aria-label=\"Layout com 2 Frames\"])"
+          "selector": ".layout-panel__preview:not(:disabled):has(svg[aria-label=\"Layout com 2 quadros\"])"
         },
         {
           "type": "click",
-          "selector": "button[aria-label=\"Aplicar e travar Layout 1\"]"
+          "selector": "button[aria-label=\"Aplicar e travar layout 1\"]"
         }
       ]
     },
@@ -7190,7 +7190,7 @@
         "width": 1440,
         "height": 800
       },
-      "readySelector": ".layout-panel__preview:not(:disabled):has(svg[aria-label=\"Layout com 2 Frames\"])",
+      "readySelector": ".layout-panel__preview:not(:disabled):has(svg[aria-label=\"Layout com 2 quadros\"])",
       "actions": [
         {
           "type": "assert",
@@ -7198,7 +7198,7 @@
         },
         {
           "type": "click",
-          "selector": "button[aria-label=\"Layouts da Lâmina 01\"]"
+          "selector": "button[aria-label=\"Layouts da lâmina 01\"]"
         },
         {
           "type": "assert",
@@ -7206,7 +7206,7 @@
         },
         {
           "type": "focus",
-          "selector": "select[aria-label=\"Quantidade de Frames\"]"
+          "selector": "select[aria-label=\"Quantidade de quadros\"]"
         },
         {
           "type": "key",
@@ -7230,7 +7230,7 @@
         },
         {
           "type": "click",
-          "selector": "button[aria-label=\"Aplicar e travar Layout 1\"]"
+          "selector": "button[aria-label=\"Aplicar e travar layout 1\"]"
         },
         {
           "type": "assert",
@@ -7238,19 +7238,19 @@
         },
         {
           "type": "assert",
-          "selector": "select[aria-label=\"Quantidade de Frames\"]:disabled"
+          "selector": "select[aria-label=\"Quantidade de quadros\"]:disabled"
         },
         {
           "type": "click",
-          "selector": "button[aria-label=\"Destravar Layout da Lâmina 01\"]"
+          "selector": "button[aria-label=\"Destravar layout da lâmina 01\"]"
         },
         {
           "type": "assert",
-          "selector": "select[aria-label=\"Quantidade de Frames\"]:not(:disabled):has(option[value=\"2\"]):not(:has(option[value=\"1\"]))"
+          "selector": "select[aria-label=\"Quantidade de quadros\"]:not(:disabled):has(option[value=\"2\"]):not(:has(option[value=\"1\"]))"
         },
         {
           "type": "focus",
-          "selector": "select[aria-label=\"Quantidade de Frames\"]"
+          "selector": "select[aria-label=\"Quantidade de quadros\"]"
         },
         {
           "type": "key",
@@ -7274,15 +7274,15 @@
         },
         {
           "type": "assert",
-          "selector": ".layout-panel__preview:not(:disabled):has(svg[aria-label=\"Layout com 2 Frames\"])"
+          "selector": ".layout-panel__preview:not(:disabled):has(svg[aria-label=\"Layout com 2 quadros\"])"
         },
         {
           "type": "click",
-          "selector": ".layout-panel__preview:not(:disabled):has(svg[aria-label=\"Layout com 2 Frames\"])"
+          "selector": ".layout-panel__preview:not(:disabled):has(svg[aria-label=\"Layout com 2 quadros\"])"
         },
         {
           "type": "assert",
-          "selector": ".layout-panel__preview[aria-label=\"Aplicar Layout 1 — último aplicado\"]"
+          "selector": ".layout-panel__preview[aria-label=\"Aplicar layout 1 — último aplicado\"]"
         },
         {
           "type": "hover",
@@ -7298,11 +7298,11 @@
         },
         {
           "type": "assert",
-          "selector": "button[aria-label=\"Layouts da Lâmina 01\"]:not(:disabled)"
+          "selector": "button[aria-label=\"Layouts da lâmina 01\"]:not(:disabled)"
         },
         {
           "type": "click",
-          "selector": "button[aria-label=\"Layouts da Lâmina 01\"]"
+          "selector": "button[aria-label=\"Layouts da lâmina 01\"]"
         },
         {
           "type": "hover",
@@ -7323,7 +7323,7 @@
         "width": 1440,
         "height": 800
       },
-      "readySelector": ".layout-panel__preview:not(:disabled):has(svg[aria-label=\"Layout com 2 Frames\"])",
+      "readySelector": ".layout-panel__preview:not(:disabled):has(svg[aria-label=\"Layout com 2 quadros\"])",
       "actions": [
         {
           "type": "assert",
@@ -7331,7 +7331,7 @@
         },
         {
           "type": "click",
-          "selector": "button[aria-label=\"Layouts da Lâmina 01\"]"
+          "selector": "button[aria-label=\"Layouts da lâmina 01\"]"
         },
         {
           "type": "assert",
@@ -7339,7 +7339,7 @@
         },
         {
           "type": "focus",
-          "selector": "select[aria-label=\"Quantidade de Frames\"]"
+          "selector": "select[aria-label=\"Quantidade de quadros\"]"
         },
         {
           "type": "key",
@@ -7363,7 +7363,7 @@
         },
         {
           "type": "click",
-          "selector": "button[aria-label=\"Aplicar e travar Layout 1\"]"
+          "selector": "button[aria-label=\"Aplicar e travar layout 1\"]"
         },
         {
           "type": "assert",
@@ -7371,19 +7371,19 @@
         },
         {
           "type": "assert",
-          "selector": "select[aria-label=\"Quantidade de Frames\"]:disabled"
+          "selector": "select[aria-label=\"Quantidade de quadros\"]:disabled"
         },
         {
           "type": "click",
-          "selector": "button[aria-label=\"Destravar Layout da Lâmina 01\"]"
+          "selector": "button[aria-label=\"Destravar layout da lâmina 01\"]"
         },
         {
           "type": "assert",
-          "selector": "select[aria-label=\"Quantidade de Frames\"]:not(:disabled):has(option[value=\"2\"]):not(:has(option[value=\"1\"]))"
+          "selector": "select[aria-label=\"Quantidade de quadros\"]:not(:disabled):has(option[value=\"2\"]):not(:has(option[value=\"1\"]))"
         },
         {
           "type": "focus",
-          "selector": "select[aria-label=\"Quantidade de Frames\"]"
+          "selector": "select[aria-label=\"Quantidade de quadros\"]"
         },
         {
           "type": "key",
@@ -7407,15 +7407,15 @@
         },
         {
           "type": "assert",
-          "selector": ".layout-panel__preview:not(:disabled):has(svg[aria-label=\"Layout com 2 Frames\"])"
+          "selector": ".layout-panel__preview:not(:disabled):has(svg[aria-label=\"Layout com 2 quadros\"])"
         },
         {
           "type": "click",
-          "selector": ".layout-panel__preview:not(:disabled):has(svg[aria-label=\"Layout com 2 Frames\"])"
+          "selector": ".layout-panel__preview:not(:disabled):has(svg[aria-label=\"Layout com 2 quadros\"])"
         },
         {
           "type": "assert",
-          "selector": ".layout-panel__preview[aria-label=\"Aplicar Layout 1 — último aplicado\"]"
+          "selector": ".layout-panel__preview[aria-label=\"Aplicar layout 1 — último aplicado\"]"
         },
         {
           "type": "hover",
@@ -7431,11 +7431,11 @@
         },
         {
           "type": "assert",
-          "selector": "button[aria-label=\"Layouts da Lâmina 01\"]:not(:disabled)"
+          "selector": "button[aria-label=\"Layouts da lâmina 01\"]:not(:disabled)"
         },
         {
           "type": "click",
-          "selector": "button[aria-label=\"Layouts da Lâmina 01\"]"
+          "selector": "button[aria-label=\"Layouts da lâmina 01\"]"
         },
         {
           "type": "click-text",
@@ -7447,11 +7447,11 @@
         },
         {
           "type": "assert",
-          "selector": "button[aria-label=\"Layouts da Lâmina 01\"]:not(:disabled)"
+          "selector": "button[aria-label=\"Layouts da lâmina 01\"]:not(:disabled)"
         },
         {
           "type": "click",
-          "selector": "button[aria-label=\"Layouts da Lâmina 01\"]"
+          "selector": "button[aria-label=\"Layouts da lâmina 01\"]"
         },
         {
           "type": "hover",
@@ -7472,7 +7472,7 @@
         "width": 1440,
         "height": 800
       },
-      "readySelector": ".layout-panel__preview:not(:disabled):has(svg[aria-label=\"Layout com 2 Frames\"])",
+      "readySelector": ".layout-panel__preview:not(:disabled):has(svg[aria-label=\"Layout com 2 quadros\"])",
       "actions": [
         {
           "type": "assert",
@@ -7480,7 +7480,7 @@
         },
         {
           "type": "click",
-          "selector": "button[aria-label=\"Layouts da Lâmina 01\"]"
+          "selector": "button[aria-label=\"Layouts da lâmina 01\"]"
         },
         {
           "type": "assert",
@@ -7488,7 +7488,7 @@
         },
         {
           "type": "focus",
-          "selector": "select[aria-label=\"Quantidade de Frames\"]"
+          "selector": "select[aria-label=\"Quantidade de quadros\"]"
         },
         {
           "type": "key",
@@ -7512,7 +7512,7 @@
         },
         {
           "type": "click",
-          "selector": "button[aria-label=\"Aplicar e travar Layout 1\"]"
+          "selector": "button[aria-label=\"Aplicar e travar layout 1\"]"
         },
         {
           "type": "assert",
@@ -7520,19 +7520,19 @@
         },
         {
           "type": "assert",
-          "selector": "select[aria-label=\"Quantidade de Frames\"]:disabled"
+          "selector": "select[aria-label=\"Quantidade de quadros\"]:disabled"
         },
         {
           "type": "click",
-          "selector": "button[aria-label=\"Destravar Layout da Lâmina 01\"]"
+          "selector": "button[aria-label=\"Destravar layout da lâmina 01\"]"
         },
         {
           "type": "assert",
-          "selector": "select[aria-label=\"Quantidade de Frames\"]:not(:disabled):has(option[value=\"2\"]):not(:has(option[value=\"1\"]))"
+          "selector": "select[aria-label=\"Quantidade de quadros\"]:not(:disabled):has(option[value=\"2\"]):not(:has(option[value=\"1\"]))"
         },
         {
           "type": "focus",
-          "selector": "select[aria-label=\"Quantidade de Frames\"]"
+          "selector": "select[aria-label=\"Quantidade de quadros\"]"
         },
         {
           "type": "key",
@@ -7556,15 +7556,15 @@
         },
         {
           "type": "assert",
-          "selector": ".layout-panel__preview:not(:disabled):has(svg[aria-label=\"Layout com 2 Frames\"])"
+          "selector": ".layout-panel__preview:not(:disabled):has(svg[aria-label=\"Layout com 2 quadros\"])"
         },
         {
           "type": "click",
-          "selector": ".layout-panel__preview:not(:disabled):has(svg[aria-label=\"Layout com 2 Frames\"])"
+          "selector": ".layout-panel__preview:not(:disabled):has(svg[aria-label=\"Layout com 2 quadros\"])"
         },
         {
           "type": "assert",
-          "selector": ".layout-panel__preview[aria-label=\"Aplicar Layout 1 — último aplicado\"]"
+          "selector": ".layout-panel__preview[aria-label=\"Aplicar layout 1 — último aplicado\"]"
         },
         {
           "type": "hover",
@@ -7585,7 +7585,7 @@
         "width": 1440,
         "height": 800
       },
-      "readySelector": ".layout-panel__preview:not(:disabled):has(svg[aria-label=\"Layout com 2 Frames\"])",
+      "readySelector": ".layout-panel__preview:not(:disabled):has(svg[aria-label=\"Layout com 2 quadros\"])",
       "actions": [
         {
           "type": "assert",
@@ -7593,7 +7593,7 @@
         },
         {
           "type": "click",
-          "selector": "button[aria-label=\"Layouts da Lâmina 01\"]"
+          "selector": "button[aria-label=\"Layouts da lâmina 01\"]"
         },
         {
           "type": "assert",
@@ -7601,7 +7601,7 @@
         },
         {
           "type": "focus",
-          "selector": "select[aria-label=\"Quantidade de Frames\"]"
+          "selector": "select[aria-label=\"Quantidade de quadros\"]"
         },
         {
           "type": "key",
@@ -7625,7 +7625,7 @@
         },
         {
           "type": "click",
-          "selector": "button[aria-label=\"Aplicar e travar Layout 1\"]"
+          "selector": "button[aria-label=\"Aplicar e travar layout 1\"]"
         },
         {
           "type": "assert",
@@ -7633,19 +7633,19 @@
         },
         {
           "type": "assert",
-          "selector": "select[aria-label=\"Quantidade de Frames\"]:disabled"
+          "selector": "select[aria-label=\"Quantidade de quadros\"]:disabled"
         },
         {
           "type": "click",
-          "selector": "button[aria-label=\"Destravar Layout da Lâmina 01\"]"
+          "selector": "button[aria-label=\"Destravar layout da lâmina 01\"]"
         },
         {
           "type": "assert",
-          "selector": "select[aria-label=\"Quantidade de Frames\"]:not(:disabled):has(option[value=\"2\"]):not(:has(option[value=\"1\"]))"
+          "selector": "select[aria-label=\"Quantidade de quadros\"]:not(:disabled):has(option[value=\"2\"]):not(:has(option[value=\"1\"]))"
         },
         {
           "type": "focus",
-          "selector": "select[aria-label=\"Quantidade de Frames\"]"
+          "selector": "select[aria-label=\"Quantidade de quadros\"]"
         },
         {
           "type": "key",
@@ -7669,15 +7669,15 @@
         },
         {
           "type": "assert",
-          "selector": ".layout-panel__preview:not(:disabled):has(svg[aria-label=\"Layout com 2 Frames\"])"
+          "selector": ".layout-panel__preview:not(:disabled):has(svg[aria-label=\"Layout com 2 quadros\"])"
         },
         {
           "type": "click",
-          "selector": ".layout-panel__preview:not(:disabled):has(svg[aria-label=\"Layout com 2 Frames\"])"
+          "selector": ".layout-panel__preview:not(:disabled):has(svg[aria-label=\"Layout com 2 quadros\"])"
         },
         {
           "type": "assert",
-          "selector": ".layout-panel__preview[aria-label=\"Aplicar Layout 1 — último aplicado\"]"
+          "selector": ".layout-panel__preview[aria-label=\"Aplicar layout 1 — último aplicado\"]"
         },
         {
           "type": "hover",
@@ -7706,7 +7706,7 @@
         },
         {
           "type": "click",
-          "selector": "button[aria-label=\"Layouts da Lâmina 01\"]"
+          "selector": "button[aria-label=\"Layouts da lâmina 01\"]"
         },
         {
           "type": "assert",
@@ -7714,7 +7714,7 @@
         },
         {
           "type": "focus",
-          "selector": "select[aria-label=\"Quantidade de Frames\"]"
+          "selector": "select[aria-label=\"Quantidade de quadros\"]"
         },
         {
           "type": "key",
@@ -7759,7 +7759,7 @@
         },
         {
           "type": "click",
-          "selector": "button[aria-label=\"Layouts da Lâmina 01\"]"
+          "selector": "button[aria-label=\"Layouts da lâmina 01\"]"
         },
         {
           "type": "assert",
@@ -7767,7 +7767,7 @@
         },
         {
           "type": "focus",
-          "selector": "select[aria-label=\"Quantidade de Frames\"]"
+          "selector": "select[aria-label=\"Quantidade de quadros\"]"
         },
         {
           "type": "key",
@@ -7791,7 +7791,7 @@
         },
         {
           "type": "click",
-          "selector": "button[aria-label=\"Aplicar e travar Layout 1\"]"
+          "selector": "button[aria-label=\"Aplicar e travar layout 1\"]"
         }
       ]
     },
@@ -7816,7 +7816,7 @@
         },
         {
           "type": "click",
-          "selector": "button[aria-label=\"Layouts da Lâmina 01\"]"
+          "selector": "button[aria-label=\"Layouts da lâmina 01\"]"
         },
         {
           "type": "assert",
@@ -7832,7 +7832,7 @@
         },
         {
           "type": "click",
-          "selector": "button[aria-label=\"Aplicar e travar Layout 1\"]"
+          "selector": "button[aria-label=\"Aplicar e travar layout 1\"]"
         }
       ]
     },
@@ -7857,7 +7857,7 @@
         },
         {
           "type": "click",
-          "selector": "button[aria-label=\"Layouts da Lâmina 01\"]"
+          "selector": "button[aria-label=\"Layouts da lâmina 01\"]"
         },
         {
           "type": "assert",
@@ -7873,7 +7873,7 @@
         },
         {
           "type": "click",
-          "selector": "button[aria-label=\"Aplicar e travar Layout 1\"]"
+          "selector": "button[aria-label=\"Aplicar e travar layout 1\"]"
         }
       ]
     },
@@ -7914,7 +7914,7 @@
         },
         {
           "type": "click",
-          "selector": "button[aria-label=\"Layouts da Lâmina 01\"]"
+          "selector": "button[aria-label=\"Layouts da lâmina 01\"]"
         },
         {
           "type": "assert",
@@ -7947,7 +7947,7 @@
         },
         {
           "type": "click",
-          "selector": "button[aria-label=\"Layouts da Lâmina 01\"]"
+          "selector": "button[aria-label=\"Layouts da lâmina 01\"]"
         },
         {
           "type": "assert",
@@ -7997,7 +7997,7 @@
         },
         {
           "type": "click",
-          "selector": "button[aria-label=\"Layouts da Lâmina 01\"]"
+          "selector": "button[aria-label=\"Layouts da lâmina 01\"]"
         },
         {
           "type": "hover",
@@ -8046,7 +8046,7 @@
         },
         {
           "type": "click",
-          "selector": "button[aria-label=\"Layouts da Lâmina 01\"]"
+          "selector": "button[aria-label=\"Layouts da lâmina 01\"]"
         },
         {
           "type": "hover",
@@ -8095,7 +8095,7 @@
         },
         {
           "type": "click",
-          "selector": "button[aria-label=\"Layouts da Lâmina 01\"]"
+          "selector": "button[aria-label=\"Layouts da lâmina 01\"]"
         },
         {
           "type": "hover",
@@ -8144,7 +8144,7 @@
         },
         {
           "type": "click",
-          "selector": "button[aria-label=\"Layouts da Lâmina 01\"]"
+          "selector": "button[aria-label=\"Layouts da lâmina 01\"]"
         },
         {
           "type": "focus",
@@ -8173,7 +8173,7 @@
         },
         {
           "type": "click",
-          "selector": "button[aria-label=\"Layouts da Lâmina 01\"]"
+          "selector": "button[aria-label=\"Layouts da lâmina 01\"]"
         },
         {
           "type": "hover",
@@ -8727,11 +8727,11 @@
         },
         {
           "type": "click",
-          "selector": "button[aria-label=\"Informações do Álbum\"]"
+          "selector": "button[aria-label=\"Informações do álbum\"]"
         },
         {
           "type": "click",
-          "selector": "button[aria-label=\"Design do Álbum\"]"
+          "selector": "button[aria-label=\"Design do álbum\"]"
         }
       ]
     },
@@ -9082,7 +9082,7 @@
       "actions": [
         {
           "type": "click",
-          "selector": "button[aria-label=\"Informações do Álbum\"]"
+          "selector": "button[aria-label=\"Informações do álbum\"]"
         }
       ]
     },
@@ -9104,11 +9104,11 @@
       "actions": [
         {
           "type": "click",
-          "selector": "button[aria-label=\"Informações do Álbum\"]"
+          "selector": "button[aria-label=\"Informações do álbum\"]"
         },
         {
           "type": "focus",
-          "selector": "input[aria-label=\"Espaço entre Frames\"]"
+          "selector": "input[aria-label=\"Espaço entre quadros\"]"
         },
         {
           "type": "key",
@@ -9295,7 +9295,7 @@
       "actions": [
         {
           "type": "click-text",
-          "text": "Limpar cache"
+          "text": "Limpar prévias"
         },
         {
           "type": "click-text",
@@ -9320,7 +9320,7 @@
       "actions": [
         {
           "type": "click-text",
-          "text": "Limpar cache"
+          "text": "Limpar prévias"
         }
       ]
     },
@@ -9341,7 +9341,7 @@
       "actions": [
         {
           "type": "click-text",
-          "text": "Limpar cache"
+          "text": "Limpar prévias"
         }
       ]
     },
@@ -9379,7 +9379,7 @@
         "width": 1440,
         "height": 900
       },
-      "readySelector": "[role=\"menu\"][aria-label=\"Ações da Foto\"]",
+      "readySelector": "[role=\"menu\"][aria-label=\"Ações da foto\"]",
       "actions": [
         {
           "type": "context-click",
@@ -9400,7 +9400,7 @@
         "width": 1440,
         "height": 900
       },
-      "readySelector": "[role=\"menu\"][aria-label=\"Ações da Foto\"]",
+      "readySelector": "[role=\"menu\"][aria-label=\"Ações da foto\"]",
       "actions": [
         {
           "type": "context-click",
@@ -9504,7 +9504,7 @@
     {
       "id": "storage-full-export-manual",
       "title": "Exportação — falta de espaço (manual)",
-      "implementationPath": "/project-dialog.html?state=%7B%22kind%22%3A%22storageFull%22%2C%22message%22%3A%22Libere%20espa%C3%A7o%20para%20continuar.%20Arquivos%20j%C3%A1%20exportados%20foram%20mantidos.%22%2C%22canClearCache%22%3Afalse%2C%22busy%22%3Afalse%7D",
+      "implementationPath": "/project-dialog.html?state=%7B%22kind%22%3A%22storageFull%22%2C%22message%22%3A%22Libere%20espa%C3%A7o%20para%20continuar.%20arquivos%20j%C3%A1%20exportados%20foram%20mantidos.%22%2C%22canClearCache%22%3Afalse%2C%22busy%22%3Afalse%7D",
       "comparison": {
         "kind": "implementation-only",
         "surface": "batch-export-window",
@@ -9521,7 +9521,7 @@
     {
       "id": "storage-full-export-cleanup",
       "title": "Exportação — falta de espaço (cleanup)",
-      "implementationPath": "/project-dialog.html?state=%7B%22kind%22%3A%22storageFull%22%2C%22message%22%3A%22Libere%20espa%C3%A7o%20para%20continuar.%20Arquivos%20j%C3%A1%20exportados%20foram%20mantidos.%22%2C%22canClearCache%22%3Atrue%2C%22busy%22%3Afalse%7D",
+      "implementationPath": "/project-dialog.html?state=%7B%22kind%22%3A%22storageFull%22%2C%22message%22%3A%22Libere%20espa%C3%A7o%20para%20continuar.%20arquivos%20j%C3%A1%20exportados%20foram%20mantidos.%22%2C%22canClearCache%22%3Atrue%2C%22busy%22%3Afalse%7D",
       "comparison": {
         "kind": "implementation-only",
         "surface": "batch-export-window",
@@ -9538,7 +9538,7 @@
     {
       "id": "storage-full-export-busy",
       "title": "Exportação — falta de espaço (busy)",
-      "implementationPath": "/project-dialog.html?state=%7B%22kind%22%3A%22storageFull%22%2C%22message%22%3A%22Libere%20espa%C3%A7o%20para%20continuar.%20Arquivos%20j%C3%A1%20exportados%20foram%20mantidos.%22%2C%22canClearCache%22%3Atrue%2C%22busy%22%3Atrue%7D",
+      "implementationPath": "/project-dialog.html?state=%7B%22kind%22%3A%22storageFull%22%2C%22message%22%3A%22Libere%20espa%C3%A7o%20para%20continuar.%20arquivos%20j%C3%A1%20exportados%20foram%20mantidos.%22%2C%22canClearCache%22%3Atrue%2C%22busy%22%3Atrue%7D",
       "comparison": {
         "kind": "implementation-only",
         "surface": "batch-export-window",
@@ -9605,7 +9605,7 @@
         "width": 1440,
         "height": 900
       },
-      "readySelector": "[role=\"dialog\"][aria-label=\"Escolher cor do Background da Lâmina\"]",
+      "readySelector": "[role=\"dialog\"][aria-label=\"Escolher cor do fundo da lâmina\"]",
       "actions": [
         {
           "type": "assert",
@@ -9613,7 +9613,7 @@
         },
         {
           "type": "click",
-          "selector": "[aria-label=\"Cor do Background da Lâmina\"]"
+          "selector": "[aria-label=\"Cor do fundo da lâmina\"]"
         }
       ]
     },
@@ -9625,8 +9625,8 @@
       "viewport": { "width": 1440, "height": 900 },
       "readySelector": "[role='dialog']:has(input[aria-invalid='true']) [role='tooltip']",
       "actions": [
-        { "type": "click", "selector": "[aria-label='Cor do Background da Lâmina']" },
-        { "type": "input", "selector": "[aria-label='Cor hexadecimal do Background da Lâmina']", "value": "#oops" }
+        { "type": "click", "selector": "[aria-label='Cor do fundo da lâmina']" },
+        { "type": "input", "selector": "[aria-label='Código da cor do fundo da lâmina']", "value": "#oops" }
       ]
     },
     {
@@ -9651,11 +9651,11 @@
         },
         {
           "type": "click",
-          "selector": "[aria-label=\"Cor do Background da Lâmina\"]"
+          "selector": "[aria-label=\"Cor do fundo da lâmina\"]"
         },
         {
           "type": "input",
-          "selector": "[aria-label=\"Cor hexadecimal do Background da Lâmina\"]",
+          "selector": "[aria-label=\"Código da cor do fundo da lâmina\"]",
           "value": "#E7D6C4"
         },
         {
@@ -9686,11 +9686,11 @@
         },
         {
           "type": "click",
-          "selector": "[aria-label=\"Cor do Background da Lâmina\"]"
+          "selector": "[aria-label=\"Cor do fundo da lâmina\"]"
         },
         {
           "type": "input",
-          "selector": "[aria-label=\"Cor hexadecimal do Background da Lâmina\"]",
+          "selector": "[aria-label=\"Código da cor do fundo da lâmina\"]",
           "value": "#E7D6C4"
         },
         {
@@ -9725,7 +9725,7 @@
         },
         {
           "type": "click",
-          "selector": ".sheet-design-role[aria-label=\"Background\"] .sheet-design-role__actions > button"
+          "selector": ".sheet-design-role[aria-label=\"Fundo\"] .sheet-design-role__actions > button"
         }
       ]
     },
@@ -9755,7 +9755,7 @@
         },
         {
           "type": "click",
-          "selector": ".sheet-design-role[aria-label=\"Background\"] .sheet-design-role__restore"
+          "selector": ".sheet-design-role[aria-label=\"Fundo\"] .sheet-design-role__restore"
         }
       ]
     },
@@ -9781,7 +9781,7 @@
         },
         {
           "type": "click",
-          "selector": ".sheet-design-role[aria-label=\"Overlay\"] .sheet-design-role__actions > button"
+          "selector": ".sheet-design-role[aria-label=\"Sobreposição\"] .sheet-design-role__actions > button"
         }
       ]
     },
@@ -9807,7 +9807,7 @@
         },
         {
           "type": "click",
-          "selector": ".sheet-design-role[aria-label=\"Background\"] .sheet-design-role__restore"
+          "selector": ".sheet-design-role[aria-label=\"Fundo\"] .sheet-design-role__restore"
         }
       ]
     },
@@ -9833,7 +9833,7 @@
         },
         {
           "type": "click",
-          "selector": ".sheet-design-role[aria-label=\"Overlay\"] .sheet-design-role__restore"
+          "selector": ".sheet-design-role[aria-label=\"Sobreposição\"] .sheet-design-role__restore"
         }
       ]
     },
@@ -9873,7 +9873,7 @@
         "width": 1440,
         "height": 800
       },
-      "readySelector": "#application-menu-sheet [aria-label='Duplicar Lâmina']:not(:disabled)",
+      "readySelector": "#application-menu-sheet [aria-label='Duplicar lâmina']:not(:disabled)",
       "actions": [
         {
           "type": "assert",
@@ -9899,7 +9899,7 @@
         "width": 1440,
         "height": 600
       },
-      "readySelector": "[role='menu'][aria-label='Ações da Lâmina 01']",
+      "readySelector": "[role='menu'][aria-label='Ações da lâmina 01']",
       "actions": [
         {
           "type": "assert",
@@ -9938,7 +9938,7 @@
         },
         {
           "type": "click",
-          "selector": "#application-menu-sheet [aria-label='Duplicar Lâmina']"
+          "selector": "#application-menu-sheet [aria-label='Duplicar lâmina']"
         }
       ]
     },
@@ -9969,7 +9969,7 @@
         },
         {
           "type": "click-text",
-          "text": "Duplicar Lâmina"
+          "text": "Duplicar lâmina"
         }
       ]
     },
@@ -9987,7 +9987,7 @@
         "width": 1440,
         "height": 800
       },
-      "readySelector": "[role='menu'][aria-label='Ações da Lâmina 01']",
+      "readySelector": "[role='menu'][aria-label='Ações da lâmina 01']",
       "actions": [
         {
           "type": "assert",
@@ -10015,7 +10015,7 @@
         "width": 1440,
         "height": 800
       },
-      "readySelector": "#application-menu-sheet [aria-label='Duplicar Lâmina']:disabled",
+      "readySelector": "#application-menu-sheet [aria-label='Duplicar lâmina']:disabled",
       "actions": [
         {
           "type": "assert",
@@ -10041,7 +10041,7 @@
         "width": 1440,
         "height": 800
       },
-      "readySelector": "#application-menu-sheet [aria-label='Duplicar Lâmina']:disabled",
+      "readySelector": "#application-menu-sheet [aria-label='Duplicar lâmina']:disabled",
       "actions": [
         {
           "type": "assert",
@@ -10079,7 +10079,7 @@
         },
         {
           "type": "click",
-          "selector": "#application-menu-sheet [aria-label='Duplicar Lâmina']"
+          "selector": "#application-menu-sheet [aria-label='Duplicar lâmina']"
         },
         {
           "type": "assert",
@@ -10491,7 +10491,7 @@
       "actions": [
         {
           "type": "focus",
-          "selector": "input[aria-label=\"Buscar Fotos\"]"
+          "selector": "input[aria-label=\"Buscar fotos\"]"
         },
         {
           "type": "pointer-click",
@@ -10965,7 +10965,7 @@
         },
         {
           "type": "click",
-          "selector": "[role=\"menuitem\"][aria-label=\"Ajustar Lâmina\"]"
+          "selector": "[role=\"menuitem\"][aria-label=\"Ajustar lâmina\"]"
         },
         {
           "type": "assert",
@@ -11055,7 +11055,7 @@
         },
         {
           "type": "assert",
-          "selector": "[role=\"menuitem\"][aria-label=\"Ajustar Lâmina\"]:not([disabled])"
+          "selector": "[role=\"menuitem\"][aria-label=\"Ajustar lâmina\"]:not([disabled])"
         }
       ]
     },
@@ -11260,7 +11260,7 @@
         "width": 1100,
         "height": 400
       },
-      "readySelector": "[aria-label^=\"Pasta Fundos,\"][aria-pressed=\"true\"]",
+      "readySelector": "[aria-label^=\"Pasta fundos,\"][aria-pressed=\"true\"]",
       "actions": [
         {
           "type": "click",
@@ -11268,7 +11268,7 @@
         },
         {
           "type": "click",
-          "selector": "[aria-label^=\"Pasta Fundos,\"]"
+          "selector": "[aria-label^=\"Pasta fundos,\"]"
         }
       ]
     },
@@ -11468,7 +11468,7 @@
       },
       "id": "workspace-photo-zoom-mixed",
       "title": "Zoom — duas Fotos com valores diferentes e um placeholder",
-      "readySelector": "[aria-label=\"Zoom da Foto em porcentagem\"][aria-valuetext=\"Múltiplos valores\"]",
+      "readySelector": "[aria-label=\"Zoom da foto em porcentagem\"][aria-valuetext=\"Múltiplos valores\"]",
       "actions": []
     },
     {
@@ -11484,11 +11484,11 @@
       },
       "id": "workspace-photo-zoom-group",
       "title": "Zoom — aplicação de 175% na seleção",
-      "readySelector": "body[data-photo-orientation=\"group-zoom\"][data-photo-orientation-history=\"1,0\"] [aria-label=\"Zoom da Foto em porcentagem\"][value=\"175\"]",
+      "readySelector": "body[data-photo-orientation=\"group-zoom\"][data-photo-orientation-history=\"1,0\"] [aria-label=\"Zoom da foto em porcentagem\"][value=\"175\"]",
       "actions": [
         {
           "type": "input",
-          "selector": "[aria-label=\"Zoom da Foto em porcentagem\"]",
+          "selector": "[aria-label=\"Zoom da foto em porcentagem\"]",
           "value": "175"
         },
         {
@@ -11514,7 +11514,7 @@
       "actions": [
         {
           "type": "input",
-          "selector": "[aria-label=\"Zoom da Foto em porcentagem\"]",
+          "selector": "[aria-label=\"Zoom da foto em porcentagem\"]",
           "value": "175"
         },
         {
@@ -11531,7 +11531,7 @@
         },
         {
           "type": "assert",
-          "selector": "body[data-photo-orientation=\"single-zoom\"][data-photo-orientation-history=\"0,1\"] [aria-label=\"Zoom da Foto em porcentagem\"][aria-valuetext=\"Múltiplos valores\"]"
+          "selector": "body[data-photo-orientation=\"single-zoom\"][data-photo-orientation-history=\"0,1\"] [aria-label=\"Zoom da foto em porcentagem\"][aria-valuetext=\"Múltiplos valores\"]"
         },
         {
           "type": "click-text",
@@ -11556,11 +11556,11 @@
       },
       "id": "workspace-photo-zoom-invalid",
       "title": "Zoom — valor inválido não altera o Projeto",
-      "readySelector": "body[data-photo-orientation='single-zoom'][data-photo-orientation-history='0,0'] .numeric-property-control:has([aria-label='Zoom da Foto em porcentagem'][aria-invalid='true']) [role='tooltip']",
+      "readySelector": "body[data-photo-orientation='single-zoom'][data-photo-orientation-history='0,0'] .numeric-property-control:has([aria-label='Zoom da foto em porcentagem'][aria-invalid='true']) [role='tooltip']",
       "actions": [
         {
           "type": "input",
-          "selector": "[aria-label=\"Zoom da Foto em porcentagem\"]",
+          "selector": "[aria-label=\"Zoom da foto em porcentagem\"]",
           "value": "450"
         }
       ]
@@ -11571,8 +11571,8 @@
       "implementationPath": "/workspace-preview.html?frame=orientation&orientation=single-zoom",
       "comparison": { "kind": "implementation-only", "surface": "photo-zoom", "reason": "O design 0040 reutiliza o controle de propriedades no Zoom individual. O draft é local; a composição inicial provém do Core." },
       "viewport": { "width": 1440, "height": 800 },
-      "readySelector": "[aria-label='Zoom da Foto em porcentagem'][value='200'][autocomplete='off']",
-      "actions": [{ "type": "input", "selector": "[aria-label='Zoom da Foto em porcentagem']", "value": "200" }]
+      "readySelector": "[aria-label='Zoom da foto em porcentagem'][value='200'][autocomplete='off']",
+      "actions": [{ "type": "input", "selector": "[aria-label='Zoom da foto em porcentagem']", "value": "200" }]
     },
     {
       "id": "workspace-photo-zoom-single-invalid",
@@ -11580,8 +11580,8 @@
       "implementationPath": "/workspace-preview.html?frame=orientation&orientation=single-zoom",
       "comparison": { "kind": "implementation-only", "surface": "photo-zoom", "reason": "O design 0040 mantém a validação no controle numérico existente e preserva o Projeto enquanto a entrada é inválida." },
       "viewport": { "width": 1440, "height": 800 },
-      "readySelector": "body[data-photo-orientation-history='0,0'] .numeric-property-control:has([aria-label='Zoom da Foto em porcentagem'][aria-invalid='true']) [role='tooltip']",
-      "actions": [{ "type": "input", "selector": "[aria-label='Zoom da Foto em porcentagem']", "value": "9999" }]
+      "readySelector": "body[data-photo-orientation-history='0,0'] .numeric-property-control:has([aria-label='Zoom da foto em porcentagem'][aria-invalid='true']) [role='tooltip']",
+      "actions": [{ "type": "input", "selector": "[aria-label='Zoom da foto em porcentagem']", "value": "9999" }]
     },
     {
       "id": "workspace-photo-zoom-single-cancel",
@@ -11589,8 +11589,8 @@
       "implementationPath": "/workspace-preview.html?frame=orientation&orientation=single-zoom",
       "comparison": { "kind": "implementation-only", "surface": "photo-zoom", "reason": "O design 0040 mantém cancelamento e foco no controle reutilizado. Escape restaura o Zoom de 150% do corpus do Core, sem Histórico." },
       "viewport": { "width": 1440, "height": 800 },
-      "readySelector": "body[data-photo-orientation-history='0,0'] [aria-label='Zoom da Foto em porcentagem'][value='150']",
-      "actions": [{ "type": "input", "selector": "[aria-label='Zoom da Foto em porcentagem']", "value": "200" }, { "type": "key", "key": "Escape" }]
+      "readySelector": "body[data-photo-orientation-history='0,0'] [aria-label='Zoom da foto em porcentagem'][value='150']",
+      "actions": [{ "type": "input", "selector": "[aria-label='Zoom da foto em porcentagem']", "value": "200" }, { "type": "key", "key": "Escape" }]
     },
     {
       "id": "command-sheet-menu-owns-delete",
@@ -11598,11 +11598,11 @@
       "implementationPath": "/workspace-preview.html?structure=physical",
       "comparison": { "kind": "implementation-only", "surface": "command-context", "implementationCaptureSelector": ".app-shell", "reason": "Issue #12: menus preservam a elegibilidade local. Delete não alcança a Lâmina centralizada por trás do menu; nomes e visual seguem o editor vigente." },
       "viewport": { "width": 1440, "height": 600 },
-      "readySelector": ".app-shell:has(.canvas-host[data-centered-sheet-id='sheet-002']):has([role='menu'][aria-label='Ações da Lâmina 02'])",
+      "readySelector": ".app-shell:has(.canvas-host[data-centered-sheet-id='sheet-002']):has([role='menu'][aria-label='Ações da lâmina 02'])",
       "actions": [
         { "type": "assert", "selector": ".canvas-host[data-centered-sheet-id='sheet-002']" },
         { "type": "context-click", "selector": ".canvas-host canvas" },
-        { "type": "focus", "selector": "[role='menu'][aria-label='Ações da Lâmina 02'] button" },
+        { "type": "focus", "selector": "[role='menu'][aria-label='Ações da lâmina 02'] button" },
         { "type": "key", "key": "Delete" },
         { "type": "assert", "selector": "[data-reorder-surface='bar'] [data-sheet-id='sheet-002']" }
       ]

@@ -186,7 +186,7 @@ test("announces an invalid Grade target without inventing a placeholder", () => 
 
   expect(
     screen.getByText(
-      "Posição inválida: Páginas únicas permanecem nas extremidades.",
+      "Posição inválida: páginas únicas permanecem nas extremidades.",
     ),
   ).toHaveAttribute("role", "status");
   expect(screen.queryByTestId("reorder-placeholder")).not.toBeInTheDocument();
@@ -446,7 +446,7 @@ function sheetSlot(sheetId: string): HTMLElement {
 
 function sheetButton(number: number): HTMLElement {
   return screen.getByRole("button", {
-    name: new RegExp(`^Ir para Lâmina ${String(number).padStart(2, "0")},`),
+    name: new RegExp(`^Ir para lâmina ${String(number).padStart(2, "0")},`),
   });
 }
 

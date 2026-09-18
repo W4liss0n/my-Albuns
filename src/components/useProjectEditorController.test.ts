@@ -36,11 +36,11 @@ function projectCorePort(): ProjectCorePort {
     validateMediaFolderName: async () => { throw new Error("Folder validation is not configured in this fixture."); },
     queryLayouts: async () => { throw new Error("Layouts are not configured in this fixture."); },
     previewLayout: async () => { throw new Error("Layouts are not configured in this fixture."); },
-    previewFrameStyle: async () => { throw new Error("Frame style preview is not configured in this fixture."); },
+    previewFrameStyle: async () => { throw new Error("Quadro style preview is not configured in this fixture."); },
     previewDecorativeDrop: async () => { throw new Error("Decorative preview is not configured in this fixture."); },
-    previewPhotoZoom: async () => { throw new Error("Photo Zoom preview is not configured in this fixture."); },
+    previewPhotoZoom: async () => { throw new Error("Photo zoom preview is not configured in this fixture."); },
     previewPhotoAngle: async () => { throw new Error("Photo angle preview is not configured in this fixture."); },
-    previewFrameGeometry: async () => { throw new Error("Frame geometry preview is not configured in this fixture."); },
+    previewFrameGeometry: async () => { throw new Error("Quadro geometry preview is not configured in this fixture."); },
     resolvePhotoDropTarget: async () => ({ kind: "invalid" }),
     replaceImage: async () => representativeProjection, relink: async () => representativeProjection,
     undo: async () => representativeProjection,
@@ -104,7 +104,7 @@ test.each(["success", "failure"])("a pending Frame edit followed by Save uses th
   expect(save).not.toHaveBeenCalled();
   await act(async () => {
     if (outcome === "success") pending.resolve(changed);
-    else pending.reject(new Error("A geometria do Frame foi alterada durante o gesto."));
+    else pending.reject(new Error("A geometria do quadro foi alterada durante o gesto."));
     await finished;
   });
   if (outcome === "success") {
@@ -115,7 +115,7 @@ test.each(["success", "failure"])("a pending Frame edit followed by Save uses th
     expect(await finished).toBeNull();
     expect(save).not.toHaveBeenCalled();
     expect(onProjectionChange).not.toHaveBeenCalled();
-    expect(view.result.current.message).toContain("geometria do Frame");
+    expect(view.result.current.message).toContain("geometria do quadro");
   }
 });
 

@@ -137,7 +137,7 @@ pub(crate) async fn import_media(
 ) -> Result<ImportMediaResult, String> {
     let _operation = crate::project_ui_operations::begin(&app)?;
     if window.label() != PROJECT_WINDOW_LABEL {
-        return Err("A importação só está disponível na Janela do Projeto.".into());
+        return Err("A importação só está disponível na Janela do projeto.".into());
     }
     let host = state.inner().clone();
     use crate::ipc_contract::MediaImportSource;
@@ -190,7 +190,7 @@ pub(crate) async fn import_media(
             FilePath::Path(path) => paths.push(path),
             FilePath::Url(_) => unsupported.push(crate::ipc_contract::ImageProcessingProblem {
                 file_name: "Local selecionado".into(),
-                reason: "O local escolhido não é um Arquivo do Windows válido.".into(),
+                reason: "O local escolhido não é um arquivo do Windows válido.".into(),
             }),
         }
     }
@@ -236,7 +236,7 @@ pub(crate) fn photo_drop_target(
     state: State<'_, ProjectHost>,
 ) -> Result<PhotoDropTarget, String> {
     if window.label() != PROJECT_WINDOW_LABEL {
-        return Err("O alvo da Foto só pode ser consultado na Janela do Projeto.".into());
+        return Err("O alvo da foto só pode ser consultado na Janela do projeto.".into());
     }
     state.project_photo_drop_target(&sheet_id, x_um, y_um)
 }
@@ -248,7 +248,7 @@ pub(crate) async fn preview_photo_zoom(
     state: State<'_, ProjectHost>,
 ) -> Result<Vec<myalbuns_core::ComposedFrame>, String> {
     if window.label() != PROJECT_WINDOW_LABEL {
-        return Err("O Zoom da Foto só pode ser consultado na Janela do Projeto.".into());
+        return Err("O zoom da foto só pode ser consultado na Janela do projeto.".into());
     }
     state.preview_photo_zoom(&edit)
 }
@@ -260,7 +260,7 @@ pub(crate) async fn preview_photo_angle(
     state: State<'_, ProjectHost>,
 ) -> Result<Vec<myalbuns_core::ComposedFrame>, String> {
     if window.label() != PROJECT_WINDOW_LABEL {
-        return Err("O Ângulo da Foto só pode ser consultada na Janela do Projeto.".into());
+        return Err("O Ângulo da foto só pode ser consultada na Janela do projeto.".into());
     }
     state.preview_photo_angle(&edit)
 }
@@ -272,7 +272,7 @@ pub(crate) fn preview_decorative_drop(
     state: State<'_, ProjectHost>,
 ) -> Result<Option<myalbuns_core::DecorativeDropPreview>, String> {
     if window.label() != PROJECT_WINDOW_LABEL {
-        return Err("O Decorativo só pode ser consultado na Janela do Projeto.".into());
+        return Err("O decorativo só pode ser consultado na Janela do projeto.".into());
     }
     state.preview_decorative_drop(&request)
 }
@@ -286,11 +286,11 @@ pub(crate) async fn query_layouts(
     catalog: State<'_, crate::layout_catalog_store::LayoutCatalogStore>,
 ) -> Result<myalbuns_core::LayoutQueryResult, String> {
     if window.label() != PROJECT_WINDOW_LABEL {
-        return Err("Os Layouts só podem ser consultados na Janela do Projeto.".into());
+        return Err("Os layouts só podem ser consultados na Janela do projeto.".into());
     }
     let snapshot = catalog
         .load()
-        .map_err(|_| "Não foi possível ler os Layouts personalizados.".to_string())?;
+        .map_err(|_| "Não foi possível ler os layouts personalizados.".to_string())?;
     state.refresh_layout_catalog(snapshot)?;
     state.query_layouts(&sheet_id, frame_request)
 }
@@ -302,7 +302,7 @@ pub(crate) async fn preview_layout(
     state: State<'_, ProjectHost>,
 ) -> Result<Vec<myalbuns_core::ComposedFrame>, String> {
     if window.label() != PROJECT_WINDOW_LABEL {
-        return Err("A prévia de Layout só está disponível na Janela do Projeto.".into());
+        return Err("A prévia de layout só está disponível na Janela do projeto.".into());
     }
     state.preview_layout(&selection)
 }
@@ -314,7 +314,7 @@ pub(crate) async fn preview_frame_style(
     state: State<'_, ProjectHost>,
 ) -> Result<Vec<myalbuns_core::ComposedFrame>, String> {
     if window.label() != PROJECT_WINDOW_LABEL {
-        return Err("O estilo do Frame só pode ser consultado na Janela do Projeto.".into());
+        return Err("O estilo do quadro só pode ser consultado na Janela do projeto.".into());
     }
     state.preview_frame_style(&edit)
 }
@@ -322,7 +322,7 @@ pub(crate) async fn preview_frame_style(
 #[tauri::command]
 pub(crate) fn slider_double_click_time(window: WebviewWindow) -> Result<u32, String> {
     if window.label() != PROJECT_WINDOW_LABEL {
-        return Err("O intervalo de dois cliques só está disponível na Janela do Projeto.".into());
+        return Err("O intervalo de dois cliques só está disponível na Janela do projeto.".into());
     }
     #[cfg(windows)]
     {
@@ -340,7 +340,7 @@ pub(crate) async fn preview_frame_geometry(
     state: State<'_, ProjectHost>,
 ) -> Result<myalbuns_core::FrameGeometryPreview, String> {
     if window.label() != PROJECT_WINDOW_LABEL {
-        return Err("A geometria do Frame só pode ser consultada na Janela do Projeto.".into());
+        return Err("A geometria do quadro só pode ser consultada na Janela do projeto.".into());
     }
     state.preview_frame_geometry(&edit)
 }
@@ -350,7 +350,7 @@ pub(crate) async fn frame_drag_threshold(
     window: WebviewWindow,
 ) -> Result<crate::ipc_contract::PointerDragThreshold, String> {
     if window.label() != PROJECT_WINDOW_LABEL {
-        return Err("O arraste de Frame só está disponível na Janela do Projeto.".into());
+        return Err("O arraste de quadro só está disponível na Janela do projeto.".into());
     }
     let scale = window.scale_factor().map_err(|error| error.to_string())?;
     #[cfg(windows)]
@@ -376,7 +376,7 @@ pub(crate) async fn frame_drag_threshold(
     #[cfg(not(windows))]
     {
         let _ = scale;
-        Err("A edição de Frames requer a plataforma Windows suportada.".into())
+        Err("A edição de quadros requer a plataforma Windows suportada.".into())
     }
 }
 
@@ -428,7 +428,7 @@ async fn change_media_reference(
 ) -> Result<EditorProjection, String> {
     let _operation = crate::project_ui_operations::begin(&app)?;
     if window.label() != PROJECT_WINDOW_LABEL {
-        return Err("A alteração de imagem só está disponível na Janela do Projeto.".into());
+        return Err("A alteração de imagem só está disponível na Janela do projeto.".into());
     }
     let host = state.inner().clone();
     let binding = host
@@ -436,17 +436,17 @@ async fn change_media_reference(
         .bindings
         .into_iter()
         .find(|binding| binding.media_id == media_id)
-        .ok_or_else(|| "A ocorrência de mídia não pertence a este Projeto.".to_string())?;
+        .ok_or_else(|| "A ocorrência de mídia não pertence a este projeto.".to_string())?;
     if kind == MediaChangeKind::Relink {
         let inspected_binding = binding.clone();
         let absent = tauri::async_runtime::spawn_blocking(move || {
             occurrence_is_authoritatively_absent(&inspected_binding)
         })
         .await
-        .map_err(|_| "Não foi possível reinspecionar o Arquivo vinculado.".to_string())?;
+        .map_err(|_| "Não foi possível reinspecionar o arquivo vinculado.".to_string())?;
         if !absent {
             return Err(
-            "Somente um Arquivo comprovadamente ausente pode ser religado; tente novamente se a origem estiver indisponível."
+            "Somente um arquivo comprovadamente ausente pode ser religado; tente novamente se a origem estiver indisponível."
                 .into(),
         );
         }

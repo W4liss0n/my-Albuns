@@ -15,7 +15,7 @@ test("the central Layout control opens its own Sheet without starting reorder or
   const callbacks = props({ layouts: { disabled: false, activeSheetId: "sheet-2", onToggle } });
   const onKey = vi.fn();
   render(<div onKeyDown={onKey}><SheetBarOverlay {...callbacks} /></div>);
-  const button = screen.getByRole("button", { name: "Layouts da Lâmina 02" });
+  const button = screen.getByRole("button", { name: "Layouts da lâmina 02" });
   expect(button).toHaveAttribute("aria-expanded", "true");
   fireEvent.keyDown(button, { key: "Enter" });
   fireEvent.pointerDown(button, { button: 0, pointerId: 1, clientX: 220, clientY: 40 });
@@ -34,7 +34,7 @@ test("the swap hotspot targets its Sheet and owns pointer, double-click and cont
     sheetBarMetadata: sheets.map((sheet) => ({ sheetId: sheet.sheetId, pageNumbers: [], layoutLocked: false, canSwapSides: true })),
   });
   render(<SheetBarOverlay {...callbacks} />);
-  const button = screen.getByRole("button", { name: "Trocar lados da Lâmina 02" });
+  const button = screen.getByRole("button", { name: "Trocar lados da lâmina 02" });
   expect(button.parentElement).toHaveStyle({ left: "180px", top: "35px", width: "26px", height: "26px" });
   fireEvent.pointerEnter(button);
   fireEvent.pointerDown(button, { button: 0, pointerId: 1, clientX: 190, clientY: 40 });
@@ -54,7 +54,7 @@ test("the swap hotspot targets its Sheet and owns pointer, double-click and cont
 test("the unavailable swap hotspot does not fall through to reordering or editing", () => {
   const callbacks = props({ onSwapSides: vi.fn() });
   render(<SheetBarOverlay {...callbacks} />);
-  const button = screen.getByRole("button", { name: "Trocar lados da Lâmina 01" });
+  const button = screen.getByRole("button", { name: "Trocar lados da lâmina 01" });
   expect(button).toBeDisabled();
   fireEvent.pointerDown(button, { button: 0, pointerId: 1, clientX: 45, clientY: 40 });
   fireEvent.pointerMove(button, { pointerId: 1, clientX: 220, clientY: 40 });
@@ -73,7 +73,7 @@ test("aligns enabled pointer handles with the scaled Sheet Bar slots", () => {
     <SheetBarOverlay {...props({ onPreview })} />,
   );
   const overlay = screen.getByRole("group", {
-    name: "Reordenação pela Barra da Lâmina",
+    name: "Reordenação pela Barra da lâmina",
   });
   const first = barHandle(1);
   const second = barHandle(2);
@@ -197,7 +197,7 @@ test("moves neighboring handles and renders only the declared preview markers", 
     />,
   );
   expect(screen.getByRole("status")).toHaveTextContent(
-    "Posição inválida: Páginas únicas permanecem nas extremidades.",
+    "Posição inválida: páginas únicas permanecem nas extremidades.",
   );
   expect(screen.queryByTestId("reorder-placeholder")).not.toBeInTheDocument();
 });
@@ -626,13 +626,13 @@ test("cancels and releases an active Bar reorder when its surface unmounts", () 
 
 function barHandle(number: number): HTMLButtonElement {
   return screen.getByRole("button", {
-    name: `Reordenar Lâmina ${String(number).padStart(2, "0")} pela Barra`,
+    name: `Reordenar lâmina ${String(number).padStart(2, "0")} pela Barra`,
   });
 }
 
 function barSurface(): HTMLElement {
   return screen.getByRole("group", {
-    name: "Reordenação pela Barra da Lâmina",
+    name: "Reordenação pela Barra da lâmina",
   });
 }
 
@@ -711,7 +711,7 @@ function pointerUp(
 function setOverlayBounds() {
   vi.spyOn(
     screen.getByRole("group", {
-      name: "Reordenação pela Barra da Lâmina",
+      name: "Reordenação pela Barra da lâmina",
     }),
     "getBoundingClientRect",
   ).mockReturnValue(rect(0, 0, 640, 200));

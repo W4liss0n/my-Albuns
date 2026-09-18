@@ -22,7 +22,7 @@ export const PROJECT_CLOSE_CONFIRMATION_EVENT =
 function invalidCloseResponse() {
   return new ProjectCloseError(
     "invalid_response",
-    "Não foi possível confirmar o estado do fechamento do Projeto.",
+    "Não foi possível confirmar o estado do fechamento do projeto.",
   );
 }
 
@@ -62,7 +62,7 @@ function normalizeCloseError(error: unknown) {
   }
   return new ProjectCloseError(
     "close_unavailable",
-    "Não foi possível iniciar o fechamento do Projeto.",
+    "Não foi possível iniciar o fechamento do projeto.",
   );
 }
 

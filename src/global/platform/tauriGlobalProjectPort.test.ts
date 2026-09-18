@@ -87,7 +87,7 @@ test("fails closed when a command outcome carries fields outside the closed cont
     status: "failed",
     error: {
       code: "open_project_unavailable",
-      message: "Não foi possível iniciar a abertura do Projeto.",
+      message: "Não foi possível iniciar a abertura do projeto.",
       action:
         "Tente novamente. Se o problema continuar, reinicie o MyAlbuns.",
     },
@@ -144,7 +144,7 @@ test("keeps picker cancellation distinct from a malformed response", async () =>
     status: "failed",
     error: {
       code: "decorative_picker_unavailable",
-      message: "Não foi possível concluir o seletor de Imagem decorativa.",
+      message: "Não foi possível concluir o seletor de imagem decorativa.",
       action: "Tente novamente.",
     },
   });
@@ -256,7 +256,7 @@ test("keeps an unavailable creation distinct from an unavailable opening", async
     status: "failed",
     error: {
       code: "create_project_unavailable",
-      message: "Não foi possível iniciar a criação do Projeto.",
+      message: "Não foi possível iniciar a criação do projeto.",
       action:
         "Tente novamente. Se o problema continuar, reinicie o MyAlbuns.",
     },
@@ -309,7 +309,7 @@ test("keeps an actionable structured backend failure inside the application port
     error: {
       code: "project_in_use",
       stage: "open",
-      message: "Este Projeto já está aberto em outra janela.",
+      message: "Este projeto já está aberto em outra janela.",
       action: "Feche a outra janela e tente novamente.",
       pathname: "C:\\Trabalho\\Álbum.myalbuns",
     },
@@ -320,7 +320,7 @@ test("keeps an actionable structured backend failure inside the application port
     error: {
       code: "project_in_use",
       stage: "open",
-      message: "Este Projeto já está aberto em outra janela.",
+      message: "Este projeto já está aberto em outra janela.",
       action: "Feche a outra janela e tente novamente.",
     },
   });
@@ -365,7 +365,7 @@ test("reopens a recent Project by opaque id only", async () => {
 test("reads a structured startup failure without its pathname", async () => {
   vi.mocked(invoke).mockResolvedValueOnce({
     code: "invalid_project",
-    message: "O arquivo selecionado não é um Projeto válido.",
+    message: "O arquivo selecionado não é um projeto válido.",
     action: "Escolha outro arquivo .myalbuns.",
     pathname: "C:\\Trabalho\\Inválido.myalbuns",
   });
@@ -374,7 +374,7 @@ test("reads a structured startup failure without its pathname", async () => {
     tauriGlobalProjectPort.startupOpenFailure(),
   ).resolves.toEqual({
     code: "invalid_project",
-    message: "O arquivo selecionado não é um Projeto válido.",
+    message: "O arquivo selecionado não é um projeto válido.",
     action: "Escolha outro arquivo .myalbuns.",
   });
   expect(invoke).toHaveBeenCalledWith("startup_open_failure");
@@ -391,7 +391,7 @@ test("ignores an unavailable startup diagnostic", async () => {
 test("delegates a launch failure to the owned native dialog window", async () => {
   const error = {
     code: "project_in_use",
-    message: "Este Projeto já está aberto em outra janela.",
+    message: "Este projeto já está aberto em outra janela.",
     action: "Feche a outra janela e tente novamente.",
   };
   vi.mocked(invoke).mockResolvedValueOnce(undefined);
@@ -421,7 +421,7 @@ test("subscribes before snapshotting and delivers each activation terminal once"
       status: "failed",
       error: {
         code: "project_in_use",
-        message: "Este Projeto está aberto por outra instância.",
+        message: "Este projeto está aberto por outra instância.",
         action: "Focalize a instância proprietária.",
         pathname: "C:\\Acervo\\Álbum.myalbuns",
       },
@@ -445,7 +445,7 @@ test("subscribes before snapshotting and delivers each activation terminal once"
     status: "failed",
     error: {
       code: "project_in_use",
-      message: "Este Projeto está aberto por outra instância.",
+      message: "Este projeto está aberto por outra instância.",
       action: "Focalize a instância proprietária.",
     },
   });

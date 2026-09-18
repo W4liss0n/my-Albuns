@@ -38,7 +38,7 @@ const newProjectPort = createNewProjectPortStub();
 const supportedGraphics = {
   supported: true,
   renderer: "NVIDIA GeForce RTX",
-  reason: "WebGL2 acelerado por hardware confirmado.",
+  reason: "A aceleração gráfica está disponível.",
   limits: {
     maxTextureSizePx: 16_384,
     maxRenderbufferSizePx: 16_384,

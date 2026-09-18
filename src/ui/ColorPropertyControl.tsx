@@ -22,7 +22,7 @@ export function ColorPropertyControl({ rgb, disabled, label, defaultRgb = "#0000
   const actions = useRef({ onCancel });
   actions.current = { onCancel };
   const valid = draft !== null && /^#[\da-f]{6}$/i.test(draft);
-  const error = draft !== null && !valid ? "Use uma cor hexadecimal com seis dígitos, como #A1B2C3." : undefined;
+  const error = draft !== null && !valid ? "Use uma cor no formato #A1B2C3." : undefined;
   const validationTooltip = useFieldValidationTooltip(useId(), [
     { field: "color", messages: error ? [error] : undefined },
   ]);
@@ -57,7 +57,7 @@ export function ColorPropertyControl({ rgb, disabled, label, defaultRgb = "#0000
       <div className="ui-color-property-inputs">
         <input type="color" aria-label={`Selecionar cor ${label}`} value={valid ? draft : defaultRgb}
           onChange={(event) => update(event.currentTarget.value)} />
-        <TextInput type="text" className="ui-field-control" aria-label={`Cor hexadecimal ${label}`} value={draft} maxLength={7}
+        <TextInput type="text" className="ui-field-control" aria-label={`Código da cor ${label}`} value={draft} maxLength={7}
           {...fieldValidationTooltipAttributes("color", error, validationTooltip)}
           onMouseEnter={() => { if (error) validationTooltip.show("color"); }}
           autoFocus aria-invalid={!valid} onChange={(event) => update(event.currentTarget.value)}

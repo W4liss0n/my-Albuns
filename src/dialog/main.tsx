@@ -62,7 +62,7 @@ function DialogContent() {
   };
 
   if (kind === "processing-images") {
-    return <ProgressDialog title="Processando Imagens" progress={{
+    return <ProgressDialog title="Processando imagens" progress={{
       kind: "determinate", completed: 0, total: 1,
     }} />;
   }
@@ -72,10 +72,10 @@ function DialogContent() {
   }
 
   if (kind === "project-failure") {
-    const title = parameter("title", "Não foi possível abrir o Projeto");
+    const title = parameter("title", "Não foi possível abrir o projeto");
     const message = parameter(
       "message",
-      "Não foi possível abrir este Projeto.",
+      "Não foi possível abrir este projeto.",
     );
     const action = parameter("action", "Tente novamente.");
 

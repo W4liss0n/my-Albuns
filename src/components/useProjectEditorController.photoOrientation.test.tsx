@@ -36,9 +36,9 @@ function harness(effects = false) {
     validateMediaFolderName: async () => { throw new Error("Folder validation is not configured in this fixture."); },
     queryLayouts: async () => { throw new Error("Layouts are not configured in this fixture."); },
     previewLayout: async () => { throw new Error("Layouts are not configured in this fixture."); },
-    previewFrameStyle: async () => { throw new Error("Frame style preview is not configured in this fixture."); },
+    previewFrameStyle: async () => { throw new Error("Quadro style preview is not configured in this fixture."); },
     previewDecorativeDrop: async () => { throw new Error("Decorative preview is not configured in this fixture."); },
-    previewPhotoZoom: async () => { throw new Error("Photo Zoom preview is not configured in this fixture."); },
+    previewPhotoZoom: async () => { throw new Error("Photo zoom preview is not configured in this fixture."); },
     previewPhotoAngle: async () => { throw new Error("Photo angle preview is not configured in this fixture."); },
     previewFrameGeometry: unsupported,
     saveAs: unsupported, validateAlbumInformation: unsupported, importMedia: unsupported,
@@ -70,7 +70,7 @@ test.each(["success", "failure"])("orientation, adjacent orientation, Save and U
   act(() => useEditorView.getState().selectFrames(corpus.placeholders));
   await act(async () => {
     if (outcome === "success") h.pending.resolve(h.rotated);
-    else h.pending.reject(new Error("Falha ao orientar as Fotos."));
+    else h.pending.reject(new Error("Falha ao orientar as fotos."));
     await h.view.result.current.runner.waitForIdle();
   });
   if (outcome === "success") {
@@ -83,7 +83,7 @@ test.each(["success", "failure"])("orientation, adjacent orientation, Save and U
     expect(h.save).not.toHaveBeenCalled();
     expect(h.undo).not.toHaveBeenCalled();
     expect(h.view.result.current.projection).toEqual(h.initial);
-    expect(h.view.result.current.message).toBe("Falha ao orientar as Fotos.");
+    expect(h.view.result.current.message).toBe("Falha ao orientar as fotos.");
   }
   expect(useEditorView.getState().selectedFrameIds).toEqual(corpus.placeholders);
 });

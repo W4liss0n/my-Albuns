@@ -140,7 +140,7 @@ export function createProjectApplicationMenus({
           implemented(id, "frame", () => arrangeFrames(action), !canArrangeFrames))),
         separator("edit-layout-separator"),
         { ...implemented("save-frame-arrangement-as-layout", "frame", saveLayout, !canSaveLayout),
-          title: canSaveLayout ? "Salvar a disposição dos Frames em Personalizados." : "Entre no Modo de edição de uma Lâmina com ao menos um Frame." },
+          title: canSaveLayout ? "Salvar a disposição dos quadros em Personalizados." : "Entre no Modo de edição de uma lâmina com ao menos um quadro." },
         implemented("select-all", "frame", selectAllFrames, !canSelectAllFrames),
       ],
     },
@@ -253,7 +253,7 @@ function placeholder(
   const descriptor = projectCommandDescriptor(id);
   const binding = projectCommandBinding(id, context);
   if (binding?.availability !== "placeholder") {
-    throw new Error(`Comando ${id} não é um placeholder em ${context}.`);
+    throw new Error(`Comando ${id} não é um quadro vazio em ${context}.`);
   }
   return {
     availability: "placeholder",

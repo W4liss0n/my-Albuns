@@ -395,12 +395,12 @@ export function NewProjectFlow({
             </ActionButton>
           ) : (
             <ActionButton
-              aria-label={isCreating ? "Criando Projeto…" : "Criar Projeto"}
+              aria-label={isCreating ? "Criando projeto…" : "Criar projeto"}
               disabled={isCreating}
               onClick={() => void createProject()}
               variant="primary"
             >
-              {isCreating ? "Criando Projeto…" : "Criar Projeto"}
+              {isCreating ? "Criando projeto…" : "Criar projeto"}
             </ActionButton>
           )}
         </div>
@@ -526,7 +526,7 @@ function ConfigurationStep({
           />
         </ControlSection>
 
-        <ControlSection title="Dimensão da Lâmina fechada">
+        <ControlSection title="Tamanho da lâmina fechada">
           <div className="new-project-size-fields">
             <NumericField
               attempted={attempted}
@@ -534,7 +534,7 @@ function ConfigurationStep({
               field="sheetWidth"
               hideLabel
               inputMode="decimal"
-              label="Largura da Lâmina fechada"
+              label="Largura da lâmina fechada"
               onChange={(text) => updatePhysical("closedSheetWidth", text)}
               ref={registerField("sheetWidth")}
               suffix={displayUnitLabel(draft.displayUnit)}
@@ -550,7 +550,7 @@ function ConfigurationStep({
               field="sheetHeight"
               hideLabel
               inputMode="decimal"
-              label="Altura da Lâmina fechada"
+              label="Altura da lâmina fechada"
               onChange={(text) => updatePhysical("sheetHeight", text)}
               ref={registerField("sheetHeight")}
               suffix={displayUnitLabel(draft.displayUnit)}
@@ -595,14 +595,14 @@ function ConfigurationStep({
             controls={
               <span className="new-project-stepper-actions">
                 <button
-                  aria-label="Diminuir quantidade de Lâminas"
+                  aria-label="Diminuir quantidade de lâminas"
                   onClick={() => adjustSheetCount(-2)}
                   type="button"
                 >
                   <AppIcon icon={Minus} size={12} />
                 </button>
                 <button
-                  aria-label="Aumentar quantidade de Lâminas"
+                  aria-label="Aumentar quantidade de lâminas"
                   onClick={() => adjustSheetCount(2)}
                   type="button"
                 >
@@ -614,7 +614,7 @@ function ConfigurationStep({
             field="sheetCount"
             hideLabel
             inputMode="numeric"
-            label="Quantidade de Lâminas"
+            label="Quantidade de lâminas"
             onChange={(sheetCountText) =>
               onChange({ ...draft, sheetCountText }, ["sheetCount"])
             }
@@ -624,7 +624,7 @@ function ConfigurationStep({
           />
         </ControlSection>
 
-        <ControlSection title="Resolução do Projeto">
+        <ControlSection title="Resolução do projeto">
           <NumericField
             attempted={attempted}
             error={errors.dpi}
@@ -642,17 +642,17 @@ function ConfigurationStep({
           />
         </ControlSection>
 
-        <ControlSection title="Configuração das extremidades">
+        <ControlSection title="Primeira e última lâmina">
           <div className="new-project-paired-fields">
             <SelectField
-              label="Primeira Lâmina"
+              label="Primeira lâmina"
               onChange={(firstSheet) =>
                 onChange({ ...draft, firstSheet }, [])
               }
               value={draft.firstSheet}
             />
             <SelectField
-              label="Última Lâmina"
+              label="Última lâmina"
               onChange={(lastSheet) => onChange({ ...draft, lastSheet }, [])}
               value={draft.lastSheet}
             />
@@ -745,7 +745,7 @@ function PresetControl({
             onChange={(event) => onApply(event.target.value)}
             value={selectedPresetId}
           >
-            <option value="">Nenhuma</option>
+            <option value="">Sem modelo</option>
             {presets.map((preset) => (
               <option key={preset.id} value={preset.id}>
                 {preset.name}

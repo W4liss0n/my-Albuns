@@ -74,7 +74,7 @@ test.each([
   } finally {
     await act(async () => {
       if (outcome === "success") resolve(zoomed);
-      else reject(new Error("Falha ao confirmar Zoom."));
+      else reject(new Error("Falha ao confirmar zoom."));
       await view.result.current.runner.waitForIdle();
     });
     expect(view.result.current.photoZoom.disabled).toBe(reselect);

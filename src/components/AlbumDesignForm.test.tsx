@@ -58,7 +58,7 @@ test("preserves an unapplied draft across a semantically equivalent projection",
   const onApply = vi.fn<ComponentProps<typeof AlbumDesignForm>["onApply"]>();
   const baseline = representativeProjection.state.album.visualDefaults;
   const view = render(<Harness onApply={onApply} value={baseline} />);
-  fireEvent.change(screen.getByLabelText("Cor do Background"), {
+  fireEvent.change(screen.getByLabelText("Cor do fundo"), {
     target: { value: "#f7f5f0" },
   });
   await waitFor(() =>
@@ -69,7 +69,7 @@ test("preserves an unapplied draft across a semantically equivalent projection",
     <Harness onApply={onApply} value={cloneVisualDefaults(baseline)} />,
   );
 
-  expect(screen.getByLabelText("Cor do Background")).toHaveValue("#f7f5f0");
+  expect(screen.getByLabelText("Cor do fundo")).toHaveValue("#f7f5f0");
   expect(screen.getByRole("button", { name: "Aplicar" })).toBeEnabled();
 });
 
@@ -77,8 +77,8 @@ test("edits the confirmed Project gap as part of Apply and adopts the applied ba
   const value = representativeProjection.state.album.visualDefaults;
   const onApply = vi.fn<ComponentProps<typeof AlbumDesignForm>["onApply"]>(async () => true);
   const view = render(<Harness onApply={onApply} value={value} frameGapUm={7_000} />);
-  expect(screen.getByRole("slider", { name: "Espaço entre Frames" })).toHaveValue("7000");
-  fireEvent.change(screen.getByRole("slider", { name: "Espaço entre Frames" }), { target: { value: "9000" } });
+  expect(screen.getByRole("slider", { name: "Espaço entre quadros" })).toHaveValue("7000");
+  fireEvent.change(screen.getByRole("slider", { name: "Espaço entre quadros" }), { target: { value: "9000" } });
   expect(onApply).not.toHaveBeenCalled();
   expect(screen.getByRole("button", { name: "Aplicar" })).toBeEnabled();
   fireEvent.click(screen.getByRole("button", { name: "Aplicar" }));
@@ -89,7 +89,7 @@ test("edits the confirmed Project gap as part of Apply and adopts the applied ba
   });
   view.rerender(<Harness onApply={onApply} value={value} frameGapUm={9_000} revision={26} />);
   await waitFor(() => expect(screen.getByRole("button", { name: "Aplicar" })).toBeDisabled());
-  expect(screen.getByRole("slider", { name: "Espaço entre Frames" })).toHaveValue("9000");
+  expect(screen.getByRole("slider", { name: "Espaço entre quadros" })).toHaveValue("9000");
 });
 
 test("rebases an unapplied draft over an authoritative Album design change", async () => {
@@ -103,7 +103,7 @@ test("rebases an unapplied draft over an authoritative Album design change", asy
     },
   };
   const view = render(<Harness onApply={onApply} value={baseline} />);
-  fireEvent.change(screen.getByLabelText("Cor do Background"), {
+  fireEvent.change(screen.getByLabelText("Cor do fundo"), {
     target: { value: "#f7f5f0" },
   });
   await waitFor(() =>
@@ -113,7 +113,7 @@ test("rebases an unapplied draft over an authoritative Album design change", asy
   view.rerender(<Harness onApply={onApply} value={changed} />);
 
   await waitFor(() =>
-    expect(screen.getByLabelText("Cor do Background")).toHaveValue("#f7f5f0"),
+    expect(screen.getByLabelText("Cor do fundo")).toHaveValue("#f7f5f0"),
   );
   expect(screen.getByRole("button", { name: "Aplicar" })).toBeEnabled();
 });
@@ -136,7 +136,7 @@ test("preserves edits made after submit while the applied projection arrives", a
   };
   const view = render(<Harness onApply={onApply} value={baseline} />);
 
-  fireEvent.change(screen.getByLabelText("Cor do Background"), {
+  fireEvent.change(screen.getByLabelText("Cor do fundo"), {
     target: { value: "#f7f5f0" },
   });
   await waitFor(() =>
@@ -145,13 +145,13 @@ test("preserves edits made after submit while the applied projection arrives", a
   fireEvent.click(screen.getByRole("button", { name: "Aplicar" }));
   expect(screen.getByRole("button", { name: "Aplicar" })).toBeDisabled();
 
-  fireEvent.change(screen.getByLabelText("Cor do Background"), {
+  fireEvent.change(screen.getByLabelText("Cor do fundo"), {
     target: { value: "#ffffff" },
   });
   view.rerender(<Harness onApply={onApply} value={applied} />);
 
   await waitFor(() =>
-    expect(screen.getByLabelText("Cor do Background")).toHaveValue("#ffffff"),
+    expect(screen.getByLabelText("Cor do fundo")).toHaveValue("#ffffff"),
   );
   await act(async () => {
     finishApply(true);
@@ -182,7 +182,7 @@ test("keeps the post-submit Design delta through temporarily matching predecesso
   };
   const view = render(<Harness onApply={onApply} value={baseline} />);
 
-  fireEvent.change(screen.getByLabelText("Cor do Background"), {
+  fireEvent.change(screen.getByLabelText("Cor do fundo"), {
     target: { value: "#f7f5f0" },
   });
   await waitFor(() =>
@@ -198,7 +198,7 @@ test("keeps the post-submit Design delta through temporarily matching predecesso
       value={submittedTarget}
     />,
   );
-  fireEvent.change(screen.getByLabelText("Espessura da Borda"), {
+  fireEvent.change(screen.getByLabelText("Espessura da borda"), {
     target: { value: "1000" },
   });
 
@@ -209,7 +209,7 @@ test("keeps the post-submit Design delta through temporarily matching predecesso
       value={matchingPostEdit}
     />,
   );
-  fireEvent.change(screen.getByLabelText("Cor do Background"), {
+  fireEvent.change(screen.getByLabelText("Cor do fundo"), {
     target: { value: "#aabbcc" },
   });
 
@@ -226,11 +226,11 @@ test("keeps the post-submit Design delta through temporarily matching predecesso
   });
 
   await waitFor(() =>
-    expect(screen.getByLabelText("Cor do Background")).toHaveValue(
+    expect(screen.getByLabelText("Cor do fundo")).toHaveValue(
       "#aabbcc",
     ),
   );
-  expect(screen.getByLabelText("Espessura da Borda")).toHaveValue("1000");
+  expect(screen.getByLabelText("Espessura da borda")).toHaveValue("1000");
 });
 
 test("restores the complete Design intent when Apply fails after a predecessor", async () => {
@@ -251,7 +251,7 @@ test("restores the complete Design intent when Apply fails after a predecessor",
   };
   const view = render(<Harness onApply={onApply} value={baseline} />);
 
-  fireEvent.change(screen.getByLabelText("Cor do Background"), {
+  fireEvent.change(screen.getByLabelText("Cor do fundo"), {
     target: { value: "#f7f5f0" },
   });
   await waitFor(() =>
@@ -272,7 +272,7 @@ test("restores the complete Design intent when Apply fails after a predecessor",
     await pendingApply;
   });
 
-  expect(screen.getByLabelText("Cor do Background")).toHaveValue("#f7f5f0");
+  expect(screen.getByLabelText("Cor do fundo")).toHaveValue("#f7f5f0");
   await waitFor(() =>
     expect(screen.getByRole("button", { name: "Aplicar" })).toBeEnabled(),
   );
@@ -296,7 +296,7 @@ test("records a post-submit reset against the concurrent value shown to the user
   };
   const view = render(<Harness onApply={onApply} value={baseline} />);
 
-  fireEvent.change(screen.getByLabelText("Cor do Background"), {
+  fireEvent.change(screen.getByLabelText("Cor do fundo"), {
     target: { value: "#f7f5f0" },
   });
   await waitFor(() =>
@@ -313,9 +313,9 @@ test("records a post-submit reset against the concurrent value shown to the user
     />,
   );
   await waitFor(() =>
-    expect(screen.getByLabelText("Espessura da Borda")).toHaveValue("2000"),
+    expect(screen.getByLabelText("Espessura da borda")).toHaveValue("2000"),
   );
-  fireEvent.change(screen.getByLabelText("Espessura da Borda"), {
+  fireEvent.change(screen.getByLabelText("Espessura da borda"), {
     target: { value: "0" },
   });
 
@@ -328,6 +328,6 @@ test("records a post-submit reset against the concurrent value shown to the user
   );
 
   await waitFor(() =>
-    expect(screen.getByLabelText("Espessura da Borda")).toHaveValue("0"),
+    expect(screen.getByLabelText("Espessura da borda")).toHaveValue("0"),
   );
 });

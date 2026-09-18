@@ -33,7 +33,7 @@ test("exposes every canonical surface as a navigable, stable map node", () => {
   expect(screen.getByText("Configurações", { selector: "strong" })).toBeInTheDocument();
   expect(screen.queryByText("Dimensões", { selector: "strong" })).not.toBeInTheDocument();
   expect(screen.getByTestId("surface-transition-map")).toHaveTextContent(
-    "Boas-vindas → Configurações → Personalização → Nome e local → Projeto",
+    "Boas-vindas → Configurações → Personalização → Nome e local → projeto",
   );
   expect(
     within(
@@ -61,11 +61,11 @@ test("exposes every canonical surface as a navigable, stable map node", () => {
 test("applies only Ctrl zoom gestures between Ajustar Lâmina and the calibrated 4× cap", () => {
   const { unmount } = render(<UiArchitecturePrototype initialView="editor" />);
 
-  const canvas = screen.getByRole("region", { name: "Canvas do protótipo" });
+  const canvas = screen.getByRole("region", { name: "área de edição do protótipo" });
   const sheet = screen.getByTestId("prototype-editing-sheet");
   expect(canvas).toHaveAttribute("data-zoom-level", "1");
-  expect(screen.queryByRole("region", { name: "Barra de Lâminas" })).not.toBeInTheDocument();
-  expect(screen.queryByRole("region", { name: "Grade de Lâminas" })).not.toBeInTheDocument();
+  expect(screen.queryByRole("region", { name: "Barra de lâminas" })).not.toBeInTheDocument();
+  expect(screen.queryByRole("region", { name: "Grade de lâminas" })).not.toBeInTheDocument();
 
   fireEvent.keyDown(canvas, { ctrlKey: true, key: "+" });
   expect(canvas).toHaveAttribute("data-zoom-level", "1.25");
@@ -143,24 +143,24 @@ test("previews, cancels, and commits one synchronized reorder from the Barra", (
     <UiArchitecturePrototype initialEditorMode="normal" initialView="editor" />,
   );
 
-  const bar = screen.getByRole("region", { name: "Barra de Lâminas" });
-  const grid = screen.getByRole("region", { name: "Grade de Lâminas" });
+  const bar = screen.getByRole("region", { name: "Barra de lâminas" });
+  const grid = screen.getByRole("region", { name: "Grade de lâminas" });
   const originalOrder = "sheet-001,sheet-002,sheet-003,sheet-004,sheet-005";
   const reordered = "sheet-001,sheet-004,sheet-002,sheet-003,sheet-005";
 
   expect(bar).toHaveAttribute("data-sheet-order", originalOrder);
   expect(grid).toHaveAttribute("data-sheet-order", originalOrder);
-  expect(screen.getByText("Modo normal · reordenação de Lâminas")).toBeInTheDocument();
+  expect(screen.getByText("Modo normal · reordenação de lâminas")).toBeInTheDocument();
   expect(screen.queryByRole("button", { name: "Layout travado" })).not.toBeInTheDocument();
-  const canvas = screen.getByRole("region", { name: "Canvas do protótipo" });
+  const canvas = screen.getByRole("region", { name: "área de edição do protótipo" });
   fireEvent.keyDown(canvas, { ctrlKey: true, key: "+" });
   expect(canvas).toHaveAttribute("data-zoom-level", "1");
 
   const source = within(bar).getByRole("button", {
-    name: "Reordenar Lâmina 04 pela Barra",
+    name: "Reordenar lâmina 04 pela Barra",
   });
   const target = within(bar).getByRole("button", {
-    name: "Reordenar Lâmina 02 pela Barra",
+    name: "Reordenar lâmina 02 pela Barra",
   });
   fireEvent.pointerDown(source, { clientX: 10, clientY: 10, pointerId: 1 });
   fireEvent.pointerMove(source, { clientX: 12, clientY: 12, pointerId: 1 });
@@ -228,14 +228,14 @@ test("keeps the Canvas stable during a Grade preview and rejects an interior Pá
     <UiArchitecturePrototype initialEditorMode="normal" initialView="editor" />,
   );
 
-  const bar = screen.getByRole("region", { name: "Barra de Lâminas" });
-  const grid = screen.getByRole("region", { name: "Grade de Lâminas" });
+  const bar = screen.getByRole("region", { name: "Barra de lâminas" });
+  const grid = screen.getByRole("region", { name: "Grade de lâminas" });
   const originalOrder = "sheet-001,sheet-002,sheet-003,sheet-004,sheet-005";
   const source = within(grid).getByRole("button", {
-    name: "Reordenar Lâmina 01 pela Grade",
+    name: "Reordenar lâmina 01 pela Grade",
   });
   const invalidTarget = within(grid).getByRole("button", {
-    name: "Reordenar Lâmina 03 pela Grade",
+    name: "Reordenar lâmina 03 pela Grade",
   });
 
   fireEvent.pointerDown(source, { clientX: 10, clientY: 10, pointerId: 3 });
@@ -260,10 +260,10 @@ test("keeps the Canvas stable during a Grade preview and rejects an interior Pá
   expect(screen.getByTestId("prototype-history-count")).toHaveTextContent("0");
 
   const validSource = within(grid).getByRole("button", {
-    name: "Reordenar Lâmina 04 pela Grade",
+    name: "Reordenar lâmina 04 pela Grade",
   });
   const validTarget = within(grid).getByRole("button", {
-    name: "Reordenar Lâmina 02 pela Grade",
+    name: "Reordenar lâmina 02 pela Grade",
   });
   fireEvent.pointerDown(validSource, {
     clientX: 10,
@@ -285,8 +285,8 @@ test("keeps the Canvas stable during a Grade preview and rejects an interior Pá
 test("projects mixed values for Ctrl multi-selection and applies the first absolute edit to every Frame", () => {
   render(<UiArchitecturePrototype initialView="editor" />);
 
-  const firstFrame = screen.getByRole("button", { name: "Selecionar Frame 01" });
-  const secondFrame = screen.getByRole("button", { name: "Selecionar Frame 02" });
+  const firstFrame = screen.getByRole("button", { name: "Selecionar quadro 01" });
+  const secondFrame = screen.getByRole("button", { name: "Selecionar quadro 02" });
   fireEvent.pointerDown(firstFrame, { button: 0, pointerId: 10 });
   fireEvent.pointerUp(firstFrame, { button: 0, pointerId: 10 });
   fireEvent.click(firstFrame);
@@ -306,11 +306,11 @@ test("projects mixed values for Ctrl multi-selection and applies the first absol
   expect(secondFrame).toHaveAttribute("aria-pressed", "true");
   expect(screen.getByTestId("frame-selection-bounds")).toBeInTheDocument();
 
-  const inspector = screen.getByRole("region", { name: "Inspector de Frames" });
+  const inspector = screen.getByRole("region", { name: "Inspector de quadros" });
   expect(inspector).toHaveAttribute("data-selection-count", "2");
-  expect(within(inspector).getByText("2 Frames · 1 Foto · 1 placeholder")).toBeInTheDocument();
+  expect(within(inspector).getByText("2 quadros · 1 foto · 1 quadro vazio")).toBeInTheDocument();
   const opacity = within(inspector).getByRole("spinbutton", {
-    name: "Opacidade dos Frames",
+    name: "Opacidade dos quadros",
   });
   expect(opacity).toHaveValue(null);
   expect(opacity).toHaveAttribute("placeholder", "—");
@@ -319,7 +319,7 @@ test("projects mixed values for Ctrl multi-selection and applies the first absol
     "data-mixed-value",
     "color",
   );
-  expect(within(inspector).getByRole("checkbox", { name: "Borda dos Frames" })).toHaveAttribute(
+  expect(within(inspector).getByRole("checkbox", { name: "Borda dos quadros" })).toHaveAttribute(
     "aria-checked",
     "mixed",
   );
@@ -336,7 +336,7 @@ test("projects mixed values for Ctrl multi-selection and applies the first absol
 test("moves and resizes one selected Frame, then blocks both gestures when Layout is locked", () => {
   render(<UiArchitecturePrototype initialView="editor" />);
 
-  const frame = screen.getByRole("button", { name: "Selecionar Frame 01" });
+  const frame = screen.getByRole("button", { name: "Selecionar quadro 01" });
   fireEvent.click(frame);
   expect(screen.getAllByTestId("frame-resize-handle")).toHaveLength(8);
 
@@ -350,7 +350,7 @@ test("moves and resizes one selected Frame, then blocks both gestures when Layou
   expect(screen.getByTestId("prototype-history-count")).toHaveTextContent("1");
 
   const southeastHandle = screen.getByRole("button", {
-    name: "Redimensionar Frame 01 pelo canto inferior direito",
+    name: "Redimensionar quadro 01 pelo canto inferior direito",
   });
   const resizeTarget = screen.getByTestId("frame-resize-target");
   fireEvent.pointerDown(southeastHandle, {

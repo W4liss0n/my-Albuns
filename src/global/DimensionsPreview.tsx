@@ -13,7 +13,7 @@ export function DimensionsPreview({ draft }: DimensionsPreviewProps) {
   return (
     <NewProjectPreviewPanel
       draft={draft}
-      surfaceLabel="Prévia do formato da Lâmina"
+      surfaceLabel="Prévia do formato da lâmina"
     >
       {(geometry) => {
         const { heightUm, widthUm } = geometry;

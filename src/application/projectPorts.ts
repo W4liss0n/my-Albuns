@@ -84,7 +84,7 @@ export interface ExportResult {
 
 export class LayoutExportBlockedError extends Error {
   constructor(readonly problems: LayoutExportProblem[]) {
-    super("Preencha os Frames vazios antes de exportar a seleção.");
+    super("Preencha os quadros vazios antes de exportar a seleção.");
     this.name = "LayoutExportBlockedError";
   }
 }

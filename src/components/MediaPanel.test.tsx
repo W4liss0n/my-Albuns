@@ -45,7 +45,7 @@ test("applies only the double-clicked Decorative and distinguishes each usage ro
   fireEvent.doubleClick(overlay, { shiftKey: true });
   expect(onApplyDecorative).toHaveBeenLastCalledWith("decorative-overlay", "overlay");
   expect(onApplyDecorative).toHaveBeenCalledTimes(2);
-  expect(overlay).toHaveAccessibleName(/2 Fundos.*1 Overlay.*1 padrão de Fundo.*1 padrão de Overlay/);
+  expect(overlay).toHaveAccessibleName(/2 fundos.*1 sobreposição.*1 padrão de fundo.*1 padrão de sobreposição/);
 });
 
 test("requests the initial measured viewport without waiting for a scroll or observer paint", () => {
@@ -65,7 +65,7 @@ test("requests the initial measured viewport without waiting for a scroll or obs
     expect(onDemandChange).toHaveBeenLastCalledWith(expect.objectContaining({
       visibleMediaIds: expect.arrayContaining(["photo-album-2"]),
     }));
-    const grid = screen.getByRole("group", { name: "Grade de Fotos" });
+    const grid = screen.getByRole("group", { name: "Grade de fotos" });
     grid.scrollTop = 190;
     fireEvent.scroll(grid);
     expect(onDemandChange).toHaveBeenLastCalledWith(expect.objectContaining({
@@ -112,7 +112,7 @@ test("prepares only the future viewport with the panel's active ordering and fil
     } } },
   };
   const view = render(<MediaPanel {...props} ref={ref} mediaItems={mediaItems} />);
-  const grid = screen.getByRole("group", { name: "Grade de Fotos" });
+  const grid = screen.getByRole("group", { name: "Grade de fotos" });
   Object.defineProperties(grid, { clientWidth: { value: 202 }, clientHeight: { value: 114 } });
   Object.assign(grid.style, { padding: "10px 12px", rowGap: "10px", columnGap: "10px" });
   grid.scrollTop = 188;
@@ -122,12 +122,12 @@ test("prepares only the future viewport with the panel's active ordering and fil
   plan.commit();
   view.rerender(<MediaPanel {...props} ref={ref} mediaItems={photos} />);
   expect(demand).toHaveBeenLastCalledWith(plan.demand);
-  fireEvent.change(screen.getByRole("searchbox", { name: "Buscar Fotos" }), { target: { value: "album 99" } });
+  fireEvent.change(screen.getByRole("searchbox", { name: "Buscar fotos" }), { target: { value: "album 99" } });
   // A shorter filtered catalog clamps scroll just as the browser does.
   expect(ref.current!.planCatalog(photos, []).demand).toEqual({
     visibleMediaIds: ["photo-99"], preloadMediaIds: [],
   });
-  fireEvent.change(screen.getByRole("searchbox", { name: "Buscar Fotos" }), { target: { value: "nenhuma" } });
+  fireEvent.change(screen.getByRole("searchbox", { name: "Buscar fotos" }), { target: { value: "nenhuma" } });
   expect(ref.current!.planCatalog(photos, []).demand).toEqual({ visibleMediaIds: [], preloadMediaIds: [] });
 });
 
@@ -143,7 +143,7 @@ test("matches the reference toolbar and disables folders when no mutation port i
     "aria-pressed",
     "false",
   );
-  const photoSearch = screen.getByRole("searchbox", { name: "Buscar Fotos" });
+  const photoSearch = screen.getByRole("searchbox", { name: "Buscar fotos" });
   expect(photoSearch).toBeVisible();
   expect(photoSearch).toHaveClass("ui-embedded-input");
   expect(photoSearch.closest(".media-search")).toHaveClass(
@@ -197,7 +197,7 @@ test("imports a Windows drop anywhere inside the visible panel into the current 
   vi.spyOn(screen.getByRole("region", { name: "Painel de imagens" }), "getBoundingClientRect").mockReturnValue({ left: 10, right: 510, top: 400, bottom: 600 } as DOMRect);
   await user.click(screen.getByRole("button", { name: "Decorativos" }));
   act(() => publish({ kind: "over", x: 15, y: 405 }));
-  expect(screen.getByText("Solte para importar em Decorativos")).toBeVisible();
+  expect(screen.getByText("Solte para importar em decorativos")).toBeVisible();
   act(() => publish({ kind: "drop", x: 15, y: 405, dropId: "native-drop-1" }));
   expect(onImportMedia).toHaveBeenCalledWith({ mediaKind: "decorative", source: { kind: "drop", dropId: "native-drop-1" } });
   act(() => publish({ kind: "drop", x: 15, y: 100, dropId: "native-drop-2" }));
@@ -219,16 +219,16 @@ test("renders only centered copy when the media catalog is empty", () => {
   );
 
   const emptyState = screen.getByRole("status", {
-    name: "Nenhuma Foto importada",
+    name: "Nenhuma foto importada",
   });
   expect(emptyState).toHaveClass("ui-empty-state");
   expect(emptyState).toHaveClass("media-empty-state--catalog");
-  expect(screen.getByRole("group", { name: "Grade de Fotos" })).toHaveAttribute(
+  expect(screen.getByRole("group", { name: "Grade de fotos" })).toHaveAttribute(
     "data-empty",
     "catalog",
   );
   expect(emptyState).toHaveTextContent(
-    "As Fotos importadas para este Projeto aparecerão aqui.",
+    "Use Importar para adicionar fotos ao projeto.",
   );
   expect(emptyState.querySelector(".ui-empty-state__eyebrow")).toBeNull();
   expect(emptyState.querySelector(".ui-empty-state__icon")).toBeNull();
@@ -239,7 +239,7 @@ test("keeps only centered copy when filters have no results", async () => {
   renderPanel();
 
   await user.type(
-    screen.getByRole("searchbox", { name: "Buscar Fotos" }),
+    screen.getByRole("searchbox", { name: "Buscar fotos" }),
     "inexistente",
   );
 
@@ -247,12 +247,12 @@ test("keeps only centered copy when filters have no results", async () => {
     name: "Nenhum item encontrado",
   });
   expect(emptyState).toHaveClass("media-empty-state--filtered");
-  expect(screen.getByRole("group", { name: "Grade de Fotos" })).toHaveAttribute(
+  expect(screen.getByRole("group", { name: "Grade de fotos" })).toHaveAttribute(
     "data-empty",
     "filtered",
   );
   expect(emptyState).toHaveTextContent(
-    "Ajuste a Busca ou o Filtro de uso para ver outros itens.",
+    "Tente outro nome ou altere o filtro.",
   );
   expect(emptyState.querySelector(".ui-empty-state__eyebrow")).toBeNull();
   expect(emptyState.querySelector(".ui-empty-state__icon")).toBeNull();
@@ -262,7 +262,7 @@ test("combines accent-insensitive search with the usage filter and natural name 
   const user = userEvent.setup();
   renderPanel();
 
-  await user.type(screen.getByRole("searchbox", { name: "Buscar Fotos" }), "album");
+  await user.type(screen.getByRole("searchbox", { name: "Buscar fotos" }), "album");
   expect(visibleMediaIds()).toEqual(["photo-album-2", "photo-album-10"]);
 
   await user.click(
@@ -318,7 +318,7 @@ test.each(["photo", "decorative"] as const)("an absent %s keeps its natural posi
   view.rerender(<MediaPanel {...props} previewSource={{ kind: "static", previews: {
     middle: { mediaId: "middle", state: "absent", url: null },
   } }} />);
-  const grid = screen.getByRole("group", { name: kind === "photo" ? "Grade de Fotos" : "Grade de Decorativos" });
+  const grid = screen.getByRole("group", { name: kind === "photo" ? "Grade de fotos" : "Grade de decorativos" });
   const order = () => Array.from(grid.querySelectorAll("[data-media-id]")).map(item => item.getAttribute("data-media-id"));
   expect(order()).toEqual(["first", "middle", "last"]);
   expect(screen.getByRole("button", { name: "Foto 2. Arquivo ausente" })).toHaveAttribute("aria-pressed", "true");
@@ -351,18 +351,18 @@ test("keeps independent search text for Fotos and Decorativos", async () => {
   const user = userEvent.setup();
   renderPanel();
 
-  const photoSearch = screen.getByRole("searchbox", { name: "Buscar Fotos" });
+  const photoSearch = screen.getByRole("searchbox", { name: "Buscar fotos" });
   await user.type(photoSearch, "retrato");
   await user.click(screen.getByRole("button", { name: "Decorativos" }));
 
   const decorativeSearch = screen.getByRole("searchbox", {
-    name: "Buscar Decorativos",
+    name: "Buscar decorativos",
   });
   expect(decorativeSearch).toHaveValue("");
   await user.type(decorativeSearch, "dourado");
 
   await user.click(screen.getByRole("button", { name: "Fotos" }));
-  expect(screen.getByRole("searchbox", { name: "Buscar Fotos" })).toHaveValue(
+  expect(screen.getByRole("searchbox", { name: "Buscar fotos" })).toHaveValue(
     "retrato",
   );
 });
@@ -377,7 +377,7 @@ test("shares thumbnail size between tabs and resets both tabs together", async (
   const size = screen.getByRole("slider", { name: "Tamanho das miniaturas" });
   fireEvent.change(size, { target: { value: "124" } });
 
-  expect(screen.getByRole("group", { name: "Grade de Fotos" })).toHaveStyle({
+  expect(screen.getByRole("group", { name: "Grade de fotos" })).toHaveStyle({
     "--media-thumbnail-size": "124px",
   });
 
@@ -392,7 +392,7 @@ test("shares thumbnail size between tabs and resets both tabs together", async (
     name: "Tamanho das miniaturas",
   });
   expect(decorativeSize).toHaveValue("124");
-  expect(screen.getByRole("group", { name: "Grade de Decorativos" })).toHaveStyle({
+  expect(screen.getByRole("group", { name: "Grade de decorativos" })).toHaveStyle({
     "--media-thumbnail-size": "124px",
   });
   fireEvent.change(decorativeSize, { target: { value: "110" } });
@@ -408,7 +408,7 @@ test("shares thumbnail size between tabs and resets both tabs together", async (
   fireEvent.doubleClick(restoredPhotoSize);
   expect(restoredPhotoSize).toHaveValue("84");
   await user.click(screen.getByRole("button", { name: "Decorativos" }));
-  expect(screen.getByRole("group", { name: "Grade de Decorativos" })).toHaveStyle({
+  expect(screen.getByRole("group", { name: "Grade de decorativos" })).toHaveStyle({
     "--media-thumbnail-size": "84px",
   });
 });
@@ -694,7 +694,7 @@ test("keeps selection on media ids and supports click, Ctrl, Shift, and Ctrl+A",
   const portrait = screen.getByRole("button", {
     name: "Retrato. Já usada. 1 uso",
   });
-  const grid = screen.getByRole("group", { name: "Grade de Fotos" });
+  const grid = screen.getByRole("group", { name: "Grade de fotos" });
 
   expect(album2).toHaveAttribute("aria-pressed", "false");
   fireEvent.click(album2);
@@ -742,7 +742,7 @@ test("preserves a selected group on right click and replaces it for an unselecte
 test("clears selection and keeps Ctrl+A in the grid after a background click", () => {
   renderPanel();
 
-  const grid = screen.getByRole("group", { name: "Grade de Fotos" });
+  const grid = screen.getByRole("group", { name: "Grade de fotos" });
   const album2 = screen.getByRole("button", { name: "album 2" });
   fireEvent.click(album2);
   expect(album2).toHaveAttribute("aria-pressed", "true");
@@ -784,7 +784,7 @@ test("removes hidden items from the transient media selection", async () => {
   renderPanel();
 
   await user.click(screen.getByRole("button", { name: "album 2" }));
-  const search = screen.getByRole("searchbox", { name: "Buscar Fotos" });
+  const search = screen.getByRole("searchbox", { name: "Buscar fotos" });
   await user.type(search, "retrato");
   await user.clear(search);
 
@@ -863,7 +863,7 @@ test("an open media menu keeps selection shortcuts from executing behind it", as
   const photo = screen.getByRole("button", { name: /Retrato/ });
   fireEvent.contextMenu(photo);
   const menu = screen.getByRole("menu", { name: "Ações das imagens" });
-  const target = within(menu).getByRole("menuitem", { name: /Substituir Imagem/ });
+  const target = within(menu).getByRole("menuitem", { name: /Substituir imagem/ });
   expect(fireEvent.keyDown(target, { key: "a", ctrlKey: true })).toBe(false);
   expect(screen.getByRole("button", { name: /Álbum 10/ })).toHaveAttribute("aria-pressed", "false");
   fireEvent.keyDown(target, { key: "Delete" });
@@ -951,7 +951,7 @@ test.each([
   if (kind === "photo") expect(onFillPhoto).toHaveBeenCalledWith("missing");
   else expect(onApplyDecorative).toHaveBeenCalledWith("missing", "background");
   fireEvent.contextMenu(card);
-  fireEvent.click(screen.getByRole("menuitem", { name: "Religar" }));
+  fireEvent.click(screen.getByRole("menuitem", { name: "Localizar imagem…" }));
   expect(onRelinkMedia).toHaveBeenCalledExactlyOnceWith("missing");
   expect(screen.queryByRole("menu", { name: "Ações das imagens" })).not.toBeInTheDocument();
 });
@@ -968,7 +968,7 @@ test.each(["photo", "decorative"] as const)("Substituir Imagem is available for 
   fireEvent.click(screen.getByRole("button", { name: /^absent/ }), { ctrlKey: true });
   for (const state of states) {
     fireEvent.contextMenu(screen.getByRole("button", { name: new RegExp(`^${state}`) }));
-    fireEvent.click(screen.getByRole("menuitem", { name: "Substituir Imagem" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Substituir imagem" }));
     expect(onReplaceMedia).toHaveBeenLastCalledWith(state);
     expect(screen.queryByRole("menu", { name: "Ações das imagens" })).not.toBeInTheDocument();
   }
@@ -992,13 +992,13 @@ test("Religar targets the right-clicked absent item while preserving a selected 
   fireEvent.contextMenu(second);
   expect(first).toHaveAttribute("aria-pressed", "true");
   expect(second).toHaveAttribute("aria-pressed", "true");
-  fireEvent.click(screen.getByRole("menuitem", { name: "Religar" }));
+  fireEvent.click(screen.getByRole("menuitem", { name: "Localizar imagem…" }));
   expect(onRelinkMedia).toHaveBeenCalledExactlyOnceWith("second");
   fireEvent.contextMenu(first);
   view.rerender(<MediaPanel {...props} mediaFiles={{ ...props.mediaFiles,
     first: { ...props.mediaFiles.first, state: "available" },
   }} />);
-  expect(screen.queryByRole("menuitem", { name: "Religar" })).not.toBeInTheDocument();
+  expect(screen.queryByRole("menuitem", { name: "Localizar imagem…" })).not.toBeInTheDocument();
 });
 
 test.each(["relinkDisabled", "importPending"] as const)("Religar remains disabled during %s", (busyProp) => {
@@ -1009,9 +1009,9 @@ test.each(["relinkDisabled", "importPending"] as const)("Religar remains disable
       missing: { mediaId: "missing", state: "absent", url: null },
     } }} />);
   fireEvent.contextMenu(screen.getByRole("button", { name: /^Imagem 1/ }));
-  const relink = screen.getByRole("menuitem", { name: "Religar" });
+  const relink = screen.getByRole("menuitem", { name: "Localizar imagem…" });
   expect(relink).toBeDisabled();
-  expect(screen.getByRole("menuitem", { name: "Substituir Imagem" })).toBeDisabled();
+  expect(screen.getByRole("menuitem", { name: "Substituir imagem" })).toBeDisabled();
   fireEvent.click(relink);
   expect(onRelinkMedia).not.toHaveBeenCalled();
 });

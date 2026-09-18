@@ -181,9 +181,9 @@ export class AlbumCanvasScene {
     this.input = input;
     this.frameAreaSelection.synchronize(input);
     this.app.canvas.setAttribute("aria-label", input.mode.kind === "sheet-editing"
-      ? `Canvas da Lâmina em edição. Ctrl mais roda, ${projectCommandShortcutLabel("canvas-zoom-in")} ou ${projectCommandShortcutLabel("canvas-zoom-out")} ajustam o Zoom; ${projectCommandShortcutLabel("fit-sheet")} mostra a Lâmina inteira. Espaço mais arraste ou botão do meio movem a visualização ampliada. ${projectCommandShortcutLabel("select-all")} seleciona todos os Frames. Arraste na área vazia para selecionar por caixa; Ctrl acrescenta à seleção. Arraste um Frame para mover ou use as alças para redimensionar. Shift preserva a proporção; Alt preserva o centro; Ctrl suspende o snap; Esc cancela o gesto.`
-      : input.mode.isolatedSheetId ? "Canvas da Lâmina no Painel de Layouts. Passe sobre uma miniatura para visualizar o Layout."
-      : `Canvas contínuo do Álbum. ${projectCommandShortcutLabel("enter-sheet-editing")} edita a Lâmina centralizada. Arraste uma Foto sobre outro Frame para trocar o conteúdo, inclusive entre Lâminas. Esc cancela. Use a roda para navegar, Alt mais arraste para Pan e Alt mais roda para Zoom.`);
+      ? `área de edição da lâmina em edição. Ctrl mais roda, ${projectCommandShortcutLabel("canvas-zoom-in")} ou ${projectCommandShortcutLabel("canvas-zoom-out")} ajustam o zoom; ${projectCommandShortcutLabel("fit-sheet")} mostra a lâmina inteira. Espaço mais arraste ou botão do meio movem a visualização ampliada. ${projectCommandShortcutLabel("select-all")} seleciona todos os quadros. Arraste na área vazia para selecionar por caixa; Ctrl acrescenta à seleção. Arraste um quadro para mover ou use as alças para redimensionar. Shift preserva a proporção; Alt preserva o centro; Ctrl suspende o encaixe automático; Esc cancela o gesto.`
+      : input.mode.isolatedSheetId ? "área de edição da lâmina no painel de layouts. Passe sobre uma miniatura para visualizar o layout."
+      : `Área de edição contínua do álbum. ${projectCommandShortcutLabel("enter-sheet-editing")} edita a lâmina centralizada. Arraste uma foto sobre outro quadro para trocar o conteúdo, inclusive entre lâminas. Esc cancela. Use a roda para navegar, Alt mais arraste para mover a foto e Alt mais roda para zoom.`);
     const modePolicy = albumCanvasModePolicy(input.mode);
     const confirmedSheets = sheetsForCanvasMode(
       input.composition.sheets,

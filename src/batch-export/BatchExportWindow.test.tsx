@@ -29,14 +29,14 @@ test("exports the whole album at maximum JPEG quality without collapsing configu
   let finish!: (view: BatchExportView) => void;
   const api = port({ run: vi.fn(() => new Promise<BatchExportView>(resolve => { finish = resolve; })) });
   render(<BatchExportWindow port={api} />);
-  fireEvent.change(screen.getByRole("textbox", { name: "Pasta dos Projetos" }), { target: { value: "C:\\Projetos" } });
-  await screen.findByText("1 Projeto encontrado");
+  fireEvent.change(screen.getByRole("textbox", { name: "Pasta dos projetos" }), { target: { value: "C:\\Projetos" } });
+  await screen.findByText("1 projeto encontrado");
   expect(screen.queryByRole("slider")).not.toBeInTheDocument();
   expect(screen.queryByText("Intervalo personalizado")).not.toBeInTheDocument();
   fireEvent.click(screen.getByRole("button", { name: "Verificar e exportar" }));
   await waitFor(() => expect(api.run).toHaveBeenCalledWith("ask"));
   expect(api.prepare).toHaveBeenCalledWith(ready.options);
-  expect(screen.getByRole("textbox", { name: "Pasta dos Projetos" })).toHaveValue("C:\\Projetos");
+  expect(screen.getByRole("textbox", { name: "Pasta dos projetos" })).toHaveValue("C:\\Projetos");
   expect(screen.queryByText("Pronto para exportar")).not.toBeInTheDocument();
   await act(async () => finish({ ...ready, phase: "finished", items: ready.items.map(item => ({ ...item, status: "completed" })) }));
   expect(await screen.findByText("Exportação concluída")).toBeVisible();
@@ -46,18 +46,18 @@ test("saved corrections and relinks require explicit Continue even after the las
   const api = port({ current: async () => ({ ...ready, canContinue: false, items: [{ ...ready.items[0],
     problems: [{ kind: "missingMedia", mediaId: "photo", message: "Imagem ausente: 001.jpg" }] }] }) });
   render(<BatchExportWindow port={api} />);
-  fireEvent.click(await screen.findByRole("button", { name: "Religar…" }));
+  fireEvent.click(await screen.findByRole("button", { name: "Localizar imagens…" }));
   await screen.findByText("Pronto para exportar");
   expect(api.relink).toHaveBeenCalledWith("album");
   expect(api.run).not.toHaveBeenCalled();
-  fireEvent.click(screen.getByRole("button", { name: "Continuar Exportação" }));
+  fireEvent.click(screen.getByRole("button", { name: "Continuar exportação" }));
   await waitFor(() => expect(api.run).toHaveBeenCalledOnce());
 });
 
 test("asks once for generic conflicts with Ignore, Replace or Cancel", async () => {
   const api = port({ current: async () => ({ ...ready, hasConflicts: true }) });
   render(<BatchExportWindow port={api} />);
-  fireEvent.click(await screen.findByRole("button", { name: "Continuar Exportação" }));
+  fireEvent.click(await screen.findByRole("button", { name: "Continuar exportação" }));
   await screen.findByText("Já existe uma exportação");
   expect(screen.getByRole("button", { name: "Cancelar" })).toBeEnabled();
   expect(screen.getByRole("button", { name: "Substituir" })).toBeEnabled();
@@ -106,7 +106,7 @@ test("disk full presents a compact pause modal instead of a failed-project table
   const api = port({ current: async () => ({ ...ready, phase: "storageFull", canContinue: false }) });
   const { container } = render(<BatchExportWindow port={api} />);
   await screen.findByText("Espaço insuficiente");
-  expect(screen.queryByText(/álbum atual foi publicado parcialmente/)).not.toBeInTheDocument();
+  expect(screen.queryByText(/arquivos do álbum atual já foram exportados/)).not.toBeInTheDocument();
   expect(screen.queryByRole("table")).not.toBeInTheDocument();
   expect(container.querySelector(".ui-owned-window-shell")).toHaveStyle({ width: "520px" });
   expect(api.resultReady).toHaveBeenCalled();
@@ -133,7 +133,7 @@ test("the storage modal discloses a partial publication before the user cancels"
   const api = port({ current: async () => ({ ...ready, phase: "storageFull", canContinue: false, partialPublication: true }) });
   render(<BatchExportWindow port={api} />);
   await screen.findByText("Espaço insuficiente");
-  expect(screen.getByText(/álbum atual foi publicado parcialmente/)).toBeVisible();
+  expect(screen.getByText(/arquivos do álbum atual já foram exportados/)).toBeVisible();
   await waitFor(() => expect(screen.getByRole("button", { name: "Cancelar" })).toBeEnabled());
   fireEvent.click(screen.getByRole("button", { name: "Cancelar" }));
   await waitFor(() => expect(api.end).toHaveBeenCalledWith("batch"));
@@ -146,12 +146,12 @@ test("cleanup must finish before retrying, and a second full result waits again"
     clear: vi.fn(() => new Promise<boolean>(resolve => { finish = resolve; })) };
   const api = port({ current: async () => paused, storageRecovery, run: vi.fn(async () => ({ ...paused })) });
   render(<BatchExportWindow port={api} />);
-  fireEvent.click(await screen.findByRole("button", { name: "Limpar cache e retomar" }));
+  fireEvent.click(await screen.findByRole("button", { name: "Limpar prévias temporárias e retomar" }));
   expect(screen.getByRole("button", { name: "Cancelar" })).toBeDisabled();
   expect(api.resume).not.toHaveBeenCalled();
   await act(async () => finish(true));
   await waitFor(() => expect(api.run).toHaveBeenCalledOnce());
-  await waitFor(() => expect(screen.getByRole("button", { name: "Limpar cache e retomar" })).toBeEnabled());
+  await waitFor(() => expect(screen.getByRole("button", { name: "Limpar prévias temporárias e retomar" })).toBeEnabled());
   expect(storageRecovery.clear).toHaveBeenCalledOnce();
   expect(api.resume).toHaveBeenCalledOnce();
 });
@@ -160,8 +160,8 @@ test("no bytes reclaimed keeps the same modal with manual resume", async () => {
   const api = port({ current: async () => ({ ...ready, phase: "storageFull", canContinue: false }),
     storageRecovery: { status: async () => ({ id: "failure", canClearCache: true }), clear: async () => false } });
   render(<BatchExportWindow port={api} />);
-  fireEvent.click(await screen.findByRole("button", { name: "Limpar cache e retomar" }));
-  await waitFor(() => expect(screen.queryByRole("button", { name: "Limpar cache e retomar" })).not.toBeInTheDocument());
+  fireEvent.click(await screen.findByRole("button", { name: "Limpar prévias temporárias e retomar" }));
+  await waitFor(() => expect(screen.queryByRole("button", { name: "Limpar prévias temporárias e retomar" })).not.toBeInTheDocument());
   expect(screen.getByRole("button", { name: "Retomar" })).toBeEnabled();
   expect(api.resume).not.toHaveBeenCalled();
 });

@@ -10,7 +10,7 @@ interface PhotoZoomControlProps extends PhotoZoomControlActions {
 
 export function PhotoZoomControl(props: PhotoZoomControlProps) {
   return <NumericPropertyControl {...props}
-    label="Zoom da Foto" numberLabel="Zoom da Foto em porcentagem" sliderLabel="Zoom da Foto" unit="%"
+    label="Zoom da foto" numberLabel="Zoom da foto em porcentagem" sliderLabel="Zoom da foto" unit="%"
     step={1} resetValue={props.minimum}
     formatValue={String} parseValue={(text) => /^\d+$/.test(text.trim()) ? Number(text) : null}
     valueText={(value) => `${value}%`}

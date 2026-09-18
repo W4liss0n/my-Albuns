@@ -391,7 +391,7 @@ test("retiring the Project during recovery prevents automatic resumption", async
 });
 
 test("a recovered Original with a failed preview shows the processing problem instead of silently resuming", async () => {
-  const notes = [{ fileName: "Foto.jpg", reason: "Não foi possível publicar a prévia do Cache." }];
+  const notes = [{ fileName: "Foto.jpg", reason: "Não foi possível publicar a prévia das prévias temporárias." }];
   const relink = vi.fn<ExportMediaPort["relink"]>(async () => ({ projection: representativeProjection, problems: [], notes }));
   const onProjectionChange = vi.fn();
   const { dialog, exportHarness } = renderControl({ exportMediaPort: { relink, inspect: vi.fn() }, onProjectionChange });
@@ -522,7 +522,7 @@ test("handles cancellation actions from the child window and keeps feedback ther
   expect(dialog.present).toHaveBeenLastCalledWith({
     cancelled: true,
     kind: "exportFailure",
-    message: "A Exportação foi cancelada.",
+    message: "A exportação foi cancelada.",
     retryDisabled: false,
   });
 });
@@ -593,7 +593,7 @@ test("replaces native progress with the standard success dialog", async () => {
 
   expect(dialog.present).toHaveBeenLastCalledWith({
     kind: "exportSuccess",
-    message: "A Exportação foi concluída com sucesso.",
+    message: "A exportação foi concluída com sucesso.",
   });
   expect(screen.queryByRole("status")).not.toBeInTheDocument();
 });

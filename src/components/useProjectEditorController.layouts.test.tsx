@@ -24,10 +24,10 @@ function harness(pendingKind: "applyLayout" | "lockLayout" | "unlockLayout" | "s
   let resolve!: () => void;
   let reject!: (error: Error) => void;
   const pending = new Promise<void>((yes, no) => { resolve = yes; reject = no; });
-  const unsupported = async (): Promise<never> => { throw new Error("Unsupported in this Layout test."); };
+  const unsupported = async (): Promise<never> => { throw new Error("Unsupported in this layout test."); };
   const checkSelection = (selection: LayoutSelection) => {
     if (selection.queryId !== prepared?.queryId || prepared.revision !== authoritative.state.revision) {
-      throw new Error("Esta prévia de Layout expirou.");
+      throw new Error("Esta prévia de layout expirou.");
     }
   };
   const apply = vi.fn<ProjectCorePort["apply"]>(async (intent) => {
@@ -63,7 +63,7 @@ function harness(pendingKind: "applyLayout" | "lockLayout" | "unlockLayout" | "s
       return structuredClone(sample.before.queries[sheetId].previews[selection.candidateIndex]);
     },
     previewDecorativeDrop: async () => { throw new Error("Decorative preview is not configured in this fixture."); },
-    previewPhotoZoom: async () => { throw new Error("Photo Zoom preview is not configured in this fixture."); },
+    previewPhotoZoom: async () => { throw new Error("Photo zoom preview is not configured in this fixture."); },
     previewFrameStyle: unsupported, previewPhotoAngle: unsupported, previewFrameGeometry: unsupported,
     saveAs: unsupported, validateAlbumInformation: unsupported, applyWithOutcome: unsupported,
     importMedia: unsupported, resolvePhotoDropTarget: unsupported, replaceImage: unsupported, relink: unsupported,
@@ -133,5 +133,5 @@ test.each([false, true])("a pending predecessor never silently retargets the pre
   await act(async () => { if (fails) reject(new Error("DPI recusado.")); else resolve(); await completion; });
   expect(apply.mock.calls[1][0]).toEqual({ kind: "applyLayout", selection: { queryId, candidateIndex: 0 } });
   expect(await layoutApplied).toBe(fails);
-  if (!fails) expect(view.result.current.message).toBe("Esta prévia de Layout expirou.");
+  if (!fails) expect(view.result.current.message).toBe("Esta prévia de layout expirou.");
 });

@@ -86,7 +86,7 @@ export function CanvasHorizontalScrollbar({
     <div className="canvas-horizontal-scrollbar-shell">
       <div
         aria-disabled={!bounds}
-        aria-label="Navegação horizontal das Lâminas"
+        aria-label="Navegação horizontal das lâminas"
         aria-orientation="horizontal"
         aria-valuemax={scrollDistance}
         aria-valuemin={0}

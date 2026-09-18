@@ -59,7 +59,7 @@ test("group Photo Zoom stays mixed until an explicit value and ignores placehold
     dragThreshold: { x: 5, y: 5 }, onPreview: vi.fn(), onCommit, onCancel: vi.fn() };
   const props = inspectorProps({ kind: "multiple-frames", frames, editingSheet: composedSheet });
   const view = render(<InspectorPanel {...props} photoZoom={actions} />);
-  const field = screen.getByRole("spinbutton", { name: "Zoom da Foto em porcentagem" });
+  const field = screen.getByRole("spinbutton", { name: "Zoom da foto em porcentagem" });
   expect(field).toHaveValue("");
   expect(field).toHaveAttribute("aria-valuetext", "Múltiplos valores");
   expect(onCommit).not.toHaveBeenCalled();
@@ -69,7 +69,7 @@ test("group Photo Zoom stays mixed until an explicit value and ignores placehold
   view.rerender(<InspectorPanel {...props} context={{ kind: "multiple-frames",
     frames: frames.map((frame) => ({ ...frame, photo: null })), editingSheet: composedSheet,
   }} photoZoom={actions} />);
-  expect(screen.queryByRole("slider", { name: "Zoom da Foto" })).not.toBeInTheDocument();
+  expect(screen.queryByRole("slider", { name: "Zoom da foto" })).not.toBeInTheDocument();
 });
 
 test("Frame style keeps mixed values neutral and lets an explicit color or restoration affect the selection", () => {
@@ -81,19 +81,19 @@ test("Frame style keeps mixed values neutral and lets an explicit color or resto
   const props = inspectorProps({ kind: "multiple-frames", frames, editingSheet: state.composition.sheets[0] });
   const view = render(<InspectorPanel {...props} frameStyle={actions} />);
   expect(screen.getByRole("spinbutton", { name: "Opacidade em porcentagem" })).toHaveValue("");
-  expect(screen.getByRole("spinbutton", { name: "Espessura da Borda em mm" })).toHaveValue("");
-  const color = screen.getByRole("button", { name: "Cor da Borda" });
+  expect(screen.getByRole("spinbutton", { name: "Espessura da borda em mm" })).toHaveValue("");
+  const color = screen.getByRole("button", { name: "Cor da borda" });
   expect(color).toHaveAttribute("data-mixed", "true");
   expect(onCommit).not.toHaveBeenCalled();
   fireEvent.click(color);
   fireEvent.click(screen.getByRole("button", { name: "Aplicar cor" }));
   expect(onCommit).toHaveBeenCalledExactlyOnceWith({ kind: "borderColor", rgb: "#000000" });
-  fireEvent.click(screen.getByRole("button", { name: "Voltar ao design do álbum" }));
+  fireEvent.click(screen.getByRole("button", { name: "Usar padrão do álbum" }));
   expect(onCommit).toHaveBeenLastCalledWith({ kind: "restoreAlbum" });
   view.rerender(<InspectorPanel {...props} context={{ kind: "multiple-frames",
     frames: frames.map((frame) => ({ ...frame, photo: null })), editingSheet: state.composition.sheets[0],
   }} frameStyle={actions} />);
-  expect(screen.getByRole("slider", { name: "Opacidade do Frame" })).toBeEnabled();
+  expect(screen.getByRole("slider", { name: "Opacidade do quadro" })).toBeEnabled();
   expect(screen.queryByRole("button", { name: "Ajustes e Efeitos" })).not.toBeInTheDocument();
 });
 
@@ -110,7 +110,7 @@ test("Black and white has its own Effects section and exposes the mixed Photo st
   expect(section).toHaveAttribute("aria-expanded", "true");
   const effect = screen.getByRole("button", { name: "Preto e branco" });
   expect(effect).toHaveAttribute("aria-pressed", "mixed");
-  expect(screen.getByText("Aplicado a 2 Fotos de 3 Frames")).toBeInTheDocument();
+  expect(screen.getByText("Aplicado a 2 fotos de 3 quadros")).toBeInTheDocument();
   fireEvent.click(effect);
   expect(onToggleBlackAndWhite).toHaveBeenCalledOnce();
   fireEvent.click(section);
@@ -134,8 +134,8 @@ test("Photo orientation controls show mixed values and target compatible Photos"
   const onAction = vi.fn();
   const props = inspectorProps({ kind: "multiple-frames", frames, editingSheet: composedSheet });
   const view = render(<InspectorPanel {...props} photoOrientation={{ disabled: false, onAction }} />);
-  expect(screen.getByText("Aplicado a 2 Fotos de 3 Frames")).toBeInTheDocument();
-  expect(screen.getByLabelText("Giro das Fotos")).toHaveTextContent("—");
+  expect(screen.getByText("Aplicado a 2 fotos de 3 quadros")).toBeInTheDocument();
+  expect(screen.getByLabelText("Giro das fotos")).toHaveTextContent("—");
   const mirror = screen.getByRole("button", { name: "Espelhar horizontalmente" });
   expect(mirror).toHaveAttribute("aria-pressed", "mixed");
   fireEvent.click(screen.getByRole("button", { name: "Girar 90° à esquerda" }));
@@ -154,14 +154,14 @@ test("shows Design da Lâmina and preserves its scope while Frame temporarily ow
   const view = render(<InspectorPanel {...inspectorProps(sheetContext())} />);
 
   expect(
-    screen.queryByRole("button", { name: "Informações do Álbum" }),
+    screen.queryByRole("button", { name: "Informações do álbum" }),
   ).not.toBeInTheDocument();
   const sectionTrigger = screen.getByRole("button", {
-    name: "Design da Lâmina",
+    name: "Design da lâmina",
   });
   expect(sectionTrigger).toHaveAttribute("aria-expanded", "true");
   expect(
-    screen.getByRole("img", { name: "Prévia da Lâmina 01" }),
+    screen.getByRole("img", { name: "Prévia da lâmina 01" }),
   ).toBeInTheDocument();
 
   const both = screen.getByRole("button", { name: "Ambos os lados" });
@@ -187,7 +187,7 @@ test("shows Design da Lâmina and preserves its scope while Frame temporarily ow
       })}
     />,
   );
-  expect(screen.getByText("Frame selecionado")).toBeInTheDocument();
+  expect(screen.getByText("Quadro selecionado")).toBeInTheDocument();
 
   view.rerender(<InspectorPanel {...inspectorProps(sheetContext())} />);
   expect(
@@ -239,7 +239,7 @@ test("keeps inactive sides inert for a single-page Sheet", () => {
     ),
   ).toBeInTheDocument();
   const preview = screen.getByRole("group", {
-    name: "Selecionar escopo da Lâmina 01",
+    name: "Aplicar na lâmina 01",
   });
   expect(preview).toHaveAttribute("data-active-sides", "right");
   expect(preview).toHaveStyle({
@@ -294,7 +294,7 @@ test("reads and publishes accordion preferences through the shared workspace sta
     />,
   );
 
-  const trigger = screen.getByRole("button", { name: "Design da Lâmina" });
+  const trigger = screen.getByRole("button", { name: "Design da lâmina" });
   fireEvent.click(trigger);
 
   expect(onSectionPreferenceChange).toHaveBeenCalledWith(
@@ -320,17 +320,17 @@ test("shows Sheet-design origin and local controls without placeholders", () => 
   render(<InspectorPanel {...inspectorProps(sheetContext())} />);
 
   const section = screen
-    .getByRole("button", { name: "Design da Lâmina" })
+    .getByRole("button", { name: "Design da lâmina" })
     .closest("section") as HTMLElement;
   const design = within(section);
 
-  expect(design.getByText("Background")).toBeInTheDocument();
-  expect(design.getByText("Overlay")).toBeInTheDocument();
-  expect(design.getAllByText("Usando o design do álbum")).toHaveLength(2);
-  expect(design.getByRole("button", { name: "Cor do Background da Lâmina" })).toBeInTheDocument();
+  expect(design.getByText("Fundo")).toBeInTheDocument();
+  expect(design.getByText("Sobreposição")).toBeInTheDocument();
+  expect(design.getAllByText("Usando o padrão do álbum")).toHaveLength(2);
+  expect(design.getByRole("button", { name: "Cor do fundo da lâmina" })).toBeInTheDocument();
   expect(design.queryByText("Origem ainda não disponível")).not.toBeInTheDocument();
   expect(section.querySelector('[data-placeholder-feature="edit-sheet-background"]')).toBeNull();
   expect(section.querySelector('[data-placeholder-feature="edit-sheet-overlay"]')).toBeNull();
-  expect(design.getByRole("button", { name: "Salvar disposição como Layout" })).toBeDisabled();
+  expect(design.getByRole("button", { name: "Salvar disposição como layout" })).toBeDisabled();
   expect(section.querySelector('[data-placeholder-feature="save-sheet-layout"]')).toBeNull();
 });

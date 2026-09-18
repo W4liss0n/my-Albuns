@@ -268,7 +268,7 @@ impl BatchRunner {
                 self.phase = BatchPhase::Interrupted;
                 self.items[index].problems = vec![problem(
                     BatchProblemKind::Failed,
-                    "Exportação interrompida. Este Projeto será refeito ao retomar.",
+                    "Exportação interrompida. Este projeto será refeito ao retomar.",
                 )];
                 break;
             }
@@ -300,7 +300,7 @@ impl BatchRunner {
                             promoted_outputs,
                             total_outputs,
                         } => format!(
-                            "{} Foram publicados {promoted_outputs} de {total_outputs} arquivos. A pasta pode conter saídas anteriores e novas; exporte este Projeto inteiro novamente.",
+                            "{} Foram exportados {promoted_outputs} de {total_outputs} arquivos. A pasta pode conter arquivos anteriores e novos; exporte este projeto inteiro novamente.",
                             error.message
                         ),
                         _ => error.message,
@@ -390,7 +390,7 @@ impl BatchRunner {
         if item.digest.as_deref() != Some(first.content_sha256()) {
             return Err(vec![problem(
                 BatchProblemKind::Changed,
-                "O Projeto mudou depois da verificação. Verifique novamente antes de exportar.",
+                "O projeto mudou depois da verificação. Verifique novamente antes de exportar.",
             )]
             .into());
         }
@@ -399,7 +399,7 @@ impl BatchRunner {
         if current.content_sha256() != first.content_sha256() {
             return Err(vec![problem(
                 BatchProblemKind::Changed,
-                "O Projeto mudou durante a verificação. Tente novamente.",
+                "O projeto mudou durante a verificação. Tente novamente.",
             )]
             .into());
         }

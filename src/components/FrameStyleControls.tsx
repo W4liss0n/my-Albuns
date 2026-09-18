@@ -37,18 +37,18 @@ export function FrameStyleControls({ frames, unit, ...actions }: FrameStyleContr
   };
   return <div className="frame-style-controls">
     <NumericPropertyControl {...number((opacityPercent) => ({ kind: "opacity", opacityPercent }))}
-      value={opacity} label="Opacidade" numberLabel="Opacidade em porcentagem" sliderLabel="Opacidade do Frame"
+      value={opacity} label="Opacidade" numberLabel="Opacidade em porcentagem" sliderLabel="Opacidade do quadro"
       unit="%" minimum={0} maximum={100} step={1} resetValue={100}
       formatValue={String} parseValue={(text) => /^\d+$/.test(text.trim()) ? Number(text) : null}
       valueText={(value) => `${value}%`} help="Dois cliques para restaurar 100%" invalidHelp="Use um número inteiro entre 0 e 100."
     />
     <div className="frame-style-border-row">
-      <ColorPropertyControl rgb={rgb} label="da Borda" disabled={actions.disabled}
+      <ColorPropertyControl rgb={rgb} label="da borda" disabled={actions.disabled}
         onPreview={(value) => actions.onPreview({ kind: "borderColor", rgb: value })}
         onCommit={(value) => actions.onCommit({ kind: "borderColor", rgb: value })}
         onCancel={actions.onCancel} />
       <NumericPropertyControl {...number((widthUm) => ({ kind: "borderWidth", widthUm }))}
-        value={width} label="Borda" numberLabel={`Espessura da Borda em ${displayUnitLabel(unit)}`} sliderLabel="Espessura da Borda"
+        value={width} label="Borda" numberLabel={`Espessura da borda em ${displayUnitLabel(unit)}`} sliderLabel="Espessura da borda"
         unit={displayUnitLabel(unit)} minimum={0} maximum={Number.MAX_SAFE_INTEGER} step={250} resetValue={0}
         sliderMaximum={Math.max(5_000, ...frames.map((frame) => frame.style.borderWidthUm))}
         formatValue={(value) => formatMicrometers(value, unit)} parseValue={parseWidth}
@@ -58,11 +58,11 @@ export function FrameStyleControls({ frames, unit, ...actions }: FrameStyleContr
       />
     </div>
     <div className="frame-style-origin">
-      <p>{source === "album" ? "Usando o design do álbum" : source === "custom"
-        ? frames.length === 1 ? "Definido neste Frame" : "Definido nestes Frames"
+      <p>{source === "album" ? "Usando o padrão do álbum" : source === "custom"
+        ? frames.length === 1 ? "Definido neste quadro" : "Definido nestes quadros"
         : "Parte da seleção usa o design do álbum"}</p>
       {customized && <ActionButton density="compact" variant="quiet" disabled={actions.disabled}
-        onClick={() => actions.onCommit({ kind: "restoreAlbum" })}>Voltar ao design do álbum</ActionButton>}
+        onClick={() => actions.onCommit({ kind: "restoreAlbum" })}>Usar padrão do álbum</ActionButton>}
     </div>
   </div>;
 }

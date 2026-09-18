@@ -920,7 +920,7 @@ export function ProjectWorkspace({
         onArrange={(action) => { void controller.arrangeFrames(action); }}
         onDismiss={() => setFrameContextMenu(null)} /> : null}
       {frameContextMenu?.kind === "empty" ? (
-        <ContextMenuSurface label="Área vazia do Canvas" position={frameContextMenu.position}
+        <ContextMenuSurface label="Área vazia da área de edição" position={frameContextMenu.position}
           onDismiss={() => setFrameContextMenu(null)}>
           <button type="button" role="menuitem" onClick={() => {
             void controller.addFrame();
@@ -970,6 +970,6 @@ function projectAlbumMetadata(
   const { album, document } = projection.state;
   const width = formatMicrometers(document.sheetWidthUm / 2, presentationUnit);
   const height = formatMicrometers(document.sheetHeightUm, presentationUnit);
-  const sheetLabel = album.sheets.length === 1 ? "Lâmina" : "Lâminas";
+  const sheetLabel = album.sheets.length === 1 ? "lâmina" : "lâminas";
   return `${width}×${height} ${displayUnitLabel(presentationUnit)} · ${album.sheets.length} ${sheetLabel}`;
 }

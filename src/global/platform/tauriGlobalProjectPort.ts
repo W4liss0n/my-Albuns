@@ -20,7 +20,7 @@ export const GLOBAL_ACTIVATION_TERMINAL_EVENT =
 
 const openFallbackFailure: ProjectLaunchFailure = {
   code: "open_project_unavailable",
-  message: "Não foi possível iniciar a abertura do Projeto.",
+  message: "Não foi possível iniciar a abertura do projeto.",
   action: "Tente novamente. Se o problema continuar, reinicie o MyAlbuns.",
 };
 

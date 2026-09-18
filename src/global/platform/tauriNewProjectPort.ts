@@ -13,19 +13,19 @@ import {
 
 const createFallbackFailure: ProjectLaunchFailure = {
   code: "create_project_unavailable",
-  message: "Não foi possível iniciar a criação do Projeto.",
+  message: "Não foi possível iniciar a criação do projeto.",
   action: "Tente novamente. Se o problema continuar, reinicie o MyAlbuns.",
 };
 
 const validationFallbackFailure: ProjectLaunchFailure = {
   code: "project_configuration_validation_unavailable",
-  message: "Não foi possível validar as Dimensões do Projeto.",
+  message: "Não foi possível validar as Dimensões do projeto.",
   action: "Tente novamente. Se o problema continuar, reinicie o MyAlbuns.",
 };
 
 const decorativePickerFallbackFailure: ProjectLaunchFailure = {
   code: "decorative_picker_unavailable",
-  message: "Não foi possível concluir o seletor de Imagem decorativa.",
+  message: "Não foi possível concluir o seletor de imagem decorativa.",
   action: "Tente novamente.",
 };
 

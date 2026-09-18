@@ -121,7 +121,7 @@ Object.assign(window, {
       const frame = find("canvas-frame-frame-001");
       const target = action === "resize" ? find(group ? "frame-resize-handle-right-group-sheet-001" : "frame-resize-handle-right-frame-001")
         : action === "overlap" ? find("canvas-frame-frame-002") : frame;
-      if (!target) throw new Error("Frame target was not rendered.");
+      if (!target) throw new Error("Quadro target was not rendered.");
       const point = target.toGlobal(action === "resize" ? { x: 0, y: 0 } : action === "empty" ? { x: -70, y: -20 } : { x: 30, y: 12 });
       const bounds = app.canvas.getBoundingClientRect();
       return {

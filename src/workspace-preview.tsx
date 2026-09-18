@@ -188,7 +188,7 @@ const projectCorePort: ProjectCorePort = {
   refreshLayoutCatalog: async () => layoutCase.favoriteStates ? layoutCase.favoriteStates[layoutFavoriteStage].queries[projection.state.album.sheets[0].id].query.catalogRevision : layoutCatalogStage === "deleted" ? 2 : layoutCatalogStage === "saved" ? 1
     : layoutCase.before.queries[layoutCase.before.projection.state.album.sheets[0].id].query.catalogRevision,
   saveCustomLayout: async (sheetId) => {
-    if (frameContext !== "layouts" || !layoutCase.saveResult || sheetId !== projection.state.album.sheets[0].id) throw new Error("Captura de Layout fora do corpus.");
+    if (frameContext !== "layouts" || !layoutCase.saveResult || sheetId !== projection.state.album.sheets[0].id) throw new Error("Captura de layout fora do corpus.");
     const result = { ...layoutCase.saveResult, created: layoutCatalogStage === "initial" && layoutCase.saveResult.created };
     layoutCatalogStage = "saved";
     return result;
@@ -199,7 +199,7 @@ const projectCorePort: ProjectCorePort = {
       layoutFavoriteStage = "orphaned";
       return 2;
     }
-    if (frameContext !== "layouts" || layoutId !== layoutCase.saveResult?.layoutId || !layoutCase.catalogDeleted) throw new Error("Exclusão de Layout fora do corpus.");
+    if (frameContext !== "layouts" || layoutId !== layoutCase.saveResult?.layoutId || !layoutCase.catalogDeleted) throw new Error("Exclusão de layout fora do corpus.");
     layoutCatalogStage = "deleted";
     return 2;
   },
@@ -216,7 +216,7 @@ const projectCorePort: ProjectCorePort = {
     const sample = samples.find((state) => state &&
       JSON.stringify(state.projection.state.album) === JSON.stringify(projection.state.album));
     const prepared = sample?.queries[sheetId];
-    if (frameContext !== "layouts" || !prepared) throw new Error("Consulta fora do corpus de Layouts.");
+    if (frameContext !== "layouts" || !prepared) throw new Error("Consulta fora do corpus de layouts.");
     preparedLayoutQuery = { ...structuredClone(prepared), query: { ...structuredClone(prepared.query),
       queryId: `layout-preview-${++layoutQuerySequence}`, revision: projection.state.revision } };
     return preparedLayoutQuery.query;
@@ -224,7 +224,7 @@ const projectCorePort: ProjectCorePort = {
   previewLayout: async (selection) => {
     if (!preparedLayoutQuery || selection.queryId !== preparedLayoutQuery.query.queryId ||
         projection.state.revision !== preparedLayoutQuery.query.revision || !preparedLayoutQuery.previews[selection.candidateIndex]) {
-      throw new Error("Esta prévia de Layout expirou.");
+      throw new Error("Esta prévia de layout expirou.");
     }
     return structuredClone(preparedLayoutQuery.previews[selection.candidateIndex]);
   },
@@ -263,7 +263,7 @@ const projectCorePort: ProjectCorePort = {
     return structuredClone(sample.frames);
   },
   previewDecorativeDrop: async (request) => decorativePreview(projection, request),
-  previewFrameGeometry: async () => { throw new Error("Frame geometry preview is not configured in this fixture."); },
+  previewFrameGeometry: async () => { throw new Error("Quadro geometry preview is not configured in this fixture."); },
   // Replay Core-produced point probes with tolerance for CSS pixel rounding.
   resolvePhotoDropTarget: async (sheetId, xUm, yUm) => frameContext === "swap"
     ? frameContentSwapCorpus.dropProbes.find((probe) => probe.sheetId === sheetId &&
@@ -453,7 +453,7 @@ function createPreviewProjection(
     preview.state.album.media.push({
       id: unavailableDecorativeId,
       kind: "decorative",
-      name: "Overlay indisponível.png",
+      name: "Sobreposição indisponível.png",
       sourceWidthPx: 2_400,
       sourceHeightPx: 1_800,
       palette: ["#17344a", "#88b7c5", "#d4a15e"],
@@ -465,7 +465,7 @@ function createPreviewProjection(
     for (const sheet of preview.composition.sheets) {
       sheet.overlays.push({
         mediaId: unavailableDecorativeId,
-        name: "Overlay indisponível.png",
+        name: "Sobreposição indisponível.png",
         drawRect: {
           x: 0,
           y: 0,
@@ -584,7 +584,7 @@ function applyPreviewIntent(intent: ProjectIntent): ProjectMutationOutcome {
     const sample = decorativeCorpus.transitions.find((item) => item.from === decorativeStateName(projection) &&
       item.intent.kind === intent.kind && item.intent.sheetId === intent.sheetId && item.intent.scope === intent.scope &&
       JSON.stringify(item.intent.change) === JSON.stringify(intent.change));
-    if (frameContext !== "decorations" || !sample) throw new Error("Edição fora do corpus de Decorativos.");
+    if (frameContext !== "decorations" || !sample) throw new Error("Edição fora do corpus de decorativos.");
     projection = finalizePhysicalPreviewMutation(structuredClone(sample.projection), structuredClone(projection));
     document.body.dataset.sheetDesignApplied = intent.change.kind;
     return { projection, affectedFrameId: null, affectedSheetId: intent.sheetId };
@@ -598,7 +598,7 @@ function applyPreviewIntent(intent: ProjectIntent): ProjectMutationOutcome {
     const sample = decorativeCorpus.transitions.find((item) => item.from === decorativeStateName(projection) &&
       edit && item.intent.kind === "applyDecorative" && item.intent.sheetId === edit.sheetId && item.intent.mediaId === edit.mediaId &&
       item.intent.role === edit.role && item.intent.scope === edit.scope);
-    if (frameContext !== "decorations" || !sample) throw new Error("Aplicação fora do corpus de Decorativos.");
+    if (frameContext !== "decorations" || !sample) throw new Error("Aplicação fora do corpus de decorativos.");
     projection = finalizePhysicalPreviewMutation(structuredClone(sample.projection), structuredClone(projection));
     document.body.dataset.decorativeApplied = `${edit!.role}-${edit!.scope}`;
     return { projection, affectedFrameId: null, affectedSheetId: sample.intent.sheetId };
@@ -607,7 +607,7 @@ function applyPreviewIntent(intent: ProjectIntent): ProjectMutationOutcome {
     const transition = layoutCase.favoriteTransitions?.find((item) => item.from === layoutFavoriteStage && item.candidateIndex === intent.selection.candidateIndex);
     if (frameContext !== "layouts" || !transition || !preparedLayoutQuery ||
         intent.selection.queryId !== preparedLayoutQuery.query.queryId || projection.state.revision !== preparedLayoutQuery.query.revision) {
-      throw new Error("Favorito fora do corpus de Layouts desta prévia.");
+      throw new Error("Favorito fora do corpus de layouts desta prévia.");
     }
     layoutFavoriteStage = transition.to;
     projection = finalizePhysicalPreviewMutation(structuredClone(layoutCase.favoriteStates![transition.to].projection), structuredClone(projection));
@@ -631,7 +631,7 @@ function applyPreviewIntent(intent: ProjectIntent): ProjectMutationOutcome {
     if (frameContext !== "layouts" || !result || !preparedLayoutQuery ||
         intent.selection.queryId !== preparedLayoutQuery.query.queryId ||
         projection.state.revision !== preparedLayoutQuery.query.revision || intent.selection.candidateIndex !== 0) {
-      throw new Error("Aplicação fora do corpus de Layouts desta prévia.");
+      throw new Error("Aplicação fora do corpus de layouts desta prévia.");
     }
     projection = finalizePhysicalPreviewMutation(structuredClone(result.projection), structuredClone(projection));
     return { projection, affectedFrameId: null, affectedSheetId: preparedLayoutQuery.query.sheetId };
@@ -653,7 +653,7 @@ function applyPreviewIntent(intent: ProjectIntent): ProjectMutationOutcome {
     }
     const transition = photoOrientationCorpus.zoomTransitions.find((item) =>
       item.from === current && item.edit.userZoom === intent.edit.userZoom && [...item.edit.frameIds].sort().join() === [...intent.edit.frameIds].sort().join());
-    if (frameContext !== "orientation" || !transition) throw new Error("Comando fora do corpus de Zoom desta prévia.");
+    if (frameContext !== "orientation" || !transition) throw new Error("Comando fora do corpus de zoom desta prévia.");
     projection = finalizePhysicalPreviewMutation(structuredClone(photoOrientationCorpus.states[transition.to]), structuredClone(projection));
     exposePhotoOrientationState();
     return { projection, affectedFrameId: null, affectedSheetId: null };
@@ -797,7 +797,7 @@ function applyPreviewIntent(intent: ProjectIntent): ProjectMutationOutcome {
     const insertsOutside =
       insertionIndex === 0 || insertionIndex === next.state.album.sheets.length;
     if (insertsOutside && pushedEdge?.activeSides !== "both") {
-      throw new Error("Uma Página única não pode ser empurrada para o interior.");
+      throw new Error("Uma página única não pode ser empurrada para o interior.");
     }
     affectedSheetId = `sheet-added-${String(++addedSheetSequence).padStart(3, "0")}`;
     const sheet = {
@@ -819,7 +819,7 @@ function applyPreviewIntent(intent: ProjectIntent): ProjectMutationOutcome {
     );
   } else if (intent.kind === "deleteSheet") {
     if (next.state.album.sheets.length <= 2) {
-      throw new Error("O Álbum precisa manter ao menos duas Lâminas.");
+      throw new Error("O álbum precisa manter ao menos duas lâminas.");
     }
     const deletedIndex = next.state.album.sheets.findIndex(
       (sheet) => sheet.id === intent.sheetId,
@@ -843,12 +843,12 @@ function applyPreviewIntent(intent: ProjectIntent): ProjectMutationOutcome {
       intent.targetIndex < 0 ||
       intent.targetIndex >= next.state.album.sheets.length
     ) {
-      throw new Error("Posição de Lâmina inválida.");
+      throw new Error("Posição de lâmina inválida.");
     }
     const [moved] = next.state.album.sheets.splice(sourceIndex, 1);
     next.state.album.sheets.splice(intent.targetIndex, 0, moved);
     if (!physicalSheetOrderIsValid(next)) {
-      throw new Error("Uma Página única deve permanecer em sua extremidade.");
+      throw new Error("Uma página única deve permanecer em sua extremidade.");
     }
     affectedSheetId = intent.sheetId;
   }

@@ -12,7 +12,7 @@ describe("SheetContextMenu", () => {
       position={{ x: 20, y: 30 }} sheetNumber={2} onAddAfter={vi.fn()}
       onAddBefore={vi.fn()} onConvertEdge={vi.fn()} onDelete={vi.fn()}
       onDuplicate={duplicate} onDismiss={dismiss} />);
-    fireEvent.click(screen.getByRole("menuitem", { name: "Duplicar Lâmina" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Duplicar lâmina" }));
     expect(duplicate).toHaveBeenCalledOnce();
     expect(dismiss).toHaveBeenCalledOnce();
   });
@@ -75,7 +75,7 @@ describe("SheetContextMenu", () => {
     );
 
     const menu = screen.getByRole("menu", {
-      name: "Ações da Lâmina 04",
+      name: "Ações da lâmina 04",
     });
     expect(menu).toHaveStyle({ left: "140px", top: "220px" });
     expect(
@@ -85,7 +85,7 @@ describe("SheetContextMenu", () => {
       screen.getByRole("menuitem", { name: "Adicionar depois" }),
     ).toBeEnabled();
     expect(
-      screen.getByRole("menuitem", { name: "Duplicar Lâmina" }),
+      screen.getByRole("menuitem", { name: "Duplicar lâmina" }),
     ).toBeDisabled();
     expect(
       screen.getByRole("menuitem", { name: "Converter extremidade" }),
@@ -218,7 +218,7 @@ describe("SheetContextMenu", () => {
         <SheetContextMenu {...props} position={{ x: 0, y: 0 }} />,
       );
       const menu = screen.getByRole("menu", {
-        name: "Ações da Lâmina 02",
+        name: "Ações da lâmina 02",
       });
       const corners = [
         { position: { x: 0, y: 0 }, expected: { left: "8px", top: "8px" } },

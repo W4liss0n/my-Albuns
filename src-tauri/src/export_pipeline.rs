@@ -340,37 +340,35 @@ impl ExportProgress {
 
 fn processor_failure_message(code: ImagingFailureCode) -> &'static str {
     match code {
-        ImagingFailureCode::InvalidRenderRequest => {
-            "A solicitação de Exportação não corresponde ao contrato do Processador."
-        }
+        ImagingFailureCode::InvalidRenderRequest => "Não foi possível preparar a exportação.",
         ImagingFailureCode::SourceUnavailable => {
-            "Um Arquivo original necessário está ausente ou indisponível. Religue a mídia no Painel de imagens e tente a Exportação novamente."
+            "Uma imagem não foi encontrada ou não pôde ser aberta. Localize-a no painel de imagens e tente exportar novamente."
         }
         ImagingFailureCode::UnsupportedSourceFormat => {
-            "Uma fonte original não usa JPEG ou PNG estático aceito neste fluxo."
+            "Uma imagem não está em um formato aceito. Use JPEG ou PNG sem animação."
         }
         ImagingFailureCode::UnsupportedSourceVariant => {
-            "Uma fonte original usa uma variante de imagem não aceita neste fluxo."
+            "Uma imagem usa uma versão do formato que não é aceita para exportação."
         }
         ImagingFailureCode::UnsupportedColorModel => {
-            "Uma fonte original usa um modelo de cor não aceito neste fluxo."
+            "Uma imagem usa um modelo de cor que não é aceito para exportação."
         }
         ImagingFailureCode::UnsupportedColorProfile => {
-            "Uma fonte original contém um perfil de cor não permitido ou malformado."
+            "Uma imagem tem um perfil de cor inválido ou incompatível com a exportação."
         }
-        ImagingFailureCode::DecodeFailed => {
-            "Uma fonte original permitida não pôde ser decodificada para a Exportação."
+        ImagingFailureCode::DecodeFailed => "Não foi possível ler uma imagem para exportar.",
+        ImagingFailureCode::CompositionFailed => {
+            "Não foi possível preparar a lâmina para exportar."
         }
-        ImagingFailureCode::CompositionFailed => "A composição da Lâmina não pôde ser concluída.",
         ImagingFailureCode::ResourceLimitExceeded => {
-            "A Exportação excede o limite seguro de recursos desta versão."
+            "A exportação precisa de mais recursos do que esta versão permite."
         }
-        ImagingFailureCode::EncodeFailed => "O JPEG não pôde ser codificado e sincronizado.",
+        ImagingFailureCode::EncodeFailed => "Não foi possível gravar o arquivo exportado.",
         ImagingFailureCode::OutputStorageFull => {
             myalbuns_paths::AppPathsError::EXPORT_STORAGE_FULL_MESSAGE
         }
         ImagingFailureCode::VerificationFailed => {
-            "O JPEG preparado não passou pela verificação de integridade."
+            "Não foi possível confirmar se o arquivo exportado está completo."
         }
     }
 }

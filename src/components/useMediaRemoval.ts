@@ -48,7 +48,7 @@ export function useMediaRemoval(input: {
         }
         if (!decision.current) return null;
         return latest.current.runner.run((port, current) => {
-          if ((current ?? latest.current.projection).state.revision !== projection.state.revision) throw new Error("O Projeto mudou. Revise a seleção antes de remover.");
+          if ((current ?? latest.current.projection).state.revision !== projection.state.revision) throw new Error("O projeto mudou. Revise a seleção antes de remover.");
           return port.apply({ kind: "removeMedia", mediaIds: ids, mode });
         }, { cancelAfterPendingFailure: true });
       });

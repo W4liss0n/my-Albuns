@@ -49,7 +49,7 @@ test("composes the Decorative preview below Frames, switches role with Shift, an
   const mediaDrag = { gestureId: 1, mediaId: "decorative-001", kind: "decorative" as const, x: 600, y: 250, shiftKey: false, phase: "dragging" as const };
   const callbacks = { revision: 1, onPreviewDecorativeDrop, onDropDecorative };
   view.rerenderCanvas({ ...callbacks, mediaDrag });
-  await waitFor(() => expect(screen.getByRole("status", { name: "Aplicação do Decorativo" })).toHaveTextContent("Fundo · Ambos os lados"));
+  await waitFor(() => expect(screen.getByRole("status", { name: "Aplicação do decorativo" })).toHaveTextContent("Fundo · Ambos os lados"));
   await waitFor(() => expect(displayWithLabel("background-media-fallback-decorative-001")).toBeDefined());
   expect(displayWithLabel("decorative-drop-target-sheet-001")).toMatchObject({ rectCommands: [{ x: 0, y: 0, width: 600, height: 300 }], fillStyles: [] });
   expect(displayWithLabel("decorative-drop-center-sheet-001")).toMatchObject({ rectCommands: [], fillStyles: [] });
@@ -58,7 +58,7 @@ test("composes the Decorative preview below Frames, switches role with Shift, an
   expect(onDropDecorative).not.toHaveBeenCalled();
   expect(onSelectFrame).not.toHaveBeenCalled();
   view.rerenderCanvas({ ...callbacks, mediaDrag: { ...mediaDrag, shiftKey: true } });
-  await waitFor(() => expect(screen.getByRole("status", { name: "Aplicação do Decorativo" })).toHaveTextContent("Overlay · Ambos os lados"));
+  await waitFor(() => expect(screen.getByRole("status", { name: "Aplicação do decorativo" })).toHaveTextContent("Sobreposição · Ambos os lados"));
   expect(onPreviewDecorativeDrop).toHaveBeenLastCalledWith(expect.objectContaining({ role: "overlay" }));
   await waitFor(() => expect(displayWithLabel("decorative-overlay-fallback-decorative-001")).toBeDefined());
   view.rerenderCanvas({ ...callbacks, mediaDrag: { ...mediaDrag, shiftKey: true, phase: "drop" } });
@@ -84,7 +84,7 @@ test.each(["left", "right"] as const)("outlines the entire %s Page instead of th
   });
   view.rerenderCanvas({ revision: 1, onPreviewDecorativeDrop,
     mediaDrag: { gestureId: 1, mediaId: "decorative-001", kind: "decorative", x: scope === "left" ? 300 : 900, y: 250, shiftKey: false, phase: "dragging" } });
-  await waitFor(() => expect(screen.getByRole("status", { name: "Aplicação do Decorativo" })).toBeInTheDocument());
+  await waitFor(() => expect(screen.getByRole("status", { name: "Aplicação do decorativo" })).toBeInTheDocument());
   expect(displayWithLabel("decorative-drop-target-sheet-001")).toMatchObject({
     rectCommands: [{ x: scope === "left" ? 0 : 300, y: 0, width: 300, height: 300 }], fillStyles: [],
   });
@@ -117,16 +117,16 @@ test("ignores obsolete Decorative previews and cancels a pending release with Es
   view.rerenderCanvas({ ...callbacks, mediaDrag });
   await waitFor(() => expect(onPreviewDecorativeDrop).toHaveBeenCalledOnce());
   view.rerenderCanvas({ ...callbacks, mediaDrag: { ...mediaDrag, shiftKey: true } });
-  await waitFor(() => expect(screen.getByRole("status", { name: "Aplicação do Decorativo" })).toHaveTextContent("Overlay"));
+  await waitFor(() => expect(screen.getByRole("status", { name: "Aplicação do decorativo" })).toHaveTextContent("Sobreposição"));
   await act(async () => resolveOld({ ...preview, role: "background" }));
-  expect(screen.getByRole("status", { name: "Aplicação do Decorativo" })).toHaveTextContent("Overlay");
+  expect(screen.getByRole("status", { name: "Aplicação do decorativo" })).toHaveTextContent("Sobreposição");
   view.rerenderCanvas({ ...callbacks, mediaDrag: { ...mediaDrag, x: 605, shiftKey: true } });
   expect(onPreviewDecorativeDrop).toHaveBeenCalledTimes(2);
   view.rerenderCanvas({ ...callbacks, mediaDrag: { ...mediaDrag, shiftKey: true, phase: "drop" } });
   await waitFor(() => expect(onPreviewDecorativeDrop).toHaveBeenCalledTimes(3));
   fireEvent.keyDown(window, { key: "Escape" });
   await act(async () => resolveDrop(preview));
-  expect(screen.queryByRole("status", { name: "Aplicação do Decorativo" })).not.toBeInTheDocument();
+  expect(screen.queryByRole("status", { name: "Aplicação do decorativo" })).not.toBeInTheDocument();
   expect(onDropDecorative).not.toHaveBeenCalled();
   expect(onPhotoDragCancel).toHaveBeenCalledOnce();
   view.rerenderCanvas({ ...callbacks, mediaDrag: { ...mediaDrag, gestureId: 2, x: 1_300, phase: "drop" } });
@@ -295,7 +295,7 @@ test("matches the reference Canvas surface, cut-area crop and empty Frame treatm
     "frame-placeholder-label-frame-placeholder",
   );
   expect(placeholderLabel).toMatchObject({
-    text: "Adicionar Foto",
+    text: "Adicionar foto",
     visible: true,
   });
   const expectedUiScale = 1 / ((500 - 2 * 28) / 300);
@@ -910,7 +910,7 @@ test("materializes the integrated Sheet Bar instead of a loose sheet label", asy
     tint: 0x403b35,
   });
   expect(screen.queryByRole("button", {
-    name: "Abrir Painel de Layouts — indisponível nesta versão",
+    name: "Abrir painel de layouts — indisponível nesta versão",
   })).not.toBeInTheDocument();
   expect(displayWithLabel("sheet-bar-number-sheet-001")).toMatchObject({
     text: "L01",
@@ -963,7 +963,7 @@ test("shares side swap availability and hover between the DOM button and Pixi Ba
     },
   };
   view.rerenderCanvas(options);
-  const button = screen.getByRole("button", { name: "Trocar lados da Lâmina 01" });
+  const button = screen.getByRole("button", { name: "Trocar lados da lâmina 01" });
   expect(button).toBeEnabled();
   fireEvent.pointerEnter(button);
   await act(async () => { await vi.advanceTimersByTimeAsync(160); });
@@ -1000,7 +1000,7 @@ test("shares side swap availability and hover between the DOM button and Pixi Ba
   view.rerenderCanvas({ ...options, sheetReorder: { ...options.sheetReorder, status: "cancelled" } });
   expect(button).toBeEnabled();
   view.rerenderCanvas({ ...options, mode: { kind: "sheet-editing", sheetId: "sheet-001" } });
-  expect(screen.queryByRole("button", { name: "Trocar lados da Lâmina 01" })).not.toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Trocar lados da lâmina 01" })).not.toBeInTheDocument();
 });
 
 test("keeps the Layout button and its Bar visible while the DOM action has focus", async () => {
@@ -1017,7 +1017,7 @@ test("keeps the Layout button and its Bar visible while the DOM action has focus
       onCancel: vi.fn(), onDrop: vi.fn(), onSelect: vi.fn(), onPreview: vi.fn(),
     },
   });
-  const button = screen.getByRole("button", { name: "Layouts da Lâmina 01" });
+  const button = screen.getByRole("button", { name: "Layouts da lâmina 01" });
   fireEvent.focus(button);
   fireEvent.pointerLeave(button);
   currentBarNode("canvas-sheet-sheet-001").emit("pointerleave", {});
@@ -1308,10 +1308,10 @@ function adaptFinalRendererCaseForCanvas(caseId: string) {
     },
   );
   if (!rawCase) {
-    throw new Error(`final-renderer Canvas case not found: ${caseId}`);
+    throw new Error(`final-renderer área de edição case not found: ${caseId}`);
   }
   if (!rawCase.data.adapterRegistrations.includes("canvas")) {
-    throw new Error(`final-renderer case is not registered for Canvas: ${caseId}`);
+    throw new Error(`final-renderer case is not registered for área de edição: ${caseId}`);
   }
 
   const creativeSheets = new Map(
@@ -1335,7 +1335,7 @@ function adaptFinalRendererCaseForCanvas(caseId: string) {
           layer.data.paint.kind !== "solid"
         ) {
           throw new Error(
-            `unsupported Canvas layer in final-renderer case: ${expectedSheet.sheetId}`,
+            `unsupported área de edição layer in final-renderer case: ${expectedSheet.sheetId}`,
           );
         }
         const [x, y, width, height] = layer.data.rectUm;
@@ -1593,7 +1593,7 @@ test.each([1, 6])("shows a loaded panel photo on the first Canvas update with %i
   expect(frame).toBeDefined();
   const inside = find(frame, "photo-pan-inside-preview")!;
   expect(inside.children?.some((child) => child.texture !== undefined),
-    "the newly selected Frame must show the already loaded photo, without the provisional colored background").toBe(true);
+    "the newly selected quadro must show the already loaded photo, without the provisional colored fundo").toBe(true);
 });
 
 test("uses the loaded photo when the unused-media filter removes its thumbnail in the placement commit", async () => {
@@ -2151,13 +2151,13 @@ test("mounts the productive Sheet Bar seam for selection, edit, context, and reo
   await finishPixiInitialization();
 
   const first = screen.getByRole("button", {
-    name: "Reordenar Lâmina 01 pela Barra",
+    name: "Reordenar lâmina 01 pela Barra",
   });
   const second = screen.getByRole("button", {
-    name: "Reordenar Lâmina 02 pela Barra",
+    name: "Reordenar lâmina 02 pela Barra",
   });
   const overlay = view.getByRole("group", {
-    name: "Reordenação pela Barra da Lâmina",
+    name: "Reordenação pela Barra da lâmina",
   });
   vi.spyOn(overlay, "getBoundingClientRect").mockReturnValue({
     left: 0,

@@ -56,7 +56,7 @@ function detailsFromReview(review: AlbumInformationReview) {
     review.baseline,
     review.impact,
   ), ...review.conversionLosses.map((loss) => ({
-    label: `Remoção na Lâmina ${loss.sheetNumber}`,
+    label: `Remoção na lâmina ${loss.sheetNumber}`,
     value: edgeConversionLossDescription(loss),
   }))];
 }
@@ -75,7 +75,7 @@ export function albumInformationDetails(
     label: string,
     before: string | number,
     after: string | number,
-  ) => details.push({ label, value: `${before} → ${after}` });
+  ) => details.push({ label, value: `${before} → ${typeof after === "string" ? after[0].toLocaleLowerCase("pt-BR") + after.slice(1) : after}` });
   const dimensionsChanged =
     information.sheetWidthUm !== baseline.sheetWidthUm ||
     information.sheetHeightUm !== baseline.sheetHeightUm;
@@ -83,14 +83,14 @@ export function albumInformationDetails(
 
   if (information.firstSheet !== baseline.firstSheet) {
     addChange(
-      "Primeira Lâmina",
+      "Primeira lâmina",
       formatEnd(baseline.firstSheet),
       formatEnd(information.firstSheet),
     );
   }
   if (information.lastSheet !== baseline.lastSheet) {
     addChange(
-      "Última Lâmina",
+      "Última lâmina",
       formatEnd(baseline.lastSheet),
       formatEnd(information.lastSheet),
     );
@@ -107,14 +107,14 @@ export function albumInformationDetails(
   }
   if (information.sheetWidthUm !== baseline.sheetWidthUm) {
     addChange(
-      "Largura da Lâmina",
+      "Largura da lâmina",
       measurement(baseline.sheetWidthUm),
       measurement(information.sheetWidthUm),
     );
   }
   if (information.sheetHeightUm !== baseline.sheetHeightUm) {
     addChange(
-      "Altura da Lâmina",
+      "Altura da lâmina",
       measurement(baseline.sheetHeightUm),
       measurement(information.sheetHeightUm),
     );
@@ -136,7 +136,7 @@ export function albumInformationDetails(
   if (rasterChanged) {
     details.push({
       label: "Resolução resultante",
-      value: `Lâmina ${formatPixels(impact.sheetWidthPx)} × ${formatPixels(impact.heightPx)} px · Página ${formatPixels(impact.pageWidthPx)} × ${formatPixels(impact.heightPx)} px`,
+      value: `Lâmina ${formatPixels(impact.sheetWidthPx)} × ${formatPixels(impact.heightPx)} px · página ${formatPixels(impact.pageWidthPx)} × ${formatPixels(impact.heightPx)} px`,
     });
   }
   if (dimensionsChanged) {
@@ -157,5 +157,5 @@ function formatPixels(value: number) {
 function messageFromError(error: unknown) {
   return error instanceof Error
     ? error.message
-    : "Não foi possível abrir a confirmação das Informações do Álbum.";
+    : "Não foi possível abrir a confirmação das Informações do álbum.";
 }

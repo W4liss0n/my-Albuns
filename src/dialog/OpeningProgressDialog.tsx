@@ -13,7 +13,7 @@ export function OpeningProgressDialog({
   images?: OpeningImageProgress | null;
 }) {
   return <ProgressDialog
-    title={creating ? "Criando Projeto" : "Abrindo Projeto"}
+    title={creating ? "Criando projeto" : "Abrindo projeto"}
     reserveProgressMeta
     progress={images ? {
       kind: "determinate",
@@ -22,7 +22,7 @@ export function OpeningProgressDialog({
       status: "Preparando imagens",
     } : {
       kind: "indeterminate",
-      status: "Preparando a Janela do Projeto…",
+      status: "Preparando a Janela do projeto…",
     }}
   />;
 }

@@ -206,7 +206,7 @@ export class FrameInteractionSession {
       ) return;
       if (gesture.layoutLocked) {
         this.cancel();
-        gesture.controls.onError("O Layout está travado. Destrave-o no Painel de Layouts para mover os Frames.");
+        gesture.controls.onError("O layout está travado. Destrave-o no painel de layouts para mover os quadros.");
         return;
       }
       gesture.phase = "dragging";

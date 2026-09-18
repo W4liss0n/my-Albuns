@@ -336,11 +336,11 @@ export function InspectorPanel({
           <>
             <div className="context-heading">
               <span>Seleção múltipla</span>
-              <h2>{context.frames.length} Frames selecionados</h2>
+              <h2>{context.frames.length} quadros selecionados</h2>
               <p>
-                {selectedPhotoCount} {selectedPhotoCount === 1 ? "Foto" : "Fotos"}
+                {selectedPhotoCount} {selectedPhotoCount === 1 ? "foto" : "fotos"}
                 {" · "}
-                {selectedPlaceholderCount} {selectedPlaceholderCount === 1 ? "placeholder" : "placeholders"}
+                {selectedPlaceholderCount} {selectedPlaceholderCount === 1 ? "quadro vazio" : "quadros vazios"}
               </p>
             </div>
             {(frameStyle || ((photoOrientation || photoZoom) && selectedPhotoCount > 0)) && (
@@ -369,8 +369,8 @@ export function InspectorPanel({
         ) : context.kind === "frame" ? (
           <>
             <div className="context-heading">
-              <span>Frame selecionado</span>
-              <h2>{context.composedPhoto?.name ?? "Frame placeholder"}</h2>
+              <span>Quadro selecionado</span>
+              <h2>{context.composedPhoto?.name ?? "Quadro vazio"}</h2>
             </div>
             <InspectorSection
               key="frame-photo-design"
@@ -380,11 +380,11 @@ export function InspectorPanel({
               defaultOpen
             >
               <PropertyRow
-                label="Frame"
+                label="Quadro"
                 value={context.frame.id.replace("frame-", "").toUpperCase()}
               />
               {context.frame.photo && <PropertyRow
-                label="Pan horizontal"
+                label="Posição horizontal"
                 value={`${Math.round(displayedPhotoPanX * 100)}%`}
               />}
               {context.frame.photo && context.composedPhoto && photoZoom && (
@@ -405,9 +405,9 @@ export function InspectorPanel({
           </>
         ) : context.kind === "sheet" && selectedSheetScope ? (
           <InspectorSection
-            accessibleTitle="Design da Lâmina"
+            accessibleTitle="Design da lâmina"
             key="sheet-design"
-            title="Design da Lâmina"
+            title="Design da lâmina"
             preferenceKey="sheet.design"
             sectionState={sectionState}
             defaultOpen
@@ -442,9 +442,9 @@ export function InspectorPanel({
                   Aplicar
                 </ActionButton>
               }
-              accessibleTitle="Informações do Álbum"
+              accessibleTitle="Informações do álbum"
               key="album-information"
-              title="Informações do Álbum"
+              title="Informações do álbum"
               preferenceKey="album.information"
               sectionState={sectionState}
               defaultOpen
@@ -475,9 +475,9 @@ export function InspectorPanel({
                   Aplicar
                 </ActionButton>
               }
-              accessibleTitle="Design do Álbum"
+              accessibleTitle="Design do álbum"
               key="album-design"
-              title="Design do Álbum"
+              title="Design do álbum"
               preferenceKey="album.design"
               sectionState={sectionState}
               defaultOpen
@@ -496,9 +496,9 @@ export function InspectorPanel({
               />
             </InspectorSection>
             <InspectorSection
-              accessibleTitle="Grade de Lâminas"
+              accessibleTitle="Grade de lâminas"
               key="album-sheet-grid"
-              title="Grade de Lâminas"
+              title="Grade de lâminas"
               preferenceKey="album.sheet-grid"
               sectionState={sectionState}
               meta={sheets.length}
@@ -507,9 +507,9 @@ export function InspectorPanel({
               {sheets.length === 0 ? (
                 <EmptyState
                   density="compact"
-                  description="As Lâminas do Projeto aparecerão aqui."
+                  description="As lâminas do projeto aparecerão aqui."
                   icon={<AppIcon icon={PanelsTopLeft} size={16} />}
-                  title="Nenhuma Lâmina na Grade"
+                  title="Nenhuma lâmina na Grade"
                 />
               ) : (
                 <div
@@ -589,7 +589,7 @@ export function InspectorPanel({
                         ) : null}
                       <Button
                         aria-current={active ? "true" : undefined}
-                        aria-label={`Ir para Lâmina ${number}, ${accessiblePageLabel}`}
+                        aria-label={`Ir para lâmina ${number}, ${accessiblePageLabel.toLocaleLowerCase("pt-BR")}`}
                         className={active ? "sheet-tile active" : "sheet-tile"}
                         data-active-sides={sheet.activeSides}
                         style={tileStyle}
@@ -833,13 +833,13 @@ function formatSheetPageMetadata(sheet: SheetSnapshot | undefined) {
   const lastPage = sheet.pageNumbers[sheet.pageNumbers.length - 1];
   if (sheet.role === "initial" && sheet.pageNumbers.length === 1) {
     return {
-      accessibleLabel: `Lâmina inicial, Página ${firstPage}`,
+      accessibleLabel: `Lâmina inicial, página ${firstPage}`,
       visualLabel: String(firstPage),
     };
   }
   if (sheet.role === "final" && sheet.pageNumbers.length === 1) {
     return {
-      accessibleLabel: `Lâmina final, Página ${firstPage}`,
+      accessibleLabel: `Lâmina final, página ${firstPage}`,
       visualLabel: String(firstPage),
     };
   }

@@ -245,7 +245,7 @@ impl GenerationRunner {
                         && item.exists
                         && item.problems.is_empty()
                     {
-                        vec!["Já existe um Projeto no destino.".into()]
+                        vec!["Já existe um projeto no destino.".into()]
                     } else {
                         item.problems.clone()
                     },
@@ -402,13 +402,13 @@ fn creation_error(error: myalbuns_core::CreateProjectError) -> String {
     use myalbuns_core::CreateProjectError as E;
     match error {
         E::ProjectInUse => {
-            "O Projeto está aberto. Feche-o e verifique novamente, ou ignore este item."
+            "O projeto está aberto. Feche-o e verifique novamente, ou ignore este item."
         }
         E::DestinationConflict => "O destino mudou após a verificação. Verifique novamente.",
         E::IdentityIndeterminate => {
-            "Não foi possível confirmar se o Projeto está em uso. Verifique novamente."
+            "Não foi possível confirmar se o projeto está em uso. Verifique novamente."
         }
-        _ => "Não foi possível gravar o Projeto. Verifique o acesso à pasta de destino.",
+        _ => "Não foi possível gravar o projeto. Verifique o acesso à pasta de destino.",
     }
     .into()
 }

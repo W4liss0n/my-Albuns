@@ -14,7 +14,7 @@ test("Cache cleanup requires confirmation and survives changing tabs while it is
   };
   const close = vi.fn();
   render(<SettingsWindow photoshopPort={photoshopSettingsPreview(null)} cachePort={cachePort} close={close} />);
-  const clear = screen.getByRole("button", { name: "Limpar cache" });
+  const clear = screen.getByRole("button", { name: "Limpar prévias" });
   await waitFor(() => expect(clear).toBeEnabled());
   fireEvent.click(clear);
   expect(cachePort.clearAll).not.toHaveBeenCalled();
@@ -23,8 +23,8 @@ test("Cache cleanup requires confirmation and survives changing tabs while it is
   fireEvent.click(screen.getByRole("tab", { name: "Outros" }));
   await act(async () => complete());
   fireEvent.click(screen.getByRole("tab", { name: "Desempenho" }));
-  expect(screen.getByRole("status")).toHaveTextContent("Limpeza agendada");
-  expect(screen.getByRole("button", { name: "Limpar cache" })).toBeDisabled();
+  expect(screen.getByRole("status")).toHaveTextContent("quando você abrir o MyAlbuns novamente");
+  expect(screen.getByRole("button", { name: "Limpar prévias" })).toBeDisabled();
   expect(cachePort.freeClosedProjects).not.toHaveBeenCalled();
   expect(screen.queryByRole("button", { name: "Confirmar" })).not.toBeInTheDocument();
   fireEvent.click(screen.getByRole("button", { name: "Fechar" }));
@@ -38,11 +38,11 @@ test("canceling cleanup returns to the cache actions without deleting anything",
     clearAll: vi.fn(async () => ({ kind: "scheduled" as const })),
   };
   render(<SettingsWindow photoshopPort={photoshopSettingsPreview(null)} cachePort={cachePort} close={vi.fn()} />);
-  await waitFor(() => expect(screen.getByRole("button", { name: "Limpar cache" })).toBeEnabled());
-  fireEvent.click(screen.getByRole("button", { name: "Limpar cache" }));
+  await waitFor(() => expect(screen.getByRole("button", { name: "Limpar prévias" })).toBeEnabled());
+  fireEvent.click(screen.getByRole("button", { name: "Limpar prévias" }));
   expect(screen.getByRole("button", { name: "Cancelar" })).toHaveFocus();
   fireEvent.click(screen.getByRole("button", { name: "Cancelar" }));
-  expect(screen.getByRole("button", { name: "Limpar cache" })).toHaveFocus();
+  expect(screen.getByRole("button", { name: "Limpar prévias" })).toHaveFocus();
   expect(cachePort.freeClosedProjects).not.toHaveBeenCalled();
   expect(cachePort.clearAll).not.toHaveBeenCalled();
 });
@@ -54,10 +54,10 @@ test.each(["escape", "outside", "focus"])("dismissing the cache confirmation wit
     clearAll: vi.fn(async () => ({ kind: "scheduled" as const })),
   };
   render(<SettingsWindow photoshopPort={photoshopSettingsPreview(null)} cachePort={cachePort} close={vi.fn()} />);
-  const trigger = screen.getByRole("button", { name: "Limpar cache" });
+  const trigger = screen.getByRole("button", { name: "Limpar prévias" });
   await waitFor(() => expect(trigger).toBeEnabled());
   fireEvent.click(trigger);
-  expect(screen.getByRole("dialog", { name: "Confirmar limpeza do cache" })).toBeInTheDocument();
+  expect(screen.getByRole("dialog", { name: "Confirmar limpeza das prévias temporárias" })).toBeInTheDocument();
   expect(screen.getByText("Espaço ocupado")).toBeVisible();
   if (reason === "escape") fireEvent.keyDown(document, { key: "Escape" });
   else if (reason === "outside") fireEvent.pointerDown(screen.getByRole("tab", { name: "Outros" }));

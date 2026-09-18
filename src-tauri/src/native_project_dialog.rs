@@ -391,11 +391,11 @@ mod windows_dialog {
                     dialog.SetFileTypes(&filters)?;
                     dialog.SetFileTypeIndex(1)?;
                     dialog.SetDefaultExtension(w!("myalbuns"))?;
-                    dialog.SetFileName(w!("Novo Projeto.myalbuns"))?;
-                    dialog.SetTitle(w!("Criar Projeto MyAlbuns"))?;
+                    dialog.SetFileName(w!("Novo projeto.myalbuns"))?;
+                    dialog.SetTitle(w!("Criar projeto MyAlbuns"))?;
                     dialog.SetOkButtonLabel(w!("Criar"))?;
                 }
-                wide("Substituir Projeto MyAlbuns")
+                wide("Substituir projeto MyAlbuns")
             }
             SaveDialogKind::SaveAs { suggested_filename } => {
                 let filters = [COMDLG_FILTERSPEC {
@@ -409,10 +409,10 @@ mod windows_dialog {
                     dialog.SetFileTypeIndex(1)?;
                     dialog.SetDefaultExtension(w!("myalbuns"))?;
                     dialog.SetFileName(PCWSTR(suggested_filename.as_ptr()))?;
-                    dialog.SetTitle(w!("Salvar Projeto como"))?;
+                    dialog.SetTitle(w!("Salvar projeto como"))?;
                     dialog.SetOkButtonLabel(w!("Salvar"))?;
                 }
-                wide("Substituir Projeto MyAlbuns")
+                wide("Substituir projeto MyAlbuns")
             }
         };
         // SAFETY: the dialog interface is live on this STA.

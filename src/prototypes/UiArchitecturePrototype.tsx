@@ -34,7 +34,7 @@ const canonicalSurfaces = [
     href: "/welcome-preview.html",
     id: "global.new-project.configuration",
     owner: "#9",
-    parent: "Novo Projeto",
+    parent: "Novo projeto",
     title: "Configurações",
   },
   {
@@ -42,7 +42,7 @@ const canonicalSurfaces = [
     href: "/welcome-preview.html",
     id: "global.new-project.personalization",
     owner: "#21",
-    parent: "Novo Projeto",
+    parent: "Novo projeto",
     title: "Personalização",
   },
   {
@@ -58,7 +58,7 @@ const canonicalSurfaces = [
     href: "/workspace-preview.html",
     id: "project.normal",
     owner: "#9",
-    parent: "Janela do Projeto",
+    parent: "Janela do projeto",
     title: "Modo normal",
   },
   {
@@ -66,7 +66,7 @@ const canonicalSurfaces = [
     href: "/ui-architecture-prototype.html?view=editor",
     id: "project.edit",
     owner: "#20 e #22",
-    parent: "Janela do Projeto",
+    parent: "Janela do projeto",
     title: "Modo de edição",
   },
   {
@@ -74,7 +74,7 @@ const canonicalSurfaces = [
     href: "/docs/design/0004-exportacao-normal.md",
     id: "project.export",
     owner: "#35",
-    parent: "Janela do Projeto",
+    parent: "Janela do projeto",
     title: "Exportação",
   },
   {
@@ -86,11 +86,11 @@ const canonicalSurfaces = [
     title: "Exportação em lote",
   },
   {
-    availability: "Somente pelo Projeto",
+    availability: "Somente pelo projeto",
     href: "/docs/design/0008-configuracao-da-geracao-em-lote.md",
     id: "project.batch-generation",
     owner: "#36",
-    parent: "Janela do Projeto",
+    parent: "Janela do projeto",
     title: "Geração em lote",
   },
   {
@@ -295,7 +295,7 @@ function ReorderStrip({
 
   return (
     <section
-      aria-label={`${surfaceName} de Lâminas`}
+      aria-label={`${surfaceName} de lâminas`}
       className={`prototype-reorder prototype-reorder--${surface}`}
       data-preview-order={previewOrder.join(",")}
       data-reorder-state={state}
@@ -328,7 +328,7 @@ function ReorderStrip({
                 />
               ) : null}
               <button
-                aria-label={`Reordenar ${sheet?.label ?? sheetId} pela ${surfaceName}`}
+                aria-label={`Reordenar ${sheet?.label.toLocaleLowerCase("pt-BR") ?? sheetId} pela ${surfaceName}`}
                 className={
                   gesture?.sourceId === sheetId && isOrigin
                     ? "prototype-reorder__sheet prototype-reorder__sheet--source"
@@ -761,7 +761,7 @@ export function UiArchitecturePrototype({
             data-testid="surface-transition-map"
           >
             Boas-vindas → Configurações → Personalização → Nome e local →
-            Projeto · Modo normal ⇄ Modo de edição
+            projeto · Modo normal ⇄ Modo de edição
           </p>
           <div className="prototype-surface-map__grid">
             {canonicalSurfaces.map((surface) => (
@@ -801,12 +801,12 @@ export function UiArchitecturePrototype({
           <header className="editor-prototype__toolbar">
             <strong>
               {editorMode === "edit"
-                ? "Modo de edição · Lâmina 03"
-                : "Modo normal · reordenação de Lâminas"}
+                ? "Modo de edição · lâmina 03"
+                : "Modo normal · reordenação de lâminas"}
             </strong>
             <output aria-live="polite" className="prototype-visually-hidden">
               {zoom === fitZoom
-                ? "Visualização ajustada à Lâmina"
+                ? "Visualização ajustada à lâmina"
                 : "Visualização ampliada"}
             </output>
             <div className="editor-prototype__mode-actions">
@@ -851,7 +851,7 @@ export function UiArchitecturePrototype({
             />
           ) : null}
           <section
-            aria-label="Canvas do protótipo"
+            aria-label="área de edição do protótipo"
             className="editor-prototype__canvas"
             data-last-zoom-input={lastZoomInput ?? undefined}
             data-zoom-anchor={zoomAnchor}
@@ -878,7 +878,7 @@ export function UiArchitecturePrototype({
             >
               <span>Lâmina 03</span>
               <div
-                aria-label="Frames da Lâmina"
+                aria-label="Quadros da lâmina"
                 className="prototype-frames"
                 onPointerMove={previewFrameGesture}
                 onPointerUp={finishFrameGesture}
@@ -889,7 +889,7 @@ export function UiArchitecturePrototype({
                   const selected = selectedFrameIds.includes(frame.id);
                   return (
                     <button
-                      aria-label={`Selecionar Frame 0${index + 1}`}
+                      aria-label={`Selecionar quadro 0${index + 1}`}
                       aria-pressed={selected}
                       className={`prototype-frame prototype-frame--${frame.kind}`}
                       data-frame-id={frame.id}
@@ -918,7 +918,7 @@ export function UiArchitecturePrototype({
                       }}
                       type="button"
                     >
-                      <span>{frame.kind === "photo" ? `Foto 0${index + 1}` : "Frame vazio"}</span>
+                      <span>{frame.kind === "photo" ? `Foto 0${index + 1}` : "Quadro vazio"}</span>
                     </button>
                   );
                 })}
@@ -956,7 +956,7 @@ export function UiArchitecturePrototype({
                     !layoutLocked
                       ? resizeHandles.map((handle) => (
                           <button
-                            aria-label={`Redimensionar Frame 0${frames.findIndex((frame) => frame.id === selectedFrameIds[0]) + 1} pelo ${handle.label}`}
+                            aria-label={`Redimensionar quadro 0${frames.findIndex((frame) => frame.id === selectedFrameIds[0]) + 1} pelo ${handle.label}`}
                             data-resize-handle={handle.id}
                             data-testid="frame-resize-handle"
                             key={handle.id}
@@ -1005,30 +1005,30 @@ export function UiArchitecturePrototype({
             </p>
           ) : null}
           <section
-            aria-label="Inspector de Frames"
+            aria-label="Inspector de quadros"
             className="prototype-frame-inspector"
             data-selection-count={String(selectedFrameIds.length)}
           >
             <header>
-              <strong>Frame</strong>
+              <strong>Quadro</strong>
               <span>
                 {selectedFrameIds.length > 0
-                  ? `${selectedFrameIds.length} Frame${selectedFrameIds.length === 1 ? "" : "s"}`
+                  ? `${selectedFrameIds.length} quadro${selectedFrameIds.length === 1 ? "" : "s"}`
                   : "Nenhuma seleção"}
               </span>
             </header>
             {selectedFrames.length > 0 ? (
               <div className="prototype-frame-inspector__fields">
                 <p>
-                  {selectedFrames.length} Frame
+                  {selectedFrames.length} quadro
                   {selectedFrames.length === 1 ? "" : "s"} · {" "}
-                  {selectedFrames.filter((frame) => frame.kind === "photo").length} Foto · {" "}
-                  {selectedFrames.filter((frame) => frame.kind === "placeholder").length} placeholder
+                  {selectedFrames.filter((frame) => frame.kind === "photo").length} foto · {" "}
+                  {selectedFrames.filter((frame) => frame.kind === "placeholder").length} quadro vazio
                 </p>
                 <label>
                   Opacidade
                   <input
-                    aria-label="Opacidade dos Frames"
+                    aria-label="Opacidade dos quadros"
                     data-mixed-value={opacityIsMixed ? "numeric" : undefined}
                     max="100"
                     min="0"
@@ -1063,7 +1063,7 @@ export function UiArchitecturePrototype({
                       ? "mixed"
                       : Boolean(selectedFrames[0]?.borderEnabled)
                   }
-                  aria-label="Borda dos Frames"
+                  aria-label="Borda dos quadros"
                   role="checkbox"
                   type="button"
                 >

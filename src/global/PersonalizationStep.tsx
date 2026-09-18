@@ -115,7 +115,7 @@ export function PersonalizationStep({
             onChange(fixPersonalizationScope(personalization, "both")),
           pressed: personalization.fixedScope === "both",
         }}
-        surfaceLabel="Prévia do formato da Lâmina"
+        surfaceLabel="Prévia do formato da lâmina"
       >
         {(geometry) => (
           <PersonalizationScopeSurface
@@ -139,15 +139,15 @@ export function PersonalizationStep({
           {scopeLabel}
         </p>
         <section className="new-project-value-group">
-          <h2>Background</h2>
+          <h2>Fundo</h2>
           <div
-            aria-label="Cores de Background"
+            aria-label="Cores de fundo"
             className="new-project-color-swatches"
             role="group"
           >
             {BACKGROUND_SWATCHES.map((color) => (
               <button
-                aria-label={`Usar Background ${color}`}
+                aria-label={`Usar fundo ${color}`}
                 aria-pressed={
                   selectedBackground?.kind === "color" &&
                   selectedBackground.rgb.toLowerCase() === color.toLowerCase()
@@ -161,9 +161,9 @@ export function PersonalizationStep({
               />
             ))}
             <label className="new-project-color-picker">
-              <span className="ui-visually-hidden">Cor do Background</span>
+              <span className="ui-visually-hidden">Cor do fundo</span>
               <input
-                aria-label="Cor do Background"
+                aria-label="Cor do fundo"
                 onChange={(event) =>
                   onChange(
                     setBackgroundColor(personalization, event.target.value),
@@ -175,7 +175,7 @@ export function PersonalizationStep({
             </label>
           </div>
           <ActionButton
-            aria-label="Usar imagem… no Background"
+            aria-label="Usar imagem… no fundo"
             className="new-project-image-action"
             onClick={() => void chooseBackground()}
           >
@@ -191,9 +191,9 @@ export function PersonalizationStep({
           ) : null}
         </section>
         <section className="new-project-value-group">
-          <h2>Overlay</h2>
+          <h2>Sobreposição</h2>
           <ActionButton
-            aria-label="Escolher imagem… de Overlay"
+            aria-label="Escolher imagem… de sobreposição"
             className="new-project-image-action new-project-image-action--dashed"
             onClick={() => void chooseOverlay()}
           >
@@ -208,7 +208,7 @@ export function PersonalizationStep({
                 {selectedOverlay.selection.displayName}
               </p>
               <ActionButton
-                aria-label="Remover Overlay"
+                aria-label="Remover sobreposição"
                 density="compact"
                 onClick={() => onChange(clearOverlay(personalization))}
                 variant="quiet"
@@ -218,16 +218,16 @@ export function PersonalizationStep({
               </ActionButton>
             </>
           ) : (
-            <p className="new-project-native-note">Sem Overlay</p>
+            <p className="new-project-native-note">Sem sobreposição</p>
           )}
         </section>
         <section className="new-project-value-group">
           <p className="ui-section-eyebrow new-project-group-eyebrow">
-            Todas as Lâminas
+            Todas as lâminas
           </p>
-          <h2>Frames</h2>
+          <h2>Quadros</h2>
           <FrameRangeControl
-            label="Espessura da Borda padrão"
+            label="Espessura da borda padrão"
             max={5_000}
             min={0}
             onChange={changeFrameBorderWidth}
@@ -237,13 +237,13 @@ export function PersonalizationStep({
             visibleLabel="Borda padrão"
           />
           <div
-            aria-label="Cores da Borda"
+            aria-label="Cores da borda"
             className="new-project-color-swatches new-project-color-swatches--frames"
             role="group"
           >
             {FRAME_BORDER_SWATCHES.map((color) => (
               <button
-                aria-label={`Usar cor da Borda ${color}`}
+                aria-label={`Usar cor da borda ${color}`}
                 aria-pressed={
                   frameBorderColor.toLowerCase() === color.toLowerCase()
                 }
@@ -255,7 +255,7 @@ export function PersonalizationStep({
             ))}
           </div>
           <FrameRangeControl
-            label="Espaço entre Frames"
+            label="Espaço entre quadros"
             max={24_000}
             min={0}
             onChange={(frameGapUm) => onChange({ ...personalization, frameGapUm })}
@@ -265,11 +265,11 @@ export function PersonalizationStep({
               frameGapUm,
               draft.displayUnit,
             )} ${displayUnitLabel(draft.displayUnit)}`}
-            visibleLabel="Espaço entre Frames"
+            visibleLabel="Espaço entre quadros"
           />
         </section>
         <p className="new-project-native-note">
-          Nome e Localização serão escolhidos no diálogo do Windows ao criar.
+          Na próxima etapa, escolha o nome e onde salvar o projeto.
         </p>
       </div>
     </div>
@@ -288,9 +288,9 @@ const BACKGROUND_SWATCHES = [
 const FRAME_BORDER_SWATCHES = ["#FFFFFF", "#2C2924", "#C5A46D"] as const;
 
 const NEW_PROJECT_SCOPE_PRESENTATION = {
-  accessiblePreviewLabel: "Reprodução da Lâmina",
+  accessiblePreviewLabel: "Reprodução da lâmina",
   externalSelection: true,
-  scopeControlsLabel: "Escopo da personalização",
+  scopeControlsLabel: "Aplicar personalização em",
   technicalGuides: true,
 } as const;
 

@@ -361,10 +361,10 @@ pub(crate) enum ProjectFailureDialogContext {
 impl ProjectFailureDialogContext {
     fn title(self) -> &'static str {
         match self {
-            Self::ProjectOpening => "Não foi possível abrir o Projeto",
+            Self::ProjectOpening => "Não foi possível abrir o projeto",
             Self::ConfigurationValidation => "Não foi possível validar as Configurações",
-            Self::DecorativeSelection => "Não foi possível escolher a Imagem decorativa",
-            Self::ProjectCreation => "Não foi possível criar o Projeto",
+            Self::DecorativeSelection => "Não foi possível escolher a imagem decorativa",
+            Self::ProjectCreation => "Não foi possível criar o projeto",
         }
     }
 
@@ -1264,7 +1264,7 @@ mod tests {
         let cases = [
             (
                 ProjectFailureDialogContext::ProjectOpening,
-                "Não foi possível abrir o Projeto",
+                "Não foi possível abrir o projeto",
             ),
             (
                 ProjectFailureDialogContext::ConfigurationValidation,
@@ -1272,11 +1272,11 @@ mod tests {
             ),
             (
                 ProjectFailureDialogContext::DecorativeSelection,
-                "Não foi possível escolher a Imagem decorativa",
+                "Não foi possível escolher a imagem decorativa",
             ),
             (
                 ProjectFailureDialogContext::ProjectCreation,
-                "Não foi possível criar o Projeto",
+                "Não foi possível criar o projeto",
             ),
         ];
 

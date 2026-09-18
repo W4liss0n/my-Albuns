@@ -10,7 +10,7 @@ const base: GenerationView = { id: "preview", phase: "prepared", canContinue: fa
   options: { sourceFolder: "D:\\Fotos\\Formatura 2026", destinationFolder: "E:\\Álbuns\\Formatura 2026" },
   items: ["Ana Oliveira", "Pedro Santos", "Turma 3 — Escola São José"].map((name, index) => ({
     id: String(index), name, destination: `E:\\Álbuns\\Formatura 2026\\${name}.myalbuns`, status: "pending", decision: null,
-    conflict: true, canReplace: index === 0, problems: index === 1 ? ["O Projeto está aberto. Feche-o e verifique novamente, ou ignore este item."] : index === 2 ? ["Não foi possível acessar a pasta de destino."] : [],
+    conflict: true, canReplace: index === 0, problems: index === 1 ? ["O projeto está aberto. Feche-o e verifique novamente, ou ignore este item."] : index === 2 ? ["Não foi possível acessar a pasta de destino."] : [],
   })),
 };
 const view: GenerationView | null = ["configuration", "verification-cancelled", "error"].includes(scenario ?? "") ? null : scenario === "ready" ? { ...base, canContinue: true, items: base.items.map(item => ({ ...item, conflict: false, problems: [] })) }

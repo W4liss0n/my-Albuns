@@ -58,11 +58,11 @@ function projectSessionPort(
     validateMediaFolderName: async () => { throw new Error("Folder validation is not configured in this fixture."); },
     queryLayouts: async () => { throw new Error("Layouts are not configured in this fixture."); },
     previewLayout: async () => { throw new Error("Layouts are not configured in this fixture."); },
-    previewFrameStyle: async () => { throw new Error("Frame style preview is not configured in this fixture."); },
+    previewFrameStyle: async () => { throw new Error("Quadro style preview is not configured in this fixture."); },
     previewDecorativeDrop: async () => { throw new Error("Decorative preview is not configured in this fixture."); },
-    previewPhotoZoom: async () => { throw new Error("Photo Zoom preview is not configured in this fixture."); },
+    previewPhotoZoom: async () => { throw new Error("Photo zoom preview is not configured in this fixture."); },
     previewPhotoAngle: async () => { throw new Error("Photo angle preview is not configured in this fixture."); },
-    previewFrameGeometry: async () => { throw new Error("Frame geometry preview is not configured in this fixture."); },
+    previewFrameGeometry: async () => { throw new Error("Quadro geometry preview is not configured in this fixture."); },
     resolvePhotoDropTarget: async () => ({ kind: "invalid" }),
     replaceImage: async () => representativeProjection, relink: async () => representativeProjection,
     undo,
@@ -511,7 +511,7 @@ test.each(["file", "operation"] as const)("waits for image cache before Save and
   expect(view.result.current.imageProcessingProgress).toEqual({ completedFiles: 0, totalFiles: 1 });
   expect(port.save).not.toHaveBeenCalled();
   expect(port.apply).not.toHaveBeenCalled();
-  const problem = { fileName: "Foto.jpg", reason: "A Foto foi vinculada, mas seu Cache não pôde ser preparado." };
+  const problem = { fileName: "Foto.jpg", reason: "A foto foi vinculada, mas seu prévias temporárias não pôde ser preparado." };
   const operationProblem = "Não foi possível continuar o processamento por falta de memória.";
   const warning = failureKind === "file" ? { problem } : { operationProblem };
   await act(async () => {
@@ -604,7 +604,7 @@ test.each(["confirmEdgeConversion", "cancelEdgeConversion"] as const)(
       harness.result.current.undo();
     });
     await waitFor(() => expect(harness.present).toHaveBeenCalledWith({ kind: "edgeConversionConfirmation",
-      message: "O Background personalizado da página esquerda da Lâmina 1 será removido." }));
+      message: "O fundo personalizado da página esquerda da lâmina 1 será removido." }));
     expect(harness.apply).not.toHaveBeenCalled();
     await waitFor(() => expect(harness.undo).toHaveBeenCalledOnce());
     await act(async () => {
@@ -710,7 +710,7 @@ test("rechecks changed discarded applications after confirmation without blockin
   await act(async () => { harness.emit("confirmEdgeConversion"); });
   await waitFor(() => expect(harness.present).toHaveBeenCalledTimes(2));
   expect(harness.present).toHaveBeenLastCalledWith({ kind: "edgeConversionConfirmation",
-    message: "O Overlay personalizado da página esquerda da Lâmina 1 será removido." });
+    message: "O sobreposição personalizado da página esquerda da lâmina 1 será removido." });
   expect(harness.apply).not.toHaveBeenCalled();
   await act(async () => { harness.emit("confirmEdgeConversion"); expect(await completed).toBe(true); });
   expect(harness.apply).toHaveBeenCalledOnce();

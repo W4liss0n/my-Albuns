@@ -63,7 +63,7 @@ fn conflicts_require_explicit_decisions_and_recheck_after_closing_a_project() {
     batch.decide(None, GenerationDecision::Ignore).unwrap();
     assert_eq!(
         batch.view().items[0].problems,
-        ["Já existe um Projeto no destino."]
+        ["Já existe um projeto no destino."]
     );
     batch.decide(None, GenerationDecision::Replace).unwrap();
     assert!(batch.view().can_continue);

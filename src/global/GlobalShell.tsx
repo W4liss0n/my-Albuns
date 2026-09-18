@@ -188,8 +188,8 @@ export function GlobalShell({
       .catch(() => {
         if (active) void failureDialogPort.present({ context: "projectCreation", error: {
           code: "new_project_activation_unavailable",
-          message: "Não foi possível receber o pedido de Novo Projeto.",
-          action: "Use Novo Projeto nesta janela ou tente novamente.",
+          message: "Não foi possível receber o pedido de Novo projeto.",
+          action: "Use Novo projeto nesta janela ou tente novamente.",
         } });
       });
     return () => { active = false; unlisten?.(); };
@@ -253,7 +253,7 @@ export function GlobalShell({
   if (surface === "newProject") {
     return (
       <div className="global-shell global-shell--new-project ui-chrome-selection-scope">
-        <ApplicationHeader context="Novo Projeto" />
+        <ApplicationHeader context="Novo projeto" />
         <NewProjectFlow
           onCancel={cancelCreation}
           onChooseDecorative={() =>
@@ -278,15 +278,15 @@ export function GlobalShell({
 
   return (
     <div className="global-shell ui-chrome-selection-scope">
-      <ApplicationHeader status="diagramação de Álbuns" />
+      <ApplicationHeader status="diagramação de álbuns" />
 
       <main className="global-recent-projects">
         <h1 className="ui-section-eyebrow">Projetos recentes</h1>
         {recentProjects.length === 0 ? (
           <EmptyState
             className="global-empty-state"
-            description="Os Projetos abertos recentemente aparecerão aqui."
-            title="Nenhum Projeto recente"
+            description="Crie um projeto ou abra um arquivo .myalbuns."
+            title="Nenhum projeto recente"
           />
         ) : (
           <ul
@@ -337,10 +337,10 @@ export function GlobalShell({
       </main>
 
       <aside aria-label="Ações principais" className="global-primary-actions">
-        <BrandWordmark subtitle="diagramação de Álbuns · versão 0.1.0" />
+        <BrandWordmark subtitle="diagramação de álbuns · versão 0.1.0" />
         <div className="global-action-stack">
           <ActionButton
-            aria-label="Novo Projeto"
+            aria-label="Novo projeto"
             aria-keyshortcuts={projectCommandShortcutAria("new-project")}
             disabled={isOpening}
             onClick={startCreation}
@@ -348,18 +348,18 @@ export function GlobalShell({
             variant="primary"
           >
             <AppIcon icon={Plus} size={16} />
-            <span>Novo Projeto</span>
+            <span>Novo projeto</span>
             <kbd>{projectCommandShortcutLabel("new-project")}</kbd>
           </ActionButton>
           <ActionButton
-            aria-label={isOpening ? "Abrindo Projeto…" : "Abrir Projeto"}
+            aria-label={isOpening ? "Abrindo projeto…" : "Abrir projeto"}
             aria-keyshortcuts={projectCommandShortcutAria("open-project")}
             disabled={isOpening}
             onClick={openProject}
           >
             <AppIcon icon={FolderOpen} size={16} />
             <span>
-              {isOpening ? "Abrindo Projeto…" : "Abrir Projeto…"}
+              {isOpening ? "Abrindo projeto…" : "Abrir projeto…"}
             </span>
             <kbd>{projectCommandShortcutLabel("open-project")}</kbd>
           </ActionButton>

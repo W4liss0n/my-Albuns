@@ -36,13 +36,13 @@ impl PhotoshopCommandError {
                 "O arquivo escolhido não é uma instalação compatível do Adobe Photoshop."
             }
             PhotoshopErrorCode::OriginalAbsent => {
-                "O arquivo original da Foto está ausente. Religue a Foto antes de abri-la no Photoshop."
+                "A foto original não foi encontrada. Use Localizar imagem para indicar a pasta onde ela está."
             }
             PhotoshopErrorCode::OriginalUnavailable => {
-                "Não foi possível acessar o original da Foto. Verifique o acesso e tente novamente."
+                "Não foi possível acessar o original da foto. Verifique o acesso e tente novamente."
             }
             PhotoshopErrorCode::InvalidContext => {
-                "Selecione exatamente uma Foto ou um Frame preenchido para abrir no Photoshop."
+                "Selecione exatamente uma foto ou um quadro preenchido para abrir no Photoshop."
             }
             PhotoshopErrorCode::LaunchFailed => {
                 "Não foi possível iniciar o Photoshop selecionado. Abra Configurações para escolher ou localizar outra instalação."
@@ -51,7 +51,7 @@ impl PhotoshopCommandError {
                 "Não foi possível salvar a preferência do Photoshop. Tente novamente."
             }
             PhotoshopErrorCode::DialogUnavailable => {
-                "Não foi possível abrir a seleção do executável do Photoshop."
+                "Não foi possível abrir a janela para localizar o Photoshop."
             }
         };
         Self {

@@ -277,7 +277,7 @@ export const ExportPreviewControl = forwardRef<
             presentDialog({
               cancelled: true,
               kind: "exportFailure",
-              message: "A Exportação foi cancelada.",
+              message: "A exportação foi cancelada.",
               retryDisabled: false,
             });
           } else {
@@ -294,7 +294,7 @@ export const ExportPreviewControl = forwardRef<
         setPhase("completed");
         presentDialog({
           kind: "exportSuccess",
-          message: "A Exportação foi concluída com sucesso.",
+          message: "A exportação foi concluída com sucesso.",
         });
       },
       (error: unknown) => finishAttemptWithFailure(attemptId, error),
@@ -582,5 +582,5 @@ function messageFromError(error: unknown) {
   ) {
     return error.message;
   }
-  return "Não foi possível concluir a Exportação.";
+  return "Não foi possível concluir a exportação.";
 }

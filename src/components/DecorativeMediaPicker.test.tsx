@@ -15,12 +15,12 @@ test("closes on Escape and restores focus to the trigger", async () => {
   const user = userEvent.setup();
   renderPicker();
   const trigger = screen.getByRole("button", {
-    name: "Escolher Decorativo para Background",
+    name: "Escolher decorativo para fundo",
   });
 
   await user.click(trigger);
   const menu = screen.getByRole("menu", {
-    name: "Decorativos para Background",
+    name: "Decorativos para fundo",
   });
   const menuItems = within(menu).getAllByRole("menuitem");
   expect(menuItems[0]).toHaveFocus();
@@ -44,14 +44,14 @@ test("closes on an outside pointer and restores focus to the trigger", async () 
     </>,
   );
   const trigger = screen.getByRole("button", {
-    name: "Escolher Decorativo para Background",
+    name: "Escolher decorativo para fundo",
   });
 
   await user.click(trigger);
   await user.click(screen.getByRole("button", { name: "Fora do seletor" }));
 
   expect(
-    screen.queryByRole("menu", { name: "Decorativos para Background" }),
+    screen.queryByRole("menu", { name: "Decorativos para fundo" }),
   ).not.toBeInTheDocument();
   await waitFor(() => expect(trigger).toHaveFocus());
 });
@@ -62,24 +62,24 @@ test("keeps one picker open and exposes valid menu item semantics", async () => 
 
   await user.click(
     screen.getByRole("button", {
-      name: "Escolher Decorativo para Background",
+      name: "Escolher decorativo para fundo",
     }),
   );
   expect(
-    screen.getByRole("menu", { name: "Decorativos para Background" }),
+    screen.getByRole("menu", { name: "Decorativos para fundo" }),
   ).toBeInTheDocument();
 
   await user.click(
     screen.getByRole("button", {
-      name: "Escolher Decorativo para Overlay",
+      name: "Escolher decorativo para sobreposição",
     }),
   );
 
   expect(
-    screen.queryByRole("menu", { name: "Decorativos para Background" }),
+    screen.queryByRole("menu", { name: "Decorativos para fundo" }),
   ).not.toBeInTheDocument();
   const overlayMenu = screen.getByRole("menu", {
-    name: "Decorativos para Overlay",
+    name: "Decorativos para sobreposição",
   });
   const options = within(overlayMenu).getAllByRole("menuitem");
   expect(options[0]).toHaveFocus();
@@ -90,7 +90,7 @@ test("keeps one picker open and exposes valid menu item semantics", async () => 
   ).toHaveAttribute("data-has-preview", "false");
   expect(
     within(overlayMenu).getByRole("menuitem", {
-      name: "Importar Decorativo",
+      name: "Importar decorativo",
     }),
   ).toBeDisabled();
 });
@@ -100,11 +100,11 @@ test("uses the shared intrinsic ratio inside the decorative menu", async () => {
   renderPicker();
   await user.click(
     screen.getByRole("button", {
-      name: "Escolher Decorativo para Background",
+      name: "Escolher decorativo para fundo",
     }),
   );
   const portraitOption = screen.getByRole("menuitem", {
-    name: "Usar Background Textura vertical",
+    name: "Usar fundo Textura vertical",
   });
   const image = portraitOption.querySelector("img");
   expect(image).not.toBeNull();
@@ -129,7 +129,7 @@ function PickerHarness() {
   return (
     <DecorativeMediaPicker
       decorativeMedia={decorativeMedia}
-      label="Background"
+      label="Fundo"
       mediaPreviewUrls={{
         "decorative-landscape": "/horizontal.png",
         "decorative-portrait": "/vertical.png",
@@ -144,11 +144,11 @@ function PickerHarness() {
 
 function PairedPickerHarness() {
   const [openPicker, setOpenPicker] = useState<
-    "Background" | "Overlay" | null
+    "Fundo" | "Sobreposição" | null
   >(null);
   return (
     <>
-      {(["Background", "Overlay"] as const).map((label) => (
+      {(["Fundo", "Sobreposição"] as const).map((label) => (
         <DecorativeMediaPicker
           decorativeMedia={decorativeMedia}
           key={label}

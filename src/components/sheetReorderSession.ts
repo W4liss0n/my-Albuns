@@ -60,7 +60,7 @@ export interface SheetReorderRepresentation {
 }
 
 export const SHEET_REORDER_INVALID_MESSAGE =
-  "Posição inválida: Páginas únicas permanecem nas extremidades.";
+  "Posição inválida: páginas únicas permanecem nas extremidades.";
 
 export function createSheetReorderSession(
   sheets: readonly SheetSnapshot[],

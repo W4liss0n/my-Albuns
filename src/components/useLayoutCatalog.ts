@@ -88,7 +88,7 @@ export function useLayoutCatalog(input: LayoutCatalogInput) {
     setRevision((previous) => Math.max(previous, result.catalogRevision));
     setRevealId(result.layoutId);
     if (noticeContext.current === savingNoticeContext) {
-      setNotice({ message: result.created ? "Layout salvo em Personalizados." : "Este Layout já está em Personalizados." });
+      setNotice({ message: result.created ? "Layout salvo em Personalizados." : "Este layout já está em Personalizados." });
     }
   }
 

@@ -31,12 +31,12 @@ export function PhotoOrientationControls({ frames, disabled, onAction, angle }: 
     <div className="photo-orientation-controls">
       {frames.length > 1 && (
         <p className="photo-orientation-scope">
-          Aplicado a {photos.length} {photos.length === 1 ? "Foto" : "Fotos"} de {frames.length} Frames
+          Aplicado a {photos.length} {photos.length === 1 ? "foto" : "fotos"} de {frames.length} quadros
         </p>
       )}
       <div className="photo-orientation-row">
         <span>Giro</span>
-        <output aria-label="Giro das Fotos">{turns === null ? "—" : `${((4 - turns) % 4) * 90}°`}</output>
+        <output aria-label="Giro das fotos">{turns === null ? "—" : `${((4 - turns) % 4) * 90}°`}</output>
         <ActionButton
           density="compact"
           aria-label={rotate.label}

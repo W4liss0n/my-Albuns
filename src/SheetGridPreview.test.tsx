@@ -15,10 +15,10 @@ test("moves the Grade highlight when a sheet is clicked", async () => {
   render(<SheetGridPreview />);
 
   const firstSheet = screen.getByRole("button", {
-    name: "Ir para Lâmina 01, Lâmina inicial, Página 1",
+    name: "Ir para lâmina 01, lâmina inicial, página 1",
   });
   const secondSheet = screen.getByRole("button", {
-    name: "Ir para Lâmina 02, Páginas 2–3",
+    name: "Ir para lâmina 02, páginas 2–3",
   });
   expect(secondSheet).toHaveAttribute("aria-current", "true");
 
@@ -33,15 +33,15 @@ test("recomposes the development Grade after applying Album changes", async () =
 
   const information = within(
     screen
-      .getByRole("button", { name: "Informações do Álbum" })
+      .getByRole("button", { name: "Informações do álbum" })
       .closest("section") as HTMLElement,
   );
   const firstPreview = screen.getByRole("img", {
-    name: "Prévia da Lâmina 01",
+    name: "Prévia da lâmina 01",
   });
   expect(firstPreview).toHaveAttribute("viewBox", "0 0 300000 300000");
 
-  fireEvent.change(information.getByLabelText("Primeira Lâmina"), {
+  fireEvent.change(information.getByLabelText("Primeira lâmina"), {
     target: { value: "double" },
   });
   fireEvent.change(information.getByRole("textbox", { name: "Largura" }), {
@@ -61,26 +61,26 @@ test("recomposes the development Grade after applying Album changes", async () =
   );
   expect(
     screen.getByRole("button", {
-      name: "Ir para Lâmina 01, Páginas 1–2",
+      name: "Ir para lâmina 01, páginas 1–2",
     }),
   ).toBeInTheDocument();
   expect(
     screen.getByRole("button", {
-      name: "Ir para Lâmina 02, Páginas 3–4",
+      name: "Ir para lâmina 02, páginas 3–4",
     }),
   ).toBeInTheDocument();
   expect(
     screen.getByRole("button", {
-      name: "Ir para Lâmina 06, Lâmina final, Página 11",
+      name: "Ir para lâmina 06, lâmina final, página 11",
     }),
   ).toBeInTheDocument();
 
   const design = within(
     screen
-      .getByRole("button", { name: "Design do Álbum" })
+      .getByRole("button", { name: "Design do álbum" })
       .closest("section") as HTMLElement,
   );
-  fireEvent.change(design.getByLabelText("Cor do Background"), {
+  fireEvent.change(design.getByLabelText("Cor do fundo"), {
     target: { value: "#f7f5f0" },
   });
   fireEvent.click(design.getByRole("button", { name: "Aplicar" }));

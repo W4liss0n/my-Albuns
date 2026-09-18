@@ -21,7 +21,7 @@ test("confirms hardware WebGL2 with its texture limits and releases the probe co
   expect(probeGraphics()).toEqual({
     supported: true,
     renderer: "ANGLE (NVIDIA GeForce RTX 3050)",
-    reason: "WebGL2 acelerado por hardware confirmado.",
+    reason: "A aceleração gráfica está disponível.",
     limits: {
       maxTextureSizePx: 16_384,
       maxRenderbufferSizePx: 16_384,

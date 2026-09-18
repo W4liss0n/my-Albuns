@@ -422,7 +422,7 @@ impl MediaResolver {
         binding: &MediaBinding,
     ) -> Result<PhotoSourceMetadata, String> {
         if binding.kind != MediaKind::Photo {
-            return Err("A ocorrência escolhida não é uma Foto.".into());
+            return Err("A ocorrência escolhida não é uma foto.".into());
         }
         inspect_media_source(&binding.logical_path, false)
     }
@@ -654,13 +654,15 @@ fn inspect_media_source_in_plan(
 ) -> Result<PhotoSourceMetadata, String> {
     let resolved = plan
         .resolve_existing(path, ExpectedObject::RegularFile)
-        .map_err(|error| format!("O Arquivo escolhido não está disponível: {error}"))?;
-    let file = resolved
-        .reopen_for_read()
-        .map_err(|error| format!("Não foi possível inspecionar o Arquivo escolhido: {error}"))?;
+        .map_err(|error| media_inspection_failure(error, "O arquivo escolhido não está disponível. Confira se ele continua no mesmo local e pode ser aberto."))?;
+    let file = resolved.reopen_for_read().map_err(|error| {
+        media_inspection_failure(error, "Não foi possível abrir o arquivo escolhido.")
+    })?;
     let reader = ImageReader::new(BufReader::new(file))
         .with_guessed_format()
-        .map_err(|error| format!("Não foi possível validar a mídia escolhida: {error}"))?;
+        .map_err(|error| {
+            media_inspection_failure(error, "Não foi possível ler a imagem escolhida.")
+        })?;
     let compatible = if require_jpeg {
         reader.format() == Some(ImageFormat::Jpeg)
     } else {
@@ -671,17 +673,20 @@ fn inspect_media_source_in_plan(
     };
     if !compatible {
         return Err(if require_jpeg {
-            "Escolha um Arquivo JPEG válido (.jpg ou .jpeg).".into()
+            "Escolha um arquivo JPEG válido (.jpg ou .jpeg).".into()
         } else {
-            "O Arquivo escolhido não usa um formato de mídia compatível.".into()
+            "O arquivo escolhido não usa um formato de mídia compatível.".into()
         });
     }
-    let mut decoder = reader
-        .into_decoder()
-        .map_err(|error| format!("Não foi possível validar a mídia escolhida: {error}"))?;
+    let mut decoder = reader.into_decoder().map_err(|error| {
+        media_inspection_failure(error, "Não foi possível ler a imagem escolhida.")
+    })?;
     let (mut width, mut height) = decoder.dimensions();
     let orientation = decoder.orientation().map_err(|error| {
-        format!("Não foi possível ler a orientação da mídia escolhida: {error}")
+        media_inspection_failure(
+            error,
+            "Não foi possível ler a orientação da imagem escolhida.",
+        )
     })?;
     if matches!(
         orientation,
@@ -696,9 +701,9 @@ fn inspect_media_source_in_plan(
     PHOTO_SOURCE_DECODES.set(PHOTO_SOURCE_DECODES.get() + 1);
     DynamicImage::from_decoder(decoder).map_err(|_| {
         if require_jpeg {
-            "O JPEG está corrompido ou não pôde ser decodificado.".to_string()
+            "Não foi possível ler o JPEG. O arquivo pode estar danificado.".to_string()
         } else {
-            "A imagem está corrompida ou não pôde ser decodificada.".to_string()
+            "Não foi possível ler a imagem. O arquivo pode estar danificado.".to_string()
         }
     })?;
     PhotoSourceMetadata::new(
@@ -706,7 +711,12 @@ fn inspect_media_source_in_plan(
         height,
         ["#D8DEE2".into(), "#BBC4CA".into(), "#929EA6".into()],
     )
-    .map_err(|error| error.to_string())
+    .map_err(crate::project_error_message::project_error_message)
+}
+
+fn media_inspection_failure(error: impl std::fmt::Display, message: &str) -> String {
+    tracing::warn!(target: "myalbuns.desktop", %error, event = "media_inspection_failed");
+    message.into()
 }
 
 #[derive(Clone, Debug, Default)]
@@ -1844,7 +1854,7 @@ mod tests {
         let unstable = monitor.poll_readable_fixture(&runtime, &bindings);
         assert!(
             unstable.update().is_none(),
-            "one hint cannot invalidate Cache"
+            "one hint cannot invalidate prévias temporárias"
         );
         let stable = monitor.poll_readable_fixture(&runtime, &bindings);
         assert_eq!(
@@ -2032,7 +2042,7 @@ mod tests {
                 .poll_readable_fixture(&runtime, &relinked_bindings)
                 .update()
                 .is_none(),
-            "one relink observation cannot invalidate Cache"
+            "one relink observation cannot invalidate prévias temporárias"
         );
         let stable = monitor.poll_readable_fixture(&runtime, &relinked_bindings);
         assert_eq!(stable.update().unwrap().changed_media_ids(), ["photo-a"]);

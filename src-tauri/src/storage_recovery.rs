@@ -209,7 +209,7 @@ pub(crate) async fn discard_export_recovery(
     recoveries: State<'_, StorageRecoveries>,
 ) -> Result<(), String> {
     if window.label() != crate::product_runtime::PROJECT_WINDOW_LABEL {
-        return Err("A Exportação pertence à Janela do Projeto.".into());
+        return Err("A exportação pertence à Janela do projeto.".into());
     }
     let recoveries = recoveries.inner().clone();
     tauri::async_runtime::spawn_blocking(move || recoveries.take_export(&id).map(drop))

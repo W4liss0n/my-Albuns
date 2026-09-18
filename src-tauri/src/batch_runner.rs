@@ -109,7 +109,7 @@ impl BatchRunner {
             .iter()
             .find(|item| item.id == id)
             .map(|item| item.path.clone())
-            .ok_or_else(|| "O Projeto não pertence ao lote.".into())
+            .ok_or_else(|| "O projeto não pertence ao lote.".into())
     }
     pub(crate) fn discover(
         mut configuration: BatchConfiguration,
@@ -131,7 +131,7 @@ impl BatchRunner {
         }
         let files = discover_projects(&configuration.source, &mut paths)?;
         if files.is_empty() {
-            return Err("Nenhum Projeto encontrado nessa pasta.".into());
+            return Err("Nenhum projeto encontrado nessa pasta.".into());
         }
         let items = files
             .into_iter()
@@ -341,16 +341,16 @@ fn load_in_plan(
     .map_err(|error| match error {
         LoadProjectError::Path(_) => problem(
             BatchProblemKind::Unavailable,
-            "Não foi possível acessar o Projeto. Verifique a pasta e tente novamente.",
+            "Não foi possível acessar o projeto. Verifique a pasta e tente novamente.",
         ),
         LoadProjectError::ExternalCopyRequiresInteractiveResolution
         | LoadProjectError::IdentityIndeterminate => problem(
             BatchProblemKind::InvalidProject,
-            "Abra o Projeto para resolver sua identificação e salve antes de verificar novamente.",
+            "Abra o projeto para resolver sua identificação e salve antes de verificar novamente.",
         ),
         LoadProjectError::Document(_) => problem(
             BatchProblemKind::InvalidProject,
-            "O arquivo não é um Projeto válido ou usa uma versão incompatível.",
+            "O arquivo não é um projeto válido ou usa uma versão incompatível.",
         ),
     })
 }
@@ -375,7 +375,7 @@ fn inspect_and_plan(
     match frozen.validate_export_sheets(&sheet_ids) {
         Ok(layout) if !layout.is_empty() => problems.push(problem(
             BatchProblemKind::Placeholder,
-            "Preencha os Frames vazios e salve o Projeto.",
+            "Preencha os quadros vazios e salve o projeto.",
         )),
         Err(error) => problems.push(problem(BatchProblemKind::InvalidProject, error.to_string())),
         _ => {}
@@ -394,7 +394,7 @@ fn inspect_and_plan(
         if !paths.covers(media.path()) {
             problems.push(problem(
                 BatchProblemKind::Unavailable,
-                "Uma origem do Projeto não pertence às pastas verificadas. Verifique novamente.",
+                "Uma origem do projeto não pertence às pastas verificadas. Verifique novamente.",
             ));
         }
         let media_id =
@@ -493,7 +493,7 @@ fn inspect_and_plan(
         if !paths.covers(&path) {
             return Err(vec![problem(
                 BatchProblemKind::Changed,
-                "O Projeto passou a usar outra pasta. Verifique novamente.",
+                "O projeto passou a usar outra pasta. Verifique novamente.",
             )]);
         }
     }

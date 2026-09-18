@@ -122,7 +122,7 @@ impl ReferenceChange<'_> {
             })
         {
             return Err(
-                "O arquivo escolhido já está vinculado a outra imagem deste Projeto.".into(),
+                "O arquivo escolhido já está vinculado a outra imagem deste projeto.".into(),
             );
         }
         self.engine
@@ -142,7 +142,7 @@ impl ReferenceChange<'_> {
             .bindings
             .into_iter()
             .find(|current| current.media_id == binding.media_id)
-            .ok_or_else(|| "A imagem não pertence mais ao Projeto.".to_string())
+            .ok_or_else(|| "A imagem não pertence mais ao projeto.".to_string())
     }
 }
 

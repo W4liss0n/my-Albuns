@@ -40,11 +40,11 @@ export function ProjectRecoveryDialog({
         <ConfirmationDialog
           cancelAction={{ label: "Voltar", onClick: onBack }}
           confirmAction={{
-            label: "Descartar recuperação e abrir",
+            label: "Descartar alterações e abrir",
             onClick: onDiscard,
           }}
           confirmButtonRef={primaryActionRef}
-          description="A última versão salva será aberta e o trabalho recuperável será removido definitivamente."
+          description="As alterações não salvas serão descartadas definitivamente. O projeto abrirá na última versão salva."
           title="Descartar o trabalho recuperável?"
           tone="danger"
         >
@@ -71,11 +71,11 @@ export function ProjectRecoveryDialog({
         }}
         confirmAction={{
           disabled: busy,
-          label: "Reabrir e recuperar",
+          label: "Recuperar e abrir",
           onClick: onRecover,
         }}
         confirmButtonRef={primaryActionRef}
-        description="O MyAlbuns encontrou trabalho concluído depois da última versão salva deste Projeto."
+        description="Há alterações não salvas deste projeto. Deseja recuperá-las?"
         leadingAction={{
           disabled: busy,
           label: "Agora não",

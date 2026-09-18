@@ -11,19 +11,19 @@ test("presents indeterminate progress without inventing a percentage", () => {
     <ProgressDialog
       progress={{
         kind: "indeterminate",
-        status: "Preparando a Janela do Projeto…",
+        status: "Preparando a Janela do projeto…",
       }}
-      title="Abrindo Projeto"
+      title="Abrindo projeto"
     />,
   );
 
-  const dialog = screen.getByRole("dialog", { name: "Abrindo Projeto" });
+  const dialog = screen.getByRole("dialog", { name: "Abrindo projeto" });
   const progressbar = within(dialog).getByRole("progressbar", {
-    name: "Progresso de Abrindo Projeto",
+    name: "Progresso de Abrindo projeto",
   });
 
   expect(within(dialog).getByRole("status")).toHaveTextContent(
-    "Preparando a Janela do Projeto",
+    "Preparando a Janela do projeto",
   );
   expect(progressbar).not.toHaveAttribute("aria-valuenow");
   expect(
@@ -40,7 +40,7 @@ test("shows percentage and an automatic count below every determinate bar", () =
         kind: "determinate",
         total: 40,
       }}
-      title="Processando Imagens"
+      title="Processando imagens"
     />,
   );
 
@@ -75,15 +75,15 @@ test("shows percentage and an automatic count below every determinate bar", () =
 });
 
 test("keeps zero and complete counts in the standard row without inventing units", () => {
-  const { rerender } = render(<ProgressDialog title="Processando Imagens"
+  const { rerender } = render(<ProgressDialog title="Processando imagens"
     progress={{ kind: "determinate", completed: 0, total: 0 }} />);
   expect(screen.getByText("0 de 0")).toBeVisible();
   expect(screen.getByText("0%")).toBeVisible();
-  rerender(<ProgressDialog title="Processando Imagens"
+  rerender(<ProgressDialog title="Processando imagens"
     progress={{ kind: "determinate", completed: 12, total: 12 }} />);
   expect(screen.getByText("12 de 12")).toBeVisible();
   expect(screen.getByText("100%")).toBeVisible();
-  rerender(<ProgressDialog title="Processando Imagens" reserveProgressMeta
+  rerender(<ProgressDialog title="Processando imagens" reserveProgressMeta
     progress={{ kind: "indeterminate", status: "Aguarde…" }} />);
   expect(screen.queryByText("12 de 12")).not.toBeInTheDocument();
   expect(screen.queryByText(/%/)).not.toBeInTheDocument();
@@ -98,7 +98,7 @@ test("keeps confirmation actions in their standard semantic positions", async ()
     <ConfirmationDialog
       cancelAction={{ label: "Cancelar", onClick: vi.fn() }}
       confirmAction={{ label: "Excluir lâmina", onClick: onConfirm }}
-      description="Os 5 frames desta lâmina serão removidos."
+      description="Os 5 quadros desta lâmina serão removidos."
       leadingAction={{ label: "Descartar", onClick: onDiscard }}
       title="Excluir a lâmina 04?"
       tone="danger"

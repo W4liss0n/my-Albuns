@@ -36,7 +36,7 @@ test("reports when the actual Pixi Canvas diagnostic rejects WebGL2", async () =
       supported: false,
       code: "webgl2_unavailable",
       renderer: "indisponível",
-      reason: "O Canvas real não disponibilizou WebGL2.",
+      reason: "O área de edição real não disponibilizou WebGL2.",
       limits: null,
     }));
   const view = renderCanvas({
@@ -71,7 +71,7 @@ test("blocks the Canvas while WebGL2 is lost and resumes the same Canvas after r
   });
   await finishPixiInitialization();
   const canvas = view.getByLabelText(
-    /Canvas contínuo do Álbum/,
+    /Área de edição contínua do álbum/,
   ) as HTMLCanvasElement;
   const contextLost = new Event("webglcontextlost", {
     cancelable: true,
@@ -83,7 +83,7 @@ test("blocks the Canvas while WebGL2 is lost and resumes the same Canvas after r
 
   expect(contextLost.defaultPrevented).toBe(true);
   expect(view.getByRole("status")).toHaveTextContent(
-    "Restaurando o contexto gráfico",
+    "Restaurando editor",
   );
   expect(view.onTransformPreview).toHaveBeenCalledWith(null);
   expect(logEvents).toEqual(
@@ -103,7 +103,7 @@ test("blocks the Canvas while WebGL2 is lost and resumes the same Canvas after r
     expect(view.queryByRole("status")).not.toBeInTheDocument(),
   );
   expect(
-    view.getByLabelText(/Canvas contínuo do Álbum/),
+    view.getByLabelText(/Área de edição contínua do álbum/),
   ).toBe(canvas);
   expect(logEvents).toEqual(
     expect.arrayContaining([
@@ -120,7 +120,7 @@ test("reports a fatal diagnostic when a lost context is not restored", async () 
   const onGraphicsUnavailable = vi.fn();
   const view = renderCanvas({ onGraphicsUnavailable });
   await finishPixiInitialization();
-  const canvas = view.getByLabelText(/Canvas contínuo do Álbum/);
+  const canvas = view.getByLabelText(/Área de edição contínua do álbum/);
 
   act(() => {
     canvas.dispatchEvent(

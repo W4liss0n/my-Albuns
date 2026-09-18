@@ -43,14 +43,14 @@ export function ProjectDialogView({
     case "mediaRemovalConfirmation":
       return <ConfirmationDialog title={`Remover ${state.count} ${state.mediaKind === "photo" ? (state.count === 1 ? "Foto" : "Fotos") : (state.count === 1 ? "Decorativo" : "Decorativos")}?`} tone="danger"
         description={state.mediaKind === "photo"
-          ? `${state.usedCount} da seleção em uso, em ${state.usageCount} Frames. Remover tudo exclui Frames destravados e mantém as posições travadas vazias.`
-          : `${state.usedCount} da seleção em uso. As aplicações removidas voltam ao padrão do Álbum; padrões removidos passam a Background branco ou Overlay ausente.`}
+          ? `${state.usedCount} da seleção em uso, em ${state.usageCount} Quadros. Remover tudo exclui quadros destravados e mantém as posições travadas vazias.`
+          : `${state.usedCount} da seleção em uso. As aplicações removidas voltam ao padrão do álbum; padrões removidos passam a fundo branco ou sobreposição ausente.`}
         cancelAction={{ label: "Cancelar", disabled: state.busy, onClick: () => onAction("cancelMediaRemoval") }}
-        leadingAction={state.mediaKind === "photo" ? { label: "Remover imagens e manter os Frames", disabled: state.busy, onClick: () => onAction("removeMediaKeepFrames") } : undefined}
+        leadingAction={state.mediaKind === "photo" ? { label: "Remover imagens e manter quadros", disabled: state.busy, onClick: () => onAction("removeMediaKeepFrames") } : undefined}
         confirmAction={{ label: state.busy ? "Removendo…" : state.mediaKind === "photo" ? "Remover tudo" : "Remover", disabled: state.busy, onClick: () => onAction("removeAllMedia") }} />;
     case "layoutDeletionConfirmation":
-      return <ConfirmationDialog title="Excluir Layout personalizado?" tone="danger"
-        description="O Layout será removido do catálogo em todas as Janelas. As composições aplicadas e as cópias guardadas nos Projetos serão preservadas."
+      return <ConfirmationDialog title="Excluir layout personalizado?" tone="danger"
+        description="Este layout será removido da lista de personalizados. Os álbuns que já o usam e as cópias salvas nos projetos serão mantidos."
         cancelAction={{ label: "Cancelar", disabled: state.busy, onClick: () => onAction("cancelLayoutDeletion") }}
         confirmAction={{ label: state.busy ? "Excluindo…" : "Excluir", disabled: state.busy, onClick: () => onAction("confirmLayoutDeletion") }} />;
     case "edgeConversionConfirmation":
@@ -59,26 +59,26 @@ export function ProjectDialogView({
         cancelAction={{ label: "Cancelar", onClick: () => onAction("cancelEdgeConversion") }}
         confirmAction={{ label: "Converter", onClick: () => onAction("confirmEdgeConversion") }} />;
     case "exportMediaProblems":
-      return <ProblemsDialog title="Problemas na Exportação"
-        description={state.message || "Recupere os Arquivos necessários à Lâmina selecionada."}
+      return <ProblemsDialog title="Problemas na exportação"
+        description={state.message || "Resolva os problemas abaixo para exportar."}
         columns={["Projeto", "Problema", "Ações"]}
         rows={state.problems.map(problem => [state.projectName,
-          `${problem.fileName}: Arquivo ${problem.state === "absent" ? "ausente" : "indisponível"}.`,
+          `${problem.fileName}: arquivo ${problem.state === "absent" ? "ausente" : "indisponível"}.`,
           <ActionButton disabled={state.busy} onClick={() => onAction(problem.state === "absent" ? "relinkExportMedia" : "retryExportMedia")}>
-            {problem.state === "absent" ? "Relinkar" : "Tentar novamente"}
+            {problem.state === "absent" ? "Localizar imagens…" : "Tentar novamente"}
           </ActionButton>])}
         closeDisabled={state.busy}
         onClose={() => onAction("dismissExport")} />;
     case "exportProblems":
-      return <ProblemsDialog title="Problemas na Exportação"
-        description="Preencha os Frames vazios para exportar a seleção."
+      return <ProblemsDialog title="Problemas na exportação"
+        description="Adicione fotos aos quadros vazios para exportar a seleção."
         columns={["Projeto", "Motivo", "Ação"]}
         rows={state.problems.map((problem) => [state.projectName,
-          `Lâmina ${String(problem.sheetNumber).padStart(2, "0")}, posição ${problem.frameNumber}: Frame vazio.`,
-          <ActionButton onClick={() => onAction("openExportProject")}>Abrir Projeto</ActionButton>])}
+          `Lâmina ${String(problem.sheetNumber).padStart(2, "0")}, posição ${problem.frameNumber}: quadro vazio.`,
+          <ActionButton onClick={() => onAction("openExportProject")}>Voltar ao álbum</ActionButton>])}
         onClose={() => onAction("dismissExport")} />;
     case "imageProcessingProgress":
-      return <ProgressDialog title="Processando Imagens" progress={state.progress} />;
+      return <ProgressDialog title="Processando imagens" progress={state.progress} />;
     case "imageProcessingProblems": {
       const imported = state.importedCount === null ? "" : state.importedCount === 0 ? "Nenhuma imagem nova foi importada." :
         state.importedCount === 1 ? "1 imagem importada." : `${state.importedCount} imagens importadas.`;
@@ -107,7 +107,7 @@ export function ProjectDialogView({
             onClick: () => onAction("confirmAlbumInformation"),
           }}
           description="As alterações serão aplicadas juntas e poderão ser desfeitas em uma única ação."
-          title="Aplicar alterações no Álbum?"
+          title="Aplicar alterações no álbum?"
         >
           <dl className="album-information-change-list">
             {state.details.map((detail) => {
@@ -142,7 +142,7 @@ export function ProjectDialogView({
             label: state.busy ? "Salvando…" : "Salvar e fechar",
             onClick: () => onAction("saveAndClose"),
           }}
-          description="O Projeto tem alterações que ainda não foram salvas."
+          description="O projeto tem alterações que ainda não foram salvas."
           leadingAction={{
             disabled: state.busy,
             label: "Descartar e fechar",
@@ -160,7 +160,7 @@ export function ProjectDialogView({
             label: "Fechar",
             onClick: () => onAction("dismissProjectCloseFailure"),
           }}
-          title="Não foi possível fechar o Projeto"
+          title="Não foi possível fechar o projeto"
           tone="error"
         />
       );
@@ -185,16 +185,16 @@ export function ProjectDialogView({
             <>
               <p>{state.reason}</p>
               <p>
-                O editor não continuará sem WebGL2 acelerado por hardware.
+                O editor precisa de aceleração gráfica para continuar.
               </p>
             </>
           }
           secondaryAction={{
-            label: "Fechar Projeto",
+            label: "Fechar projeto",
             onClick: () => onAction("closeProjectAfterGraphicsFailure"),
           }}
           secondaryButtonRef={graphicsFailureActionRef}
-          title="O Canvas não pôde ser iniciado"
+          title="Não foi possível iniciar o editor"
           tone="error"
         />
       );
@@ -208,7 +208,7 @@ export function ProjectDialogView({
                   disabled: state.cancelRequested,
                   label: state.cancelRequested
                     ? "Cancelando…"
-                    : "Cancelar Exportação",
+                    : "Cancelar exportação",
                   onClick: () => onAction("cancelExport"),
                 }
               : undefined

@@ -18,7 +18,7 @@ import {
 const states: readonly ProjectDialogState[] = [
   { kind: "exportMediaProblems", projectName: "Álbum", problems: [{ mediaId: "photo-1", fileName: "Foto.jpg", state: "absent" }], busy: true, message: "Procurando arquivos…" },
   { kind: "layoutDeletionConfirmation", busy: false },
-  { kind: "edgeConversionConfirmation", message: "O Overlay personalizado será removido." },
+  { kind: "edgeConversionConfirmation", message: "O sobreposição personalizado será removido." },
   { kind: "mediaRemovalConfirmation", mediaKind: "photo", count: 3, usedCount: 2, usageCount: 4, busy: false },
   { kind: "exportProblems", projectName: "Álbum", problems: [{ sheetId: "sheet-001", sheetNumber: 1, frameId: "frame-002", frameNumber: 2 }] },
   { kind: "imageProcessingProgress", progress: { kind: "determinate", completed: 5, total: 12, status: "" } },

@@ -40,7 +40,7 @@ export function ExternalCopyDecisionDialog({
           onClick: onSaveCopyAs,
         }}
         confirmButtonRef={primaryActionRef}
-        description="Este arquivo é uma Cópia externa somente leitura. Escolha outro local para criar uma versão editável sem alterar o original."
+        description="Para editar este arquivo, salve uma cópia em outro local. O original será mantido."
         title="Cópia externa somente leitura"
       >
         {error ? <InlineNotice tone="error">{error}</InlineNotice> : null}

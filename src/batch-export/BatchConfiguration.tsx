@@ -37,7 +37,7 @@ export function BatchConfiguration({ port, busy, onSubmit, onError, onClose }: {
   return <div className="ui-operation-dialog batch-configuration">
     <DialogWindowFrame title="Exportação em lote" layout="form" actions={<>
       <span className="ui-operation-form__summary" aria-live="polite">
-        {count !== null ? `${count} ${count === 1 ? "Projeto encontrado" : "Projetos encontrados"}` : ""}
+        {count !== null ? `${count} ${count === 1 ? "projeto encontrado" : "projetos encontrados"}` : ""}
       </span>
       <ActionButton disabled={busy} onClick={onClose}>Cancelar</ActionButton>
       <ActionButton variant="primary" disabled={busy || count === null || count === 0 || (alternate && !destination.trim())}
@@ -46,9 +46,9 @@ export function BatchConfiguration({ port, busy, onSubmit, onError, onClose }: {
     </>}>
       <form className="ui-operation-form" onSubmit={event => event.preventDefault()} aria-busy={busy}>
         <fieldset className="ui-operation-form__section" disabled={busy}>
-          <legend>Pasta dos Projetos</legend>
+          <legend>Pasta dos projetos</legend>
           <div className="ui-operation-form__destination">
-            <TextInput className="ui-field-control" aria-label="Pasta dos Projetos" value={source} title={source}
+            <TextInput className="ui-field-control" aria-label="Pasta dos projetos" value={source} title={source}
               onChange={event => setSource(event.target.value)} />
             <ActionButton onClick={() => void choose("source")}>Escolher…</ActionButton>
           </div>
@@ -72,12 +72,12 @@ export function BatchConfiguration({ port, busy, onSubmit, onError, onClose }: {
         <fieldset className="ui-operation-form__section" disabled={busy}>
           <legend>Destino da exportação</legend>
           <div className="batch-configuration__destination-mode">
-            <label><input type="radio" name="batch-destination" checked={!alternate} onChange={() => setAlternate(false)} />Padrão de cada Projeto</label>
+            <label><input type="radio" name="batch-destination" checked={!alternate} onChange={() => setAlternate(false)} />Padrão de cada projeto</label>
             <label><input type="radio" name="batch-destination" checked={alternate} onChange={() => setAlternate(true)} />Outra pasta</label>
           </div>
           <div className="ui-operation-form__destination">
             <TextInput className="ui-field-control" aria-label="Pasta de destino" disabled={!alternate}
-              placeholder={alternate ? "" : "Ao lado de cada Projeto"} value={alternate ? destination : ""}
+              placeholder={alternate ? "" : "Ao lado de cada projeto"} value={alternate ? destination : ""}
               title={destination} onChange={event => setDestination(event.target.value)} />
             <ActionButton disabled={!alternate} onClick={() => void choose("destination")}>Escolher…</ActionButton>
           </div>

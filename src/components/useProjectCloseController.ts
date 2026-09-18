@@ -36,7 +36,7 @@ function closeErrorMessage(error: unknown) {
   if (error instanceof ProjectCloseError || error instanceof Error) {
     return error.message;
   }
-  return "Não foi possível concluir o fechamento do Projeto.";
+  return "Não foi possível concluir o fechamento do projeto.";
 }
 
 function hasClosePhase(

@@ -48,18 +48,18 @@ test("Layout focus fits only its target and aligns the Sheet Bar, then restores 
   expect(world.position.y + renderedHeight / 2).toBeCloseTo(350, 4);
   expect(view.onCenteredSheetChange).toHaveBeenLastCalledWith("sheet-002");
   expect(screen.queryByRole("scrollbar")).not.toBeInTheDocument();
-  const bar = screen.getByRole("button", { name: "Reordenar Lâmina 02 pela Barra" });
+  const bar = screen.getByRole("button", { name: "Reordenar lâmina 02 pela Barra" });
   expect(Number.parseFloat(bar.style.left) + Number.parseFloat(bar.style.width) / 2).toBeCloseTo(450, 4);
   expect(Number.parseFloat(bar.style.top)).toBeCloseTo(world.position.y, 4);
-  expect(screen.queryByRole("button", { name: "Reordenar Lâmina 01 pela Barra" })).not.toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Reordenar lâmina 01 pela Barra" })).not.toBeInTheDocument();
   onViewportChange.mockClear();
   app.canvas.dispatchEvent(new WheelEvent("wheel", { bubbles: true, cancelable: true, deltaY: 600 }));
   expect(view.onViewportChange).not.toHaveBeenCalled();
 
   view.rerenderCanvas({ mode: { kind: "normal" }, centeredSheetId: "sheet-002" });
   expect(screen.getByRole("scrollbar")).toBeInTheDocument();
-  expect(screen.getByRole("button", { name: "Reordenar Lâmina 01 pela Barra" })).toBeInTheDocument();
-  expect(screen.getByRole("button", { name: "Reordenar Lâmina 03 pela Barra" })).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Reordenar lâmina 01 pela Barra" })).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Reordenar lâmina 03 pela Barra" })).toBeInTheDocument();
   expect(view.onViewportChange).toHaveBeenCalled();
   expect(pixiLifecycle.instances).toHaveLength(1);
 });
@@ -154,7 +154,7 @@ test("keeps horizontal wheel navigation alive across the left, center, and right
 
   const pixiBackedBarTarget = pixiLifecycle.instances[0].canvas;
   const rightBarTarget = screen.getByRole("button", {
-    name: "Reordenar Lâmina 01 pela Barra",
+    name: "Reordenar lâmina 01 pela Barra",
   });
   // The left/page and central/action regions belong to the Pixi canvas. The
   // free right region is the productive DOM reorder overlay that exposed the
@@ -236,7 +236,7 @@ test("exposes a horizontal scrollbar bound to the continuous Canvas viewport", a
   await finishPixiInitialization();
 
   const scrollbar = screen.getByRole("scrollbar", {
-    name: "Navegação horizontal das Lâminas",
+    name: "Navegação horizontal das lâminas",
   });
   expect(scrollbar).toHaveAttribute("aria-orientation", "horizontal");
 

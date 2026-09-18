@@ -152,7 +152,7 @@ export function createCanvasFramePlaceholder(
   base.eventMode = "none";
 
   const label = new Text({
-    text: "Adicionar Foto",
+    text: "Adicionar foto",
     style: {
       fontFamily:
         '"Helvetica Neue", "Segoe UI Variable", "Segoe UI", system-ui, sans-serif',

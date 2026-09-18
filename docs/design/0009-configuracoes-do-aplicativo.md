@@ -36,19 +36,19 @@ As preferências pertencem ao usuário, não participam de Undo/Redo e não exig
 
 ## Desempenho
 
-A primeira versão não expõe calibração, número de processos, threads, memória ou paralelismo. A aba apresenta somente `Cache dos álbuns`, em uma seção compacta. Uma única linha reúne o espaço ocupado e o botão `Limpar cache`, usando toda a largura útil da janela e alinhando o botão à direita, respeitadas as margens do conteúdo. Não há uma ação separada para álbuns fechados, cartões de indicadores, números em destaque nem botão `Atualizar`; os dados são consultados ao abrir a janela e quando ela recupera o foco.
+A primeira versão não expõe calibração, número de processos, threads, memória ou paralelismo. A aba apresenta somente `Prévias temporárias`, em uma seção compacta. Uma única linha reúne o espaço ocupado e o botão `Limpar prévias`, usando toda a largura útil da janela e alinhando o botão à direita, respeitadas as margens do conteúdo. Não há uma ação separada para álbuns fechados, cartões de indicadores, números em destaque nem botão `Atualizar`; os dados são consultados ao abrir a janela e quando ela recupera o foco.
 
 ```text
 ┌──────────────────────────────────────────────────────────────────┐
-│  Cache dos álbuns                                                │
+│  Prévias temporárias                                                │
 ├──────────────────────────────────────────────────────────────────┤
-│  Espaço ocupado    {total}        [ Limpar cache ]                │
+│  Espaço ocupado    {total}        [ Limpar prévias ]                │
 └──────────────────────────────────────────────────────────────────┘
 ```
 
-`Limpar cache` solicita a limpeza completa e nunca remove Cache pertencente a um Projeto aberto durante a execução normal. Depois da confirmação, o aplicativo executa imediatamente se não houver Projeto ou Processador ativo; caso contrário, agenda automaticamente para a próxima inicialização, antes da abertura de Projetos. O usuário não precisa escolher o alcance ou o momento da limpeza. Projetos, itens do Painel, vínculos e Arquivos originais permanecem intactos. Não existe limpeza ao vivo de Cache ativo no MVP. Quando agendada, a limpeza apresenta uma única mensagem e o botão fica desabilitado para impedir solicitações repetidas.
+`Limpar prévias` solicita a limpeza completa e nunca remove Cache pertencente a um Projeto aberto durante a execução normal. Depois da confirmação, o aplicativo executa imediatamente se não houver Projeto ou Processador ativo; caso contrário, agenda automaticamente para a próxima inicialização, antes da abertura de Projetos. O usuário não precisa escolher o alcance ou o momento da limpeza. Projetos, itens do Painel, vínculos e Arquivos originais permanecem intactos. Não existe limpeza ao vivo de Cache ativo no MVP. Quando agendada, a limpeza apresenta uma única mensagem e o botão fica desabilitado para impedir solicitações repetidas.
 
-A confirmação aparece em um balão ancorado ao botão `Limpar cache`, mantendo os indicadores visíveis e sem deslocar o conteúdo ou aumentar a janela. O único texto é `Ao limpar o cache, as próximas aberturas dos álbuns podem demorar mais.`, seguido de `Cancelar` e `Confirmar`. Cancelar, pressionar Escape ou sair do balão sem confirmar apenas fecha a confirmação; não solicita a limpeza.
+A confirmação aparece em um balão ancorado ao botão `Limpar prévias`, mantendo os indicadores visíveis e sem deslocar o conteúdo ou aumentar a janela. O único texto é `As prévias serão recriadas quando necessário. Os álbuns podem demorar mais para abrir.`, seguido de `Cancelar` e `Confirmar`. Cancelar, pressionar Escape ou sair do balão sem confirmar apenas fecha a confirmação; não solicita a limpeza.
 
 O programa não impõe limite rígido, não expira Cache por idade e não mostra alertas preventivos por espaço livre ou estimativa de tamanho. Ele exibe o total ocupado em Configurações. O aviso de falta de espaço aparece somente quando a criação, gravação, finalização ou publicação de um arquivo realmente falha por esse motivo; orienta a liberar espaço e tentar novamente, sem iniciar limpeza automática.
 

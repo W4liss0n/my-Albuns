@@ -59,6 +59,7 @@ mod project_close_commands;
 mod project_commands;
 mod project_creative_commands;
 mod project_dialog_window;
+mod project_error_message;
 mod project_host;
 mod project_identity_transition;
 mod project_media_reference;

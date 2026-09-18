@@ -2,6 +2,12 @@
 
 Este arquivo fixa a linguagem ubíqua do MyAlbuns. Ele define o significado dos termos do domínio, mas não é fonte de fluxos, algoritmos, detalhes de interface ou critérios de aceite.
 
+## Nomes de apresentação
+
+A interface usa nomes em português conforme o [design 0043](docs/design/0043-plano-de-simplificacao-dos-textos.md): **Quadro** corresponde a Frame; **quadro vazio**, a Frame placeholder; **Fundo**, a Background; **Sobreposição**, a Overlay; **área de edição**, a Canvas; **prévias temporárias**, a Cache de mídia. Os comandos de Religação são apresentados como **Localizar imagem…** ou **Localizar imagens…**. Pan é apresentado como posição da foto.
+
+São equivalências do mesmo conceito, sem renomear identificadores, contratos ou o formato persistido. Lâmina e Página continuam distintos; Sangria, DPI, Layout e Opacidade mantêm seus significados. A capitalização dos conceitos nesta documentação não exige maiúsculas no meio de frases da interface.
+
 ## Projeto e estado
 
 **Projeto**:

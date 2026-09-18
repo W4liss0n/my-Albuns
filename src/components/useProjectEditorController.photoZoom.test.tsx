@@ -26,7 +26,7 @@ function harness() {
   const first = structuredClone(corpus.states["group-zoom"]);
   const second = structuredClone(corpus.states["group-zoom-two"]);
   const pending = deferred<EditorProjection>();
-  const unsupported = async (): Promise<never> => { throw new Error("Unsupported in this Photo Zoom test."); };
+  const unsupported = async (): Promise<never> => { throw new Error("Unsupported in this Photo zoom test."); };
   const apply = vi.fn<ProjectCorePort["apply"]>().mockImplementationOnce(() => pending.promise).mockResolvedValue(second);
   const preview = vi.fn<ProjectCorePort["previewPhotoZoom"]>(async (edit) => {
     const sample = corpus.zoomPreviews.find((item) => item.from === "single-zoom" && item.edit.userZoom === edit.userZoom);
@@ -43,7 +43,7 @@ function harness() {
     validateMediaFolderName: async () => { throw new Error("Folder validation is not configured in this fixture."); },
     queryLayouts: async () => { throw new Error("Layouts are not configured in this fixture."); },
     previewLayout: async () => { throw new Error("Layouts are not configured in this fixture."); },
-    previewFrameStyle: async () => { throw new Error("Frame style preview is not configured in this fixture."); },
+    previewFrameStyle: async () => { throw new Error("Quadro style preview is not configured in this fixture."); },
     previewDecorativeDrop: async () => { throw new Error("Decorative preview is not configured in this fixture."); },
     previewPhotoAngle: async () => { throw new Error("Photo angle preview is not configured in this fixture."); },
     previewPhotoZoom: preview, previewFrameGeometry: unsupported, saveAs: unsupported,
@@ -76,7 +76,7 @@ test.each(["success", "failure"])("two Zoom edits, Save and Undo share the autho
   act(() => useEditorView.getState().selectFrames(corpus.placeholders));
   await act(async () => {
     if (outcome === "success") h.pending.resolve(h.first);
-    else h.pending.reject(new Error("Falha ao ajustar Zoom."));
+    else h.pending.reject(new Error("Falha ao ajustar zoom."));
     await view.result.current.runner.waitForIdle();
   });
   if (outcome === "success") {
@@ -88,7 +88,7 @@ test.each(["success", "failure"])("two Zoom edits, Save and Undo share the autho
     expect(h.save).not.toHaveBeenCalled();
     expect(h.undo).not.toHaveBeenCalled();
     expect(view.result.current.projection).toEqual(h.initial);
-    expect(view.result.current.message).toBe("Falha ao ajustar Zoom.");
+    expect(view.result.current.message).toBe("Falha ao ajustar zoom.");
   }
   expect(useEditorView.getState().selectedFrameIds).toEqual(corpus.placeholders);
 });

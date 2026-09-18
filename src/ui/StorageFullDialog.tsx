@@ -8,6 +8,6 @@ export function StorageFullDialog({ state, onAction }: {
     description={state.message}
     leadingAction={state.canClearCache ? { label: "Retomar", disabled: state.busy, onClick: () => onAction("resumeStorage") } : undefined}
     cancelAction={{ label: "Cancelar", disabled: state.busy, onClick: () => onAction("cancelStorage") }}
-    confirmAction={{ label: state.canClearCache ? "Limpar cache e retomar" : "Retomar", disabled: state.busy,
+    confirmAction={{ label: state.canClearCache ? "Limpar prévias temporárias e retomar" : "Retomar", disabled: state.busy,
       onClick: () => onAction(state.canClearCache ? "clearStorageCache" : "resumeStorage") }} />;
 }

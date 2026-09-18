@@ -205,7 +205,7 @@ test.each([false, true])("applies a double-clicked Decorative to both sides of t
   render(<ProjectWorkspace exportPipelinePort={exportPipelinePort} projection={decorativeProjection}
     projectCorePort={projectCorePortWithApply(apply)} onProjectionChange={vi.fn()} />);
   fireEvent.click(screen.getByRole("button", { name: "Decorativos" }));
-  fireEvent.doubleClick(within(screen.getByRole("group", { name: "Grade de Decorativos" })).getByRole("button", { name: /Overlay translúcido.png/ }), { shiftKey });
+  fireEvent.doubleClick(within(screen.getByRole("group", { name: "Grade de decorativos" })).getByRole("button", { name: /Overlay translúcido.png/ }), { shiftKey });
   await waitFor(() => expect(apply).toHaveBeenCalledExactlyOnceWith({
     kind: "applyDecorative", mediaId: "decorative-overlay", sheetId: decorativeProjection.state.album.sheets[0].id,
     role: shiftKey ? "overlay" : "background", scope: "bothSides",
@@ -374,11 +374,11 @@ function projectCorePortWithApply(
     validateMediaFolderName: async () => { throw new Error("Folder validation is not configured in this fixture."); },
     queryLayouts: async () => { throw new Error("Layouts are not configured in this fixture."); },
     previewLayout: async () => { throw new Error("Layouts are not configured in this fixture."); },
-    previewFrameStyle: async () => { throw new Error("Frame style preview is not configured in this fixture."); },
+    previewFrameStyle: async () => { throw new Error("Quadro style preview is not configured in this fixture."); },
     previewDecorativeDrop: async () => { throw new Error("Decorative preview is not configured in this fixture."); },
-    previewPhotoZoom: async () => { throw new Error("Photo Zoom preview is not configured in this fixture."); },
+    previewPhotoZoom: async () => { throw new Error("Photo zoom preview is not configured in this fixture."); },
     previewPhotoAngle: async () => { throw new Error("Photo angle preview is not configured in this fixture."); },
-    previewFrameGeometry: async () => { throw new Error("Frame geometry preview is not configured in this fixture."); },
+    previewFrameGeometry: async () => { throw new Error("Quadro geometry preview is not configured in this fixture."); },
     resolvePhotoDropTarget: async () => ({ kind: "invalid" }),
     replaceImage: async () => projection, relink: async () => projection,
     undo: async () => projection,
@@ -667,7 +667,7 @@ test("creates one placeholder from Edit and selects only the new Frame", async (
   port.applyWithOutcome = vi.fn(async () => ({ projection: added,
     affectedFrameId: "manual-frame", affectedSheetId: null }));
   render(<ProjectWorkspace projection={projection} projectCorePort={port} onProjectionChange={vi.fn()} />);
-  fireEvent.click(getApplicationCommand("Editar", "Adicionar Frame"));
+  fireEvent.click(getApplicationCommand("Editar", "Adicionar quadro"));
   await waitFor(() => expect(port.applyWithOutcome).toHaveBeenCalledWith(
     { kind: "addFrame", sheetId: "sheet-001" }, expect.any(Function)));
   expect(useEditorView.getState().selectedFrameIds).toEqual(["manual-frame"]);
@@ -679,13 +679,13 @@ test("empty Canvas context creates a Frame without requiring a previous selectio
   port.applyWithOutcome = vi.fn(async () => ({ projection, affectedFrameId: "frame-001", affectedSheetId: null }));
   render(<ProjectWorkspace projection={projection} projectCorePort={port} onProjectionChange={vi.fn()} />);
   act(() => canvasHarness.props?.onOpenEmptyCanvasContextMenu?.("sheet-001", { x: 120, y: 180 }));
-  const menu = screen.getByRole("menu", { name: "Área vazia do Canvas" });
+  const menu = screen.getByRole("menu", { name: "Área vazia da área de edição" });
   expect(within(menu).getAllByRole("menuitem")).toHaveLength(1);
   expect(useEditorView.getState().selectedFrameIds).toEqual([]);
-  fireEvent.click(within(menu).getByRole("menuitem", { name: "Adicionar Frame" }));
+  fireEvent.click(within(menu).getByRole("menuitem", { name: "Adicionar quadro" }));
   await waitFor(() => expect(port.applyWithOutcome).toHaveBeenCalledWith(
     { kind: "addFrame", sheetId: "sheet-001" }, expect.any(Function)));
-  expect(screen.queryByRole("menu", { name: "Área vazia do Canvas" })).not.toBeInTheDocument();
+  expect(screen.queryByRole("menu", { name: "Área vazia da área de edição" })).not.toBeInTheDocument();
   expect(useEditorView.getState().selectedFrameIds).toEqual(["frame-001"]);
 });
 
@@ -693,10 +693,10 @@ test("manual Frame creation is unavailable outside sheet editing", () => {
   const port = projectCorePortWithApply(async () => projection);
   port.applyWithOutcome = vi.fn();
   render(<ProjectWorkspace projection={projection} projectCorePort={port} onProjectionChange={vi.fn()} />);
-  expect(getApplicationCommand("Editar", "Adicionar Frame")).toBeDisabled();
+  expect(getApplicationCommand("Editar", "Adicionar quadro")).toBeDisabled();
   fireEvent.keyDown(screen.getByRole("menu", { name: "Editar" }), { key: "Escape" });
   act(() => canvasHarness.props?.onOpenEmptyCanvasContextMenu?.("sheet-001", { x: 120, y: 180 }));
-  expect(screen.queryByRole("menu", { name: "Área vazia do Canvas" })).not.toBeInTheDocument();
+  expect(screen.queryByRole("menu", { name: "Área vazia da área de edição" })).not.toBeInTheDocument();
   expect(port.applyWithOutcome).not.toHaveBeenCalled();
 });
 
@@ -752,20 +752,20 @@ test.each([
   const apply = vi.fn(async () => structuredClone(swap.after));
   render(<ProjectWorkspace projection={initial} projectCorePort={projectCorePortWithApply(apply)} onProjectionChange={vi.fn()} />);
   if (entry === "edit") {
-    const command = getApplicationCommand("Editar", "Trocar conteúdo dos Frames");
+    const command = getApplicationCommand("Editar", "Trocar conteúdo dos quadros");
     expect(command).toBeEnabled();
     expect(command).not.toHaveAttribute("data-placeholder-feature");
     fireEvent.click(command);
   } else {
     act(() => canvasHarness.props?.onOpenFrameContextMenu?.(swap.selectedFrameIds[1], { x: 320, y: 200 }));
-    const command = screen.getByRole("menuitem", { name: "Trocar conteúdo dos Frames" });
+    const command = screen.getByRole("menuitem", { name: "Trocar conteúdo dos quadros" });
     expect(command).toBeEnabled();
     fireEvent.click(command);
   }
   await waitFor(() => expect(apply).toHaveBeenCalledWith({ kind: "swapFrameContents", frameIds: swap.selectedFrameIds }, expect.any(Function)));
   expect(apply).toHaveBeenCalledOnce();
   expect(useEditorView.getState().selectedFrameIds).toEqual(swap.selectedFrameIds);
-  expect(screen.queryByRole("menu", { name: "Organizar Frames" })).not.toBeInTheDocument();
+  expect(screen.queryByRole("menu", { name: "Organizar quadros" })).not.toBeInTheDocument();
 });
 
 test.each([
@@ -775,10 +775,10 @@ test.each([
   useEditorView.setState({ projectId: initial.state.projectId, editingSheetId: "sheet-001", selectedFrameIds });
   const apply = vi.fn(async () => initial);
   render(<ProjectWorkspace projection={initial} projectCorePort={projectCorePortWithApply(apply)} onProjectionChange={vi.fn()} />);
-  expect(getApplicationCommand("Editar", "Trocar conteúdo dos Frames")).toBeDisabled();
+  expect(getApplicationCommand("Editar", "Trocar conteúdo dos quadros")).toBeDisabled();
   fireEvent.keyDown(screen.getByRole("menu", { name: "Editar" }), { key: "Escape" });
   act(() => canvasHarness.props?.onOpenFrameContextMenu?.(selectedFrameIds[0], { x: 320, y: 200 }));
-  const command = screen.getByRole("menuitem", { name: "Trocar conteúdo dos Frames" });
+  const command = screen.getByRole("menuitem", { name: "Trocar conteúdo dos quadros" });
   expect(command).toBeDisabled();
   fireEvent.click(command);
   expect(apply).not.toHaveBeenCalled();
@@ -822,18 +822,18 @@ test("opens Frame context actions for the clicked selection and preserves it aft
   render(<ProjectWorkspace projection={grouped} projectCorePort={projectCorePortWithApply(apply)}
     onProjectionChange={vi.fn()} />);
   act(() => canvasHarness.props?.onOpenFrameContextMenu?.("frame-002", { x: 120, y: 180 }));
-  const menu = screen.getByRole("menu", { name: "Organizar Frames" });
+  const menu = screen.getByRole("menu", { name: "Organizar quadros" });
   expect(useEditorView.getState().selectedFrameIds).toEqual(["frame-001", "frame-002"]);
   fireEvent.click(within(menu).getByRole("menuitem", { name: "Enviar para trás" }));
   await waitFor(() => expect(apply).toHaveBeenLastCalledWith({
     kind: "arrangeFrames", frameIds: ["frame-001", "frame-002"], action: "sendToBack",
   }, expect.any(Function)));
-  expect(screen.queryByRole("menu", { name: "Organizar Frames" })).not.toBeInTheDocument();
+  expect(screen.queryByRole("menu", { name: "Organizar quadros" })).not.toBeInTheDocument();
   act(() => useEditorView.getState().selectFrame("frame-001"));
   act(() => canvasHarness.props?.onOpenFrameContextMenu?.("frame-002", { x: 120, y: 180 }));
   expect(useEditorView.getState().selectedFrameIds).toEqual(["frame-002"]);
-  fireEvent.keyDown(screen.getByRole("menu", { name: "Organizar Frames" }), { key: "Escape" });
-  expect(screen.queryByRole("menu", { name: "Organizar Frames" })).not.toBeInTheDocument();
+  fireEvent.keyDown(screen.getByRole("menu", { name: "Organizar quadros" }), { key: "Escape" });
+  expect(screen.queryByRole("menu", { name: "Organizar quadros" })).not.toBeInTheDocument();
 });
 
 test.each(["menu", "shortcut"])("normal-mode Frame clipboard commands are reachable through the %s", async (source) => {
@@ -883,20 +883,20 @@ test("presents the canonical desktop menus and marks unfinished commands", () =>
   ).not.toBeInTheDocument();
 
   expect(getApplicationCommand("Arquivo", "Salvar")).toBeEnabled();
-  const newProject = getApplicationCommand("Arquivo", "Novo Projeto…");
+  const newProject = getApplicationCommand("Arquivo", "Novo projeto…");
   expect(newProject).toBeDisabled();
   expect(newProject).not.toHaveAttribute("data-placeholder-feature");
 
-  expect(getApplicationCommand("Editar", "Adicionar Frame")).toBeDisabled();
+  expect(getApplicationCommand("Editar", "Adicionar quadro")).toBeDisabled();
   expect(getApplicationCommand("Editar", "Copiar")).toBeDisabled();
   expect(
-    screen.queryByRole("menuitem", { name: "Copiar Frames" }),
+    screen.queryByRole("menuitem", { name: "Copiar quadros" }),
   ).not.toBeInTheDocument();
   expect(
-    getApplicationCommand("Editar", "Trocar conteúdo dos Frames"),
+    getApplicationCommand("Editar", "Trocar conteúdo dos quadros"),
   ).toBeDisabled();
   expect(
-    getApplicationCommand("Editar", "Salvar disposição como Layout"),
+    getApplicationCommand("Editar", "Salvar disposição como layout"),
   ).toBeDisabled();
   const arrange = getApplicationCommand("Editar", "Organizar");
   expect(arrange).toHaveAttribute("aria-haspopup", "menu");
@@ -952,7 +952,7 @@ test("routes implicit menu and explicit context actions to their intended Sheets
     }),
   );
   const contextMenu = screen.getByRole("menu", {
-    name: "Ações da Lâmina 03",
+    name: "Ações da lâmina 03",
   });
   expect(contextMenu).toHaveStyle({ left: "240px", top: "180px" });
   fireEvent.click(
@@ -966,7 +966,7 @@ test("routes implicit menu and explicit context actions to their intended Sheets
     }, expect.any(Function)),
   );
   expect(
-    screen.queryByRole("menu", { name: "Ações da Lâmina 03" }),
+    screen.queryByRole("menu", { name: "Ações da lâmina 03" }),
   ).not.toBeInTheDocument();
 });
 
@@ -976,9 +976,9 @@ test("Delete in an explicit Sheet menu cannot remove the centered Sheet", async 
   vi.spyOn(core, "applyWithOutcome");
   render(<ProjectWorkspace exportPipelinePort={exportPipelinePort}
     projection={physicalProjection} projectCorePort={core} onProjectionChange={() => undefined} />);
-  fireEvent.click(screen.getByRole("button", { name: /Ir para Lâmina 02/u }));
+  fireEvent.click(screen.getByRole("button", { name: /Ir para lâmina 02/u }));
   act(() => canvasHarness.props?.onOpenSheetContextMenu?.("sheet-003", { x: 240, y: 180 }));
-  const menu = screen.getByRole("menu", { name: "Ações da Lâmina 03" });
+  const menu = screen.getByRole("menu", { name: "Ações da lâmina 03" });
   await act(async () => { fireEvent.keyDown(within(menu).getByRole("menuitem", { name: "Excluir" }), { key: "Delete" }); });
   expect(core.applyWithOutcome).not.toHaveBeenCalled();
   expect(menu).toBeInTheDocument();
@@ -1007,7 +1007,7 @@ test("opens and dismisses an explicit Sheet context menu without navigating the 
     });
   });
   fireEvent.click(
-    screen.getByRole("button", { name: /Ir para Lâmina 02/u }),
+    screen.getByRole("button", { name: /Ir para lâmina 02/u }),
   );
   const before = {
     centeredSheetId: useEditorView.getState().centeredSheetId,
@@ -1023,13 +1023,13 @@ test("opens and dismisses an explicit Sheet context menu without navigating the 
     }),
   );
   expect(
-    screen.getByRole("menu", { name: "Ações da Lâmina 03" }),
+    screen.getByRole("menu", { name: "Ações da lâmina 03" }),
   ).toBeInTheDocument();
   expect(useEditorView.getState()).toMatchObject(before);
 
   fireEvent.keyDown(document, { key: "Escape" });
   expect(
-    screen.queryByRole("menu", { name: "Ações da Lâmina 03" }),
+    screen.queryByRole("menu", { name: "Ações da lâmina 03" }),
   ).not.toBeInTheDocument();
   expect(useEditorView.getState()).toMatchObject(before);
 
@@ -1041,7 +1041,7 @@ test("opens and dismisses an explicit Sheet context menu without navigating the 
   );
   fireEvent.pointerDown(document.body);
   expect(
-    screen.queryByRole("menu", { name: "Ações da Lâmina 03" }),
+    screen.queryByRole("menu", { name: "Ações da lâmina 03" }),
   ).not.toBeInTheDocument();
   expect(useEditorView.getState()).toMatchObject(before);
 
@@ -1058,12 +1058,12 @@ test("opens and dismisses an explicit Sheet context menu without navigating the 
   fireEvent.pointerDown(dismissLayer!, { button: 0, pointerId: 31 });
   fireEvent.pointerUp(dismissLayer!, { button: 0, pointerId: 31 });
   expect(
-    screen.getByRole("menu", { name: "Ações da Lâmina 03" }),
+    screen.getByRole("menu", { name: "Ações da lâmina 03" }),
   ).toBeInTheDocument();
   expect(useEditorView.getState()).toMatchObject(before);
   fireEvent.click(dismissLayer!);
   expect(
-    screen.queryByRole("menu", { name: "Ações da Lâmina 03" }),
+    screen.queryByRole("menu", { name: "Ações da lâmina 03" }),
   ).not.toBeInTheDocument();
   expect(useEditorView.getState()).toMatchObject(before);
 });
@@ -1090,7 +1090,7 @@ test("selects a Sheet through the Bar seam without navigating the Canvas", () =>
     });
   });
   fireEvent.click(
-    screen.getByRole("button", { name: /Ir para Lâmina 02/u }),
+    screen.getByRole("button", { name: /Ir para lâmina 02/u }),
   );
   const before = {
     centeredSheetId: canvasHarness.props?.centeredSheetId,
@@ -1403,7 +1403,7 @@ test("routes implicit and explicit empty-edge conversions to their intended Shee
     }),
   );
   const contextMenu = screen.getByRole("menu", {
-    name: "Ações da Lâmina 03",
+    name: "Ações da lâmina 03",
   });
   const explicitCommand = within(contextMenu).getByRole("menuitem", {
     name: "Converter extremidade",
@@ -1468,7 +1468,7 @@ test("commits one valid Grade reorder and keeps structural controls inert in She
     }),
   );
   expect(
-    screen.queryByRole("menu", { name: "Ações da Lâmina 02" }),
+    screen.queryByRole("menu", { name: "Ações da lâmina 02" }),
   ).not.toBeInTheDocument();
 });
 
@@ -1767,7 +1767,7 @@ test("temporarily compacts the image panel during Sheet Edit Mode and restores i
   ).toBe("120px");
   expect(
     screen.getByRole("separator", {
-      name: "Redimensionar Painel de imagens",
+      name: "Redimensionar painel de imagens",
     }),
   ).toHaveAttribute("aria-disabled", "true");
 
@@ -1809,7 +1809,7 @@ test("hydrates and publishes machine-local Inspector and media density preferenc
   );
 
   const information = screen.getByRole("button", {
-    name: "Informações do Álbum",
+    name: "Informações do álbum",
   });
   await waitFor(() =>
     expect(information).toHaveAttribute("aria-expanded", "false"),
@@ -1838,7 +1838,7 @@ test("hydrates and publishes machine-local Inspector and media density preferenc
     }),
   );
   fireEvent.click(screen.getByRole("button", { name: "Decorativos" }));
-  expect(screen.getByRole("group", { name: "Grade de Decorativos" })).toHaveStyle({
+  expect(screen.getByRole("group", { name: "Grade de decorativos" })).toHaveStyle({
     "--media-thumbnail-size": "126px",
   });
   expect((await workspacePreferencesPort.load()).mediaThumbnailSize).toBe(126);
@@ -1853,7 +1853,7 @@ test("saving a custom Layout works from Sheet Design and the Edit menu while a F
   const onProjectionChange = vi.fn();
   render(<ProjectWorkspace projection={initial} projectCorePort={port} onProjectionChange={onProjectionChange} />);
   act(() => canvasHarness.props?.onEditSheet?.(sheet.id));
-  const save = screen.getByRole("button", { name: "Salvar disposição como Layout" });
+  const save = screen.getByRole("button", { name: "Salvar disposição como layout" });
   expect(save).toBeEnabled();
   await act(async () => fireEvent.click(save));
   expect(port.saveCustomLayout).toHaveBeenCalledExactlyOnceWith(sheet.id);
@@ -1861,7 +1861,7 @@ test("saving a custom Layout works from Sheet Design and the Edit menu while a F
   expect(canvasHarness.props?.mode).toEqual({ kind: "sheet-editing", sheetId: sheet.id });
   act(() => useEditorView.getState().selectFrames([sheet.frames[0].id]));
   expect(screen.queryByText("Layout salvo em Personalizados.")).not.toBeInTheDocument();
-  const menu = getApplicationCommand("Editar", "Salvar disposição como Layout");
+  const menu = getApplicationCommand("Editar", "Salvar disposição como layout");
   expect(menu).toBeEnabled();
   await act(async () => fireEvent.click(menu));
   expect(port.saveCustomLayout).toHaveBeenCalledTimes(2);
@@ -1878,16 +1878,16 @@ test.each(["exit", "collapse"])("save feedback disappears permanently when leavi
   port.saveCustomLayout = vi.fn(async () => sample.saveResult!);
   render(<ProjectWorkspace projection={initial} projectCorePort={port} onProjectionChange={() => undefined} />);
   act(() => canvasHarness.props?.onEditSheet?.(sheetId));
-  await act(async () => fireEvent.click(screen.getByRole("button", { name: "Salvar disposição como Layout" })));
+  await act(async () => fireEvent.click(screen.getByRole("button", { name: "Salvar disposição como layout" })));
   expect(screen.getByText("Layout salvo em Personalizados.")).toBeInTheDocument();
   await act(async () => {
     if (transition === "exit") useEditorView.getState().exitSheetEdit();
-    else fireEvent.click(screen.getByRole("button", { name: "Design da Lâmina" }));
+    else fireEvent.click(screen.getByRole("button", { name: "Design da lâmina" }));
   });
   expect(screen.queryByText("Layout salvo em Personalizados.")).not.toBeInTheDocument();
   await act(async () => {
     if (transition === "exit") canvasHarness.props?.onEditSheet?.(sheetId);
-    else fireEvent.click(screen.getByRole("button", { name: "Design da Lâmina" }));
+    else fireEvent.click(screen.getByRole("button", { name: "Design da lâmina" }));
   });
   expect(screen.queryByText("Layout salvo em Personalizados.")).not.toBeInTheDocument();
 });
@@ -1896,10 +1896,10 @@ test("an empty edited Sheet explains why custom Layout saving is unavailable in 
   const initial = layoutPanelCorpus.cases.empty.before.projection;
   render(<ProjectWorkspace projection={initial} onProjectionChange={() => undefined} />);
   act(() => canvasHarness.props?.onEditSheet?.(initial.state.album.sheets[0].id));
-  const save = screen.getByRole("button", { name: "Salvar disposição como Layout" });
+  const save = screen.getByRole("button", { name: "Salvar disposição como layout" });
   expect(save).toBeDisabled();
-  expect(save).toHaveAttribute("title", "Adicione ao menos um Frame para salvar um Layout.");
-  expect(getApplicationCommand("Editar", "Salvar disposição como Layout")).toBeDisabled();
+  expect(save).toHaveAttribute("title", "Adicione ao menos um quadro para salvar um layout.");
+  expect(getApplicationCommand("Editar", "Salvar disposição como layout")).toBeDisabled();
 });
 
 test("Layout focus temporarily hides media and restores the mounted panel with its search", async () => {
@@ -1910,17 +1910,17 @@ test("Layout focus temporarily hides media and restores the mounted panel with i
   port.previewLayout = async (selection) => sample.queries[sheetId].previews[selection.candidateIndex];
   render(<ProjectWorkspace projection={sample.projection} projectCorePort={port} onProjectionChange={() => undefined} />);
   const media = screen.getByRole("region", { name: "Painel de imagens" });
-  const search = within(media).getByRole("searchbox", { name: "Buscar Fotos" });
+  const search = within(media).getByRole("searchbox", { name: "Buscar fotos" });
   const initialHeight = (document.querySelector(".workspace-grid") as HTMLElement).style.getPropertyValue("--media-panel-height");
   fireEvent.change(search, { target: { value: "Minha busca" } });
   act(() => canvasHarness.props?.sheetLayouts?.onToggle(sheetId));
-  await screen.findByRole("region", { name: "Painel de Layouts" });
+  await screen.findByRole("region", { name: "Painel de layouts" });
   expect(canvasHarness.props?.mode).toEqual({ kind: "normal", isolatedSheetId: sheetId });
   expect(media).not.toBeVisible();
-  expect(screen.queryByRole("separator", { name: "Redimensionar Painel de imagens" })).not.toBeInTheDocument();
+  expect(screen.queryByRole("separator", { name: "Redimensionar painel de imagens" })).not.toBeInTheDocument();
   expect(document.querySelector(".workspace-grid")).toHaveStyle({ "--media-panel-height": "0px", "--media-splitter-size": "0px" });
   fireEvent.pointerDown(screen.getByTestId("album-canvas"));
-  expect(screen.queryByRole("region", { name: "Painel de Layouts" })).not.toBeInTheDocument();
+  expect(screen.queryByRole("region", { name: "Painel de layouts" })).not.toBeInTheDocument();
   expect(canvasHarness.props?.mode).toEqual({ kind: "normal" });
   expect(screen.getByRole("region", { name: "Painel de imagens" })).toBe(media);
   expect(media).toBeVisible();
@@ -1938,7 +1938,7 @@ test("closing Layouts keeps a previously hidden media panel hidden", async () =>
   fireEvent.click(getApplicationCommand("Exibir", "Painel de imagens"));
   expect(screen.queryByRole("region", { name: "Painel de imagens" })).not.toBeInTheDocument();
   act(() => canvasHarness.props?.sheetLayouts?.onToggle(sheetId));
-  await screen.findByRole("region", { name: "Painel de Layouts" });
+  await screen.findByRole("region", { name: "Painel de layouts" });
   fireEvent.pointerDown(screen.getByTestId("album-canvas"));
   expect(screen.queryByRole("region", { name: "Painel de imagens" })).not.toBeInTheDocument();
   expect(document.querySelector(".workspace-grid")).toHaveStyle({ "--media-panel-height": "0px" });
@@ -2067,7 +2067,7 @@ test("starts the implemented Lâmina export from the Arquivo menu", async () => 
     />,
   );
 
-  const exportAction = getApplicationCommand("Arquivo", "Exportar Lâmina…");
+  const exportAction = getApplicationCommand("Arquivo", "Exportar lâmina…");
   await act(async () => { fireEvent.click(exportAction); });
 
   expect(startSheet).toHaveBeenCalledWith("sheet-001", expect.any(Function));
@@ -2087,13 +2087,13 @@ test("uses contextual empty states when the editor has no materialized content",
   );
 
   const mediaEmptyState = screen.getByRole("status", {
-    name: "Nenhuma Foto importada",
+    name: "Nenhuma foto importada",
   });
 
   expect(mediaEmptyState).toHaveClass("ui-empty-state");
   expect(mediaEmptyState).toHaveClass("media-empty-state--catalog");
   expect(
-    screen.getByRole("status", { name: "Nenhuma Lâmina na Grade" }),
+    screen.getByRole("status", { name: "Nenhuma lâmina na Grade" }),
   ).toHaveClass("ui-empty-state");
 });
 
@@ -2178,7 +2178,7 @@ test("releases an application close when its confirmation window cannot be prese
   );
 
   fireEvent.click(screen.getByRole("menuitem", { name: "Arquivo" }));
-  fireEvent.click(screen.getByRole("menuitem", { name: "Fechar Projeto" }));
+  fireEvent.click(screen.getByRole("menuitem", { name: "Fechar projeto" }));
 
   await waitFor(() => {
     expect(harness.port.resolveClose).toHaveBeenCalledWith("cancel");
@@ -2251,7 +2251,7 @@ test("uses the same close decision for the application command and blocks it whi
   );
 
   fireEvent.click(screen.getByRole("menuitem", { name: "Arquivo" }));
-  fireEvent.click(screen.getByRole("menuitem", { name: "Fechar Projeto" }));
+  fireEvent.click(screen.getByRole("menuitem", { name: "Fechar projeto" }));
   await waitFor(() =>
     expect(harness.port.requestClose).toHaveBeenCalledOnce(),
   );
@@ -2305,7 +2305,7 @@ test("sends Discard and resumes the unchanged Project after a conclusive save fa
   failureHarness.port.resolveClose = vi.fn(async () => {
     throw new ProjectCloseError(
       "persisted_baseline_conflict",
-      "O arquivo do Projeto foi alterado fora do MyAlbuns.",
+      "O arquivo do projeto foi alterado fora do MyAlbuns.",
     );
   });
   render(
@@ -2328,7 +2328,7 @@ test("sends Discard and resumes the unchanged Project after a conclusive save fa
   await waitFor(() =>
     expect(failureHarness.dialog.present).toHaveBeenLastCalledWith({
       kind: "projectCloseFailure",
-      message: "O arquivo do Projeto foi alterado fora do MyAlbuns.",
+      message: "O arquivo do projeto foi alterado fora do MyAlbuns.",
     }),
   );
   act(() => failureHarness.dialog.emit("dismissProjectCloseFailure"));
@@ -2442,7 +2442,7 @@ test("forwards a fatal Canvas graphics diagnostic without interpreting it", () =
     supported: false,
     code: "webgl2_unavailable",
     renderer: "indisponível",
-    reason: "O Canvas real não possui WebGL2.",
+    reason: "O área de edição real não possui WebGL2.",
     limits: null,
   };
   render(
@@ -2481,7 +2481,7 @@ test("restores accordion preferences after context changes and remounts", async 
 
   const firstView = renderWorkspace();
   const albumInformation = screen.getByRole("button", {
-    name: "Informações do Álbum",
+    name: "Informações do álbum",
   });
   expect(albumInformation).toHaveAttribute("aria-expanded", "true");
 
@@ -2495,7 +2495,7 @@ test("restores accordion preferences after context changes and remounts", async 
 
   act(() => useEditorView.setState({ selectedFrameIds: [] }));
   expect(
-    screen.getByRole("button", { name: "Informações do Álbum" }),
+    screen.getByRole("button", { name: "Informações do álbum" }),
   ).toHaveAttribute("aria-expanded", "false");
 
   await waitFor(async () =>
@@ -2510,7 +2510,7 @@ test("restores accordion preferences after context changes and remounts", async 
   renderWorkspace();
   await waitFor(() =>
     expect(
-      screen.getByRole("button", { name: "Informações do Álbum" }),
+      screen.getByRole("button", { name: "Informações do álbum" }),
     ).toHaveAttribute("aria-expanded", "false"),
   );
 });
@@ -2531,17 +2531,17 @@ test("uses the reference chrome and collapsible contextual sections", () => {
       selector: ".ui-application-header__identity strong",
     }),
   ).toBeInTheDocument();
-  expect(screen.getByText("300×300 mm · 1 Lâmina")).toBeInTheDocument();
+  expect(screen.getByText("300×300 mm · 1 lâmina")).toBeInTheDocument();
   expect(screen.queryByText("Intel(R) UHD Graphics")).not.toBeInTheDocument();
   expect(screen.queryByText("revisão 25")).not.toBeInTheDocument();
-  expect(screen.queryByText("3 Fotos vinculadas")).not.toBeInTheDocument();
-  expect(screen.queryByLabelText("Zoom do Canvas")).not.toBeInTheDocument();
+  expect(screen.queryByText("3 fotos vinculadas")).not.toBeInTheDocument();
+  expect(screen.queryByLabelText("Zoom da área de edição")).not.toBeInTheDocument();
   expect(screen.queryByRole("button", { name: "Geral" })).not.toBeInTheDocument();
   expect(
-    screen.getByRole("button", { name: "Informações do Álbum" }),
+    screen.getByRole("button", { name: "Informações do álbum" }),
   ).toBeInTheDocument();
   expect(
-    screen.getByRole("button", { name: "Grade de Lâminas" }),
+    screen.getByRole("button", { name: "Grade de lâminas" }),
   ).toBeInTheDocument();
 });
 
@@ -2581,12 +2581,12 @@ test("shows the physical configuration projected from the opened Project", () =>
 
   const albumInformation = within(
     screen
-      .getByRole("button", { name: "Informações do Álbum" })
+      .getByRole("button", { name: "Informações do álbum" })
       .closest("section") as HTMLElement,
   );
 
   const sheetDimensions = within(
-    albumInformation.getByRole("group", { name: "Dimensão da Lâmina" }),
+    albumInformation.getByRole("group", { name: "Dimensão da lâmina" }),
   );
   expect(sheetDimensions.getByRole("textbox", { name: "Largura" })).toHaveValue(
     "50.8",
@@ -2596,7 +2596,7 @@ test("shows the physical configuration projected from the opened Project", () =>
   );
 
   const pageDimensions = within(
-    albumInformation.getByRole("group", { name: "Dimensão da Página" }),
+    albumInformation.getByRole("group", { name: "Dimensão da página" }),
   );
   expect(pageDimensions.getByLabelText("Largura")).toHaveTextContent(
     "25.4 cm",
@@ -2646,10 +2646,10 @@ test("projects the pending Unidade across the Project Window without changing Al
   );
 
   const informationSection = screen
-    .getByRole("button", { name: "Informações do Álbum" })
+    .getByRole("button", { name: "Informações do álbum" })
     .closest("section") as HTMLElement;
   const designSection = screen
-    .getByRole("button", { name: "Design do Álbum" })
+    .getByRole("button", { name: "Design do álbum" })
     .closest("section") as HTMLElement;
   const design = within(designSection);
   const designApply = design.getByRole("button", { name: "Aplicar" });
@@ -2658,38 +2658,38 @@ test("projects the pending Unidade across the Project Window without changing Al
     target: { value: "in" },
   });
 
-  expect(await screen.findByText("11.811×11.811 pol · 1 Lâmina")).toBeVisible();
+  expect(await screen.findByText("11.811×11.811 pol · 1 lâmina")).toBeVisible();
   expect(
     design.getByText("Borda padrão").closest("label"),
   ).toHaveTextContent("0.1 pol");
   expect(
-    design.getByText("Espaço entre Frames").closest("label"),
+    design.getByText("Espaço entre quadros").closest("label"),
   ).toHaveTextContent("0.197 pol");
   expect(designApply).toBeDisabled();
   expect(screen.getByText("salvo")).toBeVisible();
   expect(apply).not.toHaveBeenCalled();
 
   fireEvent.click(
-    screen.getByRole("button", { name: "Informações do Álbum" }),
+    screen.getByRole("button", { name: "Informações do álbum" }),
   );
-  expect(await screen.findByText("300×300 mm · 1 Lâmina")).toBeVisible();
+  expect(await screen.findByText("300×300 mm · 1 lâmina")).toBeVisible();
   expect(
-    design.getByText("Espaço entre Frames").closest("label"),
+    design.getByText("Espaço entre quadros").closest("label"),
   ).toHaveTextContent("5 mm");
   expect(designApply).toBeDisabled();
 
   fireEvent.click(
-    screen.getByRole("button", { name: "Informações do Álbum" }),
+    screen.getByRole("button", { name: "Informações do álbum" }),
   );
   fireEvent.change(
     within(
       screen
-        .getByRole("button", { name: "Informações do Álbum" })
+        .getByRole("button", { name: "Informações do álbum" })
         .closest("section") as HTMLElement,
     ).getByLabelText("Unidade"),
     { target: { value: "in" } },
   );
-  expect(await screen.findByText("11.811×11.811 pol · 1 Lâmina")).toBeVisible();
+  expect(await screen.findByText("11.811×11.811 pol · 1 lâmina")).toBeVisible();
 
   const otherProject: EditorProjection = {
     ...projectionWithBorder,
@@ -2710,7 +2710,7 @@ test("projects the pending Unidade across the Project Window without changing Al
       onProjectionChange={() => undefined}
     />,
   );
-  expect(screen.getByText("30×30 cm · 1 Lâmina")).toBeVisible();
+  expect(screen.getByText("30×30 cm · 1 lâmina")).toBeVisible();
   expect(apply).not.toHaveBeenCalled();
 });
 
@@ -2725,10 +2725,10 @@ test("clears pending Apply actions when their inspector forms are collapsed", as
   );
 
   const informationTrigger = screen.getByRole("button", {
-    name: "Informações do Álbum",
+    name: "Informações do álbum",
   });
   const designTrigger = screen.getByRole("button", {
-    name: "Design do Álbum",
+    name: "Design do álbum",
   });
   const information = within(informationTrigger.closest("section") as HTMLElement);
   const design = within(designTrigger.closest("section") as HTMLElement);
@@ -2738,7 +2738,7 @@ test("clears pending Apply actions when their inspector forms are collapsed", as
   fireEvent.change(information.getByLabelText("DPI"), {
     target: { value: "600" },
   });
-  fireEvent.change(design.getByLabelText("Cor do Background"), {
+  fireEvent.change(design.getByLabelText("Cor do fundo"), {
     target: { value: "#f7f5f0" },
   });
 
@@ -2763,12 +2763,12 @@ test("uses the current reference layout for the Album context", () => {
   );
 
   const albumInformationTrigger = screen.getByRole("button", {
-    name: "Informações do Álbum",
+    name: "Informações do álbum",
   });
   const albumInformationSection = albumInformationTrigger
     .closest("section") as HTMLElement;
   const albumDesignTrigger = screen.getByRole("button", {
-    name: "Design do Álbum",
+    name: "Design do álbum",
   });
   const albumDesignSection = albumDesignTrigger
     .closest("section") as HTMLElement;
@@ -2784,32 +2784,32 @@ test("uses the current reference layout for the Album context", () => {
   expect(albumInformation.queryByText("Projeto")).not.toBeInTheDocument();
   expect(albumInformation.queryByText("Verificação")).not.toBeInTheDocument();
   expect(
-    albumInformation.queryByLabelText("Nome do Projeto"),
+    albumInformation.queryByLabelText("Nome do projeto"),
   ).not.toBeInTheDocument();
   expect(
-    albumInformation.queryByText("Frames placeholder"),
+    albumInformation.queryByText("Quadros quadro vazio"),
   ).not.toBeInTheDocument();
   expect(
-    screen.getByRole("button", { name: "Design do Álbum" }),
+    screen.getByRole("button", { name: "Design do álbum" }),
   ).toHaveAttribute("aria-expanded", "true");
   const albumDesignPreview = albumDesign.getByLabelText(
-    "Prévia do padrão visual do Álbum",
+    "Prévia do padrão visual do álbum",
   );
   expect(albumDesignPreview).toBeInTheDocument();
   expect(
     within(albumDesignPreview).getByRole("img", {
-      name: "Composição do padrão visual do Álbum",
+      name: "Composição do padrão visual do álbum",
     }),
   ).toBeInTheDocument();
   expect(
-    within(albumDesignPreview).queryByLabelText("Guias técnicas da Lâmina"),
+    within(albumDesignPreview).queryByLabelText("Guias de dobra, corte e segurança da lâmina"),
   ).not.toBeInTheDocument();
   expect(
     albumDesignPreview.querySelector(".visual-preview-fixed-selection"),
   ).not.toBeInTheDocument();
   expect(
     within(albumDesignPreview).getByRole("group", {
-      name: "Escopo do padrão visual do Álbum",
+      name: "Escopo do padrão visual do álbum",
     }),
   ).toBeInTheDocument();
   expect(
@@ -2843,14 +2843,14 @@ test("uses the current reference layout for the Album context", () => {
   expect(albumDesign.queryByText("Documento")).not.toBeInTheDocument();
   expect(albumDesign.queryByText("Áreas técnicas")).not.toBeInTheDocument();
   expect(albumDesign.getByText("Padrões visuais")).toBeInTheDocument();
-  expect(albumDesign.getByText("Padrão dos Frames")).toBeInTheDocument();
+  expect(albumDesign.getByText("Padrão dos quadros")).toBeInTheDocument();
   expect(
-    albumDesign.getByRole("slider", { name: "Espessura da Borda" }),
+    albumDesign.getByRole("slider", { name: "Espessura da borda" }),
   ).toBeInTheDocument();
   expect(
     albumDesign.queryByRole("checkbox", { name: "Exibir borda" }),
   ).not.toBeInTheDocument();
-  expect(albumDesign.getByLabelText("Cor do Background")).toBeInTheDocument();
+  expect(albumDesign.getByLabelText("Cor do fundo")).toBeInTheDocument();
 });
 
 test("edits and applies the complete Album design draft as one intent", async () => {
@@ -2889,58 +2889,58 @@ test("edits and applies the complete Album design draft as one intent", async ()
 
   const albumDesign = within(
     screen
-      .getByRole("button", { name: "Design do Álbum" })
+      .getByRole("button", { name: "Design do álbum" })
       .closest("section") as HTMLElement,
   );
   const applyDesign = albumDesign.getByRole("button", { name: "Aplicar" });
   expect(applyDesign).toBeDisabled();
 
   const scopeControls = within(
-    albumDesign.getByLabelText("Prévia do padrão visual do Álbum"),
-  ).getByRole("group", { name: "Escopo do padrão visual do Álbum" });
+    albumDesign.getByLabelText("Prévia do padrão visual do álbum"),
+  ).getByRole("group", { name: "Escopo do padrão visual do álbum" });
   expect(within(scopeControls).getAllByRole("button")).toHaveLength(3);
   expect(
     within(scopeControls).getByRole("button", { name: "Ambos os lados" }),
   ).toHaveAttribute("aria-pressed", "true");
 
   fireEvent.click(albumDesign.getByRole("button", { name: "Lado esquerdo" }));
-  fireEvent.change(albumDesign.getByLabelText("Cor do Background"), {
+  fireEvent.change(albumDesign.getByLabelText("Cor do fundo"), {
     target: { value: "#f7f5f0" },
   });
   expect(
-    albumDesign.queryByRole("button", { name: "Escolher Overlay" }),
+    albumDesign.queryByRole("button", { name: "Escolher sobreposição" }),
   ).not.toBeInTheDocument();
   expect(
     albumDesign.queryByRole("button", { name: /Abrir mais opções/ }),
   ).not.toBeInTheDocument();
   expect(
-    albumDesign.getByRole("group", { name: "Opções de Background" }),
+    albumDesign.getByRole("group", { name: "Opções de fundo" }),
   ).toBeInTheDocument();
 
   fireEvent.click(
     albumDesign.getByRole("button", {
-      name: "Escolher Decorativo para Overlay",
+      name: "Escolher decorativo para sobreposição",
     }),
   );
   fireEvent.click(
     albumDesign.getByRole("menuitem", {
-      name: "Usar Overlay Overlay translúcido.png",
+      name: "Usar sobreposição Overlay translúcido.png",
     }),
   );
   expect(
-    albumDesign.queryByRole("menu", { name: "Decorativos para Overlay" }),
+    albumDesign.queryByRole("menu", { name: "Decorativos para sobreposição" }),
   ).not.toBeInTheDocument();
   expect(albumDesign.queryByRole("dialog")).not.toBeInTheDocument();
-  const frame = albumDesign.getByLabelText("Frame demonstrativo esquerdo 1");
-  const overlay = albumDesign.getByLabelText("Overlay do lado esquerdo");
+  const frame = albumDesign.getByLabelText("Quadro de exemplo 1, lado esquerdo");
+  const overlay = albumDesign.getByLabelText("Sobreposição do lado esquerdo");
   expect(
     frame.compareDocumentPosition(overlay) & Node.DOCUMENT_POSITION_FOLLOWING,
   ).toBeTruthy();
-  fireEvent.change(albumDesign.getByLabelText("Cor da Borda"), {
+  fireEvent.change(albumDesign.getByLabelText("Cor da borda"), {
     target: { value: "#2c2924" },
   });
   const borderWidth = albumDesign.getByRole("slider", {
-    name: "Espessura da Borda",
+    name: "Espessura da borda",
   });
   expect(borderWidth).toHaveAttribute("min", "0");
   fireEvent.change(borderWidth, { target: { value: "1250" } });
@@ -2987,10 +2987,10 @@ test("prevents re-entering Album Design Apply while its mutation is pending", as
 
   const albumDesign = within(
     screen
-      .getByRole("button", { name: "Design do Álbum" })
+      .getByRole("button", { name: "Design do álbum" })
       .closest("section") as HTMLElement,
   );
-  fireEvent.change(albumDesign.getByLabelText("Cor do Background"), {
+  fireEvent.change(albumDesign.getByLabelText("Cor do fundo"), {
     target: { value: "#f7f5f0" },
   });
   const applyDesign = albumDesign.getByRole("button", { name: "Aplicar" });
@@ -3050,10 +3050,10 @@ test("saves the revision committed by a pending Album Design Apply", async () =>
 
   const albumDesign = within(
     screen
-      .getByRole("button", { name: "Design do Álbum" })
+      .getByRole("button", { name: "Design do álbum" })
       .closest("section") as HTMLElement,
   );
-  fireEvent.change(albumDesign.getByLabelText("Cor do Background"), {
+  fireEvent.change(albumDesign.getByLabelText("Cor do fundo"), {
     target: { value: "#f7f5f0" },
   });
   fireEvent.click(albumDesign.getByRole("button", { name: "Aplicar" }));
@@ -3074,7 +3074,7 @@ test("saves the revision committed by a pending Album Design Apply", async () =>
 test("cancels a queued Save when Album Design Apply fails and allows a clean retry", async () => {
   const pendingApply = deferredProjection();
   const dialog = projectDialogHarness();
-  const failure = new Error("O Design do Álbum não pôde ser aplicado.");
+  const failure = new Error("O Design do álbum não pôde ser aplicado.");
   const appliedProjection: EditorProjection = {
     ...projection,
     state: {
@@ -3117,10 +3117,10 @@ test("cancels a queued Save when Album Design Apply fails and allows a clean ret
 
   const albumDesign = within(
     screen
-      .getByRole("button", { name: "Design do Álbum" })
+      .getByRole("button", { name: "Design do álbum" })
       .closest("section") as HTMLElement,
   );
-  fireEvent.change(albumDesign.getByLabelText("Cor do Background"), {
+  fireEvent.change(albumDesign.getByLabelText("Cor do fundo"), {
     target: { value: "#f7f5f0" },
   });
   fireEvent.click(albumDesign.getByRole("button", { name: "Aplicar" }));
@@ -3178,7 +3178,7 @@ test("clears pending Save state after a queued Album Design save fails", async (
   };
   const saveFailure = new SaveProjectError(
     "persisted_baseline_conflict",
-    "O arquivo do Projeto foi alterado fora do MyAlbuns.",
+    "O arquivo do projeto foi alterado fora do MyAlbuns.",
   );
   const save = vi
     .fn<ProjectSessionPort["save"]>()
@@ -3207,10 +3207,10 @@ test("clears pending Save state after a queued Album Design save fails", async (
 
   const albumDesign = within(
     screen
-      .getByRole("button", { name: "Design do Álbum" })
+      .getByRole("button", { name: "Design do álbum" })
       .closest("section") as HTMLElement,
   );
-  fireEvent.change(albumDesign.getByLabelText("Cor do Background"), {
+  fireEvent.change(albumDesign.getByLabelText("Cor do fundo"), {
     target: { value: "#f7f5f0" },
   });
   fireEvent.click(albumDesign.getByRole("button", { name: "Aplicar" }));
@@ -3278,10 +3278,10 @@ test("revalidates queued Redo after Album Design Apply changes History eligibili
 
   const albumDesign = within(
     screen
-      .getByRole("button", { name: "Design do Álbum" })
+      .getByRole("button", { name: "Design do álbum" })
       .closest("section") as HTMLElement,
   );
-  fireEvent.change(albumDesign.getByLabelText("Cor do Background"), {
+  fireEvent.change(albumDesign.getByLabelText("Cor do fundo"), {
     target: { value: "#f7f5f0" },
   });
   fireEvent.click(albumDesign.getByRole("button", { name: "Aplicar" }));
@@ -3319,16 +3319,16 @@ test("cancels queued Undo when Album Design Apply fails", async () => {
 
   const albumDesign = within(
     screen
-      .getByRole("button", { name: "Design do Álbum" })
+      .getByRole("button", { name: "Design do álbum" })
       .closest("section") as HTMLElement,
   );
-  fireEvent.change(albumDesign.getByLabelText("Cor do Background"), {
+  fireEvent.change(albumDesign.getByLabelText("Cor do fundo"), {
     target: { value: "#f7f5f0" },
   });
   fireEvent.click(albumDesign.getByRole("button", { name: "Aplicar" }));
   fireEvent.keyDown(window, { ctrlKey: true, key: "z" });
 
-  const failure = new Error("O Design do Álbum não pôde ser aplicado.");
+  const failure = new Error("O Design do álbum não pôde ser aplicado.");
   await act(async () => {
     pendingApply.reject(failure);
     await pendingApply.promise.catch(() => undefined);
@@ -3369,14 +3369,14 @@ test("waits for a pending Album Design Apply before requesting Project close", a
 
   const albumDesign = within(
     screen
-      .getByRole("button", { name: "Design do Álbum" })
+      .getByRole("button", { name: "Design do álbum" })
       .closest("section") as HTMLElement,
   );
-  fireEvent.change(albumDesign.getByLabelText("Cor do Background"), {
+  fireEvent.change(albumDesign.getByLabelText("Cor do fundo"), {
     target: { value: "#f7f5f0" },
   });
   fireEvent.click(albumDesign.getByRole("button", { name: "Aplicar" }));
-  fireEvent.click(getApplicationCommand("Arquivo", "Fechar Projeto"));
+  fireEvent.click(getApplicationCommand("Arquivo", "Fechar projeto"));
 
   expect(close.port.requestClose).not.toHaveBeenCalled();
 
@@ -3409,18 +3409,18 @@ test("cancels a queued Project close after Album Design Apply fails and allows r
 
   const albumDesign = within(
     screen
-      .getByRole("button", { name: "Design do Álbum" })
+      .getByRole("button", { name: "Design do álbum" })
       .closest("section") as HTMLElement,
   );
-  fireEvent.change(albumDesign.getByLabelText("Cor do Background"), {
+  fireEvent.change(albumDesign.getByLabelText("Cor do fundo"), {
     target: { value: "#f7f5f0" },
   });
   fireEvent.click(albumDesign.getByRole("button", { name: "Aplicar" }));
-  fireEvent.click(getApplicationCommand("Arquivo", "Fechar Projeto"));
+  fireEvent.click(getApplicationCommand("Arquivo", "Fechar projeto"));
 
   expect(close.port.requestClose).not.toHaveBeenCalled();
 
-  const failure = new Error("O Design do Álbum não pôde ser aplicado.");
+  const failure = new Error("O Design do álbum não pôde ser aplicado.");
   await act(async () => {
     pendingApply.reject(failure);
     await pendingApply.promise.catch(() => undefined);
@@ -3443,7 +3443,7 @@ test("cancels a queued Project close after Album Design Apply fails and allows r
     expect(close.dialog.dismiss).toHaveBeenCalledTimes(dismissCount + 1),
   );
 
-  fireEvent.click(getApplicationCommand("Arquivo", "Fechar Projeto"));
+  fireEvent.click(getApplicationCommand("Arquivo", "Fechar projeto"));
 
   await waitFor(() => expect(close.port.requestClose).toHaveBeenCalledOnce());
   expect(close.dialog.present).toHaveBeenLastCalledWith({
@@ -3477,10 +3477,10 @@ test("releases a native close request when pending Album Design Apply fails", as
   );
   const albumDesign = within(
     screen
-      .getByRole("button", { name: "Design do Álbum" })
+      .getByRole("button", { name: "Design do álbum" })
       .closest("section") as HTMLElement,
   );
-  fireEvent.change(albumDesign.getByLabelText("Cor do Background"), {
+  fireEvent.change(albumDesign.getByLabelText("Cor do fundo"), {
     target: { value: "#f7f5f0" },
   });
   fireEvent.click(albumDesign.getByRole("button", { name: "Aplicar" }));
@@ -3488,7 +3488,7 @@ test("releases a native close request when pending Album Design Apply fails", as
 
   expect(close.port.resolveClose).not.toHaveBeenCalled();
 
-  const failure = new Error("O Design do Álbum não pôde ser aplicado.");
+  const failure = new Error("O Design do álbum não pôde ser aplicado.");
   await act(async () => {
     pendingApply.reject(failure);
     await pendingApply.promise.catch(() => undefined);
@@ -3567,11 +3567,11 @@ test("maps Borda zero to none and a positive value back to solid", async () => {
 
   const design = within(
     screen
-      .getByRole("button", { name: "Design do Álbum" })
+      .getByRole("button", { name: "Design do álbum" })
       .closest("section") as HTMLElement,
   );
   const borderWidth = design.getByRole("slider", {
-    name: "Espessura da Borda",
+    name: "Espessura da borda",
   });
   const applyDesign = design.getByRole("button", { name: "Aplicar" });
 
@@ -3597,7 +3597,7 @@ test("maps Borda zero to none and a positive value back to solid", async () => {
     />,
   );
   fireEvent.change(
-    design.getByRole("slider", { name: "Espessura da Borda" }),
+    design.getByRole("slider", { name: "Espessura da borda" }),
     { target: { value: "1250" } },
   );
   expect(design.getByText("1.25 mm")).toBeVisible();
@@ -3629,11 +3629,11 @@ test("previews the pending gap and confirms it with Album Design Apply", async (
   );
 
   const designSection = screen
-    .getByRole("button", { name: "Design do Álbum" })
+    .getByRole("button", { name: "Design do álbum" })
     .closest("section") as HTMLElement;
   const design = within(designSection);
-  const gap = design.getByRole("slider", { name: "Espaço entre Frames" });
-  const secondFrame = design.getByLabelText("Frame demonstrativo esquerdo 2");
+  const gap = design.getByRole("slider", { name: "Espaço entre quadros" });
+  const secondFrame = design.getByLabelText("Quadro de exemplo 2, lado esquerdo");
   const initialSecondFrameX = Number(secondFrame.getAttribute("x"));
   const applyDesign = design.getByRole("button", { name: "Aplicar" });
 
@@ -3666,22 +3666,22 @@ test("coordinates Decorative popups, placeholder import and focus restoration", 
   );
 
   const designSection = screen
-    .getByRole("button", { name: "Design do Álbum" })
+    .getByRole("button", { name: "Design do álbum" })
     .closest("section") as HTMLElement;
   const design = within(designSection);
   const backgroundTrigger = design.getByRole("button", {
-    name: "Escolher Decorativo para Background",
+    name: "Escolher decorativo para fundo",
   });
   const overlayTrigger = design.getByRole("button", {
-    name: /Decorativo do Overlay: Overlay translúcido\.png/,
+    name: /Decorativo da sobreposição: Overlay translúcido\.png/,
   });
 
   fireEvent.click(backgroundTrigger);
   const backgroundMenu = design.getByRole("menu", {
-    name: "Decorativos para Background",
+    name: "Decorativos para fundo",
   });
   const importPlaceholder = within(backgroundMenu).getByRole("menuitem", {
-    name: "Importar Decorativo",
+    name: "Importar decorativo",
   });
   expect(importPlaceholder).toBeDisabled();
   expect(importPlaceholder).toHaveAttribute(
@@ -3692,7 +3692,7 @@ test("coordinates Decorative popups, placeholder import and focus restoration", 
   fireEvent.click(overlayTrigger);
   expect(backgroundMenu).not.toBeInTheDocument();
   const overlayMenu = design.getByRole("menu", {
-    name: "Decorativos para Overlay",
+    name: "Decorativos para sobreposição",
   });
   await waitFor(() =>
     expect(within(overlayMenu).getAllByRole("menuitem")[0]).toHaveFocus(),
@@ -3705,7 +3705,7 @@ test("coordinates Decorative popups, placeholder import and focus restoration", 
   fireEvent.click(backgroundTrigger);
   fireEvent.pointerDown(design.getByText("Padrões visuais"));
   expect(
-    design.queryByRole("menu", { name: "Decorativos para Background" }),
+    design.queryByRole("menu", { name: "Decorativos para fundo" }),
   ).not.toBeInTheDocument();
   await waitFor(() => expect(backgroundTrigger).toHaveFocus());
 });
@@ -3737,10 +3737,10 @@ test("presents an empty per-side Overlay as absent", () => {
   );
 
   const visualDefaults = screen
-    .getByRole("button", { name: "Design do Álbum" })
+    .getByRole("button", { name: "Design do álbum" })
     .closest("section") as HTMLElement;
   expect(
-    within(visualDefaults).getByRole("button", { name: "Sem Overlay" }),
+    within(visualDefaults).getByRole("button", { name: "Sem sobreposição" }),
   ).toHaveAttribute("aria-pressed", "true");
   expect(
     visualDefaults.querySelector(".visual-default-picker__preview--none"),
@@ -3778,11 +3778,11 @@ test("does not present divergent per-side Overlays as absent", () => {
   );
 
   const visualDefaults = screen
-    .getByRole("button", { name: "Design do Álbum" })
+    .getByRole("button", { name: "Design do álbum" })
     .closest("section") as HTMLElement;
   // Um lado tem Overlay e o outro não: o escopo é misto, não é ausência.
   expect(
-    within(visualDefaults).getByRole("button", { name: "Sem Overlay" }),
+    within(visualDefaults).getByRole("button", { name: "Sem sobreposição" }),
   ).toHaveAttribute("aria-pressed", "false");
 });
 
@@ -3829,7 +3829,7 @@ test("confirms and applies Album information as one authoritative Project change
   );
 
   const albumInformationTrigger = screen.getByRole("button", {
-    name: "Informações do Álbum",
+    name: "Informações do álbum",
   });
   if (albumInformationTrigger.getAttribute("aria-expanded") !== "true") {
     fireEvent.click(albumInformationTrigger);
@@ -3896,7 +3896,7 @@ test("confirms and applies Album information as one authoritative Project change
 
   const albumInformation = within(
     screen
-      .getByRole("button", { name: "Informações do Álbum" })
+      .getByRole("button", { name: "Informações do álbum" })
       .closest("section") as HTMLElement,
   );
   expect(albumInformation.getByRole("textbox", { name: "DPI" })).toHaveValue(
@@ -4086,18 +4086,18 @@ test("preserves both unapplied Album drafts when Save returns an equivalent proj
 
   const information = within(
     screen
-      .getByRole("button", { name: "Informações do Álbum" })
+      .getByRole("button", { name: "Informações do álbum" })
       .closest("section") as HTMLElement,
   );
   const design = within(
     screen
-      .getByRole("button", { name: "Design do Álbum" })
+      .getByRole("button", { name: "Design do álbum" })
       .closest("section") as HTMLElement,
   );
   fireEvent.change(information.getByLabelText("DPI"), {
     target: { value: "600" },
   });
-  fireEvent.change(design.getByLabelText("Cor do Background"), {
+  fireEvent.change(design.getByLabelText("Cor do fundo"), {
     target: { value: "#f7f5f0" },
   });
   await waitFor(() =>
@@ -4118,7 +4118,7 @@ test("preserves both unapplied Album drafts when Save returns an equivalent proj
 
   expect(information.getByLabelText("DPI")).toHaveValue("600");
   expect(information.getByRole("button", { name: "Aplicar" })).toBeEnabled();
-  expect(design.getByLabelText("Cor do Background")).toHaveValue("#f7f5f0");
+  expect(design.getByLabelText("Cor do fundo")).toHaveValue("#f7f5f0");
   expect(design.getByRole("button", { name: "Aplicar" })).toBeEnabled();
 });
 
@@ -4155,18 +4155,18 @@ test("preserves the Album Information draft when Album Design is applied", async
   );
   const information = within(
     screen
-      .getByRole("button", { name: "Informações do Álbum" })
+      .getByRole("button", { name: "Informações do álbum" })
       .closest("section") as HTMLElement,
   );
   const design = within(
     screen
-      .getByRole("button", { name: "Design do Álbum" })
+      .getByRole("button", { name: "Design do álbum" })
       .closest("section") as HTMLElement,
   );
   fireEvent.change(information.getByLabelText("DPI"), {
     target: { value: "600" },
   });
-  fireEvent.change(design.getByLabelText("Cor do Background"), {
+  fireEvent.change(design.getByLabelText("Cor do fundo"), {
     target: { value: "#f7f5f0" },
   });
   await waitFor(() =>
@@ -4227,15 +4227,15 @@ test("preserves the Album Design draft when Album Information is applied", async
   );
   const information = within(
     screen
-      .getByRole("button", { name: "Informações do Álbum" })
+      .getByRole("button", { name: "Informações do álbum" })
       .closest("section") as HTMLElement,
   );
   const design = within(
     screen
-      .getByRole("button", { name: "Design do Álbum" })
+      .getByRole("button", { name: "Design do álbum" })
       .closest("section") as HTMLElement,
   );
-  fireEvent.change(design.getByLabelText("Cor do Background"), {
+  fireEvent.change(design.getByLabelText("Cor do fundo"), {
     target: { value: "#f7f5f0" },
   });
   fireEvent.change(information.getByLabelText("DPI"), {
@@ -4264,7 +4264,7 @@ test("preserves the Album Design draft when Album Information is applied", async
     />,
   );
 
-  expect(design.getByLabelText("Cor do Background")).toHaveValue("#f7f5f0");
+  expect(design.getByLabelText("Cor do fundo")).toHaveValue("#f7f5f0");
   expect(design.getByRole("button", { name: "Aplicar" })).toBeEnabled();
 });
 
@@ -4311,18 +4311,18 @@ test("preserves both unapplied Album drafts across equivalent Undo and Redo proj
   );
   const information = within(
     screen
-      .getByRole("button", { name: "Informações do Álbum" })
+      .getByRole("button", { name: "Informações do álbum" })
       .closest("section") as HTMLElement,
   );
   const design = within(
     screen
-      .getByRole("button", { name: "Design do Álbum" })
+      .getByRole("button", { name: "Design do álbum" })
       .closest("section") as HTMLElement,
   );
   fireEvent.change(information.getByLabelText("DPI"), {
     target: { value: "600" },
   });
-  fireEvent.change(design.getByLabelText("Cor do Background"), {
+  fireEvent.change(design.getByLabelText("Cor do fundo"), {
     target: { value: "#f7f5f0" },
   });
   await waitFor(() =>
@@ -4340,7 +4340,7 @@ test("preserves both unapplied Album drafts across equivalent Undo and Redo proj
     />,
   );
   expect(information.getByLabelText("DPI")).toHaveValue("600");
-  expect(design.getByLabelText("Cor do Background")).toHaveValue("#f7f5f0");
+  expect(design.getByLabelText("Cor do fundo")).toHaveValue("#f7f5f0");
 
   fireEvent.keyDown(window, { ctrlKey: true, key: "y" });
   await waitFor(() => expect(onProjectionChange).toHaveBeenCalledWith(afterRedo));
@@ -4353,7 +4353,7 @@ test("preserves both unapplied Album drafts across equivalent Undo and Redo proj
     />,
   );
   expect(information.getByLabelText("DPI")).toHaveValue("600");
-  expect(design.getByLabelText("Cor do Background")).toHaveValue("#f7f5f0");
+  expect(design.getByLabelText("Cor do fundo")).toHaveValue("#f7f5f0");
 });
 
 test("keeps a mutation failure behind Album Information and releases both owners in order", async () => {
@@ -4375,17 +4375,17 @@ test("keeps a mutation failure behind Album Information and releases both owners
 
   const design = within(
     screen
-      .getByRole("button", { name: "Design do Álbum" })
+      .getByRole("button", { name: "Design do álbum" })
       .closest("section") as HTMLElement,
   );
-  fireEvent.change(design.getByLabelText("Cor do Background"), {
+  fireEvent.change(design.getByLabelText("Cor do fundo"), {
     target: { value: "#f7f5f0" },
   });
   fireEvent.click(design.getByRole("button", { name: "Aplicar" }));
 
   const information = within(
     screen
-      .getByRole("button", { name: "Informações do Álbum" })
+      .getByRole("button", { name: "Informações do álbum" })
       .closest("section") as HTMLElement,
   );
   fireEvent.change(information.getByLabelText("DPI"), {
@@ -4401,7 +4401,7 @@ test("keeps a mutation failure behind Album Information and releases both owners
     ),
   );
 
-  const failure = new Error("O Design do Álbum não pôde ser aplicado.");
+  const failure = new Error("O Design do álbum não pôde ser aplicado.");
   await act(async () => {
     pendingDesign.reject(failure);
     await pendingDesign.promise.catch(() => undefined);
@@ -4568,11 +4568,11 @@ test("materializes an Album Design draft over the projection produced by a pendi
   );
   const design = within(
     screen
-      .getByRole("button", { name: "Design do Álbum" })
+      .getByRole("button", { name: "Design do álbum" })
       .closest("section") as HTMLElement,
   );
   fireEvent.click(design.getByRole("button", { name: "Lado esquerdo" }));
-  fireEvent.change(design.getByLabelText("Cor do Background"), {
+  fireEvent.change(design.getByLabelText("Cor do fundo"), {
     target: { value: "#f7f5f0" },
   });
   fireEvent.keyDown(window, { ctrlKey: true, key: "z" });
@@ -4617,10 +4617,10 @@ test("applies an Album Design draft over its captured baseline when pending Undo
   );
   const design = within(
     screen
-      .getByRole("button", { name: "Design do Álbum" })
+      .getByRole("button", { name: "Design do álbum" })
       .closest("section") as HTMLElement,
   );
-  fireEvent.change(design.getByLabelText("Cor do Background"), {
+  fireEvent.change(design.getByLabelText("Cor do fundo"), {
     target: { value: "#f7f5f0" },
   });
   fireEvent.keyDown(window, { ctrlKey: true, key: "z" });
@@ -4698,7 +4698,7 @@ test("materializes an Album Information draft over the projection produced by a 
   );
   const information = within(
     screen
-      .getByRole("button", { name: "Informações do Álbum" })
+      .getByRole("button", { name: "Informações do álbum" })
       .closest("section") as HTMLElement,
   );
   fireEvent.change(information.getByLabelText("DPI"), {
@@ -4767,7 +4767,7 @@ test("applies an Album Information draft over its captured baseline when pending
   );
   const information = within(
     screen
-      .getByRole("button", { name: "Informações do Álbum" })
+      .getByRole("button", { name: "Informações do álbum" })
       .closest("section") as HTMLElement,
   );
   fireEvent.change(information.getByLabelText("DPI"), {
@@ -4864,7 +4864,7 @@ test("revalidates materialized Album Information after pending History and block
   );
   const information = within(
     screen
-      .getByRole("button", { name: "Informações do Álbum" })
+      .getByRole("button", { name: "Informações do álbum" })
       .closest("section") as HTMLElement,
   );
   fireEvent.change(information.getByLabelText("DPI"), {
@@ -4905,7 +4905,7 @@ test("revalidates materialized Album Information after pending History and block
     expect(dialog.present).toHaveBeenCalledWith({
       kind: "projectOperationFailure",
       message:
-        "As Informações do Álbum mudaram enquanto a confirmação estava aberta e precisam ser revistas antes de Aplicar.",
+        "As Informações do álbum mudaram enquanto a confirmação estava aberta e precisam ser revistas antes de Aplicar.",
     }),
   );
 });
@@ -4957,7 +4957,7 @@ test("updates a stale Album Information summary and requires reconfirmation afte
   );
   const information = within(
     screen
-      .getByRole("button", { name: "Informações do Álbum" })
+      .getByRole("button", { name: "Informações do álbum" })
       .closest("section") as HTMLElement,
   );
   fireEvent.change(information.getByLabelText("DPI"), {
@@ -5241,7 +5241,7 @@ test("releases the Salvar como barrier after a reported failure", async () => {
     rejectSaveAs(
       new SaveProjectError(
         "destination_conflict",
-        "Já existe um Projeto no destino escolhido.",
+        "Já existe um projeto no destino escolhido.",
       ),
     );
     await pendingSaveAs.catch(() => undefined);
@@ -5250,7 +5250,7 @@ test("releases the Salvar como barrier after a reported failure", async () => {
   await waitFor(() =>
     expect(dialog.present).toHaveBeenCalledWith({
       kind: "projectOperationFailure",
-      message: "Já existe um Projeto no destino escolhido.",
+      message: "Já existe um projeto no destino escolhido.",
     }),
   );
   expect(screen.getByRole("menuitem", { name: "Arquivo" })).toBeEnabled();
@@ -5357,7 +5357,7 @@ test("shows the localized Project save failure", async () => {
   projectCorePort.save = vi.fn(async () => {
     throw new SaveProjectError(
       "persisted_baseline_conflict",
-      "O arquivo do Projeto foi alterado fora do MyAlbuns. O Salvamento não substituiu essas alterações.",
+      "O arquivo do projeto foi alterado fora do MyAlbuns. O salvamento não substituiu essas alterações.",
     );
   });
   render(
@@ -5380,7 +5380,7 @@ test("shows the localized Project save failure", async () => {
     expect(dialog.present).toHaveBeenCalledWith({
       kind: "projectOperationFailure",
       message:
-        "O arquivo do Projeto foi alterado fora do MyAlbuns. O Salvamento não substituiu essas alterações.",
+        "O arquivo do projeto foi alterado fora do MyAlbuns. O salvamento não substituiu essas alterações.",
     }),
   );
   expect(screen.queryByRole("alert")).not.toBeInTheDocument();
@@ -5397,10 +5397,10 @@ test("renders each Grade item from its own composed sheet", () => {
   );
 
   expect(
-    screen.getByRole("img", { name: "Prévia da Lâmina 01" }),
+    screen.getByRole("img", { name: "Prévia da lâmina 01" }),
   ).toBeInTheDocument();
   expect(
-    screen.getByRole("img", { name: "Prévia da Lâmina 02" }),
+    screen.getByRole("img", { name: "Prévia da lâmina 02" }),
   ).toBeInTheDocument();
   const sheetGrid = view.container.querySelector(".sheet-grid") as HTMLElement;
   expect(within(sheetGrid).getAllByRole("img")).toHaveLength(2);
@@ -5464,7 +5464,7 @@ test("presents the Grade with reference metadata and navigation state", () => {
   );
 
   const gradeTrigger = screen.getByRole("button", {
-    name: "Grade de Lâminas",
+    name: "Grade de lâminas",
   });
   expect(
     gradeTrigger.querySelector(".inspector-section-meta"),
@@ -5478,7 +5478,7 @@ test("presents the Grade with reference metadata and navigation state", () => {
   expect(tiles[1]).not.toHaveAttribute("aria-current");
   expect(tiles[0]).toHaveAttribute("data-active-sides", "both");
   expect(tiles[0]).toHaveAccessibleName(
-    "Ir para Lâmina 01, Páginas 7–8",
+    "Ir para lâmina 01, páginas 7–8",
   );
   expect(tiles[0].querySelector(".sheet-tile__number")).toHaveTextContent(
     "01",
@@ -5550,10 +5550,10 @@ test("shows Page numbers instead of cover and final aliases", () => {
     ),
   ).toEqual(["1", "2"]);
   expect(tiles[0]).toHaveAccessibleName(
-    "Ir para Lâmina 01, Lâmina inicial, Página 1",
+    "Ir para lâmina 01, lâmina inicial, página 1",
   );
   expect(tiles[1]).toHaveAccessibleName(
-    "Ir para Lâmina 02, Lâmina final, Página 2",
+    "Ir para lâmina 02, lâmina final, página 2",
   );
   expect(
     tilePreviews[0]?.style.getPropertyValue(
@@ -5583,8 +5583,8 @@ test("Substituir Imagem in the Panel updates the workspace through the Project m
   render(<ProjectWorkspace projection={projection} projectCorePort={port}
     exportPipelinePort={exportPipelinePort} onProjectionChange={onProjectionChange} />);
   fireEvent.contextMenu(screen.getByRole("button", { name: (name) => name.startsWith(selected.name) }));
-  expect(screen.queryByRole("menuitem", { name: "Religar" })).not.toBeInTheDocument();
-  fireEvent.click(screen.getByRole("menuitem", { name: "Substituir Imagem" }));
+  expect(screen.queryByRole("menuitem", { name: "Localizar imagem…" })).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole("menuitem", { name: "Substituir imagem" }));
   await waitFor(() => expect(port.replaceImage).toHaveBeenCalledWith(selected.id, expect.any(Function)));
   await waitFor(() => expect(onProjectionChange).toHaveBeenCalledWith(replacement));
 });
@@ -5709,7 +5709,7 @@ test("offers retry only for an unavailable occurrence and keeps Relink exclusive
   );
 
   expect(
-    screen.queryByRole("button", { name: /Religar arquivo de/i }),
+    screen.queryByRole("button", { name: /Localizar imagem… arquivo de/i }),
   ).not.toBeInTheDocument();
   expect(
     screen.getAllByRole("button", { name: /Tentar novamente o arquivo de/i }),
@@ -5724,7 +5724,7 @@ test("offers retry only for an unavailable occurrence and keeps Relink exclusive
   expect(screen.getByRole("status", { name: "Indisponível" })).toHaveTextContent(/^Indisponível$/);
   expect(screen.getByRole("status", { name: /^Prévia indisponível/ })).toHaveTextContent(/^Prévia indisponível/);
   fireEvent.contextMenu(screen.getByRole("button", { name: /Arquivo ausente/ }));
-  fireEvent.click(screen.getByRole("menuitem", { name: "Religar" }));
+  fireEvent.click(screen.getByRole("menuitem", { name: "Localizar imagem…" }));
   fireEvent.click(
     screen.getByRole("button", { name: /Tentar novamente o arquivo de/i }),
   );
@@ -5826,7 +5826,7 @@ test("remeasures Panel demand on card resize and retires obsolete observers", ()
     />,
   );
 
-  const grid = screen.getByRole("group", { name: "Grade de Fotos" });
+  const grid = screen.getByRole("group", { name: "Grade de fotos" });
   Object.defineProperties(grid, {
     clientWidth: { value: 202 },
     clientHeight: { value: 84 },
@@ -5929,12 +5929,12 @@ test("keeps a demanded Decorative pending until its ready Cache preview arrives"
   );
   const albumDesign = within(
     screen
-      .getByRole("button", { name: "Design do Álbum" })
+      .getByRole("button", { name: "Design do álbum" })
       .closest("section") as HTMLElement,
   );
 
   expect(
-    albumDesign.getByLabelText("Overlay de ambos os lados"),
+    albumDesign.getByLabelText("Sobreposição de ambos os lados"),
   ).toHaveAttribute("data-preview-state", "pending");
   expect(view.container.querySelector('image[href=""]')).toBeNull();
 
@@ -5955,10 +5955,10 @@ test("keeps a demanded Decorative pending until its ready Cache preview arrives"
   );
 
   expect(
-    albumDesign.getByLabelText("Overlay de ambos os lados"),
+    albumDesign.getByLabelText("Sobreposição de ambos os lados"),
   ).toHaveAttribute("data-preview-state", "ready");
   expect(
-    albumDesign.getByLabelText("Overlay de ambos os lados"),
+    albumDesign.getByLabelText("Sobreposição de ambos os lados"),
   ).toHaveAttribute("href", decorativePreviewUrl);
 });
 
@@ -5982,11 +5982,11 @@ test.each(["absent", "unavailable"] as const)(
           )}
           onProjectionChange={() => undefined}
         />,
-      ).getByLabelText("Prévia do padrão visual do Álbum"),
+      ).getByLabelText("Prévia do padrão visual do álbum"),
     );
 
     expect(
-      albumDesign.getByLabelText("Overlay de ambos os lados"),
+      albumDesign.getByLabelText("Sobreposição de ambos os lados"),
     ).toHaveAttribute("data-preview-state", state);
   },
 );
@@ -6009,14 +6009,14 @@ test("keeps a retained Decorative preview while preserving unavailable state", (
         )}
         onProjectionChange={() => undefined}
       />,
-    ).getByLabelText("Prévia do padrão visual do Álbum"),
+    ).getByLabelText("Prévia do padrão visual do álbum"),
   );
 
   expect(
-    albumDesign.getByLabelText("Overlay de ambos os lados"),
+    albumDesign.getByLabelText("Sobreposição de ambos os lados"),
   ).toHaveAttribute("data-preview-state", "unavailable");
   expect(
-    albumDesign.getByLabelText("Overlay de ambos os lados"),
+    albumDesign.getByLabelText("Sobreposição de ambos os lados"),
   ).toHaveAttribute("href", decorativePreviewUrl);
 });
 
@@ -6164,13 +6164,13 @@ test("resizes both workspace panels and persists only completed drags", async ()
     />,
   );
 
-  expect(screen.queryByText("Canvas contÃ­nuo")).not.toBeInTheDocument();
+  expect(screen.queryByText("área de edição contÃ­nuo")).not.toBeInTheDocument();
 
   const verticalSplitter = screen.getByRole("separator", {
-    name: "Redimensionar Painel contextual",
+    name: "Redimensionar painel contextual",
   });
   const horizontalSplitter = screen.getByRole("separator", {
-    name: "Redimensionar Painel de imagens",
+    name: "Redimensionar painel de imagens",
   });
   const workspace = verticalSplitter.parentElement!;
   vi.spyOn(workspace, "getBoundingClientRect").mockReturnValue({
@@ -6224,7 +6224,7 @@ test("resizes both workspace panels and persists only completed drags", async ()
     expect(
       screen
         .getByRole("separator", {
-          name: "Redimensionar Painel contextual",
+          name: "Redimensionar painel contextual",
         })
         .parentElement?.getAttribute("style"),
     ).toContain("--inspector-width: 350px"),
@@ -6245,7 +6245,7 @@ test("commits a slider zoom once without flashing a global busy state", async ()
     />,
   );
 
-  const slider = screen.getByRole("slider", { name: "Zoom da Foto" });
+  const slider = screen.getByRole("slider", { name: "Zoom da foto" });
   const exportButton = screen.getByRole("button", {
     name: "Exportar",
   });
@@ -6285,11 +6285,11 @@ test.each(["apply", "cancel", "invalid", "reset"])("individual numeric Zoom pres
   useEditorView.setState({ selectedFrameIds: ["frame-001"] });
   render(<ProjectWorkspace exportPipelinePort={exportPipelinePort} projection={initial}
     projectCorePort={projectCorePortWithApply(apply)} onProjectionChange={() => undefined} />);
-  const field = screen.getByRole("spinbutton", { name: "Zoom da Foto em porcentagem" });
+  const field = screen.getByRole("spinbutton", { name: "Zoom da foto em porcentagem" });
   expect(field).toHaveValue("150");
   expect(field).toHaveAttribute("autocomplete", "off");
   if (action === "reset") {
-    const slider = screen.getByRole("slider", { name: "Zoom da Foto" });
+    const slider = screen.getByRole("slider", { name: "Zoom da foto" });
     await waitFor(() => expect(slider).toBeEnabled());
     fireEvent.doubleClick(slider);
   } else {
@@ -6321,7 +6321,7 @@ test("updates the contextual Zoom slider during a Canvas gesture", () => {
     />,
   );
 
-  const slider = screen.getByRole("slider", { name: "Zoom da Foto" });
+  const slider = screen.getByRole("slider", { name: "Zoom da foto" });
   expect(slider).toHaveValue("100");
 
   act(() => {
@@ -6334,7 +6334,7 @@ test("updates the contextual Zoom slider during a Canvas gesture", () => {
   });
 
   expect(slider).toHaveValue("125");
-  expect(screen.getByText("Pan horizontal").parentElement).toHaveTextContent(
+  expect(screen.getByText("Posição horizontal").parentElement).toHaveTextContent(
     "35%",
   );
   expect(apply).not.toHaveBeenCalled();
@@ -6344,7 +6344,7 @@ test("updates the contextual Zoom slider during a Canvas gesture", () => {
   });
 
   expect(slider).toHaveValue("100");
-  expect(screen.getByText("Pan horizontal").parentElement).toHaveTextContent(
+  expect(screen.getByText("Posição horizontal").parentElement).toHaveTextContent(
     "0%",
   );
 });
@@ -6367,7 +6367,7 @@ test("discards a live Canvas value when its commit fails", async () => {
     />,
   );
 
-  const slider = screen.getByRole("slider", { name: "Zoom da Foto" });
+  const slider = screen.getByRole("slider", { name: "Zoom da foto" });
   act(() => {
     canvasHarness.props?.onTransformPreview?.({
       frameId: "frame-001",
@@ -6425,7 +6425,7 @@ test("does not let an old Project completion clear a new slider draft", async ()
     />,
   );
   const oldSlider = screen.getByRole("slider", {
-    name: "Zoom da Foto",
+    name: "Zoom da foto",
   });
   await waitFor(() => expect(oldSlider).toBeEnabled());
   oldSlider.setPointerCapture = vi.fn();
@@ -6445,7 +6445,7 @@ test("does not let an old Project completion clear a new slider draft", async ()
   );
   act(() => useEditorView.setState({ selectedFrameIds: ["frame-001"] }));
   const newSlider = screen.getByRole("slider", {
-    name: "Zoom da Foto",
+    name: "Zoom da foto",
   });
   await waitFor(() => expect(newSlider).toBeEnabled());
   newSlider.setPointerCapture = vi.fn();
@@ -6595,7 +6595,7 @@ test.each((["files", "folder"] as const).flatMap((source) =>
     await waitFor(() => expect(dialogs.dismiss).toHaveBeenCalled());
     if (outcome === "completed") {
       expect(dialogs.present).toHaveBeenCalledTimes(3);
-      expect(screen.queryByText("12 Fotos importadas.")).not.toBeInTheDocument();
+      expect(screen.queryByText("12 fotos importadas.")).not.toBeInTheDocument();
     } else {
       expect(dialogs.present).toHaveBeenLastCalledWith({ kind: "projectOperationFailure", message: "Falha na importação." });
       expect(dialogs.dismiss.mock.invocationCallOrder[0]).toBeLessThan(dialogs.present.mock.invocationCallOrder[dialogs.present.mock.calls.length - 1]);
@@ -6625,7 +6625,7 @@ test.each([0, 12])("completes import with %i new Photos without a success dialog
   await waitFor(() => expect(screen.getByRole("button", { name: "Importar" })).toBeEnabled());
   expect(port.importMedia).toHaveBeenCalledOnce();
   expect(dialogs.present).not.toHaveBeenCalled();
-  expect(screen.queryByText("12 Fotos importadas.")).not.toBeInTheDocument();
+  expect(screen.queryByText("12 fotos importadas.")).not.toBeInTheDocument();
 });
 
 test("the connected media panel preserves a group and its anchor through ordering and filters", () => {
@@ -6643,7 +6643,7 @@ test("the connected media panel preserves a group and its anchor through orderin
   fireEvent.change(screen.getByRole("combobox", { name: "Ordenar por" }), { target: { value: "name-descending" } });
   expect(first).toHaveAttribute("aria-pressed", "true");
   expect(second).toHaveAttribute("aria-pressed", "true");
-  const search = screen.getByRole("searchbox", { name: "Buscar Fotos" });
+  const search = screen.getByRole("searchbox", { name: "Buscar fotos" });
   fireEvent.change(search, { target: { value: "campo" } });
   expect(first).toHaveAttribute("aria-pressed", "true");
   fireEvent.change(search, { target: { value: "" } });
@@ -6654,12 +6654,12 @@ test("the connected media panel preserves a group and its anchor through orderin
 test("hiding the media panel preserves the search and selection for the open window", () => {
   render(<ProjectWorkspace exportPipelinePort={exportPipelinePort} projection={projection}
     projectCorePort={projectCorePortWithApply(async () => projection)} onProjectionChange={vi.fn()} />);
-  fireEvent.change(screen.getByRole("searchbox", { name: "Buscar Fotos" }), { target: { value: "Campo" } });
+  fireEvent.change(screen.getByRole("searchbox", { name: "Buscar fotos" }), { target: { value: "Campo" } });
   fireEvent.click(screen.getByRole("button", { name: "Campo.jpg" }));
   fireEvent.click(getApplicationCommand("Exibir", "Painel de imagens"));
   expect(screen.queryByRole("region", { name: "Painel de imagens" })).not.toBeInTheDocument();
   fireEvent.click(getApplicationCommand("Exibir", "Painel de imagens"));
-  expect(screen.getByRole("searchbox", { name: "Buscar Fotos" })).toHaveValue("Campo");
+  expect(screen.getByRole("searchbox", { name: "Buscar fotos" })).toHaveValue("Campo");
   expect(screen.getByRole("button", { name: "Campo.jpg" })).toHaveAttribute("aria-pressed", "true");
 });
 
@@ -6670,12 +6670,12 @@ test("restores the active media tab in a new window without restoring its search
     onProjectionChange: vi.fn(), workspacePreferences: { kind: "persistent" as const, port: preferences } };
   const first = render(<ProjectWorkspace {...props} />);
   fireEvent.click(screen.getByRole("button", { name: "Decorativos" }));
-  fireEvent.change(screen.getByRole("searchbox", { name: "Buscar Decorativos" }), { target: { value: "dourado" } });
+  fireEvent.change(screen.getByRole("searchbox", { name: "Buscar decorativos" }), { target: { value: "dourado" } });
   await act(async () => {});
   first.unmount();
   render(<ProjectWorkspace {...props} />);
   await waitFor(() => expect(screen.getByRole("button", { name: "Decorativos" })).toHaveAttribute("aria-pressed", "true"));
-  expect(screen.getByRole("searchbox", { name: "Buscar Decorativos" })).toHaveValue("");
+  expect(screen.getByRole("searchbox", { name: "Buscar decorativos" })).toHaveValue("");
   expect(props.onProjectionChange).not.toHaveBeenCalled();
 });
 
@@ -6817,7 +6817,7 @@ test("Delete respects text focus and an unused Photo selection is removed direct
   const panel = screen.getByRole("region", { name: "Painel de imagens" });
   const photos = within(panel).getAllByRole("button").filter((button) => button.hasAttribute("data-media-id"));
   fireEvent.click(photos[0]);
-  fireEvent.keyDown(screen.getByRole("searchbox", { name: "Buscar Fotos" }), { key: "Delete" });
+  fireEvent.keyDown(screen.getByRole("searchbox", { name: "Buscar fotos" }), { key: "Delete" });
   fireEvent.keyDown(document.body, { key: "Delete" });
   expect(apply).not.toHaveBeenCalled();
   fireEvent.contextMenu(photos[1], { clientX: 80, clientY: 500 });
@@ -6862,7 +6862,7 @@ test("starts Exportação for the Canvas-centered Lâmina even while focus remai
     canvasHarness.props?.onCenteredSheetChange?.("sheet-002");
   });
   expect(useEditorView.getState().focusedSheetId).toBe("sheet-001");
-  const exportAction = getApplicationCommand("Arquivo", "Exportar Lâmina…");
+  const exportAction = getApplicationCommand("Arquivo", "Exportar lâmina…");
   await act(async () => { fireEvent.click(exportAction); });
 
   expect(startSheet).toHaveBeenCalledWith(
@@ -7031,7 +7031,7 @@ test.each(["menu", "shortcut"])("New and Open from %s preserve the active Projec
   render(<ProjectWorkspace projection={projection} projectCorePort={projectCorePortWithApply(apply)}
     projectLauncher={launch} onProjectionChange={update} />);
   const view = useEditorView.getState();
-  for (const [key, label, method] of [["n", "Novo Projeto…", "newProject"], ["o", "Abrir Projeto…", "openProject"]] as const) {
+  for (const [key, label, method] of [["n", "Novo projeto…", "newProject"], ["o", "Abrir projeto…", "openProject"]] as const) {
     if (source === "menu") fireEvent.click(getApplicationCommand("Arquivo", label));
     else fireEvent.keyDown(window, { key, ctrlKey: true });
     await waitFor(() => expect(launch[method]).toHaveBeenCalledOnce());
@@ -7060,10 +7060,10 @@ test.each(["menu", "context"])("requires the owned loss confirmation for edge co
     fireEvent.click(getApplicationCommand("Lâmina", "Converter extremidade"));
   } else {
     act(() => canvasHarness.props?.onOpenSheetContextMenu?.("sheet-003", { x: 240, y: 180 }));
-    fireEvent.click(within(screen.getByRole("menu", { name: "Ações da Lâmina 03" })).getByRole("menuitem", { name: "Converter extremidade" }));
+    fireEvent.click(within(screen.getByRole("menu", { name: "Ações da lâmina 03" })).getByRole("menuitem", { name: "Converter extremidade" }));
   }
   await waitFor(() => expect(dialog.present).toHaveBeenCalledWith({ kind: "edgeConversionConfirmation",
-    message: "O Overlay personalizado da página direita da Lâmina 3 será removido." }));
+    message: "O sobreposição personalizado da página direita da lâmina 3 será removido." }));
   expect(apply).not.toHaveBeenCalled();
   await act(async () => { dialog.emit("confirmEdgeConversion"); });
   await waitFor(() => expect(apply).toHaveBeenCalledWith({ kind: "convertEdgeSheet", sheetId: "sheet-003" }, expect.any(Function)));

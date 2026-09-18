@@ -55,10 +55,10 @@ test("renders a pending Background preview as a shared media fallback", () => {
 
   expect(view.container.querySelector("image")).toBeNull();
   expect(
-    screen.getByLabelText("Background de ambos os lados"),
+    screen.getByLabelText("Fundo de ambos os lados"),
   ).toHaveAttribute("data-preview-state", "pending");
   expect(
-    screen.getByLabelText("Background de ambos os lados"),
+    screen.getByLabelText("Fundo de ambos os lados"),
   ).toHaveAttribute("fill", "#D8DEE2");
 });
 
@@ -84,7 +84,7 @@ test("renders an absent Background preview as the shared media fallback", () => 
   renderDecorativePreview({ background: { state: "absent" } });
 
   expect(
-    screen.getByLabelText("Background de ambos os lados"),
+    screen.getByLabelText("Fundo de ambos os lados"),
   ).toHaveAttribute("data-preview-state", "absent");
 });
 
@@ -94,19 +94,19 @@ test("renders an unavailable Overlay without a retained preview as the shared ou
     overlay: { state: "unavailable", url: null },
   });
 
-  expect(screen.getByLabelText("Overlay de ambos os lados")).toHaveAttribute(
+  expect(screen.getByLabelText("Sobreposição de ambos os lados")).toHaveAttribute(
     "data-preview-state",
     "unavailable",
   );
-  expect(screen.getByLabelText("Overlay de ambos os lados")).toHaveAttribute(
+  expect(screen.getByLabelText("Sobreposição de ambos os lados")).toHaveAttribute(
     "stroke",
     "#2f7fba",
   );
-  expect(screen.getByLabelText("Overlay de ambos os lados")).toHaveAttribute(
+  expect(screen.getByLabelText("Sobreposição de ambos os lados")).toHaveAttribute(
     "rx",
     "2000",
   );
-  expect(screen.getByLabelText("Overlay de ambos os lados")).toHaveAttribute(
+  expect(screen.getByLabelText("Sobreposição de ambos os lados")).toHaveAttribute(
     "stroke-width",
     "2000",
   );
@@ -137,6 +137,6 @@ test("never renders an image with an empty ready URL", () => {
 
   expect(view.container.querySelector("image")).toBeNull();
   expect(
-    screen.getByLabelText("Background de ambos os lados"),
+    screen.getByLabelText("Fundo de ambos os lados"),
   ).toHaveAttribute("data-preview-state", "ready");
 });

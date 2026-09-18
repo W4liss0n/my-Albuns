@@ -65,7 +65,7 @@ export function MediaPanelToolbar({
   const rootRef = useRef<HTMLDivElement>(null);
   const optionsButtonRef = useRef<HTMLButtonElement>(null);
   const activeKindLabel =
-    activeMediaKind === "photo" ? "Fotos" : "Decorativos";
+    activeMediaKind === "photo" ? "fotos" : "decorativos";
 
   useDismissableSurface({
     enabled: openPopup !== null,
@@ -111,7 +111,7 @@ export function MediaPanelToolbar({
           onClick={() => changeMediaKind("photo")}
         >
           <AppIcon icon={ImageIcon} size={16} />
-          {missingCounts.photo > 0 && <span className="media-missing-badge" aria-label={`${missingCounts.photo} Fotos com arquivo ausente`}>{missingCounts.photo}</span>}
+          {missingCounts.photo > 0 && <span className="media-missing-badge" aria-label={`${missingCounts.photo} fotos com arquivo ausente`}>{missingCounts.photo}</span>}
         </button>
         <button
           aria-label="Decorativos"
@@ -122,7 +122,7 @@ export function MediaPanelToolbar({
           onClick={() => changeMediaKind("decorative")}
         >
           <AppIcon icon={SlidersHorizontal} size={14} />
-          {missingCounts.decorative > 0 && <span className="media-missing-badge" aria-label={`${missingCounts.decorative} Decorativos com arquivo ausente`}>{missingCounts.decorative}</span>}
+          {missingCounts.decorative > 0 && <span className="media-missing-badge" aria-label={`${missingCounts.decorative} decorativos com arquivo ausente`}>{missingCounts.decorative}</span>}
         </button>
       </div>
 

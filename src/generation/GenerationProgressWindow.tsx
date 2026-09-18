@@ -19,11 +19,11 @@ export function GenerationProgressWindow({ port }: { port: Pick<ProjectGeneratio
   }, [port]);
   const cancel = () => { setCancelled(true); void port.cancel().catch(() => setCancelled(false)); };
   return <OwnedWindowShell width={400}>{failed ? <MessageDialog tone="error" title="Progresso indisponível" description="Cancele a geração e tente novamente." primaryAction={{ label: "Cancelar", disabled: cancelled, onClick: cancel }} /> : <ProgressDialog
-    title="Gerando Projetos"
+    title="Gerando projetos"
     reserveProgressMeta
     progress={progress?.total == null ? { kind: "indeterminate", status: null } : {
       kind: "determinate", completed: progress.completed, total: progress.total,
-      countLabel: `${progress.completed} ${progress.completed === 1 ? "Projeto" : "Projetos"} de ${progress.total}`,
+      countLabel: `${progress.completed} ${progress.completed === 1 ? "projeto" : "projetos"} de ${progress.total}`,
     }}
     cancelAction={{ label: "Cancelar", disabled: cancelled, onClick: cancel }}
   />}</OwnedWindowShell>;

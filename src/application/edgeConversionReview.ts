@@ -10,8 +10,8 @@ export function edgeConversionLoss(
 }
 
 export function edgeConversionLossDescription(loss: EdgeConversionLoss): string {
-  const subject = loss.background && loss.overlay ? "Background e Overlay personalizados"
-    : loss.background ? "O Background personalizado" : "O Overlay personalizado";
+  const subject = loss.background && loss.overlay ? "Fundo e sobreposição personalizados"
+    : loss.background ? "O fundo personalizado" : "O sobreposição personalizado";
   const verb = loss.background && loss.overlay ? "serão removidos" : "será removido";
-  return `${subject} da página ${loss.side === "left" ? "esquerda" : "direita"} da Lâmina ${loss.sheetNumber} ${verb}.`;
+  return `${subject} da página ${loss.side === "left" ? "esquerda" : "direita"} da lâmina ${loss.sheetNumber} ${verb}.`;
 }

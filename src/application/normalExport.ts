@@ -4,7 +4,7 @@ import type { NormalExportOptions } from "../contracts/generated/NormalExportOpt
 export type { ExportSheetInfo } from "../contracts/generated/ExportSheetInfo";
 
 export class ExportConflictsError extends Error {
-  constructor(readonly files: string[]) { super("Já existem arquivos no destino da Exportação."); }
+  constructor(readonly files: string[]) { super("Já existem arquivos no destino da exportação."); }
 }
 
 export function parseNormalExportOptions(value: unknown): NormalExportOptions | null {

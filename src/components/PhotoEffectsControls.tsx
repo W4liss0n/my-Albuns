@@ -18,7 +18,7 @@ export function PhotoEffectsControls({ frames, disabled, onToggleBlackAndWhite }
     <div className="photo-effects-controls">
       {frames.length > 1 && (
         <p className="photo-effects-scope">
-          Aplicado a {photos.length} {photos.length === 1 ? "Foto" : "Fotos"} de {frames.length} Frames
+          Aplicado a {photos.length} {photos.length === 1 ? "foto" : "fotos"} de {frames.length} quadros
         </p>
       )}
       <ActionButton className="photo-effect-control" density="compact" aria-pressed={enabled}

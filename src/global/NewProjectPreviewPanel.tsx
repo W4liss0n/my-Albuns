@@ -38,7 +38,7 @@ export function NewProjectPreviewPanel({
 
   return (
     <section
-      aria-label="Prévia da Lâmina aberta"
+      aria-label="Prévia da lâmina aberta"
       className="new-project-preview-panel"
       onClick={() => outsideSurfaceAction?.onPress()}
     >
@@ -56,7 +56,7 @@ export function NewProjectPreviewPanel({
           {formatMicrometers(geometry.widthUm, draft.displayUnit)} ×{" "}
           {draft.sheetHeight.text} {displayUnitLabel(draft.displayUnit)}
         </strong>
-        <span>· {draft.sheetCountText || "0"} Lâminas</span>
+        <span>· {draft.sheetCountText || "0"} lâminas</span>
         <span className="new-project-guide new-project-guide--bleed">
           sangria
         </span>
@@ -92,7 +92,7 @@ export function NewProjectPreviewPanel({
         </ProportionalPreviewViewport>
       </div>
       <p className="new-project-preview-caption">
-        Proporção real da Lâmina aberta.
+        Proporção real da lâmina aberta.
       </p>
     </section>
   );

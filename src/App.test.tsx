@@ -79,7 +79,7 @@ vi.mock("./components/AlbumCanvas", () => ({
         />
         <button
           type="button"
-          aria-label="Esvaziar demanda de Canvas"
+          aria-label="Esvaziar demanda de área de edição"
           onClick={() =>
             onMediaDemandChange?.({
               visibleMediaIds: [],
@@ -126,11 +126,11 @@ const projectCorePort: ProjectCorePort = {
     validateMediaFolderName: async () => { throw new Error("Folder validation is not configured in this fixture."); },
     queryLayouts: async () => { throw new Error("Layouts are not configured in this fixture."); },
     previewLayout: async () => { throw new Error("Layouts are not configured in this fixture."); },
-    previewFrameStyle: async () => { throw new Error("Frame style preview is not configured in this fixture."); },
+    previewFrameStyle: async () => { throw new Error("Quadro style preview is not configured in this fixture."); },
     previewDecorativeDrop: async () => { throw new Error("Decorative preview is not configured in this fixture."); },
-    previewPhotoZoom: async () => { throw new Error("Photo Zoom preview is not configured in this fixture."); },
+    previewPhotoZoom: async () => { throw new Error("Photo zoom preview is not configured in this fixture."); },
     previewPhotoAngle: async () => { throw new Error("Photo angle preview is not configured in this fixture."); },
-    previewFrameGeometry: async () => { throw new Error("Frame geometry preview is not configured in this fixture."); },
+    previewFrameGeometry: async () => { throw new Error("Quadro geometry preview is not configured in this fixture."); },
   resolvePhotoDropTarget: async () => ({ kind: "invalid" }),
   replaceImage: async () => projection, relink: async () => projection,
   undo: async () => projection,
@@ -198,7 +198,7 @@ const canvasGraphicsDiagnosticProbe = () =>
   ({
     supported: true,
     renderer: "NVIDIA GeForce RTX",
-    reason: "WebGL2 acelerado por hardware confirmado.",
+    reason: "A aceleração gráfica está disponível.",
     limits: {
       maxTextureSizePx: 16_384,
       maxRenderbufferSizePx: 16_384,
@@ -340,7 +340,7 @@ test("surfaces the durable Save As terminal when the previous WebView is restore
       expect(dialog.present).toHaveBeenCalledWith({
         kind: "projectOperationFailure",
         message:
-          "Não foi possível confirmar o destino de Salvar como. A Sessão anterior foi mantida; reinspecione o destino antes de reutilizá-lo.",
+          "Não foi possível confirmar se a cópia foi salva. O projeto anterior continua aberto. Confira o arquivo no destino escolhido antes de tentar novamente.",
       }),
     );
   } finally {
@@ -388,7 +388,7 @@ test("reports a defensive Project Canvas failure without claiming that no Sessio
   );
   expect(
     screen.queryByRole("heading", {
-      name: "O Canvas não pôde ser iniciado",
+      name: "Não foi possível iniciar o editor",
     }),
   ).not.toBeInTheDocument();
 
@@ -430,7 +430,7 @@ test("opens the Project in the real workspace when hardware WebGL2 is available"
       graphicsProbe={() => ({
         supported: true,
         renderer: "NVIDIA GeForce RTX",
-        reason: "WebGL2 acelerado por hardware confirmado.",
+        reason: "A aceleração gráfica está disponível.",
         limits: {
           maxTextureSizePx: 16_384,
           maxRenderbufferSizePx: 16_384,
@@ -528,7 +528,7 @@ test("confirms Project UI readiness only after shared preferences hydrate", asyn
       graphicsProbe={() => ({
         supported: true,
         renderer: "NVIDIA GeForce RTX",
-        reason: "WebGL2 acelerado por hardware confirmado.",
+        reason: "A aceleração gráfica está disponível.",
         limits: {
           maxTextureSizePx: 16_384,
           maxRenderbufferSizePx: 16_384,
@@ -692,7 +692,7 @@ test("prepares real media previews after opening without blocking the Workspace"
       graphicsProbe={() => ({
         supported: true,
         renderer: "NVIDIA GeForce RTX",
-        reason: "WebGL2 acelerado por hardware confirmado.",
+        reason: "A aceleração gráfica está disponível.",
         limits: {
           maxTextureSizePx: 16_384,
           maxRenderbufferSizePx: 16_384,
@@ -830,7 +830,7 @@ test("shows previously loaded Panel photos immediately after scrolling away and 
     }
   });
   try {
-    await screen.findByRole("group", { name: "Grade de Fotos" });
+    await screen.findByRole("group", { name: "Grade de fotos" });
     scrollTo(top.mediaId);
     await waitFor(() => expect(requests[requests.length - 1]?.demand.visibleMediaIds).toContain(top.mediaId));
     await act(async () => requests[requests.length - 1].finish([top]));
@@ -940,7 +940,7 @@ test("reprepares demanded media when the stable Monitor reports a change", async
       graphicsProbe={() => ({
         supported: true,
         renderer: "NVIDIA GeForce RTX",
-        reason: "WebGL2 acelerado por hardware confirmado.",
+        reason: "A aceleração gráfica está disponível.",
         limits: {
           maxTextureSizePx: 16_384,
           maxRenderbufferSizePx: 16_384,
@@ -1007,7 +1007,7 @@ test("keeps the last known preview when linked media becomes unavailable", async
       graphicsProbe={() => ({
         supported: true,
         renderer: "NVIDIA GeForce RTX",
-        reason: "WebGL2 acelerado por hardware confirmado.",
+        reason: "A aceleração gráfica está disponível.",
         limits: {
           maxTextureSizePx: 16_384,
           maxRenderbufferSizePx: 16_384,
@@ -1068,7 +1068,7 @@ test("keeps the last representation only as visual context when the Original is 
       graphicsProbe={() => ({
         supported: true,
         renderer: "NVIDIA GeForce RTX",
-        reason: "WebGL2 acelerado por hardware confirmado.",
+        reason: "A aceleração gráfica está disponível.",
         limits: {
           maxTextureSizePx: 16_384,
           maxRenderbufferSizePx: 16_384,
@@ -1119,7 +1119,7 @@ test("shows the canonical Project warning when repeated processor failures suspe
       graphicsProbe={() => ({
         supported: true,
         renderer: "NVIDIA GeForce RTX",
-        reason: "WebGL2 acelerado por hardware confirmado.",
+        reason: "A aceleração gráfica está disponível.",
         limits: {
           maxTextureSizePx: 16_384,
           maxRenderbufferSizePx: 16_384,
@@ -1134,7 +1134,7 @@ test("shows the canonical Project warning when repeated processor failures suspe
     warnCacheSuspended?.({
       state: "suspended",
       message:
-        "O Cache foi suspenso após falhas repetidas do Processador de Imagens.",
+        "O prévias temporárias foi suspenso após falhas repetidas do Processador de imagens.",
     }),
   );
 
@@ -1142,7 +1142,7 @@ test("shows the canonical Project warning when repeated processor failures suspe
     expect(dialog.present).toHaveBeenCalledWith({
       kind: "projectOperationFailure",
       message:
-        "O Cache foi suspenso após falhas repetidas do Processador de Imagens.",
+        "O prévias temporárias foi suspenso após falhas repetidas do Processador de imagens.",
     }),
   );
   expect(screen.getByRole("button", { name: "Exportar" })).toBeEnabled();
@@ -1195,7 +1195,7 @@ test("registers the Cache warning listener before the first preview demand", asy
     warnCacheSuspended?.({
       state: "suspended",
       message:
-        "O Cache foi suspenso após falhas repetidas do Processador de Imagens.",
+        "O prévias temporárias foi suspenso após falhas repetidas do Processador de imagens.",
     });
     return [];
   });
@@ -1226,7 +1226,7 @@ test("registers the Cache warning listener before the first preview demand", asy
       graphicsProbe={() => ({
         supported: true,
         renderer: "NVIDIA GeForce RTX",
-        reason: "WebGL2 acelerado por hardware confirmado.",
+        reason: "A aceleração gráfica está disponível.",
         limits: {
           maxTextureSizePx: 16_384,
           maxRenderbufferSizePx: 16_384,
@@ -1286,7 +1286,7 @@ test("registers the media-change listener before the first preview demand", asyn
       graphicsProbe={() => ({
         supported: true,
         renderer: "NVIDIA GeForce RTX",
-        reason: "WebGL2 acelerado por hardware confirmado.",
+        reason: "A aceleração gráfica está disponível.",
         limits: {
           maxTextureSizePx: 16_384,
           maxRenderbufferSizePx: 16_384,
@@ -1365,7 +1365,7 @@ test("keeps the newest media projection when equal-revision refreshes resolve ou
       graphicsProbe={() => ({
         supported: true,
         renderer: "NVIDIA GeForce RTX",
-        reason: "WebGL2 acelerado por hardware confirmado.",
+        reason: "A aceleração gráfica está disponível.",
         limits: {
           maxTextureSizePx: 16_384,
           maxRenderbufferSizePx: 16_384,
@@ -1427,7 +1427,7 @@ test("keeps recovery actions hidden until the first authoritative media observat
       graphicsProbe={() => ({
         supported: true,
         renderer: "NVIDIA GeForce RTX",
-        reason: "WebGL2 acelerado por hardware confirmado.",
+        reason: "A aceleração gráfica está disponível.",
         limits: {
           maxTextureSizePx: 16_384,
           maxRenderbufferSizePx: 16_384,
@@ -1447,7 +1447,7 @@ test("keeps recovery actions hidden until the first authoritative media observat
     screen.queryByRole("button", { name: /Tentar novamente o arquivo de/i }),
   ).not.toBeInTheDocument();
   expect(
-    screen.queryByRole("button", { name: /Religar arquivo de/i }),
+    screen.queryByRole("button", { name: /Localizar imagem… arquivo de/i }),
   ).not.toBeInTheDocument();
   expect(screen.getByTestId("album-canvas")).toHaveAttribute(
     "data-media-preview",
@@ -1542,7 +1542,7 @@ test("retries an unavailable occurrence explicitly and refreshes it without Reli
       graphicsProbe={() => ({
         supported: true,
         renderer: "NVIDIA GeForce RTX",
-        reason: "WebGL2 acelerado por hardware confirmado.",
+        reason: "A aceleração gráfica está disponível.",
         limits: {
           maxTextureSizePx: 16_384,
           maxRenderbufferSizePx: 16_384,
@@ -1624,7 +1624,7 @@ test("keeps retry actionable after an unavailable-media IPC failure without muta
       graphicsProbe={() => ({
         supported: true,
         renderer: "NVIDIA GeForce RTX",
-        reason: "WebGL2 acelerado por hardware confirmado.",
+        reason: "A aceleração gráfica está disponível.",
         limits: {
           maxTextureSizePx: 16_384,
           maxRenderbufferSizePx: 16_384,
@@ -1709,7 +1709,7 @@ test("replaces unavailable retry with a cache-only failure after authoritative r
       graphicsProbe={() => ({
         supported: true,
         renderer: "NVIDIA GeForce RTX",
-        reason: "WebGL2 acelerado por hardware confirmado.",
+        reason: "A aceleração gráfica está disponível.",
         limits: {
           maxTextureSizePx: 16_384,
           maxRenderbufferSizePx: 16_384,
@@ -1735,7 +1735,7 @@ test("replaces unavailable retry with a cache-only failure after authoritative r
     screen.queryByRole("button", { name: /Tentar novamente o arquivo de/i }),
   ).not.toBeInTheDocument();
   expect(
-    screen.queryByRole("button", { name: /Religar arquivo de/i }),
+    screen.queryByRole("button", { name: /Localizar imagem… arquivo de/i }),
   ).not.toBeInTheDocument();
   expect(retryUnavailableMedia).not.toHaveBeenCalled();
   expect(relink).not.toHaveBeenCalled();
@@ -1767,7 +1767,7 @@ test("keeps one Monitor subscription while demand revisions change", async () =>
       graphicsProbe={() => ({
         supported: true,
         renderer: "NVIDIA GeForce RTX",
-        reason: "WebGL2 acelerado por hardware confirmado.",
+        reason: "A aceleração gráfica está disponível.",
         limits: {
           maxTextureSizePx: 16_384,
           maxRenderbufferSizePx: 16_384,
@@ -1779,7 +1779,7 @@ test("keeps one Monitor subscription while demand revisions change", async () =>
 
   await waitFor(() => expect(prepareMediaPreviews).toHaveBeenCalledOnce());
   fireEvent.click(
-    screen.getByRole("button", { name: "Esvaziar demanda de Canvas" }),
+    screen.getByRole("button", { name: "Esvaziar demanda de área de edição" }),
   );
   await waitFor(() => expect(prepareMediaPreviews).toHaveBeenCalledTimes(2));
 
@@ -1824,7 +1824,7 @@ test("cancels resident media demand when runtime graphics become unavailable", a
       graphicsProbe={() => ({
         supported: true,
         renderer: "NVIDIA GeForce RTX",
-        reason: "WebGL2 acelerado por hardware confirmado.",
+        reason: "A aceleração gráfica está disponível.",
         limits: {
           maxTextureSizePx: 16_384,
           maxRenderbufferSizePx: 16_384,
@@ -1854,7 +1854,7 @@ test("cancels resident media demand when runtime graphics become unavailable", a
   ).toBeDisabled();
   expect(screen.getByTestId("album-canvas")).toBeInTheDocument();
   expect(
-    screen.queryByRole("heading", { name: /O Canvas/ }),
+    screen.queryByRole("heading", { name: /O área de edição/ }),
   ).not.toBeInTheDocument();
   await waitFor(() => expect(prepareMediaPreviews).toHaveBeenCalledTimes(2));
   expect(prepareMediaPreviews).toHaveBeenNthCalledWith(2, {
@@ -2026,7 +2026,7 @@ test("logs the typed media preview failure code without replacing it with unknow
     write: (event) => logEvents.push(event),
   };
   const failure = Object.assign(
-    new Error("A Imagem decorativa vinculada não está disponível."),
+    new Error("A imagem decorativa vinculada não está disponível."),
     { code: "unavailable" },
   );
   const prepareMediaPreviews = vi.fn(async () => {
@@ -2053,7 +2053,7 @@ test("logs the typed media preview failure code without replacing it with unknow
       graphicsProbe={() => ({
         supported: true,
         renderer: "NVIDIA GeForce RTX",
-        reason: "WebGL2 acelerado por hardware confirmado.",
+        reason: "A aceleração gráfica está disponível.",
         limits: {
           maxTextureSizePx: 16_384,
           maxRenderbufferSizePx: 16_384,
@@ -2081,7 +2081,7 @@ test("keeps a created Project usable while reporting initial image cache problem
   const problem = { fileName: "Fundo.png", reason: "A imagem foi vinculada, mas sua prévia não pôde ser preparada." };
   let warn: Parameters<MediaPreviewPort["onCacheProcessorWarning"]>[0] | undefined;
   const confirmUiReady = vi.fn(async () => {
-    warn?.({ state: "suspended", message: "O Cache foi suspenso." });
+    warn?.({ state: "suspended", message: "O prévias temporárias foi suspenso." });
     return [problem];
   });
   render(<App
@@ -2099,7 +2099,7 @@ test("keeps a created Project usable while reporting initial image cache problem
     logger={silentLogger}
   />);
   await waitFor(() => expect(dialog.present).toHaveBeenCalledWith({
-    kind: "projectOperationFailure", message: "O Cache foi suspenso.",
+    kind: "projectOperationFailure", message: "O prévias temporárias foi suspenso.",
   }));
   act(() => dialog.emit("dismissProjectOperationFailure"));
   await waitFor(() => expect(dialog.present).toHaveBeenCalledWith({
@@ -2347,7 +2347,7 @@ test.each(["ready", "decode_failed", "native_unavailable", "storage_paused"] as 
       graphicsProbe={canvasGraphicsDiagnosticProbe}
       canvasGraphicsDiagnosticProbe={canvasGraphicsDiagnosticProbe} logger={silentLogger}
     />);
-    const grid = await screen.findByRole("group", { name: "Grade de Fotos" });
+    const grid = await screen.findByRole("group", { name: "Grade de fotos" });
     Object.defineProperties(grid, {
       clientWidth: { value: 600 }, clientHeight: { value: 200 },
     });
@@ -2371,7 +2371,7 @@ test.each(["ready", "decode_failed", "native_unavailable", "storage_paused"] as 
     const secondHasPreview = outcome !== "native_unavailable" && outcome !== "storage_paused";
     await waitFor(() => expect(decodeReady.size).toBe(secondHasPreview ? 2 : 1));
     fireEvent.click(screen.getByRole("menuitem", { name: "Arquivo" }));
-    fireEvent.click(screen.getByRole("menuitem", { name: "Fechar Projeto" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Fechar projeto" }));
     expect(close).not.toHaveBeenCalled();
     expect(screen.queryByRole("button", { name: "Batch 1.jpg" })).not.toBeInTheDocument();
     expect(dialog.dismiss).not.toHaveBeenCalled();

@@ -47,15 +47,15 @@ export function LayoutPanel({ controller, sheet, catalog }: LayoutPanelProps) {
   const counts = range ? Array.from({ length: range.maximum - range.minimum + 1 }, (_, index) => range.minimum + index) : [];
   if (!counts.includes(controller.positionCount)) counts.push(controller.positionCount);
   const emptyMessage = query?.listing.generationStatus === "empty"
-    ? "Escolha a quantidade de Frames para preparar um Layout."
+    ? "Escolha quantos quadros o layout deve ter."
     : query?.listing.generationStatus === "outsideCoverage"
-      ? "As sugestões automáticas atendem de 1 a 30 Frames."
+      ? "As sugestões automáticas atendem de 1 a 30 quadros."
       : "Nenhuma sugestão atende às medidas atuais.";
   return (
-    <section aria-label="Painel de Layouts" className="layout-panel" id="layout-panel" ref={rootRef}>
+    <section aria-label="Painel de layouts" className="layout-panel" id="layout-panel" ref={rootRef}>
       <div className="layout-panel__header">
-        <label className="layout-panel__positions">Frames
-          <select aria-label="Quantidade de Frames" value={controller.positionCount}
+        <label className="layout-panel__positions">Quadros
+          <select aria-label="Quantidade de quadros" value={controller.positionCount}
             disabled={controller.committing || !range}
             onChange={(event) => controller.configurePositions(Number(event.target.value))}>
             {counts.map((value) =>
@@ -77,35 +77,35 @@ export function LayoutPanel({ controller, sheet, catalog }: LayoutPanelProps) {
                 data-custom-layout-id={candidate.customId ?? undefined}
                 key={JSON.stringify(candidate.layout)} onPointerEnter={() => controller.preview(index)}>
               <button
-              aria-label={`Aplicar Layout ${index + 1}${candidate.isLastApplied ? " — último aplicado" : ""}`}
+              aria-label={`Aplicar layout ${index + 1}${candidate.isLastApplied ? " — último aplicado" : ""}`}
               className="layout-panel__preview" disabled={busy || query!.locked || requiresLock} type="button"
               onFocus={() => controller.preview(index)} onBlur={controller.cancelPreview}
               onClick={() => { void controller.apply(index); }}
-              title={requiresLock ? "Use o cadeado para aplicar e criar as posições adicionais." : `${candidate.layout.definition.scope === "page" ? "Por Página" : "Por Lâmina"}${candidate.isLastApplied ? " · Último aplicado" : ""}`}>
+              title={requiresLock ? "Use o cadeado para aplicar este layout com quadros vazios." : `${candidate.layout.definition.scope === "page" ? "Por página" : "Por lâmina"}${candidate.isLastApplied ? " · Último aplicado" : ""}`}>
               <LayoutThumbnail sheet={sheet} frames={controller.previews[index]} />
               </button>
               <button className="layout-panel__lock layout-panel__favorite" type="button" disabled={busy || unavailable}
-                aria-label={`${candidate.favoriteId ? "Remover dos favoritos" : "Favoritar"} Layout ${index + 1}`}
+                aria-label={`${candidate.favoriteId ? "Remover dos favoritos" : "Favoritar"} layout ${index + 1}`}
                 aria-pressed={candidate.favoriteId !== null}
-                title={candidate.favoriteId ? "Remover dos favoritos deste Projeto" : "Favoritar neste Projeto"}
+                title={candidate.favoriteId ? "Remover dos favoritos deste projeto" : "Favoritar neste projeto"}
                 onClick={() => { void controller.toggleFavorite(index); }}>
                 <AppIcon icon={Star} size={12} />
               </button>
               <button className="layout-panel__lock" type="button" disabled={busy || unavailable}
-                aria-label={locked ? `Destravar Layout da Lâmina ${String(sheet.number).padStart(2, "0")}` : `Aplicar e travar Layout ${index + 1}`}
-                title={locked ? "Destravar Layout" : "Aplicar e travar Layout"}
+                aria-label={locked ? `Destravar layout da lâmina ${String(sheet.number).padStart(2, "0")}` : `Aplicar e travar layout ${index + 1}`}
+                title={locked ? "Destravar layout" : "Aplicar e travar layout"}
                 onFocus={() => controller.preview(index)} onBlur={controller.cancelPreview}
                 onClick={() => { void (locked ? controller.unlock() : controller.lock(index)); }}>
                 <AppIcon icon={locked ? LockKeyhole : LockKeyholeOpen} size={12} />
               </button>
               {catalog && candidate.customId && <button className="layout-panel__lock layout-panel__delete" type="button"
-                disabled={busy || catalog.busy} aria-label={`Excluir Layout personalizado ${index + 1}`} title="Excluir Layout personalizado"
+                disabled={busy || catalog.busy} aria-label={`Excluir layout personalizado ${index + 1}`} title="Excluir layout personalizado"
                 onClick={() => { controller.cancelPreview(); catalog.requestDelete(candidate.customId!); }}>
                 <AppIcon icon={Trash2} size={12} />
               </button>}
             </div>; })}
-            {candidates.length === 0 && <p role="status">{controller.error ?? (origin === "custom" && query ? "Nenhum Layout personalizado."
-              : query ? emptyMessage : "Consultando Layouts…")}</p>}
+            {candidates.length === 0 && <p role="status">{controller.error ?? (origin === "custom" && query ? "Nenhum layout personalizado."
+              : query ? emptyMessage : "Consultando layouts…")}</p>}
           </div>
         </div>;
       })}
@@ -115,7 +115,7 @@ export function LayoutPanel({ controller, sheet, catalog }: LayoutPanelProps) {
 
 function LayoutThumbnail({ sheet, frames }: { sheet: ComposedSheet; frames: ComposedFrame[] }) {
   return <SheetPreviewSurface activeSides={sheet.activeSides}>
-    <svg aria-label={`Layout com ${frames.length} Frames`} className="sheet-preview layout-panel__geometry"
+    <svg aria-label={`Layout com ${frames.length} quadros`} className="sheet-preview layout-panel__geometry"
       focusable="false" role="img" preserveAspectRatio="xMidYMid meet"
       viewBox={`0 0 ${sheet.widthUm} ${sheet.heightUm}`}>
       <rect className="layout-panel__surface" width={sheet.widthUm} height={sheet.heightUm} />

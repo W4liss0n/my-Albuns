@@ -32,7 +32,7 @@ export function SafeApplicationShell({
         <section className="startup-card safe-shell">
           <nav
             className="safe-shell-navigation"
-            aria-label="Superfícies globais"
+            aria-label="Navegação do aplicativo"
           >
             <SurfaceButton
               active={surface === "welcome"}
@@ -110,8 +110,7 @@ function WelcomeSurface({
       <p className="eyebrow">MyAlbuns</p>
       <h1>Boas-vindas</h1>
       <p>
-        A criação e a abertura de Projetos permanecem bloqueadas porque este
-        computador não confirmou a aceleração gráfica exigida pelo editor.
+        Não foi possível iniciar o editor neste computador.
       </p>
       <p className="ui-copyable-text" role="status">
         {diagnostic.reason}
@@ -125,8 +124,7 @@ function WelcomeSurface({
         </ActionButton>
       </div>
       <InlineNotice>
-        Somente o editor está bloqueado. Estas superfícies globais continuam
-        funcionando sem iniciar uma Sessão do Projeto ou um Canvas.
+        Você ainda pode acessar as configurações.
       </InlineNotice>
     </div>
   );
@@ -170,8 +168,8 @@ function SettingsSurface({
         >
           <h2>Desempenho</h2>
           <p>
-            O editor exige WebGL2 com aceleração por hardware. Cache e outras
-            preferências globais permanecem fora da Sessão do Projeto.
+            O editor exige WebGL2 com aceleração por hardware. prévias temporárias e outras
+            preferências globais permanecem fora da Sessão do projeto.
           </p>
           <ActionButton onClick={onOpenDiagnostic}>
             Ver diagnóstico gráfico
@@ -195,7 +193,7 @@ function SettingsSurface({
       )}
       <p className="safe-shell-scope-note">
         Este gate preserva o acesso às superfícies globais. A gestão completa
-        de Cache e a detecção do Photoshop continuam nos módulos próprios,
+        de prévias temporárias e a detecção do Photoshop continuam nos módulos próprios,
         sem implementações fictícias neste shell.
       </p>
     </div>
@@ -261,8 +259,7 @@ function DiagnosticSurface({
         )}
       </dl>
       <InlineNotice tone="warning">
-        Reative a aceleração por hardware para abrir o editor com desempenho e
-        composição visual consistentes.
+        Confira as configurações gráficas do computador. Estes detalhes podem ajudar a identificar o problema.
       </InlineNotice>
     </div>
   );

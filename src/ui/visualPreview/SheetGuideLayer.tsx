@@ -19,7 +19,7 @@ export function SheetGuideLayer({
 
   return (
     <g
-      aria-label="Guias técnicas da Lâmina"
+      aria-label="Guias de dobra, corte e segurança da lâmina"
       pointerEvents="none"
       role="group"
     >

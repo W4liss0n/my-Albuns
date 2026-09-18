@@ -119,7 +119,7 @@ export function getLocalInputErrors(
     !Number.isSafeInteger(draft.closedSheetWidth.valueUm * 2)
   ) {
     errors.sheetWidth = [
-      "A largura aberta da Lâmina excede o intervalo suportado.",
+      "A largura aberta da lâmina excede o intervalo suportado.",
     ];
   }
 

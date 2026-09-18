@@ -58,7 +58,7 @@ describe("CanvasHorizontalScrollbar", () => {
       screen.queryByRole("button", { name: "Lâmina anterior" }),
     ).not.toBeInTheDocument();
     expect(
-      screen.queryByRole("button", { name: "Próxima Lâmina" }),
+      screen.queryByRole("button", { name: "Próxima lâmina" }),
     ).not.toBeInTheDocument();
   });
 });

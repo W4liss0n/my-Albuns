@@ -626,7 +626,7 @@ async fn create_project(
         return ProjectLaunchOutcome::Failed {
             error: simple_failure(
                 "invalid_creation_surface",
-                "A criação deve ser iniciada pelo fluxo de Novo Projeto.",
+                "A criação deve ser iniciada pelo fluxo de Novo projeto.",
                 "Volte à Tela de Boas-vindas e tente novamente.",
             ),
         };
@@ -747,8 +747,8 @@ async fn open_recent_project(app: AppHandle, project_id: String) -> ProjectLaunc
             return ProjectLaunchOutcome::Failed {
                 error: simple_failure(
                     "recent_project_missing",
-                    "Este Projeto não está mais na lista de recentes.",
-                    "Use Abrir Projeto para escolhê-lo novamente.",
+                    "Este projeto não está mais na lista de recentes.",
+                    "Use Abrir projeto para escolhê-lo novamente.",
                 ),
             };
         }
@@ -967,7 +967,7 @@ async fn launch_confirmed_project_with_bindings_and_progress(
                     error: simple_failure(
                         "recovery_dialog_unavailable",
                         "Não foi possível apresentar a decisão de Recuperação.",
-                        "Tente abrir o Projeto novamente.",
+                        "Tente abrir o projeto novamente.",
                     ),
                 };
             };
@@ -987,7 +987,7 @@ async fn launch_confirmed_project_with_bindings_and_progress(
                         error: simple_failure(
                             "recovery_dialog_unavailable",
                             "Não foi possível apresentar a decisão de Recuperação.",
-                            "Tente abrir o Projeto novamente.",
+                            "Tente abrir o projeto novamente.",
                         ),
                     };
                 }
@@ -1029,7 +1029,7 @@ async fn launch_confirmed_project_with_bindings_and_progress(
                     ProjectLaunchOutcome::Failed {
                         error: simple_failure(
                             "host_unavailable",
-                            "Não foi possível concluir a Recuperação do Projeto.",
+                            "Não foi possível concluir a Recuperação do projeto.",
                             "Tente novamente. Se o problema continuar, reinicie o MyAlbuns.",
                         ),
                     },
@@ -1083,7 +1083,7 @@ async fn launch_confirmed_project(
                 error: simple_failure(
                     "external_copy_owner_required",
                     "A Cópia externa precisa do diálogo pertencente ao fluxo de abertura.",
-                    "Abra o Projeto pela Tela de Boas-vindas.",
+                    "Abra o projeto pela Tela de Boas-vindas.",
                 ),
             }
         }
@@ -1093,7 +1093,7 @@ async fn launch_confirmed_project(
                 error: simple_failure(
                     "recovery_owner_required",
                     "A Recuperação precisa do diálogo pertencente ao fluxo de abertura.",
-                    "Abra o Projeto pela Tela de Boas-vindas.",
+                    "Abra o projeto pela Tela de Boas-vindas.",
                 ),
             }
         }
@@ -1168,7 +1168,7 @@ async fn launch_confirmed_project_with_bindings(
         Err(_) => ConfirmedProjectLaunch::Completed(ProjectLaunchOutcome::Failed {
             error: simple_failure(
                 "host_unavailable",
-                "Não foi possível iniciar a Janela do Projeto.",
+                "Não foi possível iniciar a Janela do projeto.",
                 "Tente novamente. Se o problema continuar, reinicie o MyAlbuns.",
             ),
         }),
@@ -1243,7 +1243,7 @@ fn resolve_focus_existing(
         ProjectLaunchOutcome::Failed {
             error: simple_failure(
                 "project_in_use",
-                "Este Projeto já está aberto em outra janela.",
+                "Este projeto já está aberto em outra janela.",
                 "Use a janela já aberta ou feche-a antes de tentar novamente.",
             ),
         }
@@ -1256,7 +1256,7 @@ fn bootstrap_failure(failure: BootstrapFailure) -> ProjectLaunchFailure {
         return staged_failure(
             "project_in_use",
             stage,
-            "Este Projeto já está aberto em outra janela.",
+            "Este projeto já está aberto em outra janela.",
             "Use a janela já aberta ou feche-a antes de tentar novamente.",
         );
     }
@@ -1269,12 +1269,12 @@ fn bootstrap_failure(failure: BootstrapFailure) -> ProjectLaunchFailure {
     let (code, message, action) = match (failure.kind, failure.code) {
         (_, Some(FailureCode::DestinationConflict)) => (
             "destination_conflict",
-            "O destino mudou antes da criação do Projeto.",
+            "O destino mudou antes da criação do projeto.",
             "Escolha novamente o destino para confirmar o estado atual do arquivo.",
         ),
         (_, Some(FailureCode::CreateStateIndeterminate)) => (
             "create_state_indeterminate",
-            "Não foi possível confirmar se a criação do Projeto terminou.",
+            "Não foi possível confirmar se a criação do projeto terminou.",
             "Não repita a criação agora. Verifique o arquivo escolhido e tente abri-lo antes de decidir o próximo passo.",
         ),
         (_, Some(FailureCode::SaveCopyStateIndeterminate)) => (
@@ -1284,62 +1284,62 @@ fn bootstrap_failure(failure: BootstrapFailure) -> ProjectLaunchFailure {
         ),
         (_, Some(FailureCode::InvalidInitialProject)) => (
             "invalid_initial_project",
-            "O estado inicial do Projeto não é válido.",
+            "O estado inicial do projeto não é válido.",
             "Feche e abra o MyAlbuns antes de tentar novamente.",
         ),
         (_, Some(FailureCode::InvalidDocumentType)) => (
             "invalid_document_type",
-            "O arquivo escolhido não é um Documento de Projeto MyAlbuns.",
+            "O arquivo escolhido não é um Documento de projeto MyAlbuns.",
             "Escolha um arquivo .myalbuns válido.",
         ),
         (_, Some(FailureCode::UnsupportedFutureSchema)) => (
             "unsupported_future_schema",
-            "Este Projeto foi criado por uma versão mais nova do MyAlbuns.",
-            "Atualize o MyAlbuns antes de abrir o Projeto.",
+            "Este projeto foi criado por uma versão mais nova do MyAlbuns.",
+            "Atualize o MyAlbuns antes de abrir o projeto.",
         ),
         (_, Some(FailureCode::UnsupportedLegacySchema)) => (
             "unsupported_legacy_schema",
-            "Esta versão antiga do Projeto ainda não pode ser aberta.",
-            "Restaure uma cópia compatível ou use uma versão que suporte a migração.",
+            "Esta versão antiga do projeto ainda não pode ser aberta.",
+            "Abra uma cópia compatível com esta versão do MyAlbuns.",
         ),
         (_, Some(FailureCode::InvalidProjectDocument)) => (
             "invalid_project_document",
-            "O arquivo não contém um Projeto MyAlbuns v1 válido.",
+            "O arquivo não contém um projeto MyAlbuns válido.",
             "Escolha outro arquivo ou restaure uma cópia válida.",
         ),
         (_, Some(FailureCode::InvalidProjectState)) => (
             "invalid_project_state",
-            "O Projeto contém um estado que não pode ser editado com segurança.",
-            "Restaure uma cópia válida do Projeto.",
+            "O projeto contém um estado que não pode ser editado com segurança.",
+            "Restaure uma cópia válida do projeto.",
         ),
         (_, Some(FailureCode::ExternalCopyRequiresInteractiveResolution)) => (
             "external_copy_requires_interactive_resolution",
-            "O arquivo parece ser uma Cópia externa de outro Projeto.",
-            "A resolução interativa de Cópias externas será disponibilizada em um fluxo próprio.",
+            "O arquivo parece ser uma Cópia externa de outro projeto.",
+            "Abra a cópia pela tela inicial do MyAlbuns.",
         ),
         (_, Some(FailureCode::ExternalCopyNotWritable)) => (
             "external_copy_not_writable",
-            "A Cópia externa não pode receber uma nova Identidade neste local.",
+            "Não é possível editar esta cópia no local atual.",
             "Use Salvar cópia como... para criar uma versão editável em outro local.",
         ),
         (_, Some(FailureCode::IdentityIndeterminate)) => (
             "identity_indeterminate",
-            "Não foi possível confirmar com segurança a Identidade deste Projeto.",
-            "Não altere o arquivo e tente novamente quando o local estiver estável.",
+            "Não foi possível verificar o arquivo deste projeto.",
+            "Confira se o arquivo continua no mesmo local e se pode ser acessado antes de tentar novamente.",
         ),
         (BootstrapFailureKind::Timeout, _) => (
             "host_timeout",
-            "A Janela do Projeto não respondeu no prazo.",
+            "A Janela do projeto não respondeu no prazo.",
             "Confirme a disponibilidade do local e tente novamente.",
         ),
         (BootstrapFailureKind::CorrelationMismatch | BootstrapFailureKind::InvalidTerminal, _) => (
             "host_protocol_error",
-            "A Janela do Projeto respondeu de forma inválida e foi encerrada.",
+            "A Janela do projeto respondeu de forma inválida e foi encerrada.",
             "Tente novamente. Se o problema continuar, reinicie o MyAlbuns.",
         ),
         _ => (
             "open_project_failed",
-            "Não foi possível abrir este Projeto.",
+            "Não foi possível abrir este projeto.",
             "Confirme o arquivo e tente novamente.",
         ),
     };
@@ -1351,7 +1351,7 @@ fn decorative_resolution_failure(error: ProvisionalDecorativeError) -> ProjectLa
         ProvisionalDecorativeError::UnknownSelection => simple_failure(
             "image_selection_expired",
             "Uma Imagem decorativa selecionada n\u{e3}o est\u{e1} mais dispon\u{ed}vel.",
-            "Escolha novamente a imagem antes de criar o Projeto.",
+            "Escolha novamente a imagem antes de criar o projeto.",
         ),
         ProvisionalDecorativeError::InvalidPath => simple_failure(
             "invalid_image_path",
@@ -1404,37 +1404,37 @@ fn public_path_failure(
     let (code, message, action) = match code {
         FailureCode::NotFound => (
             "not_found",
-            "O arquivo do Projeto não foi encontrado.",
+            "O arquivo do projeto não foi encontrado.",
             "Confirme se ele foi movido ou removido e escolha o local correto.",
         ),
         FailureCode::AccessDenied => (
             "access_denied",
-            "O Windows negou acesso ao arquivo do Projeto.",
+            "O Windows negou acesso ao arquivo do projeto.",
             "Verifique as permissões do arquivo e tente novamente.",
         ),
         FailureCode::Unavailable => (
             "unavailable",
-            "O local do Projeto está indisponível.",
+            "O local do projeto está indisponível.",
             "Reconecte a unidade ou o compartilhamento e tente novamente.",
         ),
         FailureCode::InvalidPath => (
             "invalid_path",
-            "O caminho escolhido não é válido para um Projeto.",
+            "O caminho escolhido não é válido para um projeto.",
             "Escolha um arquivo .myalbuns e tente novamente.",
         ),
         FailureCode::UnexpectedObjectType => (
             "unexpected_object_type",
-            "O local escolhido não é um arquivo de Projeto válido.",
+            "O local escolhido não é um arquivo de projeto válido.",
             "Escolha um arquivo .myalbuns e tente novamente.",
         ),
         FailureCode::Conflict => (
             "conflict",
-            "O arquivo do Projeto mudou durante a tentativa de abertura.",
+            "O arquivo do projeto mudou durante a tentativa de abertura.",
             "Confirme o arquivo e tente novamente.",
         ),
         FailureCode::IoFailure => (
             "io_failure",
-            "O Windows não conseguiu concluir a leitura do Projeto.",
+            "O Windows não conseguiu concluir a leitura do projeto.",
             "Confirme a disponibilidade do local e tente novamente.",
         ),
         _ => return None,
@@ -1445,16 +1445,16 @@ fn public_path_failure(
 fn state_failure() -> ProjectLaunchFailure {
     simple_failure(
         "recent_projects_unavailable",
-        "A lista de Projetos recentes está indisponível.",
-        "Você ainda pode usar Abrir Projeto.",
+        "A lista de projetos recentes está indisponível.",
+        "Você ainda pode usar Abrir projeto.",
     )
 }
 
 fn graphics_gate_failure() -> ProjectLaunchFailure {
     simple_failure(
         "graphics_requirement_not_met",
-        "O editor exige WebGL2 com aceleração por hardware confirmada.",
-        "Consulte o Diagnóstico gráfico antes de abrir ou criar um Projeto.",
+        "Não foi possível confirmar a aceleração gráfica necessária para abrir o editor.",
+        "Consulte o Diagnóstico gráfico antes de abrir ou criar um projeto.",
     )
 }
 
@@ -1471,9 +1471,10 @@ fn simple_failure(code: &str, message: &str, action: &str) -> ProjectLaunchFailu
 }
 
 fn startup_cleanup_failure(reason: &str) -> ProjectLaunchFailure {
+    tracing::warn!(target: "myalbuns.desktop", error = reason, event = "startup_preview_cleanup_failed");
     simple_failure(
         "startup_cache_cleanup_unavailable",
-        &format!("A limpeza segura do Cache na inicialização não foi concluída: {reason}"),
+        "Não foi possível limpar as prévias temporárias ao abrir o MyAlbuns.",
         "Reinicie o MyAlbuns. Se o problema continuar, verifique o armazenamento local.",
     )
 }
@@ -2533,7 +2534,7 @@ public static class MyAlbunsFocusFixture
     fn mixed_multi_file_batch_preserves_the_first_non_success_terminal() {
         let expected_failure = simple_failure(
             "project_in_use",
-            "Este Projeto já está aberto em outra janela.",
+            "Este projeto já está aberto em outra janela.",
             "Use a janela já aberta ou feche-a antes de tentar novamente.",
         );
         let mut summary = ActivationBatchSummary::default();

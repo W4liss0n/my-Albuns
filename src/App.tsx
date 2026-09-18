@@ -228,7 +228,7 @@ function App({
           setLoadError(
             error instanceof Error
               ? error.message
-              : "Não foi possível iniciar a Sessão do Projeto.",
+              : "Não foi possível iniciar a Sessão do projeto.",
           );
         }
       });
@@ -333,11 +333,11 @@ function App({
   ): Promise<readonly ImageProcessingProblem[]> => {
     const imported = completion.projection;
     if (imported.state.projectId !== projectId || projectionRef.current?.state.projectId !== projectId) {
-      throw new Error("O Projeto mudou antes da entrega das miniaturas.");
+      throw new Error("O projeto mudou antes da entrega das miniaturas.");
     }
     let cancel!: () => void;
     const cancelled = new Promise<never>((_resolve, reject) => {
-      cancel = () => reject(new Error("A preparação das miniaturas foi interrompida pela troca de Projeto."));
+      cancel = () => reject(new Error("A preparação das miniaturas foi interrompida pela troca de projeto."));
     });
     const batch: ImportPresentation = {
       projectId, revision: imported.state.revision, ready: false, cancel,
@@ -582,7 +582,7 @@ function App({
         projectId,
         reason: logReasonFromError(error),
       });
-      setLoadError("Não foi possível preparar as imagens do Projeto.");
+      setLoadError("Não foi possível preparar as imagens do projeto.");
     });
   }, [logger, mediaChangeListenerReady, preferencesReadyProject, projectId, projectStartupPort]);
 
@@ -616,7 +616,7 @@ function App({
         projectId,
         reason: logReasonFromError(error),
       });
-      setLoadError("Não foi possível confirmar a inicialização da interface do Projeto.");
+      setLoadError("Não foi possível confirmar a inicialização da interface do projeto.");
     });
   }, [
     logger,
@@ -738,7 +738,7 @@ function App({
         <section className="startup-card" role="alert">
           <BrandWordmark compact />
           <p className="eyebrow">MyAlbuns</p>
-          <h1>Não foi possível abrir o Projeto</h1>
+          <h1>Não foi possível abrir o projeto</h1>
           <InlineNotice tone="error">{loadError}</InlineNotice>
         </section>
       </main>

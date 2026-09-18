@@ -98,7 +98,7 @@ export function SheetPreview({
   viewport,
 }: SheetPreviewProps) {
   const instanceId = useId().replace(/[^a-zA-Z0-9_-]/g, "");
-  const label = `Prévia da Lâmina ${String(sheet.number).padStart(2, "0")}`;
+  const label = `Prévia da lâmina ${String(sheet.number).padStart(2, "0")}`;
   const unit = CANVAS_MICROMETERS_PER_PIXEL;
   const surfaceStyle = SHEET_VISUAL_STYLE.surface;
   const frames = sheet.frames;

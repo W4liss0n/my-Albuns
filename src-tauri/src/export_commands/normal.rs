@@ -32,7 +32,7 @@ pub(crate) fn default_export_destination(
 
 fn require_owner(window: &WebviewWindow) -> Result<(), String> {
     if window.label() != PROJECT_WINDOW_LABEL {
-        return Err("A Exportação pertence à Janela do Projeto.".into());
+        return Err("A exportação pertence à Janela do projeto.".into());
     }
     Ok(())
 }
@@ -49,7 +49,7 @@ pub(crate) async fn choose_export_folder(
     app.dialog()
         .file()
         .set_parent(&parent)
-        .set_title("Escolher pasta de destino da Exportação")
+        .set_title("Escolher pasta de destino da exportação")
         .pick_folder(move |selection| {
             let _ = sender.send(selection);
         });
@@ -114,7 +114,7 @@ pub(crate) async fn export_project(
         .map_err(ExportCommandError::failed)?;
     if !layout.is_empty() {
         let mut error =
-            ExportCommandError::failed("Preencha os Frames vazios antes de exportar a seleção.");
+            ExportCommandError::failed("Preencha os quadros vazios antes de exportar a seleção.");
         error.code = ExportCommandErrorCode::UnfilledLayoutPositions;
         error.layout_problems = Some(layout);
         return Err(error.into());
@@ -138,7 +138,7 @@ pub(crate) async fn export_project(
     .map_err(|error| ExportCommandError::failed(error.to_string()))?
     .map_err(ExportCommandError::failed)?;
     if !media.is_empty() {
-        let mut error = ExportCommandError::failed("Confira os Arquivos necessários à Exportação.");
+        let mut error = ExportCommandError::failed("Confira os arquivos necessários à exportação.");
         error.code = ExportCommandErrorCode::MediaProblems;
         error.media_problems = Some(media);
         return Err(error.into());
@@ -148,7 +148,7 @@ pub(crate) async fn export_project(
         || current.state.revision != snapshot.revision
     {
         return Err(ExportCommandError::failed(
-            "O Projeto mudou durante a verificação. Tente exportar novamente.",
+            "O projeto mudou durante a verificação. Tente exportar novamente.",
         )
         .into());
     }
@@ -205,7 +205,7 @@ pub(crate) async fn export_project(
     })?;
     let (plan, conflicts, has_outputs) = plan;
     if !conflicts.is_empty() && conflict_policy == ExportConflictPolicy::Ask {
-        let mut error = ExportCommandError::failed("Já existem arquivos no Destino da Exportação.");
+        let mut error = ExportCommandError::failed("Já existem arquivos no destino da exportação.");
         error.code = ExportCommandErrorCode::ExportConflict;
         return Err(NormalExportError {
             error: Box::new(error),

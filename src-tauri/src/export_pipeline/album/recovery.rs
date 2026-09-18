@@ -270,6 +270,7 @@ impl AlbumExportRecovery {
             self.preparations[self.published]
                 .publish_retaining()
                 .map_err(|error| {
+                    tracing::warn!(target: "myalbuns.desktop", error = %error, event = "export_output_write_failed");
                     ExportFailure::from_path_error(
                         ExportFailureStage::Publish {
                             promoted_outputs: self.published as u32,
@@ -278,15 +279,15 @@ impl AlbumExportRecovery {
                         error,
                         if error == AppPathsError::ExportStorageFull {
                             if self.published > 0 {
-                                "O álbum foi publicado parcialmente. Libere espaço e retome para concluir. Os arquivos já exportados foram mantidos.".into()
+                                "Alguns arquivos do álbum já foram exportados. Libere espaço e retome para concluir. Os arquivos já exportados foram mantidos.".into()
                             } else {
                                 "Libere espaço para continuar. Os arquivos já existentes foram mantidos.".into()
                             }
                         } else {
                             format!(
-                                "Não foi possível concluir a publicação: {error}. {}",
+                                "Não foi possível salvar todos os arquivos exportados. {}",
                                 if self.published > 0 {
-                                    "O álbum foi publicado parcialmente. Tente exportar novamente para concluir."
+                                    "Alguns arquivos do álbum já foram exportados. Exporte o álbum inteiro novamente para concluir."
                                 } else {
                                     "Os arquivos já existentes foram mantidos."
                                 }

@@ -604,7 +604,7 @@ export function MediaPanel({
         media={draggedMedia} x={dragPreview.x} y={dragPreview.y}
         previewUrl={mediaPreviews[draggedMedia.id]?.url ?? undefined}
         missing={fileInformation[draggedMedia.id]?.state === "absent"} />}
-      {fileDrop.over && <div className="media-file-drop-hint" role="status">Solte para importar em {activeMediaKind === "photo" ? "Fotos" : "Decorativos"}</div>}
+      {fileDrop.over && <div className="media-file-drop-hint" role="status">Solte para importar em {activeMediaKind === "photo" ? "fotos" : "decorativos"}</div>}
       {fileDrop.error && <div className="media-file-drop-error" role="status">{fileDrop.error}</div>}
       <MediaPanelToolbar
         activeMediaKind={activeMediaKind}
@@ -638,8 +638,8 @@ export function MediaPanel({
       <div
         aria-label={
           activeMediaKind === "photo"
-            ? "Grade de Fotos"
-            : "Grade de Decorativos"
+            ? "Grade de fotos"
+            : "Grade de decorativos"
         }
         className="media-grid"
         data-empty={emptyStateReason ?? undefined}
@@ -706,8 +706,8 @@ export function MediaPanel({
                   else onApplyDecorative(media.id, event.shiftKey ? "overlay" : "background");
                 }}
                 title={[media.name, usageDetailsById.get(media.id), media.kind === "photo"
-                  ? "Duplo clique para preencher o placeholder mais à esquerda da Lâmina centralizada"
-                  : "Duplo clique aplica Fundo. Shift + duplo clique aplica Overlay."].filter(Boolean).join("\n")}
+                  ? "Duplo clique para preencher o quadro vazio mais à esquerda da lâmina centralizada"
+                  : "Duplo clique aplica fundo. Shift + duplo clique aplica sobreposição."].filter(Boolean).join("\n")}
               >
                 {availabilityLabel && (
                   <span
@@ -869,10 +869,10 @@ function mediaUsageLabel(usage: MediaUsage): string {
   if (!usage.breakdown) return usage.count ? `${usage.count} ${usage.count === 1 ? "uso" : "usos"}` : "";
   const { frames, backgrounds, overlays, albumBackgrounds, albumOverlays } = usage.breakdown;
   return [
-    frames ? `${frames} ${frames === 1 ? "Frame" : "Frames"}` : "",
-    backgrounds ? `${backgrounds} ${backgrounds === 1 ? "Fundo" : "Fundos"}` : "",
-    overlays ? `${overlays} ${overlays === 1 ? "Overlay" : "Overlays"}` : "",
-    albumBackgrounds ? `${albumBackgrounds} ${albumBackgrounds === 1 ? "padrão" : "padrões"} de Fundo` : "",
-    albumOverlays ? `${albumOverlays} ${albumOverlays === 1 ? "padrão" : "padrões"} de Overlay` : "",
+    frames ? `${frames} ${frames === 1 ? "Quadro" : "Quadros"}` : "",
+    backgrounds ? `${backgrounds} ${backgrounds === 1 ? "fundo" : "fundos"}` : "",
+    overlays ? `${overlays} ${overlays === 1 ? "sobreposição" : "sobreposições"}` : "",
+    albumBackgrounds ? `${albumBackgrounds} ${albumBackgrounds === 1 ? "padrão" : "padrões"} de fundo` : "",
+    albumOverlays ? `${albumOverlays} ${albumOverlays === 1 ? "padrão" : "padrões"} de sobreposição` : "",
   ].filter(Boolean).join(" · ");
 }

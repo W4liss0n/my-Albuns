@@ -161,10 +161,10 @@ test("renders the composed geometry and visual layers of each sheet", () => {
   );
 
   const firstPreview = screen.getByRole("img", {
-    name: "Prévia da Lâmina 01",
+    name: "Prévia da lâmina 01",
   });
   const secondPreview = screen.getByRole("img", {
-    name: "Prévia da Lâmina 02",
+    name: "Prévia da lâmina 02",
   });
 
   expect(
@@ -222,7 +222,7 @@ test("uses the shared Cache URL for a transparent Decorative Overlay", () => {
 
   expect(
     screen
-      .getByRole("img", { name: "Prévia da Lâmina 02" })
+      .getByRole("img", { name: "Prévia da lâmina 02" })
       .querySelector(
         '[data-preview-overlay-id="decorative-overlay"]',
       ),
@@ -249,7 +249,7 @@ test("preserves the canonical visual stack supplied by CompositionCore", () => {
   render(<SheetPreview sheet={canonicalStack} />);
 
   const preview = screen.getByRole("img", {
-    name: "Prévia da Lâmina 02",
+    name: "Prévia da lâmina 02",
   });
   expect(
     Array.from(
@@ -305,7 +305,7 @@ test("keeps preview strokes aligned with Canvas units at other sheet heights", (
   );
 
   const preview = screen.getByRole("img", {
-    name: "Prévia da Lâmina 02",
+    name: "Prévia da lâmina 02",
   });
   expect(
     preview.querySelector('[data-preview-frame-id="frame-002"]'),
@@ -316,7 +316,7 @@ test("keeps the physical Sheet surface straight in every renderer", () => {
   render(<SheetPreview sheet={placeholderSheet} />);
 
   const surface = screen
-    .getByRole("img", { name: "Prévia da Lâmina 02" })
+    .getByRole("img", { name: "Prévia da lâmina 02" })
     .querySelector(":scope > rect");
 
   expect(surface).toHaveAttribute("rx", "0");
@@ -345,7 +345,7 @@ test("represents a single-page extremity as the normalized active surface", () =
   const { rerender } = render(<SheetPreview sheet={singlePageSheet} />);
 
   const preview = screen.getByRole("img", {
-    name: "Prévia da Lâmina 02",
+    name: "Prévia da lâmina 02",
   });
   expect(preview).toHaveAttribute("viewBox", "0 0 300000 300000");
   expect(preview.querySelector("line")).not.toBeInTheDocument();

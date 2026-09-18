@@ -21,10 +21,10 @@ function port(overrides: Partial<ProjectGenerationPort> = {}): ProjectGeneration
 test("requires an explicit Continue after the last conflict decision", async () => {
   const api = port({ current: async () => ({ ...ready, canContinue: false, items: [{ ...ready.items[0], decision: null }] }) });
   render(<GenerationWindow port={api} />);
-  fireEvent.click(await screen.findByRole("button", { name: "Sobrescrever" }));
-  await waitFor(() => expect(screen.getByRole("button", { name: "Continuar Geração" })).toBeEnabled());
+  fireEvent.click(await screen.findByRole("button", { name: "Substituir" }));
+  await waitFor(() => expect(screen.getByRole("button", { name: "Iniciar geração" })).toBeEnabled());
   expect(api.run).not.toHaveBeenCalled();
-  fireEvent.click(screen.getByRole("button", { name: "Continuar Geração" }));
+  fireEvent.click(screen.getByRole("button", { name: "Iniciar geração" }));
   await screen.findByText("Geração concluída");
   expect(api.run).toHaveBeenCalledOnce();
 });
@@ -86,25 +86,25 @@ test("retains conflict decisions when rechecking is cancelled", async () => {
   const api = port({ current: async () => ready, recheck: vi.fn(async () => null) });
   render(<GenerationWindow port={api} />);
   fireEvent.click(await screen.findByRole("button", { name: "Verificar novamente" }));
-  await waitFor(() => expect(screen.getByRole("button", { name: "Continuar Geração" })).toBeEnabled());
-  expect(screen.getByText("Será sobrescrito")).toBeVisible();
+  await waitFor(() => expect(screen.getByRole("button", { name: "Iniciar geração" })).toBeEnabled());
+  expect(screen.getByText("Será substituído")).toBeVisible();
   expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   expect(api.run).not.toHaveBeenCalled();
 });
 test("acknowledges a prepared problem result before the native progress closes", async () => {
   const api = port({ current: async () => ({ ...ready, canContinue: false }) });
   render(<GenerationWindow port={api} />);
-  await screen.findByText("Problemas na Geração");
+  await screen.findByText("Problemas na geração");
   await waitFor(() => expect(api.resultReady).toHaveBeenCalled());
   expect(api.run).not.toHaveBeenCalled();
 });
 test("distinguishes ignored projects from failures even when both retain a reason", async () => {
   render(<GenerationWindow port={port({ current: async () => ({ ...ready, phase: "finished", items: [
-    { ...ready.items[0], status: "ignored", problems: ["O Projeto está aberto."] },
+    { ...ready.items[0], status: "ignored", problems: ["O projeto está aberto."] },
     { ...ready.items[0], id: "failed", status: "failed", problems: ["A foto mudou."] },
   ] }) })} />);
   await screen.findByText("Ignorado");
   expect(screen.getByText("Falhou")).toBeVisible();
-  expect(screen.getByText("O Projeto está aberto.")).toBeVisible();
+  expect(screen.getByText("O projeto está aberto.")).toBeVisible();
   expect(screen.getByText("A foto mudou.")).toBeVisible();
 });

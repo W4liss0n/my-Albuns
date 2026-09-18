@@ -33,28 +33,28 @@ test("locking keeps the displayed thumbnails mounted while the refreshed query i
     const panel = useLayoutPanel({ projection, editing: false, disabled: false,
       port: { queryLayouts, previewLayout }, runner, commit, onError: vi.fn() });
     return <>
-      <button aria-controls="layout-panel" onClick={() => panel.toggle(sheetId)}>Layouts da Lâmina</button>
+      <button aria-controls="layout-panel" onClick={() => panel.toggle(sheetId)}>Layouts da lâmina</button>
       {panel.visible && <LayoutPanel controller={panel} sheet={projection.composition.sheets[0]} />}
     </>;
   }
 
   render(<Workspace />);
-  fireEvent.click(screen.getByRole("button", { name: "Layouts da Lâmina" }));
-  const lock = await screen.findByRole("button", { name: "Aplicar e travar Layout 1" });
-  const panel = screen.getByRole("region", { name: "Painel de Layouts" });
-  const thumbnail = within(panel).getByRole("button", { name: /^Aplicar Layout 1(?: — último aplicado)?$/ });
+  fireEvent.click(screen.getByRole("button", { name: "Layouts da lâmina" }));
+  const lock = await screen.findByRole("button", { name: "Aplicar e travar layout 1" });
+  const panel = screen.getByRole("region", { name: "Painel de layouts" });
+  const thumbnail = within(panel).getByRole("button", { name: /^Aplicar layout 1(?: — último aplicado)?$/ });
   fireEvent.click(lock);
   await waitFor(() => expect(queryLayouts).toHaveBeenCalledTimes(2));
 
   expect(thumbnail).toBeInTheDocument();
   expect(thumbnail).toBeDisabled();
-  expect(within(panel).queryByText("Consultando Layouts…")).not.toBeInTheDocument();
+  expect(within(panel).queryByText("Consultando layouts…")).not.toBeInTheDocument();
   fireEvent.click(lock);
   expect(commit).toHaveBeenCalledOnce();
 
   await act(async () => { resolveRefresh(refreshed); });
-  await waitFor(() => expect(screen.getByRole("button", { name: "Destravar Layout da Lâmina 01" })).toBeEnabled());
-  expect(screen.getByRole("region", { name: "Painel de Layouts" })).toBe(panel);
+  await waitFor(() => expect(screen.getByRole("button", { name: "Destravar layout da lâmina 01" })).toBeEnabled());
+  expect(screen.getByRole("region", { name: "Painel de layouts" })).toBe(panel);
 });
 
 test("outside presses close the panel, while its controls and Sheet bars keep their own actions", async () => {
@@ -75,7 +75,7 @@ test("outside presses close the panel, while its controls and Sheet bars keep th
     return <>
       {sheets.map((sheet) => <button key={sheet.id} aria-controls="layout-panel"
         onPointerDown={(event) => event.stopPropagation()} onClick={() => panel.toggle(sheet.id)}>
-        Layouts da Lâmina {sheet.number}
+        Layouts da lâmina {sheet.number}
       </button>)}
       <button onPointerDown={(event) => event.stopPropagation()} onClick={outsideAction}>Outra ação</button>
       {panel.visible && <LayoutPanel controller={panel}
@@ -84,12 +84,12 @@ test("outside presses close the panel, while its controls and Sheet bars keep th
   }
   const click = (element: HTMLElement) => { fireEvent.pointerDown(element); fireEvent.click(element); };
   render(<Workspace />);
-  const firstBar = screen.getByRole("button", { name: "Layouts da Lâmina 1" });
-  const secondBar = screen.getByRole("button", { name: "Layouts da Lâmina 2" });
+  const firstBar = screen.getByRole("button", { name: "Layouts da lâmina 1" });
+  const secondBar = screen.getByRole("button", { name: "Layouts da lâmina 2" });
   click(firstBar);
-  await screen.findByRole("button", { name: "Aplicar e travar Layout 1" });
-  const panel = screen.getByRole("region", { name: "Painel de Layouts" });
-  click(within(panel).getByRole("combobox", { name: "Quantidade de Frames" }));
+  await screen.findByRole("button", { name: "Aplicar e travar layout 1" });
+  const panel = screen.getByRole("region", { name: "Painel de layouts" });
+  click(within(panel).getByRole("combobox", { name: "Quantidade de quadros" }));
   expect(panel).toBeInTheDocument();
   click(secondBar);
   await waitFor(() => expect(queryLayouts).toHaveBeenLastCalledWith(sheets[1].id));
@@ -97,8 +97,8 @@ test("outside presses close the panel, while its controls and Sheet bars keep th
   click(secondBar);
   expect(panel).not.toBeInTheDocument();
   click(firstBar);
-  await screen.findByRole("button", { name: "Aplicar e travar Layout 1" });
+  await screen.findByRole("button", { name: "Aplicar e travar layout 1" });
   click(screen.getByRole("button", { name: "Outra ação" }));
-  expect(screen.queryByRole("region", { name: "Painel de Layouts" })).not.toBeInTheDocument();
+  expect(screen.queryByRole("region", { name: "Painel de layouts" })).not.toBeInTheDocument();
   expect(outsideAction).toHaveBeenCalledOnce();
 });

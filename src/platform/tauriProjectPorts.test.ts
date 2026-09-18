@@ -187,7 +187,7 @@ test("native media preflight failures reach the recovery screen before any start
 
 test("normal export sends the complete selection and maps overwrite conflicts without starting progress", async () => {
   const options = { scope: "range" as const, sheetIds: ["sheet-002", "sheet-003"], mode: "page" as const,
-    format: { kind: "jpeg" as const, quality: 64 }, destination: "C:/Álbuns/Exportados", conflictPolicy: "ask" as const };
+    format: { kind: "jpeg" as const, quality: 64 }, destination: "C:/álbuns/Exportados", conflictPolicy: "ask" as const };
   const conflicts = ["Álbum_003.jpg", "Álbum_004.jpg"];
   vi.mocked(invoke).mockRejectedValueOnce({ code: "export_conflict", conflicts });
   const event = vi.fn();
@@ -280,7 +280,7 @@ test("cancels an Export attempt using the operation id kept inside the adapter",
 test("maps the backend cancelled error to a cancelled Export outcome", async () => {
   vi.mocked(invoke).mockRejectedValueOnce({
     code: "cancelled",
-    message: "A Exportação foi cancelada.",
+    message: "A exportação foi cancelada.",
   });
 
   const attempt = tauriExportPipelinePort.startSheet(exportSelection, vi.fn());
@@ -583,7 +583,7 @@ test("maps the typed Cache processor warning without blocking Project commands",
   eventBoundary.listeners[0]({
     payload: {
       state: "suspended",
-      message: "O Cache foi suspenso após falhas repetidas.",
+      message: "O prévias temporárias foi suspenso após falhas repetidas.",
     },
   });
 
@@ -593,7 +593,7 @@ test("maps the typed Cache processor warning without blocking Project commands",
   );
   expect(listener).toHaveBeenCalledWith({
     state: "suspended",
-    message: "O Cache foi suspenso após falhas repetidas.",
+    message: "O prévias temporárias foi suspenso após falhas repetidas.",
   });
   expect(unlisten).toEqual(expect.any(Function));
 });
@@ -736,7 +736,7 @@ test("maps an indeterminate Salvar como terminal without hiding destination risk
   await expect(tauriProjectCorePort.saveAs(25)).rejects.toMatchObject({
     code: "save_as_state_indeterminate",
     message:
-      "Não foi possível confirmar o destino de Salvar como. A Sessão anterior foi mantida; reinspecione o destino antes de reutilizá-lo.",
+      "Não foi possível confirmar se a cópia foi salva. O projeto anterior continua aberto. Confira o arquivo no destino escolhido antes de tentar novamente.",
   });
 });
 
@@ -774,7 +774,7 @@ test("rejects a Project save envelope whose projection does not confirm its outc
 
   await expect(tauriProjectCorePort.save(25)).rejects.toMatchObject({
     code: "invalid_response",
-    message: "Não foi possível confirmar o resultado do Salvamento.",
+    message: "Não foi possível confirmar o resultado do salvamento.",
   });
 });
 
@@ -787,7 +787,7 @@ test("rejects malformed stale-revision context as an unavailable save", async ()
 
   await expect(tauriProjectCorePort.save(25)).rejects.toMatchObject({
     code: "save_unavailable",
-    message: "Não foi possível iniciar o Salvamento do Projeto.",
+    message: "Não foi possível iniciar o salvamento do projeto.",
   });
 });
 
@@ -800,71 +800,71 @@ test.each([
     },
     code: "stale_revision",
     message:
-      "A revisão visível ficou desatualizada. Atualize o Projeto e tente salvar novamente.",
+      "Não foi possível salvar porque há alterações mais recentes no projeto. Nada foi salvo nesta tentativa.",
     context: { expected: 24, current: 25 },
   },
   {
     wire: { code: "persisted_baseline_conflict" },
     code: "persisted_baseline_conflict",
     message:
-      "O arquivo do Projeto foi alterado fora do MyAlbuns. O Salvamento não substituiu essas alterações.",
+      "O arquivo do projeto foi alterado fora do MyAlbuns. O salvamento não substituiu essas alterações.",
   },
   {
     wire: { code: "save_state_indeterminate" },
     code: "save_state_indeterminate",
     message:
-      "Não foi possível confirmar qual revisão ficou no arquivo. Reabra o Projeto antes de continuar.",
+      "Não foi possível confirmar a versão salva no arquivo. Reabra o projeto para conferir o conteúdo antes de continuar.",
   },
   {
     wire: { code: "recovery_cleanup_failed" },
     code: "recovery_cleanup_failed",
     message:
-      "O arquivo do Projeto foi salvo, mas não foi possível encerrar a Recuperação. Tente salvar novamente.",
+      "O projeto foi salvo, mas a limpeza dos dados de recuperação não terminou. Tente salvar novamente.",
   },
   {
     wire: { code: "session_unavailable" },
     code: "session_unavailable",
     message:
-      "A Sessão do Projeto não está mais disponível. Reabra o Projeto para continuar.",
+      "O projeto não está mais disponível para edição. Reabra o projeto para continuar.",
   },
   {
     wire: { code: "not_found" },
     code: "not_found",
     message:
-      "O arquivo do Projeto não foi encontrado. Confirme se ele foi movido ou removido.",
+      "O arquivo do projeto não foi encontrado. Confirme se ele foi movido ou removido.",
   },
   {
     wire: { code: "unavailable" },
     code: "unavailable",
     message:
-      "O local do Projeto está indisponível. Reconecte a unidade ou o compartilhamento e tente novamente.",
+      "O local do projeto está indisponível. Reconecte o disco ou a pasta de rede e tente novamente.",
   },
   {
     wire: { code: "access_denied" },
     code: "access_denied",
     message:
-      "O Windows negou acesso ao arquivo do Projeto. Verifique as permissões e tente novamente.",
+      "O Windows negou acesso ao arquivo do projeto. Verifique as permissões e tente novamente.",
   },
   {
     wire: { code: "invalid_path" },
     code: "invalid_path",
-    message: "O caminho do arquivo do Projeto não é válido.",
+    message: "O caminho do arquivo do projeto não é válido.",
   },
   {
     wire: { code: "unexpected_object_type" },
     code: "unexpected_object_type",
-    message: "O destino do Projeto deixou de ser um arquivo regular.",
+    message: "Não é possível salvar: o local do projeto não contém um arquivo válido. Verifique se o arquivo foi movido ou substituído.",
   },
   {
     wire: { code: "conflict" },
     code: "conflict",
     message:
-      "O arquivo do Projeto mudou durante o Salvamento. Tente novamente.",
+      "O arquivo do projeto mudou durante o salvamento. Tente novamente.",
   },
   {
     wire: { code: "io_failure" },
     code: "io_failure",
-    message: "O Windows não conseguiu concluir o Salvamento do Projeto.",
+    message: "O Windows não conseguiu concluir o salvamento do projeto.",
   },
 ] as const)(
   "localizes the structured $code Project save failure",
@@ -885,7 +885,7 @@ test.each([
 test("normalizes typed media preview failures without losing their code or message", async () => {
   vi.mocked(invoke).mockRejectedValueOnce({
     code: "unavailable",
-    message: "A Imagem decorativa vinculada não está disponível.",
+    message: "A imagem decorativa vinculada não está disponível.",
   });
 
   const failure = tauriMediaPreviewPort.prepareMediaPreviews({
@@ -897,7 +897,7 @@ test("normalizes typed media preview failures without losing their code or messa
   await expect(failure).rejects.toBeInstanceOf(MediaPreviewError);
   await expect(failure).rejects.toMatchObject({
     code: "unavailable",
-    message: "A Imagem decorativa vinculada não está disponível.",
+    message: "A imagem decorativa vinculada não está disponível.",
   });
 });
 

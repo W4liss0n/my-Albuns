@@ -43,7 +43,7 @@ export function CacheSettings({ port }: { port: CacheSettingsPort }) {
     if (running.current) return;
     const request = ++sequence.current;
     try { const next = await port.status(); if (request === sequence.current) { setStatus(next); setError(null); } }
-    catch { if (request === sequence.current) setError("Não foi possível consultar o uso do Cache. Tente novamente."); }
+    catch { if (request === sequence.current) setError("Não foi possível consultar o uso das prévias temporárias. Tente novamente."); }
   }, [port]);
   useEffect(() => {
     void refresh(); window.addEventListener("focus", refresh);
@@ -59,14 +59,14 @@ export function CacheSettings({ port }: { port: CacheSettingsPort }) {
       const next = await port.status();
       if (request === sequence.current) {
         setStatus(next); setConfirmation(false);
-        setMessage(outcome.kind === "scheduled" ? "Limpeza agendada para a próxima inicialização." : `${formatCacheBytes(outcome.result.freedBytes)} liberados.`);
+        setMessage(outcome.kind === "scheduled" ? "As prévias serão limpas quando você abrir o MyAlbuns novamente." : `${formatCacheBytes(outcome.result.freedBytes)} liberados.`);
       }
-    } catch { if (request === sequence.current) setError("Não foi possível concluir a limpeza do Cache. Tente novamente."); }
+    } catch { if (request === sequence.current) setError("Não foi possível concluir a limpeza das prévias temporárias. Tente novamente."); }
     finally { running.current = false; if (request === sequence.current) setPending(false); }
   };
-  const feedback = status?.clearAllScheduled ? "Limpeza agendada para a próxima inicialização." : message;
-  return <section aria-label="Cache dos álbuns" className="application-settings-panel application-settings-panel--cache" aria-busy={pending}>
-    <h2>Cache dos álbuns</h2>
+  const feedback = status?.clearAllScheduled ? "As prévias serão limpas quando você abrir o MyAlbuns novamente." : message;
+  return <section aria-label="Prévias temporárias" className="application-settings-panel application-settings-panel--cache" aria-busy={pending}>
+    <h2>Prévias temporárias</h2>
     <dl className="application-settings-cache">
       <div className="application-settings-cache-row">
         <dt>Espaço ocupado</dt>
@@ -74,11 +74,11 @@ export function CacheSettings({ port }: { port: CacheSettingsPort }) {
         <dd ref={confirmationAnchor} className="application-settings-cache-trigger">
           <ActionButton ref={clearButton} disabled={pending || !status || status.clearAllScheduled}
             aria-haspopup="dialog" aria-expanded={confirmation} aria-controls={confirmation ? confirmationId : undefined}
-            onClick={() => setConfirmation((open) => !open)}>Limpar cache</ActionButton>
-          {confirmation && <div id={confirmationId} role="dialog" aria-label="Confirmar limpeza do cache"
+            onClick={() => setConfirmation((open) => !open)}>Limpar prévias</ActionButton>
+          {confirmation && <div id={confirmationId} role="dialog" aria-label="Confirmar limpeza das prévias temporárias"
             aria-describedby={`${confirmationId}-description`}
             className="ui-anchored-tooltip application-settings-cache-confirmation">
-            <p id={`${confirmationId}-description`}>Ao limpar o cache, as próximas aberturas dos álbuns podem demorar mais.</p>
+            <p id={`${confirmationId}-description`}>As prévias serão recriadas quando necessário. Os álbuns podem demorar mais para abrir.</p>
             <div className="application-settings-actions">
               <ActionButton ref={cancelButton} disabled={pending} onClick={cancel}>Cancelar</ActionButton>
               <ActionButton disabled={pending} variant="primary" onClick={() => void confirm()}>{pending ? "Limpando…" : "Confirmar"}</ActionButton>

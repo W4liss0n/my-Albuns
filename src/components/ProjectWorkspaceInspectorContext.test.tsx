@@ -29,11 +29,11 @@ vi.mock("./MediaPanel", () => ({
 }));
 
 vi.mock("./AlbumInformationForm", () => ({
-  AlbumInformationForm: () => <div>Conteúdo de Informações do Álbum</div>,
+  AlbumInformationForm: () => <div>Conteúdo de Informações do álbum</div>,
 }));
 
 vi.mock("./AlbumDesignForm", () => ({
-  AlbumDesignForm: () => <div>Conteúdo de Design do Álbum</div>,
+  AlbumDesignForm: () => <div>Conteúdo de Design do álbum</div>,
 }));
 
 const exportPipelinePort: ExportPipelinePort = {
@@ -68,11 +68,11 @@ const projectCorePort: ProjectCorePort = {
     validateMediaFolderName: async () => { throw new Error("Folder validation is not configured in this fixture."); },
     queryLayouts: async () => { throw new Error("Layouts are not configured in this fixture."); },
     previewLayout: async () => { throw new Error("Layouts are not configured in this fixture."); },
-    previewFrameStyle: async () => { throw new Error("Frame style preview is not configured in this fixture."); },
+    previewFrameStyle: async () => { throw new Error("Quadro style preview is not configured in this fixture."); },
     previewDecorativeDrop: async () => { throw new Error("Decorative preview is not configured in this fixture."); },
-    previewPhotoZoom: async () => { throw new Error("Photo Zoom preview is not configured in this fixture."); },
+    previewPhotoZoom: async () => { throw new Error("Photo zoom preview is not configured in this fixture."); },
     previewPhotoAngle: async () => { throw new Error("Photo angle preview is not configured in this fixture."); },
-    previewFrameGeometry: async () => { throw new Error("Frame geometry preview is not configured in this fixture."); },
+    previewFrameGeometry: async () => { throw new Error("Quadro geometry preview is not configured in this fixture."); },
   resolvePhotoDropTarget: async () => ({ kind: "invalid" }),
   replaceImage: async () => representativeProjection, relink: async () => representativeProjection,
   undo: async () => representativeProjection,
@@ -133,36 +133,36 @@ test("derives Album, Sheet and Frame Inspector contexts from the editing state",
   );
 
   expect(
-    screen.getByRole("button", { name: "Informações do Álbum" }),
+    screen.getByRole("button", { name: "Informações do álbum" }),
   ).toBeInTheDocument();
 
   act(() => canvasHarness.props?.onEditSheet?.("sheet-001"));
   expect(
-    screen.getByRole("button", { name: "Design da Lâmina" }),
+    screen.getByRole("button", { name: "Design da lâmina" }),
   ).toBeInTheDocument();
   expect(
-    screen.queryByRole("button", { name: "Informações do Álbum" }),
+    screen.queryByRole("button", { name: "Informações do álbum" }),
   ).not.toBeInTheDocument();
 
   act(() => canvasHarness.props?.onSelectFrame("frame-001"));
-  expect(screen.getByText("Frame selecionado")).toBeInTheDocument();
+  expect(screen.getByText("Quadro selecionado")).toBeInTheDocument();
 
   act(() => canvasHarness.props?.onSelectFrame("frame-002", true));
-  expect(screen.getByRole("heading", { name: "2 Frames selecionados" })).toBeInTheDocument();
-  expect(screen.getByText("1 Foto · 1 placeholder")).toBeInTheDocument();
-  await waitFor(() => expect(screen.getByRole("slider", { name: "Zoom da Foto" })).toBeEnabled());
-  expect(screen.queryByRole("button", { name: "Design da Lâmina" })).not.toBeInTheDocument();
+  expect(screen.getByRole("heading", { name: "2 quadros selecionados" })).toBeInTheDocument();
+  expect(screen.getByText("1 foto · 1 quadro vazio")).toBeInTheDocument();
+  await waitFor(() => expect(screen.getByRole("slider", { name: "Zoom da foto" })).toBeEnabled());
+  expect(screen.queryByRole("button", { name: "Design da lâmina" })).not.toBeInTheDocument();
   expect(canvasHarness.props?.selectedFrameIds).toEqual(["frame-001", "frame-002"]);
   act(() => canvasHarness.props?.onSelectFrame("frame-002", true));
-  expect(screen.getByText("Frame selecionado")).toBeInTheDocument();
+  expect(screen.getByText("Quadro selecionado")).toBeInTheDocument();
 
   act(() => canvasHarness.props?.onSelectFrame(null));
   expect(
-    screen.getByRole("button", { name: "Design da Lâmina" }),
+    screen.getByRole("button", { name: "Design da lâmina" }),
   ).toBeInTheDocument();
 
   fireEvent.keyDown(window, { key: "Escape" });
   expect(
-    screen.getByRole("button", { name: "Informações do Álbum" }),
+    screen.getByRole("button", { name: "Informações do álbum" }),
   ).toBeInTheDocument();
 });

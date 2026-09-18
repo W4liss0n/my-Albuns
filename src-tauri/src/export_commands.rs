@@ -93,7 +93,7 @@ impl ExportCommandError {
     fn cancelled() -> Self {
         Self {
             code: ExportCommandErrorCode::Cancelled,
-            message: "A Exportação foi cancelada.".into(),
+            message: "A exportação foi cancelada.".into(),
             media_id: None,
             path_code: None,
             media_problems: None,
@@ -122,13 +122,16 @@ impl ExportCommandError {
                 media_problems: None,
                 layout_problems: None,
             },
-            OperationGateError::Unavailable { reason } => Self {
+            OperationGateError::Unavailable { reason } => {
+                tracing::warn!(target: "myalbuns.desktop", %reason, event = "export_reservation_failed");
+                Self {
                 code: ExportCommandErrorCode::Failed,
-                message: format!("Não foi possível reservar a Exportação: {reason}"),
+                message: "Não foi possível iniciar a exportação.".into(),
                 media_id: None,
                 path_code: None,
                 media_problems: None,
                 layout_problems: None,
+                }
             },
         }
     }
@@ -297,7 +300,7 @@ async fn run_export(
                 None,
             );
             ExportCommandError::failed(format!(
-                "Não foi possível acessar um caminho necessário à Exportação (Destino ou Arquivo original). Verifique o Destino; se a mídia estiver ausente, use Religar no Painel de imagens e tente novamente. Detalhes: {error}"
+                "Não foi possível acessar um caminho necessário à exportação (destino ou arquivo original). Verifique o destino; se a mídia estiver ausente, use Localizar imagem… no painel de imagens e tente novamente. Detalhes: {error}"
             ))
         })?,
         () = attempt.cancelled() => {
@@ -606,7 +609,7 @@ mod tests {
                 .expect("the command error serializes"),
             json!({
                 "code": "cancelled",
-                "message": "A Exportação foi cancelada.",
+                "message": "A exportação foi cancelada.",
             })
         );
     }

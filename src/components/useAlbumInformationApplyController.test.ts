@@ -36,8 +36,8 @@ test("describes only the Album information field that actually changed", () => {
 
   expect(details).toEqual([
     {
-      label: "Primeira Lâmina",
-      value: "Lâmina dupla → Página única",
+      label: "Primeira lâmina",
+      value: "Lâmina dupla → página única",
     },
   ]);
 });
@@ -61,15 +61,15 @@ test("describes final raster size and structural and dimensional impact", () => 
 
   expect(details).toEqual([
     {
-      label: "Primeira Lâmina",
-      value: "Lâmina dupla → Página única",
+      label: "Primeira lâmina",
+      value: "Lâmina dupla → página única",
     },
     { label: "DPI", value: "300 → 240" },
-    { label: "Largura da Lâmina", value: "600 mm → 700 mm" },
-    { label: "Altura da Lâmina", value: "300 mm → 350 mm" },
+    { label: "Largura da lâmina", value: "600 mm → 700 mm" },
+    { label: "Altura da lâmina", value: "300 mm → 350 mm" },
     {
       label: "Resolução resultante",
-      value: "Lâmina 6.614 × 3.307 px · Página 3.307 × 3.307 px",
+      value: "Lâmina 6.614 × 3.307 px · página 3.307 × 3.307 px",
     },
     {
       label: "Composição",
@@ -334,8 +334,8 @@ test("includes edge losses in the existing Album information confirmation", asyn
   }] }); });
   expect(dialog.present).toHaveBeenCalledOnce();
   expect(dialog.present).toHaveBeenCalledWith({ kind: "albumInformationConfirmation", busy: false, details: [
-    { label: "Primeira Lâmina", value: "Lâmina dupla → Página única" },
-    { label: "Remoção na Lâmina 1", value: "O Background personalizado da página esquerda da Lâmina 1 será removido." },
+    { label: "Primeira lâmina", value: "Lâmina dupla → página única" },
+    { label: "Remoção na lâmina 1", value: "O fundo personalizado da página esquerda da lâmina 1 será removido." },
   ] });
   await act(async () => { dialog.emit("cancelAlbumInformation"); expect(await completion).toBe(false); });
   expect(onApply).not.toHaveBeenCalled();

@@ -13,17 +13,17 @@ interface EmptyStateContent {
 
 const catalogContent: Record<MediaKind, EmptyStateContent> = {
   decorative: {
-    description: "As Imagens decorativas importadas aparecerão aqui.",
-    title: "Nenhum Decorativo importado",
+    description: "Use Importar para adicionar fundos e sobreposições.",
+    title: "Nenhum decorativo importado",
   },
   photo: {
-    description: "As Fotos importadas para este Projeto aparecerão aqui.",
-    title: "Nenhuma Foto importada",
+    description: "Use Importar para adicionar fotos ao projeto.",
+    title: "Nenhuma foto importada",
   },
 };
 
 const filteredContent: EmptyStateContent = {
-  description: "Ajuste a Busca ou o Filtro de uso para ver outros itens.",
+  description: "Tente outro nome ou altere o filtro.",
   title: "Nenhum item encontrado",
 };
 

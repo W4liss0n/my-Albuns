@@ -409,7 +409,7 @@ export function AlbumInformationForm({
           <SelectField
             error={firstError(errors.firstSheet)}
             field="firstSheet"
-            label="Primeira Lâmina"
+            label="Primeira lâmina"
             onReset={endSheetResetAction("firstSheet")}
             validationTooltip={validationTooltip}
             value={draft.firstSheet}
@@ -419,7 +419,7 @@ export function AlbumInformationForm({
           <SelectField
             error={firstError(errors.lastSheet)}
             field="lastSheet"
-            label="Última Lâmina"
+            label="Última lâmina"
             onReset={endSheetResetAction("lastSheet")}
             validationTooltip={validationTooltip}
             value={draft.lastSheet}
@@ -458,7 +458,7 @@ export function AlbumInformationForm({
           />
         </div>
         <fieldset className="album-information-dimension">
-          <legend>Dimensão da Lâmina</legend>
+          <legend>Dimensão da lâmina</legend>
           <div className="inspector-readout-grid">
             <MeasurementField
               error={firstError(errors.sheetWidth)}
@@ -482,8 +482,8 @@ export function AlbumInformationForm({
             />
           </div>
         </fieldset>
-        <div aria-label="Dimensão da Página" className="inspector-dimension" role="group">
-          <span className="inspector-dimension__title">Dimensão da Página</span>
+        <div aria-label="Dimensão da página" className="inspector-dimension" role="group">
+          <span className="inspector-dimension__title">Dimensão da página</span>
           <div className="inspector-readout-grid">
             <IntegratedReadout
               label="Largura"

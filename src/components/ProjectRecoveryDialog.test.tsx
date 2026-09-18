@@ -25,7 +25,7 @@ test("renders one accessible external dialog and traps focus on its three decisi
     name: "Recuperar trabalho não salvo?",
   });
   const recover = screen.getByRole("button", {
-    name: "Reabrir e recuperar",
+    name: "Recuperar e abrir",
   });
   const defer = screen.getByRole("button", { name: "Agora não" });
 
@@ -53,7 +53,7 @@ test("keeps discard confirmation in the same external owner and cancels it with 
 
   expect(screen.getAllByRole("dialog")).toHaveLength(1);
   expect(
-    screen.getByRole("button", { name: "Descartar recuperação e abrir" }),
+    screen.getByRole("button", { name: "Descartar alterações e abrir" }),
   ).toHaveFocus();
   fireEvent.keyDown(dialog, { key: "Escape" });
   expect(props.onBack).toHaveBeenCalledOnce();
@@ -73,7 +73,7 @@ test("does not duplicate a decision while its resolution is in flight", () => {
     screen.getByRole("button", { name: "Abrir última versão salva" }),
   ).toBeDisabled();
   expect(
-    screen.getByRole("button", { name: "Reabrir e recuperar" }),
+    screen.getByRole("button", { name: "Recuperar e abrir" }),
   ).toBeDisabled();
   fireEvent.keyDown(dialog, { key: "Escape" });
   expect(props.onDefer).not.toHaveBeenCalled();

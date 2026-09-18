@@ -125,7 +125,7 @@ export function AlbumDesignForm({
    * quando a abertura vem do teclado, que não emite `pointerdown`.
    */
   const [openPicker, setOpenPicker] = useState<
-    "Background" | "Overlay" | null
+    "Fundo" | "Sobreposição" | null
   >(null);
   const [applying, setApplying] = useState(false);
   const dirty = projectDraft.changed;
@@ -294,7 +294,7 @@ export function AlbumDesignForm({
         <div className="album-design-preview">
           <ProportionalPreviewViewport
             height={previewGeometry.heightUm}
-            label="Prévia do padrão visual do Álbum"
+            label="Prévia do padrão visual do álbum"
             width={previewGeometry.widthUm}
           >
             <PersonalizationScopeSurface
@@ -313,13 +313,13 @@ export function AlbumDesignForm({
         </p>
         <VisualDefaultControl
           decorativeMedia={decorativeMedia}
-          label="Background"
+          label="Fundo"
           mediaPreviewUrls={mediaPreviewUrls}
-          open={openPicker === "Background"}
+          open={openPicker === "Fundo"}
           selectedMediaId={
             background?.kind === "media" ? background.mediaId : null
           }
-          onOpenChange={(open) => setOpenPicker(open ? "Background" : null)}
+          onOpenChange={(open) => setOpenPicker(open ? "Fundo" : null)}
           onSelect={(mediaId) => chooseBackground({ kind: "media", mediaId })}
         >
           <label
@@ -332,7 +332,7 @@ export function AlbumDesignForm({
               style={{ background: backgroundColor(background) }}
             />
             <input
-              aria-label="Cor do Background"
+              aria-label="Cor do fundo"
               type="color"
               value={backgroundColor(background)}
               onChange={(event) =>
@@ -346,23 +346,23 @@ export function AlbumDesignForm({
         </VisualDefaultControl>
         <VisualDefaultControl
           decorativeMedia={decorativeMedia}
-          label="Overlay"
+          label="Sobreposição"
           mediaPreviewUrls={mediaPreviewUrls}
           noneSelected={overlay === null}
-          open={openPicker === "Overlay"}
+          open={openPicker === "Sobreposição"}
           selectedMediaId={overlay?.mediaId ?? null}
-          onOpenChange={(open) => setOpenPicker(open ? "Overlay" : null)}
+          onOpenChange={(open) => setOpenPicker(open ? "Sobreposição" : null)}
           onSelect={(mediaId) => chooseOverlay({ kind: "media", mediaId })}
           onClear={() => chooseOverlay(null)}
         />
       </section>
       <section className="inspector-subsection">
-        <h3>Padrão dos Frames</h3>
+        <h3>Padrão dos quadros</h3>
         <div className="album-frame-border-row">
           <label className="album-frame-border-color-picker">
-            <span className="ui-visually-hidden">Cor da Borda</span>
+            <span className="ui-visually-hidden">Cor da borda</span>
             <input
-              aria-label="Cor da Borda"
+              aria-label="Cor da borda"
               type="color"
               value={borderEditor.rgb}
               onChange={(event) =>
@@ -388,7 +388,7 @@ export function AlbumDesignForm({
               </output>
             </span>
             <input
-              aria-label="Espessura da Borda"
+              aria-label="Espessura da borda"
               className="ui-range"
               max={Math.max(5_000, borderEditor.widthUm)}
               min="0"
@@ -403,13 +403,13 @@ export function AlbumDesignForm({
         </div>
         <label className="ui-range-control">
           <span className="ui-range-control__heading">
-            <span>Espaço entre Frames</span>
+            <span>Espaço entre quadros</span>
             <output>
               {formatPhysicalMeasurement(frameGapUm, presentationUnit)}
             </output>
           </span>
           <input
-            aria-label="Espaço entre Frames"
+            aria-label="Espaço entre quadros"
             className="ui-range"
             max={Math.max(24_000, frameGapUm)}
             min="0"
@@ -441,7 +441,7 @@ function VisualDefaultControl({
 }: {
   children?: ReactNode;
   decorativeMedia: readonly MediaCatalogItem[];
-  label: "Background" | "Overlay";
+  label: "Fundo" | "Sobreposição";
   mediaPreviewUrls: Readonly<Record<string, string>>;
   /**
    * Verdadeiro apenas quando o escopo inteiro está sem Overlay. Escopo com
@@ -458,17 +458,17 @@ function VisualDefaultControl({
     <div className="visual-default-field">
       <span className="visual-default-label">{label}</span>
       <div
-        aria-label={`Opções de ${label}`}
+        aria-label={`Opções de ${label.toLocaleLowerCase("pt-BR")}`}
         className="visual-default-picker"
         role="group"
       >
         {children}
         {onClear ? (
           <button
-            aria-label="Sem Overlay"
+            aria-label="Sem sobreposição"
             aria-pressed={noneSelected}
             className="visual-default-picker__option"
-            title="Sem Overlay"
+            title="Sem sobreposição"
             type="button"
             onClick={onClear}
           >
@@ -584,8 +584,8 @@ function scopeLabel(scope: AlbumDesignScope) {
 }
 
 const ALBUM_DESIGN_SCOPE_PRESENTATION = {
-  accessiblePreviewLabel: "Composição do padrão visual do Álbum",
+  accessiblePreviewLabel: "Composição do padrão visual do álbum",
   externalSelection: false,
-  scopeControlsLabel: "Escopo do padrão visual do Álbum",
+  scopeControlsLabel: "Escopo do padrão visual do álbum",
   technicalGuides: false,
 } as const;

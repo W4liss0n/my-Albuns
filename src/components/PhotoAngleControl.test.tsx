@@ -14,7 +14,7 @@ function harness(value: number | null = 120, doubleClickTimeMs = 900) {
   const view = render(<PhotoAngleControl value={value} {...actions} />);
   Object.defineProperty(screen.getByRole("slider"), "setPointerCapture", { value: vi.fn() });
   return { view, actions, onPreview, onCommit, onCancel,
-    slider: screen.getByRole("slider", { name: "Ângulo da Foto" }),
+    slider: screen.getByRole("slider", { name: "Ângulo da foto" }),
     number: screen.getByRole("spinbutton", { name: "Ângulo em graus" }) };
 }
 

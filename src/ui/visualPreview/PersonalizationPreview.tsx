@@ -78,7 +78,7 @@ export function PersonalizationPreview({
     >
       <title>{accessibleLabel}</title>
       <rect
-        aria-label="Base branca canônica"
+        aria-label="Fundo branco"
         fill="#FFFFFF"
         height={heightUm}
         pointerEvents="none"
@@ -90,7 +90,7 @@ export function PersonalizationPreview({
         <BackgroundContent
           content={personalization.background.both}
           height={heightUm}
-          label="Background de ambos os lados"
+          label="Fundo de ambos os lados"
           width={widthUm}
           x={0}
         />
@@ -99,14 +99,14 @@ export function PersonalizationPreview({
           <BackgroundContent
             content={personalization.background.left}
             height={heightUm}
-            label="Background do lado esquerdo"
+            label="Fundo do lado esquerdo"
             width={pageWidth}
             x={0}
           />
           <BackgroundContent
             content={personalization.background.right}
             height={heightUm}
-            label="Background do lado direito"
+            label="Fundo do lado direito"
             width={pageWidth}
             x={pageWidth}
           />
@@ -145,7 +145,7 @@ export function PersonalizationPreview({
               return (
                 <g key={frameNumber}>
                   <rect
-                    aria-label={`Frame demonstrativo ${side} ${frameNumber}`}
+                    aria-label={`Quadro de exemplo ${frameNumber}, lado ${side}`}
                     fill="#7A684E"
                     fillOpacity={
                       isSelected ? "0.24" : isFocused ? "0.15" : "0.08"
@@ -159,7 +159,7 @@ export function PersonalizationPreview({
                   />
                   {frameBorder.kind === "solid" && borderFillRects.length > 0 ? (
                     <g
-                      aria-label={`Borda do Frame ${side} ${frameNumber}`}
+                      aria-label={`Borda do quadro ${side} ${frameNumber}`}
                       pointerEvents="none"
                     >
                       {borderFillRects.map((rect, index) => (
@@ -185,7 +185,7 @@ export function PersonalizationPreview({
         <OverlayContent
           content={personalization.overlay.both}
           height={heightUm}
-          label="Overlay de ambos os lados"
+          label="Sobreposição de ambos os lados"
           width={widthUm}
           x={0}
         />
@@ -194,14 +194,14 @@ export function PersonalizationPreview({
           <OverlayContent
             content={personalization.overlay.left}
             height={heightUm}
-            label="Overlay do lado esquerdo"
+            label="Sobreposição do lado esquerdo"
             width={pageWidth}
             x={0}
           />
           <OverlayContent
             content={personalization.overlay.right}
             height={heightUm}
-            label="Overlay do lado direito"
+            label="Sobreposição do lado direito"
             width={pageWidth}
             x={pageWidth}
           />
@@ -222,7 +222,7 @@ export function PersonalizationPreview({
 
         return isSelected ? null : (
           <rect
-            aria-label={`Atenuação do lado ${side}`}
+            aria-label={`Lado não selecionado: ${side}`}
             fill="#E3E0DA"
             fillOpacity={isCandidate ? "0.18" : "0.42"}
             height={heightUm}

@@ -44,16 +44,16 @@ const validationPresentation: Record<
 > = {
   sheetWidthNotPositive: {
     field: "sheetWidth",
-    message: "A largura da Lâmina deve ser maior que zero.",
+    message: "A largura da lâmina deve ser maior que zero.",
   },
   sheetWidthAboveSafeInteger: {
     field: "sheetWidth",
-    message: "A largura da Lâmina excede o intervalo suportado.",
+    message: "A largura da lâmina excede o intervalo suportado.",
   },
   sheetWidthNotEven: {
     field: "sheetWidth",
     message:
-      "A largura da Lâmina precisa permitir duas Páginas com a mesma medida.",
+      "A largura da lâmina precisa permitir duas páginas com a mesma medida.",
   },
   sheetWidthRasterOutOfRange: {
     field: "sheetWidth",
@@ -61,11 +61,11 @@ const validationPresentation: Record<
   },
   sheetHeightNotPositive: {
     field: "sheetHeight",
-    message: "A altura da Lâmina deve ser maior que zero.",
+    message: "A altura da lâmina deve ser maior que zero.",
   },
   sheetHeightAboveSafeInteger: {
     field: "sheetHeight",
-    message: "A altura da Lâmina excede o intervalo suportado.",
+    message: "A altura da lâmina excede o intervalo suportado.",
   },
   sheetHeightRasterOutOfRange: {
     field: "sheetHeight",
@@ -79,7 +79,7 @@ const validationPresentation: Record<
   sheetDimensionsRequireContentTransformation: {
     field: "sheetWidth",
     message:
-      "A composição existente exige o fluxo de mudança dimensional segura.",
+      "Não é possível aplicar esse tamanho à composição atual.",
   },
   sheetDimensionsUnknownPhotoSize: {
     field: "sheetWidth",
@@ -87,37 +87,37 @@ const validationPresentation: Record<
   },
   sheetDimensionsInvalidContent: {
     field: "sheetWidth",
-    message: "Esse tamanho não permite preservar todos os frames e as medidas do álbum.",
+    message: "Esse tamanho não permite preservar todos os quadros e as medidas do álbum.",
   },
   firstSheetConversionRequiresContentReorganization: {
     field: "firstSheet",
     message:
-      "A primeira Lâmina contém composição e exige o fluxo completo de conversão.",
+      "Revise o conteúdo da primeira lâmina antes de alterar seu tipo.",
   },
   lastSheetConversionRequiresContentReorganization: {
     field: "lastSheet",
     message:
-      "A última Lâmina contém composição e exige o fluxo completo de conversão.",
+      "Revise o conteúdo da última lâmina antes de alterar seu tipo.",
   },
   dpiOutOfRange: {
     field: "dpi",
-    message: "Informe um DPI inteiro entre 1 e 1.200.",
+    message: "Use um número inteiro entre 1 e 1.200 DPI.",
   },
   sheetCountTooSmall: {
     field: "sheetCount",
-    message: "O Álbum deve conter pelo menos 2 Lâminas.",
+    message: "O álbum deve conter pelo menos 2 lâminas.",
   },
   bleedNegative: {
     field: "bleed",
-    message: "A Sangria não pode ser negativa.",
+    message: "A sangria não pode ser negativa.",
   },
   bleedAboveSafeInteger: {
     field: "bleed",
-    message: "A Sangria excede o intervalo suportado.",
+    message: "A sangria excede o intervalo suportado.",
   },
   bleedEliminatesCutArea: {
     field: "bleed",
-    message: "A Sangria deve manter uma Área de corte positiva.",
+    message: "Reduza a sangria para manter uma área de corte.",
   },
   safetyNegative: {
     field: "safety",
@@ -130,7 +130,7 @@ const validationPresentation: Record<
   safetyEliminatesSafeArea: {
     field: "safety",
     message:
-      "Sangria e segurança devem manter uma Área de segurança positiva.",
+      "Reduza a sangria ou a margem de segurança para manter uma área útil.",
   },
 };
 
@@ -162,10 +162,10 @@ function rasterRangeMessage(
     : context.rasterLimits?.sheetWidth;
   const dimension =
     axis === "height"
-      ? "altura da Lâmina"
+      ? "altura da lâmina"
       : context.sheetWidthPresentation === "closedSheet"
-        ? "largura da Lâmina fechada"
-        : "largura da Lâmina";
+        ? "largura da lâmina fechada"
+        : "largura da lâmina";
   if (!range) {
     return `A ${dimension} precisa ser ajustada para o DPI informado.`;
   }

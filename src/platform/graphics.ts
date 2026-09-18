@@ -38,7 +38,7 @@ function diagnoseWebGl2Context(
       code: "webgl2_unavailable",
       renderer: "indisponível",
       reason:
-        "Não foi possível criar um contexto WebGL2 acelerado por hardware.",
+        "Não foi possível ativar a aceleração gráfica necessária para abrir o editor.",
       limits: null,
     };
   }
@@ -64,7 +64,7 @@ function diagnoseWebGl2Context(
       code: "hardware_unconfirmed",
       renderer: "não confirmado",
       reason:
-        "WebGL2 existe, mas seus limites gráficos não puderam ser confirmados.",
+        "Não foi possível verificar a capacidade gráfica necessária para abrir o editor.",
       limits: null,
     };
   }
@@ -75,7 +75,7 @@ function diagnoseWebGl2Context(
       code: "hardware_unconfirmed",
       renderer: "não confirmado",
       reason:
-        "WebGL2 existe, mas o backend de hardware não pôde ser confirmado.",
+        "Não foi possível confirmar a aceleração gráfica necessária para abrir o editor.",
       limits,
     };
   }
@@ -91,7 +91,7 @@ function diagnoseWebGl2Context(
       code: "hardware_unconfirmed",
       renderer: "não confirmado",
       reason:
-        "WebGL2 existe, mas o backend de hardware não pôde ser confirmado.",
+        "Não foi possível confirmar a aceleração gráfica necessária para abrir o editor.",
       limits,
     };
   }
@@ -102,7 +102,7 @@ function diagnoseWebGl2Context(
       code: "software_renderer",
       renderer,
       reason:
-        "O WebGL2 disponível está usando rasterização por software, que não atende ao editor.",
+        "O editor precisa de aceleração gráfica, que não está disponível nesta tentativa.",
       limits,
     };
   }
@@ -110,7 +110,7 @@ function diagnoseWebGl2Context(
   return {
     supported: true,
     renderer,
-    reason: "WebGL2 acelerado por hardware confirmado.",
+    reason: "A aceleração gráfica está disponível.",
     limits,
   };
 }

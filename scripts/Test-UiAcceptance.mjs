@@ -118,7 +118,7 @@ test("the welcome preview declares a stable empty-recent-Projects scenario", () 
   assert.match(scenario.comparison.reason, /referência visual vigente/iu);
   assert.equal("referencePath" in scenario, false);
   assert.deepEqual(scenario.viewport, { width: 1280, height: 720 });
-  assert.match(scenario.readySelector, /Nenhum Projeto recente/u);
+  assert.match(scenario.readySelector, /Nenhum projeto recente/u);
   assert.match(scenario.readySelector, /not\(:has\(\.global-recent-list\)\)/u);
   assert.match(
     scenario.readySelector,
@@ -128,7 +128,7 @@ test("the welcome preview declares a stable empty-recent-Projects scenario", () 
     {
       type: "assert",
       selector:
-        '.global-empty-state[role="status"][aria-label="Nenhum Projeto recente"]',
+        '.global-empty-state[role="status"][aria-label="Nenhum projeto recente"]',
     },
     {
       type: "assert",
@@ -352,16 +352,16 @@ test("the manifest covers critical integrated workspace, panel, menu, and graphi
   const expectedStates = {
     "project-workspace-integrated": {
       path: "/workspace-preview.html",
-      ready: /Informações do Álbum/u,
+      ready: /Informações do álbum/u,
     },
     "project-workspace-sheet-context": {
       path: "/workspace-preview.html",
-      ready: /Design da Lâmina/u,
+      ready: /Design da lâmina/u,
       actions: ["focus", "key"],
     },
     "project-workspace-photo-context": {
       path: "/workspace-preview.html?frame=photo",
-      ready: /Zoom da Foto/u,
+      ready: /Zoom da foto/u,
       actions: ["focus", "key", "click"],
     },
     "project-workspace-frame-placeholder-context": {
@@ -452,7 +452,7 @@ test("the manifest captures rendered structural command surfaces at the physical
       offsetX: -40,
     },
   ]);
-  assert.match(contextMenu.readySelector, /Ações da Lâmina 01/u);
+  assert.match(contextMenu.readySelector, /Ações da lâmina 01/u);
   assert.match(contextMenu.readySelector, /data-centered-sheet-id="sheet-001"/u);
   assert.match(contextMenu.readySelector, /data-viewport-offset-x="0"/u);
   assert.match(contextMenu.readySelector, /nth-of-type\(1\)/u);

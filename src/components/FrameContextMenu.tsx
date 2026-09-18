@@ -17,7 +17,7 @@ interface FrameContextMenuProps {
 
 export function FrameContextMenu({ editing = true, hasPhoto = false, canOpenInPhotoshop = false, onOpenInPhotoshop, position, onArrange, onDelete, onSwapContents, canSwapContents, onDismiss }: FrameContextMenuProps) {
   return (
-    <ContextMenuSurface label={editing ? "Organizar Frames" : "Ações da Foto"} position={position} onDismiss={onDismiss}>
+    <ContextMenuSurface label={editing ? "Organizar quadros" : "Ações da foto"} position={position} onDismiss={onDismiss}>
       {hasPhoto && <>
         <button type="button" role="menuitem" aria-label={projectCommandDescriptor("open-in-photoshop").label} disabled={!canOpenInPhotoshop} onClick={() => { onOpenInPhotoshop?.(); onDismiss(); }}>
           <span>{projectCommandDescriptor("open-in-photoshop").label}</span>

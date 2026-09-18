@@ -10,7 +10,7 @@ test.each<[DisplayUnit, string, string]>([["mm", "mm", "2,54"], ["cm", "cm", "0,
     render(<FrameStyleControls frames={frameStyleCorpus.states.album.state.album.sheets[0].frames}
       unit={unit} disabled={false} scopeKey="physical" doubleClickTimeMs={500} dragThreshold={{ x: 5, y: 5 }}
       onPreview={vi.fn()} onCommit={onCommit} onCancel={vi.fn()} />);
-    const field = screen.getByRole("spinbutton", { name: `Espessura da Borda em ${label}` });
+    const field = screen.getByRole("spinbutton", { name: `Espessura da borda em ${label}` });
     fireEvent.change(field, { target: { value } });
     fireEvent.keyDown(field, { key: "Enter" });
     expect(onCommit).toHaveBeenCalledExactlyOnceWith({ kind: "borderWidth", widthUm: 2_540 });

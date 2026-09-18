@@ -76,7 +76,7 @@ impl PhotoImportAttempt {
         paths: Vec<PathBuf>,
     ) -> Result<Self, String> {
         if catalog.project_id != namespace.project_id() {
-            return Err("O Projeto mudou durante a importação das imagens.".into());
+            return Err("O projeto mudou durante a importação das imagens.".into());
         }
         let mut seen = HashSet::new();
         let paths = paths
@@ -451,7 +451,7 @@ fn prepare_proposal_with_inspection(
                 let prepared = match preview {
                     ImportedPhotoPreview::Prepared { generation } => stage
                         .as_mut()
-                        .ok_or_else(|| "O Cache ficou indisponível.".to_string())
+                        .ok_or_else(|| "O prévias temporárias ficou indisponível.".to_string())
                         .and_then(|stage| {
                             stage.record(source.candidate.clone(), current, *generation)
                         }),
@@ -597,7 +597,7 @@ fn commit_prepared_import(
         host.commit_photo_import_proposal(&attempt.catalog.project_id, prepared.proposal)?;
     let catalog = host.authorized_media_catalog()?;
     if catalog.project_id != attempt.catalog.project_id {
-        return Err("O Projeto mudou durante a importação.".into());
+        return Err("O projeto mudou durante a importação.".into());
     }
     let by_path = catalog
         .bindings
@@ -707,7 +707,7 @@ async fn execute_import_batch(
             .is_current_project(&request.project_id)
         {
             return Err(BatchFailure::Recoverable(
-                "O Projeto mudou durante a importação.".into(),
+                "O projeto mudou durante a importação.".into(),
             ));
         }
         let admission =
@@ -716,7 +716,7 @@ async fn execute_import_batch(
                 .map_err(|error| BatchFailure::Recoverable(error.to_string()))?;
         if engine.processor_status() == CacheProcessorStatus::Suspended {
             return Err(BatchFailure::Recoverable(
-                "O Processador de Imagens está suspenso.".into(),
+                "O Processador de imagens está suspenso.".into(),
             ));
         }
         let lease = match admission
@@ -864,15 +864,14 @@ fn inspect_with_capacity(
 }
 
 fn cache_problem(path: &Path, reason: String) -> ImageProcessingProblem {
+    tracing::warn!(target: "myalbuns.desktop", error = %reason, event = "import_preview_unavailable");
     ImageProcessingProblem {
         file_name: path
             .file_name()
             .unwrap_or_default()
             .to_string_lossy()
             .into_owned(),
-        reason: format!(
-            "A imagem foi vinculada, mas não foi possível preparar sua miniatura: {reason}"
-        ),
+        reason: "A imagem foi adicionada, mas não foi possível preparar sua miniatura.".into(),
     }
 }
 
@@ -990,7 +989,7 @@ mod tests {
             },
             fingerprint,
             preview: ImportedPhotoPreview::Unavailable {
-                reason: "Cache indisponível".into(),
+                reason: "Prévias temporárias indisponível".into(),
             },
         }
     }
@@ -1385,7 +1384,7 @@ mod tests {
             None,
             HashMap::new(),
             HashMap::new(),
-            Some("Cache bloqueado".into()),
+            Some("Prévias temporárias bloqueado".into()),
             Vec::new(),
         )
         .unwrap();

@@ -12,8 +12,8 @@ test("export media recovery offers distinct actions without a Continue step", as
     { mediaId: "photo-2", fileName: "Rede.png", state: "unavailable" as const },
   ] };
   const view = render(<ProjectDialogView state={state} onAction={onAction} />);
-  expect(screen.queryByRole("button", { name: "Continuar Exportação" })).not.toBeInTheDocument();
-  await user.click(screen.getByRole("button", { name: "Relinkar" }));
+  expect(screen.queryByRole("button", { name: "Continuar exportação" })).not.toBeInTheDocument();
+  await user.click(screen.getByRole("button", { name: "Localizar imagens…" }));
   await user.click(screen.getByRole("button", { name: "Tentar novamente" }));
   expect(onAction.mock.calls).toEqual([["relinkExportMedia"], ["retryExportMedia"]]);
   view.rerender(<ProjectDialogView state={{ ...state, busy: true }} onAction={onAction} />);
@@ -38,8 +38,8 @@ test("custom Layout deletion explains its global scope and offers Cancel and Del
   const user = userEvent.setup();
   const onAction = vi.fn();
   const view = render(<ProjectDialogView onAction={onAction} state={{ kind: "layoutDeletionConfirmation", busy: false }} />);
-  const dialog = screen.getByRole("dialog", { name: "Excluir Layout personalizado?" });
-  expect(dialog).toHaveTextContent("O Layout será removido do catálogo em todas as Janelas.");
+  const dialog = screen.getByRole("dialog", { name: "Excluir layout personalizado?" });
+  expect(dialog).toHaveTextContent("Este layout será removido da lista de personalizados.");
   await user.click(within(dialog).getByRole("button", { name: "Cancelar" }));
   await user.click(within(dialog).getByRole("button", { name: "Excluir" }));
   expect(onAction.mock.calls).toEqual([["cancelLayoutDeletion"], ["confirmLayoutDeletion"]]);
@@ -67,7 +67,7 @@ test("confirms all Album information changes as one action", async () => {
   );
 
   const dialog = screen.getByRole("dialog", {
-    name: "Aplicar alterações no Álbum?",
+    name: "Aplicar alterações no álbum?",
   });
   expect(
     dialog.querySelector(".album-information-change-list"),
@@ -143,7 +143,7 @@ test("keeps the Project close confirmation body stable while resolving", () => {
     dialog.querySelector(".ui-standard-message__extra"),
   ).not.toBeInTheDocument();
   expect(dialog).toHaveTextContent(
-    "O Projeto tem alterações que ainda não foram salvas.",
+    "O projeto tem alterações que ainda não foram salvas.",
   );
 });
 
@@ -173,7 +173,7 @@ test("projects export progress and cancellation through the standard progress di
     "2",
   );
   await user.click(
-    screen.getByRole("button", { name: "Cancelar Exportação" }),
+    screen.getByRole("button", { name: "Cancelar exportação" }),
   );
   expect(onAction).toHaveBeenCalledWith("cancelExport");
   expect(screen.getByText("2 lâminas de 5")).toBeVisible();
@@ -219,7 +219,7 @@ test("projects generic operation failures through the standard message dialog", 
       onAction={onAction}
       state={{
         kind: "projectOperationFailure",
-        message: "O Projeto não pôde ser salvo.",
+        message: "O projeto não pôde ser salvo.",
       }}
     />,
   );
@@ -228,7 +228,7 @@ test("projects generic operation failures through the standard message dialog", 
     name: "A operação não foi concluída",
   });
   expect(within(dialog).getByRole("alert")).toHaveTextContent(
-    "O Projeto não pôde ser salvo.",
+    "O projeto não pôde ser salvo.",
   );
   await user.click(within(dialog).getByRole("button", { name: "Fechar" }));
   expect(onAction).toHaveBeenCalledWith("dismissProjectOperationFailure");
@@ -249,13 +249,13 @@ test("projects a fatal graphics diagnostic through the owned Project dialog", as
   );
 
   const dialog = screen.getByRole("dialog", {
-    name: "O Canvas não pôde ser iniciado",
+    name: "Não foi possível iniciar o editor",
   });
   expect(within(dialog).getByRole("alert")).toHaveTextContent(
     "O contexto WebGL2 foi perdido.",
   );
   const closeProjectButton = within(dialog).getByRole("button", {
-    name: "Fechar Projeto",
+    name: "Fechar projeto",
   });
   expect(closeProjectButton).toHaveFocus();
   await user.click(closeProjectButton);
@@ -266,7 +266,7 @@ test("shows photo import file progress without an unsafe cancel action", () => {
   const onAction = vi.fn();
   render(<ProjectDialogView onAction={onAction} state={{ kind: "imageProcessingProgress",
     progress: { kind: "determinate", completed: 6, total: 12, status: "" } }} />);
-  const dialog = screen.getByRole("dialog", { name: "Processando Imagens" });
+  const dialog = screen.getByRole("dialog", { name: "Processando imagens" });
   expect(within(dialog).getByText("6 de 12")).toBeInTheDocument();
   expect(within(dialog).getByRole("progressbar")).toHaveAttribute("aria-valuenow", "6");
   expect(within(dialog).getByRole("progressbar")).toHaveAttribute("aria-valuemax", "12");
@@ -286,7 +286,7 @@ test("projects export success through the standard message dialog", async () => 
       onAction={onAction}
       state={{
         kind: "exportSuccess",
-        message: "A Exportação foi concluída com sucesso.",
+        message: "A exportação foi concluída com sucesso.",
       }}
     />,
   );
@@ -295,7 +295,7 @@ test("projects export success through the standard message dialog", async () => 
     name: "Exportação concluída",
   });
   expect(within(dialog).getByRole("status")).toHaveTextContent(
-    "A Exportação foi concluída com sucesso.",
+    "A exportação foi concluída com sucesso.",
   );
   await user.click(within(dialog).getByRole("button", { name: "Fechar" }));
   expect(onAction).toHaveBeenCalledWith("dismissExport");
@@ -343,10 +343,10 @@ test("export placeholders list the Project, exact position and Open Project acti
   const onAction = vi.fn();
   render(<ProjectDialogView onAction={onAction} state={{ kind: "exportProblems", projectName: "Álbum da turma",
     problems: [{ sheetId: "sheet-001", sheetNumber: 1, frameId: "frame-003", frameNumber: 3 }] }} />);
-  const dialog = screen.getByRole("dialog", { name: "Problemas na Exportação" });
+  const dialog = screen.getByRole("dialog", { name: "Problemas na exportação" });
   expect(within(dialog).getByRole("columnheader", { name: "Projeto" })).toBeInTheDocument();
-  expect(within(dialog).getByRole("row", { name: "Álbum da turma Lâmina 01, posição 3: Frame vazio. Abrir Projeto" })).toBeInTheDocument();
-  await user.click(within(dialog).getByRole("button", { name: "Abrir Projeto" }));
+  expect(within(dialog).getByRole("row", { name: "Álbum da turma Lâmina 01, posição 3: quadro vazio. Voltar ao álbum" })).toBeInTheDocument();
+  await user.click(within(dialog).getByRole("button", { name: "Voltar ao álbum" }));
   expect(onAction).toHaveBeenCalledExactlyOnceWith("openExportProject");
 });
 
@@ -367,9 +367,9 @@ test("edge conversion uses the standard confirmation actions and names the disca
   const user = userEvent.setup();
   const onAction = vi.fn();
   render(<ProjectDialogView onAction={onAction} state={{ kind: "edgeConversionConfirmation",
-    message: "O Overlay personalizado da página direita da Lâmina 3 será removido." }} />);
+    message: "O sobreposição personalizado da página direita da lâmina 3 será removido." }} />);
   expect(screen.getByRole("heading", { name: "Converter para página única?" })).toBeInTheDocument();
-  expect(screen.getByText(/Overlay personalizado da página direita/)).toBeInTheDocument();
+  expect(screen.getByText(/sobreposição personalizado da página direita/)).toBeInTheDocument();
   await user.click(screen.getByRole("button", { name: "Cancelar" }));
   await user.click(screen.getByRole("button", { name: "Converter" }));
   expect(onAction.mock.calls).toEqual([["cancelEdgeConversion"], ["confirmEdgeConversion"]]);

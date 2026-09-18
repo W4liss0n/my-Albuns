@@ -468,7 +468,7 @@ export function useProjectMutations({
     if (outcome.status === "completed") {
       if (validationRejected) {
         setMessage(
-          "As Informações do Álbum mudaram enquanto a confirmação estava aberta e precisam ser revistas antes de Aplicar.",
+          "As Informações do álbum mudaram enquanto a confirmação estava aberta e precisam ser revistas antes de Aplicar.",
         );
         return { kind: "rejected" };
       }

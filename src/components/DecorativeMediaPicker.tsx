@@ -17,7 +17,7 @@ const IMPORT_PLACEHOLDER_TITLE = "Ainda não disponível nesta versão";
 
 interface DecorativeMediaPickerProps {
   decorativeMedia: readonly MediaCatalogItem[];
-  label: "Background" | "Overlay";
+  label: "Fundo" | "Sobreposição";
   mediaPreviewUrls: Readonly<Record<string, string>>;
   open: boolean;
   onOpenChange(open: boolean): void;
@@ -114,14 +114,14 @@ export function DecorativeMediaPicker({
         aria-haspopup="menu"
         aria-label={
           applied
-            ? `Decorativo do ${label}: ${applied.name}. Escolher outro`
-            : `Escolher Decorativo para ${label}`
+            ? `Decorativo ${label === "Fundo" ? "do fundo" : "da sobreposição"}: ${applied.name}. Escolher outro`
+            : `Escolher decorativo para ${label.toLocaleLowerCase("pt-BR")}`
         }
         className="visual-default-picker__option"
         data-decorative-picker-trigger="true"
         data-selected={applied ? true : undefined}
         ref={triggerRef}
-        title={applied ? applied.name : "Escolher Decorativo"}
+        title={applied ? applied.name : "Escolher decorativo"}
         type="button"
         onClick={() => onOpenChange(!open)}
       >
@@ -142,7 +142,7 @@ export function DecorativeMediaPicker({
       </button>
       {open ? (
         <div
-          aria-label={`Decorativos para ${label}`}
+          aria-label={`Decorativos para ${label.toLocaleLowerCase("pt-BR")}`}
           className="ui-floating-surface visual-default-popup"
           ref={menuRef}
           role="menu"
@@ -154,7 +154,7 @@ export function DecorativeMediaPicker({
               const selected = selectedMediaId === media.id;
               return (
                 <MediaPreviewCard
-                  aria-label={`Usar ${label} ${media.name}${
+                  aria-label={`Usar ${label.toLocaleLowerCase("pt-BR")} ${media.name}${
                     selected ? ". Selecionado" : ""
                   }`}
                   key={media.id}
@@ -174,7 +174,7 @@ export function DecorativeMediaPicker({
             })}
             {/* PLACEHOLDER UI: import commands await their application port. */}
             <MediaPreviewCard
-              aria-label="Importar Decorativo"
+              aria-label="Importar decorativo"
               data-placeholder-feature="import-decorative-files"
               disabled
               kind="placeholder"

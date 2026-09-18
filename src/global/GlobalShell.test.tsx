@@ -33,7 +33,7 @@ function GlobalShell({
 const supportedGraphics: GraphicsDiagnostic = {
   supported: true,
   renderer: "NVIDIA GeForce RTX",
-  reason: "WebGL2 acelerado por hardware confirmado.",
+  reason: "A aceleração gráfica está disponível.",
   limits: {
     maxTextureSizePx: 16_384,
     maxRenderbufferSizePx: 16_384,
@@ -88,10 +88,10 @@ test("shows the global welcome surface without a Project workspace", () => {
     screen.getByRole("heading", { name: "Projetos recentes" }),
   ).toBeInTheDocument();
   const newProjectButton = screen.getByRole("button", {
-    name: "Novo Projeto",
+    name: "Novo projeto",
   });
   const openProjectButton = screen.getByRole("button", {
-    name: "Abrir Projeto",
+    name: "Abrir projeto",
   });
   expect(newProjectButton).toBeEnabled();
   expect(newProjectButton).toHaveAttribute("aria-keyshortcuts", "Control+N");
@@ -115,10 +115,10 @@ test("uses the canonical text-only empty state for recent Projects", async () =>
   );
 
   const emptyState = await screen.findByRole("status", {
-    name: "Nenhum Projeto recente",
+    name: "Nenhum projeto recente",
   });
   expect(emptyState).toHaveTextContent(
-    "Os Projetos abertos recentemente aparecerão aqui.",
+    "Crie um projeto ou abra um arquivo .myalbuns.",
   );
   expect(emptyState.querySelector(".ui-empty-state__icon")).toBeNull();
 });
@@ -138,7 +138,7 @@ test("activates the Windows shortcuts displayed on welcome", async () => {
   fireEvent.keyDown(window, { ctrlKey: true, key: "n" });
   expect(
     screen.getByRole("banner", { name: "Barra da janela" }),
-  ).toHaveTextContent("Novo Projeto");
+  ).toHaveTextContent("Novo projeto");
 
   await user.click(screen.getByRole("button", { name: "Cancelar" }));
   fireEvent.keyDown(window, { ctrlKey: true, key: "o" });
@@ -169,7 +169,7 @@ test("transfers keyboard focus into New Project and restores its trigger on canc
   cancel.focus();
   await user.keyboard("{Enter}");
 
-  expect(screen.getByRole("button", { name: "Novo Projeto" })).toHaveFocus();
+  expect(screen.getByRole("button", { name: "Novo projeto" })).toHaveFocus();
 });
 
 test("blocks Project hosts at the global graphics boundary when hardware WebGL2 is unavailable", async () => {
@@ -195,10 +195,10 @@ test("blocks Project hosts at the global graphics boundary when hardware WebGL2 
     screen.getByText("WebGL2 acelerado por hardware não foi confirmado."),
   ).toBeInTheDocument();
   expect(
-    screen.queryByRole("button", { name: "Novo Projeto" }),
+    screen.queryByRole("button", { name: "Novo projeto" }),
   ).not.toBeInTheDocument();
   expect(
-    screen.queryByRole("button", { name: "Abrir Projeto" }),
+    screen.queryByRole("button", { name: "Abrir projeto" }),
   ).not.toBeInTheDocument();
   expect(completeGraphicsGate).toHaveBeenCalledWith(false);
   expect(openProject).not.toHaveBeenCalled();
@@ -216,15 +216,15 @@ test("replaces welcome with New Project in the same window and restores welcome 
     />,
   );
 
-  await user.click(screen.getByRole("button", { name: "Novo Projeto" }));
+  await user.click(screen.getByRole("button", { name: "Novo projeto" }));
 
   const windowTitlebar = screen.getByRole("banner", {
     name: "Barra da janela",
   });
-  expect(screen.getAllByText("Novo Projeto")).toHaveLength(1);
-  expect(windowTitlebar).toContainElement(screen.getByText("Novo Projeto"));
+  expect(screen.getAllByText("Novo projeto")).toHaveLength(1);
+  expect(windowTitlebar).toContainElement(screen.getByText("Novo projeto"));
   expect(
-    screen.queryByRole("heading", { level: 1, name: "Novo Projeto" }),
+    screen.queryByRole("heading", { level: 1, name: "Novo projeto" }),
   ).not.toBeInTheDocument();
   expect(
     screen.queryByRole("heading", { name: "Projetos recentes" }),
@@ -264,7 +264,7 @@ test("routes New Project operational failures through its owned native dialog po
     />,
   );
 
-  await user.click(screen.getByRole("button", { name: "Novo Projeto" }));
+  await user.click(screen.getByRole("button", { name: "Novo projeto" }));
   await user.click(screen.getByRole("button", { name: "Continuar" }));
 
   await waitFor(() =>
@@ -293,12 +293,12 @@ test("keeps opening progress out of the welcome document", async () => {
     />,
   );
 
-  await user.click(screen.getByRole("button", { name: "Abrir Projeto" }));
+  await user.click(screen.getByRole("button", { name: "Abrir projeto" }));
 
   expect(openProject).toHaveBeenCalledOnce();
   expect(
     screen.getByRole("button", {
-      name: "Abrindo Projeto…",
+      name: "Abrindo projeto…",
     }),
   ).toBeDisabled();
   expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
@@ -312,7 +312,7 @@ test("shows an actionable structured failure without exposing a pathname", async
   const present = vi.fn(async () => undefined);
   const failure = {
     code: "project_in_use",
-    message: "Este Projeto já está aberto em outra janela.",
+    message: "Este projeto já está aberto em outra janela.",
     action: "Feche a outra janela e tente novamente.",
   };
   const openProject = vi.fn(async () => ({
@@ -328,7 +328,7 @@ test("shows an actionable structured failure without exposing a pathname", async
       projectPort={createProjectPort({ openProject })}
     />,
   );
-  await user.click(screen.getByRole("button", { name: "Abrir Projeto" }));
+  await user.click(screen.getByRole("button", { name: "Abrir projeto" }));
 
   expect(present).toHaveBeenCalledWith({
     context: "projectOpening",
@@ -336,9 +336,9 @@ test("shows an actionable structured failure without exposing a pathname", async
   });
   expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   expect(
-    screen.getByRole("button", { name: "Abrir Projeto" }),
+    screen.getByRole("button", { name: "Abrir projeto" }),
   ).toBeEnabled();
-  expect(screen.queryByText(/\.(?:myalbuns)|\\|:\//i)).not.toBeInTheDocument();
+  expect(screen.queryByText(/(?:[A-Z]:\\|\\\\)/i)).not.toBeInTheDocument();
 });
 
 test("loads and renders recent Projects by name", async () => {
@@ -404,7 +404,7 @@ test("shows the startup failure from a direct Windows opening", async () => {
   const present = vi.fn(async () => undefined);
   const startupOpenFailure = vi.fn(async () => ({
     code: "invalid_project",
-    message: "O arquivo selecionado não é um Projeto válido.",
+    message: "O arquivo selecionado não é um projeto válido.",
     action: "Escolha outro arquivo .myalbuns.",
   }));
 
@@ -424,7 +424,7 @@ test("shows the startup failure from a direct Windows opening", async () => {
       context: "projectOpening",
       error: {
         code: "invalid_project",
-        message: "O arquivo selecionado não é um Projeto válido.",
+        message: "O arquivo selecionado não é um projeto válido.",
         action: "Escolha outro arquivo .myalbuns.",
       },
     });
@@ -449,7 +449,7 @@ test("does not overwrite a newer opening attempt with a late startup failure", a
     />,
   );
 
-  await user.click(screen.getByRole("button", { name: "Abrir Projeto" }));
+  await user.click(screen.getByRole("button", { name: "Abrir projeto" }));
   await act(async () => {
     startupFailure.resolve({
       code: "stale_startup_failure",
@@ -488,7 +488,7 @@ test("reacts to terminal outcomes forwarded after Global mounted and releases th
       status: "failed",
       error: {
         code: "project_in_use",
-        message: "Este Projeto está aberto por outra instância.",
+        message: "Este projeto está aberto por outra instância.",
         action: "Focalize a instância proprietária.",
       },
     });
@@ -498,7 +498,7 @@ test("reacts to terminal outcomes forwarded after Global mounted and releases th
       context: "projectOpening",
       error: {
         code: "project_in_use",
-        message: "Este Projeto está aberto por outra instância.",
+        message: "Este projeto está aberto por outra instância.",
         action: "Focalize a instância proprietária.",
       },
     }),
@@ -572,7 +572,7 @@ test("editor entry opens directly in New Project and repeated activation preserv
   const { unmount } = render(<GlobalShell initialSurface="newProject" onNewProjectRequest={requests}
     graphicsDiagnostic={supportedGraphics} projectPort={createProjectPort()} />);
   expect(screen.queryByRole("heading", { name: "Projetos recentes" })).not.toBeInTheDocument();
-  const count = screen.getByRole("textbox", { name: "Quantidade de Lâminas" });
+  const count = screen.getByRole("textbox", { name: "Quantidade de lâminas" });
   fireEvent.change(count, { target: { value: "23" } });
   await waitFor(() => expect(requests).toHaveBeenCalledOnce());
   act(() => activate());
@@ -580,7 +580,7 @@ test("editor entry opens directly in New Project and repeated activation preserv
   fireEvent.click(screen.getByRole("button", { name: "Cancelar" }));
   expect(screen.getByRole("heading", { name: "Projetos recentes" })).toBeInTheDocument();
   act(() => activate());
-  expect(screen.getByRole("textbox", { name: "Quantidade de Lâminas" })).toBeVisible();
+  expect(screen.getByRole("textbox", { name: "Quantidade de lâminas" })).toBeVisible();
   unmount();
   expect(release).toHaveBeenCalledOnce();
 });

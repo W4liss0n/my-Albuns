@@ -35,7 +35,7 @@ test.each([1, 2])("releasing %i Frames and immediately undoing presents the late
   undone.state.canRedo = true;
   let resolveEdit!: (projection: EditorProjection) => void;
   const pendingEdit = new Promise<EditorProjection>((resolve) => { resolveEdit = resolve; });
-  const unsupported = async (): Promise<never> => { throw new Error("Unsupported in this Frame/history test."); };
+  const unsupported = async (): Promise<never> => { throw new Error("Unsupported in this quadro/history test."); };
   const preview = vi.fn(async () => frameGeometryPreview(changed.composition.sheets[0].frames));
   const undo = vi.fn(async () => undone);
   const port: ProjectCorePort = {
@@ -45,9 +45,9 @@ test.each([1, 2])("releasing %i Frames and immediately undoing presents the late
     validateMediaFolderName: async () => { throw new Error("Folder validation is not configured in this fixture."); },
     queryLayouts: async () => { throw new Error("Layouts are not configured in this fixture."); },
     previewLayout: async () => { throw new Error("Layouts are not configured in this fixture."); },
-    previewFrameStyle: async () => { throw new Error("Frame style preview is not configured in this fixture."); },
+    previewFrameStyle: async () => { throw new Error("Quadro style preview is not configured in this fixture."); },
     previewDecorativeDrop: async () => { throw new Error("Decorative preview is not configured in this fixture."); },
-    previewPhotoZoom: async () => { throw new Error("Photo Zoom preview is not configured in this fixture."); },
+    previewPhotoZoom: async () => { throw new Error("Photo zoom preview is not configured in this fixture."); },
     previewPhotoAngle: async () => { throw new Error("Photo angle preview is not configured in this fixture."); },
     previewFrameGeometry: preview, readFrameDragThreshold: async () => ({ x: 5, y: 5 }),
     undo, redo: unsupported, save: unsupported, saveAs: unsupported,

@@ -18,7 +18,7 @@ export function BatchExportWindow({ port }: { port: BatchExportPort }) {
   const [error, setError] = useState<string | null>(null);
   const [storageState, setStorageState] = useState<StorageFullPresentation | null>(null);
   const storageMessage = view?.partialPublication
-    ? "O álbum atual foi publicado parcialmente. Libere espaço e retome para concluir. Os álbuns já exportados foram mantidos."
+    ? "Alguns arquivos do álbum atual já foram exportados. Libere espaço e retome para concluir. Os álbuns já exportados foram mantidos."
     : "Libere espaço para continuar. Os álbuns já exportados foram mantidos.";
   const storageCallbacks = useRef({ resume: () => {}, cancel: () => {} });
   const storageController = useMemo(() => new StorageRecoveryController(
@@ -96,7 +96,7 @@ export function BatchExportWindow({ port }: { port: BatchExportPort }) {
       confirmAction={{ label: "Substituir", disabled: busy, onClick: () => void act(() => run("replace")) }} />;
   } else if (recovery) {
     content = <ConfirmationDialog title="Lote interrompido" description={<>
-      {recovery.remaining} de {recovery.total} Projetos para concluir.
+      {recovery.remaining} de {recovery.total} projetos para concluir.
       <span className="batch-project-path" title={recovery.sourceFolder}>{recovery.sourceFolder}</span>
     </>} cancelAction={{ label: "Encerrar", disabled: busy, onClick: () => end(recovery.id) }}
       confirmAction={{ label: "Retomar", disabled: busy, onClick: () => refresh(() => port.resume(recovery.id)) }} />;
@@ -110,11 +110,11 @@ export function BatchExportWindow({ port }: { port: BatchExportPort }) {
     }}
       onAction={action => void storageController.act(action)} />;
   } else if (terminal && problems.length === 0) {
-    content = <MessageDialog title="Exportação concluída" description="Todos os Álbuns foram exportados." tone="success"
+    content = <MessageDialog title="Exportação concluída" description="Todos os álbuns foram exportados." tone="success"
       primaryAction={{ label: "Fechar", disabled: busy, onClick: close }} />;
   } else if (view && problems.length > 0) {
     content = <ProblemsDialog title={terminal ? "Resultado da exportação" : "Problemas na exportação"}
-      description={terminal ? resultSummary : "Resolva ou ignore os Projetos abaixo para continuar."}
+      description={terminal ? resultSummary : "Resolva ou ignore os projetos abaixo para continuar."}
       columns={["Projeto", "Problema", "Ações"]} rows={problems.map(item => [
         <span key="project">{item.name}<span className="batch-project-path" title={item.projectPath}>{item.projectPath}</span></span>,
         <div key="reasons" className="batch-problem-reasons">{item.status === "ignored" && <strong>Ignorado neste lote</strong>}
@@ -124,9 +124,9 @@ export function BatchExportWindow({ port }: { port: BatchExportPort }) {
           <ActionButton disabled={busy} onClick={() => void act(async () => {
             const outcome = await port.openProject(item.id);
             if (outcome.status === "failed") throw new Error(outcome.error.message);
-          })}>Abrir Projeto</ActionButton>
+          })}>Abrir projeto</ActionButton>
           {item.problems.some(problem => problem.kind === "missingMedia") && <ActionButton disabled={busy}
-            onClick={() => refresh(() => port.relink(item.id))}>Religar…</ActionButton>}
+            onClick={() => refresh(() => port.relink(item.id))}>Localizar imagens…</ActionButton>}
           <ActionButton disabled={busy} onClick={() => refresh(() => port.ignore(item.id))}>Ignorar neste lote</ActionButton>
         </div> : "—",
       ])} closeDisabled={busy} onClose={close} actions={terminal ? <>
@@ -135,16 +135,16 @@ export function BatchExportWindow({ port }: { port: BatchExportPort }) {
         <ActionButton disabled={busy} onClick={() => end(view.id)}>Encerrar</ActionButton>
       </> : <>
         {problems.some(item => item.status !== "ignored" && item.problems.some(problem => problem.kind === "missingMedia")) &&
-          <ActionButton disabled={busy} onClick={() => refresh(() => port.relink(null))}>Religar todos…</ActionButton>}
+          <ActionButton disabled={busy} onClick={() => refresh(() => port.relink(null))}>Localizar imagem… todos…</ActionButton>}
         <ActionButton disabled={busy} onClick={() => refresh(() => port.recheck())}>Tentar novamente</ActionButton>
         <ActionButton variant="primary" disabled={busy || !view.canContinue}
-          onClick={() => void act(() => continueBatch(view))}>Continuar Exportação</ActionButton>
+          onClick={() => void act(() => continueBatch(view))}>Continuar exportação</ActionButton>
       </>} />;
   } else if (view) {
     content = <ConfirmationDialog title="Pronto para exportar" tone="neutral"
-      description={`${view.items.filter(item => item.status === "pending").length} Projetos prontos.`}
+      description={`${view.items.filter(item => item.status === "pending").length} projetos prontos.`}
       cancelAction={{ label: "Cancelar", disabled: busy, onClick: close }}
-      confirmAction={{ label: "Continuar Exportação", disabled: busy || !view.canContinue,
+      confirmAction={{ label: "Continuar exportação", disabled: busy || !view.canContinue,
         onClick: () => void act(() => continueBatch(view)) }} />;
   }
   return <OwnedWindowShell controls={busy || (view?.phase === "storageFull" && storageState?.busy) ? "none" : "close"} context="Exportação em lote" width={view?.phase === "storageFull" ? 520 : 800}>

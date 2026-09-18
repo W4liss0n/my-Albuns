@@ -135,7 +135,7 @@ impl<F: FnMut(crate::ipc_contract::ImageProcessingProgress)> ImageProcessingBatc
                     .state::<ProjectHost>()
                     .is_current_project(&attempt.project_id)
                 {
-                    return Err("O Projeto mudou durante o processamento.".to_string());
+                    return Err("O projeto mudou durante o processamento.".to_string());
                 }
                 attempt
                     .works
@@ -257,7 +257,7 @@ impl<F: FnMut(crate::ipc_contract::ImageProcessingProgress)> ImageProcessingBatc
                         .map(|_| {
                             Err(CacheFailure::new(
                                 CacheFailureStage::Cancelled,
-                                "O Projeto mudou antes da publicação do Cache.",
+                                "O projeto mudou antes da publicação das prévias temporárias.",
                             ))
                         })
                         .collect();
@@ -273,7 +273,7 @@ impl<F: FnMut(crate::ipc_contract::ImageProcessingProgress)> ImageProcessingBatc
                     .map(|_| {
                         Err(CacheFailure::new(
                             CacheFailureStage::PublishIndex,
-                            "Não foi possível publicar o lote de Cache.",
+                            "Não foi possível publicar o lote de prévias temporárias.",
                         ))
                     })
                     .collect()
@@ -404,7 +404,7 @@ async fn synchronize_processing_sources(
         let catalog = host.authorized_media_catalog()?;
         let namespace = processing_app.state::<ActiveCacheNamespace>().namespace();
         if namespace.project_id() != catalog.project_id {
-            return Err("O Projeto mudou durante o processamento das imagens.".into());
+            return Err("O projeto mudou durante o processamento das imagens.".into());
         }
         let roots = roots.unwrap_or_else(|| {
             let mut context = OperationPathContext::new();
@@ -428,7 +428,7 @@ async fn synchronize_processing_sources(
         Ok::<_, String>((catalog, namespace, roots, prepared))
     })
     .await
-    .map_err(|_| "Não foi possível inspecionar as imagens do Projeto.".to_string())??;
+    .map_err(|_| "Não foi possível inspecionar as imagens do projeto.".to_string())??;
     drop(_permit);
     let confirmed = crate::media_confirmation::MediaConfirmation::for_app(app, &namespace)
         .confirm(&catalog.bindings, &roots, prepared, None)
@@ -444,7 +444,7 @@ async fn synchronize_processing_sources(
                     media_ids: update.changed_media_ids().to_vec(),
                 },
             )
-            .map_err(|_| "Não foi possível atualizar as imagens do Projeto.".to_string())?;
+            .map_err(|_| "Não foi possível atualizar as imagens do projeto.".to_string())?;
     }
     drop(confirmed);
     let _permit = engine
@@ -486,7 +486,7 @@ async fn synchronize_processing_sources(
         })
     })
     .await
-    .map_err(|_| "Não foi possível inspecionar as imagens do Projeto.".to_string())?
+    .map_err(|_| "Não foi possível inspecionar as imagens do projeto.".to_string())?
 }
 
 fn processing_result_for_app(
@@ -553,7 +553,7 @@ pub(crate) async fn execute_owned_cache(
     .map_err(|_| {
         CacheFailure::new(
             CacheFailureStage::PublishIndex,
-            "Não foi possível publicar a prévia do Cache.",
+            "Não foi possível preparar a prévia da imagem.",
         )
     })?
 }
@@ -589,7 +589,7 @@ async fn prepare_owned_cache(
                 .map_err(|_| {
                     CacheFailure::new(
                         CacheFailureStage::Cancelled,
-                        "A demanda de Cache ficou obsoleta.",
+                        "A demanda de prévias temporárias ficou obsoleta.",
                     )
                 })?;
         let lease = match admission
@@ -916,7 +916,9 @@ mod tests {
             }
             batch
                 .prepare_with(&binding, async {
-                    Err(ProcessingFailure::File("Cache indisponível".into()))
+                    Err(ProcessingFailure::File(
+                        "Prévias temporárias indisponíveis".into(),
+                    ))
                 })
                 .await;
             batch.prepare_with(&binding, async { Ok(()) }).await;

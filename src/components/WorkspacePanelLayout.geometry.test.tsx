@@ -83,10 +83,10 @@ test("retains separator semantics and keyboard resize on both axes", () => {
   );
 
   const inspector = screen.getByRole("separator", {
-    name: "Redimensionar Painel contextual",
+    name: "Redimensionar painel contextual",
   });
   const media = screen.getByRole("separator", {
-    name: "Redimensionar Painel de imagens",
+    name: "Redimensionar painel de imagens",
   });
   expect(inspector).toHaveAttribute("aria-orientation", "vertical");
   expect(media).toHaveAttribute("aria-orientation", "horizontal");

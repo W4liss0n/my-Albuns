@@ -106,7 +106,7 @@ test("dragging a locked selection reports the lock after the threshold without r
   expect(frameGeometry.onError).not.toHaveBeenCalled();
   fireEvent.pointerMove(window, { pointerId: 7, clientX: 150, clientY: 120 });
   fireEvent.pointerUp(window, { pointerId: 7, clientX: 150, clientY: 120 });
-  expect(frameGeometry.onError).toHaveBeenCalledExactlyOnceWith("O Layout está travado. Destrave-o no Painel de Layouts para mover os Frames.");
+  expect(frameGeometry.onError).toHaveBeenCalledExactlyOnceWith("O layout está travado. Destrave-o no painel de layouts para mover os quadros.");
   expect(frameGeometry.preview).not.toHaveBeenCalled();
   expect(frameGeometry.commit).not.toHaveBeenCalled();
 });
@@ -375,13 +375,13 @@ test.each(["project", "mode", "blocking-operation", "confirmed-geometry"])(
 
 test("a failed preview restores the confirmed Frame and reports one error", async () => {
   const frameGeometry = controls();
-  frameGeometry.preview.mockRejectedValue(new Error("A geometria do Frame mudou."));
+  frameGeometry.preview.mockRejectedValue(new Error("A geometria do quadro mudou."));
   renderCanvas({ mode: { kind: "sheet-editing", sheetId: "sheet-001" }, compositionPlan: interactiveComposition, frameGeometry });
   await finishPixiInitialization();
   preparePointerCanvas();
   startPointer();
   fireEvent.pointerMove(window, { pointerId: 7, clientX: 140, clientY: 130 });
-  await waitFor(() => expect(frameGeometry.onError).toHaveBeenCalledWith("A geometria do Frame mudou."));
+  await waitFor(() => expect(frameGeometry.onError).toHaveBeenCalledWith("A geometria do quadro mudou."));
   fireEvent.pointerUp(window, { pointerId: 7, clientX: 150, clientY: 140 });
   expect(frameGeometry.commit).not.toHaveBeenCalled();
   expect(latestFrame().position).toMatchObject({ x: 0, y: 0 });

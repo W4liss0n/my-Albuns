@@ -9,7 +9,7 @@ export interface ExportMediaProblem {
 
 export class MediaExportBlockedError extends Error {
   constructor(readonly problems: ExportMediaProblem[]) {
-    super("Confira os arquivos necessários à Exportação.");
+    super("Confira os arquivos necessários à exportação.");
     this.name = "MediaExportBlockedError";
   }
 }

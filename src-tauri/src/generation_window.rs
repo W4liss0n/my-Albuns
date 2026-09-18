@@ -105,7 +105,7 @@ pub(crate) async fn open_project_generation(
     window: WebviewWindow,
 ) -> Result<(), String> {
     if window.label() != "project" {
-        return Err("Abra a geração a partir do Projeto modelo.".into());
+        return Err("Abra a geração a partir do projeto modelo.".into());
     }
     let state = app.state::<GenerationWindowState>();
     let _serial = state.serial.lock().await;
@@ -120,7 +120,7 @@ pub(crate) async fn open_project_generation(
     let deadline = tokio::time::Instant::now() + Duration::from_secs(15);
     while !operations.is_idle() {
         if tokio::time::Instant::now() >= deadline {
-            return Err("Aguarde a operação do Projeto terminar e tente novamente.".into());
+            return Err("Aguarde a operação do projeto terminar e tente novamente.".into());
         }
         tokio::time::sleep(Duration::from_millis(25)).await;
     }

@@ -112,7 +112,7 @@ function ProjectionHarness({
 test("allows composed dimension drafts for Core validation", () => {
   renderForm({ sheetStates: representativeProjection.state.album.sheets });
 
-  const dimensions = screen.getByRole("group", { name: "Dimensão da Lâmina" });
+  const dimensions = screen.getByRole("group", { name: "Dimensão da lâmina" });
   for (const label of ["Largura", "Altura"]) {
     const input = within(dimensions).getByRole("textbox", { name: label });
     expect(input).toBeEnabled();
@@ -139,7 +139,7 @@ test("revalidates a blocked crop when source observations arrive without a Histo
 test("enables composed edge conversion through the Core Layout flow", () => {
   renderForm({ sheetStates: representativeProjection.state.album.sheets });
 
-  for (const label of ["Primeira Lâmina", "Última Lâmina"]) {
+  for (const label of ["Primeira lâmina", "Última lâmina"]) {
     const select = screen.getByRole("combobox", { name: label });
     expect(select).toBeEnabled();
     expect(select.closest(".album-information-field")).not.toHaveAttribute("data-placeholder-feature");
@@ -150,14 +150,14 @@ test("edits every Album information field and submits one complete candidate", a
   const onApply = vi.fn();
   renderForm({ onApply });
 
-  fireEvent.change(screen.getByRole("combobox", { name: "Primeira Lâmina" }), {
+  fireEvent.change(screen.getByRole("combobox", { name: "Primeira lâmina" }), {
     target: { value: "singlePage" },
   });
-  fireEvent.change(screen.getByRole("combobox", { name: "Última Lâmina" }), {
+  fireEvent.change(screen.getByRole("combobox", { name: "Última lâmina" }), {
     target: { value: "singlePage" },
   });
   const sheetDimension = screen.getByRole("group", {
-    name: "Dimensão da Lâmina",
+    name: "Dimensão da lâmina",
   });
   fireEvent.change(within(sheetDimension).getByRole("textbox", { name: "Largura" }), {
     target: { value: "700" },
@@ -265,7 +265,7 @@ test("changing Unidade converts presentation without changing physical dimension
   });
 
   const sheetDimension = screen.getByRole("group", {
-    name: "Dimensão da Lâmina",
+    name: "Dimensão da lâmina",
   });
   expect(within(sheetDimension).getByRole("textbox", { name: "Largura" })).toHaveValue("60");
   expect(within(sheetDimension).getByRole("textbox", { name: "Altura" })).toHaveValue("30");
@@ -412,7 +412,7 @@ test("keeps the calculated Page dimension visible when DPI is invalid", () => {
   });
 
   const pageDimension = screen.getByRole("group", {
-    name: "Dimensão da Página",
+    name: "Dimensão da página",
   });
   expect(within(pageDimension).getByLabelText("Largura")).toHaveTextContent(
     "300 mm",
@@ -433,7 +433,7 @@ test("shows validation from the core and blocks Apply", async () => {
     target: { value: "160" },
   });
 
-  expect(await screen.findByText("A Sangria deve manter uma Área de corte positiva.")).toBeVisible();
+  expect(await screen.findByText("Reduza a sangria para manter uma área de corte.")).toBeVisible();
   expect(screen.getByRole("button", { name: "Aplicar" })).toBeDisabled();
 });
 
@@ -450,7 +450,7 @@ test("presents raster limits in the pending Unit instead of pixels", async () =>
 
   const tooltip = await screen.findByRole("tooltip");
   expect(tooltip).toHaveTextContent(
-    "Para 300 DPI, informe a largura da Lâmina entre 0.0086 cm e 554.8672 cm.",
+    "Para 300 DPI, informe a largura da lâmina entre 0.0086 cm e 554.8672 cm.",
   );
   expect(tooltip).not.toHaveTextContent(/pixels?/i);
 });
@@ -569,7 +569,7 @@ test("lets a pending edge conversion be restored when edge content arrives", asy
     />,
   );
 
-  fireEvent.change(screen.getByRole("combobox", { name: "Primeira Lâmina" }), {
+  fireEvent.change(screen.getByRole("combobox", { name: "Primeira lâmina" }), {
     target: { value: "singlePage" },
   });
   await waitFor(() =>
@@ -595,13 +595,13 @@ test("lets a pending edge conversion be restored when edge content arrives", asy
     ),
   );
   expect(
-    screen.getByRole("combobox", { name: "Primeira Lâmina" }),
+    screen.getByRole("combobox", { name: "Primeira lâmina" }),
   ).toBeEnabled();
   fireEvent.click(
-    screen.getByRole("button", { name: "Restaurar Primeira Lâmina" }),
+    screen.getByRole("button", { name: "Restaurar Primeira lâmina" }),
   );
   expect(
-    screen.getByRole("combobox", { name: "Primeira Lâmina" }),
+    screen.getByRole("combobox", { name: "Primeira lâmina" }),
   ).toHaveValue("double");
   expect(screen.getByRole("button", { name: "Aplicar" })).toBeDisabled();
 });

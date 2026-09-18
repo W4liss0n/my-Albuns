@@ -59,11 +59,11 @@ function projectCorePortWithApply(
     validateMediaFolderName: async () => { throw new Error("Folder validation is not configured in this fixture."); },
     queryLayouts: async () => { throw new Error("Layouts are not configured in this fixture."); },
     previewLayout: async () => { throw new Error("Layouts are not configured in this fixture."); },
-    previewFrameStyle: async () => { throw new Error("Frame style preview is not configured in this fixture."); },
+    previewFrameStyle: async () => { throw new Error("Quadro style preview is not configured in this fixture."); },
     previewDecorativeDrop: async () => { throw new Error("Decorative preview is not configured in this fixture."); },
-    previewPhotoZoom: async () => { throw new Error("Photo Zoom preview is not configured in this fixture."); },
+    previewPhotoZoom: async () => { throw new Error("Photo zoom preview is not configured in this fixture."); },
     previewPhotoAngle: async () => { throw new Error("Photo angle preview is not configured in this fixture."); },
-    previewFrameGeometry: async () => { throw new Error("Frame geometry preview is not configured in this fixture."); },
+    previewFrameGeometry: async () => { throw new Error("Quadro geometry preview is not configured in this fixture."); },
     resolvePhotoDropTarget: async () => ({ kind: "invalid" }),
     replaceImage: async () => projection, relink: async () => projection,
     undo: async () => projection,
@@ -131,9 +131,9 @@ test.each(["pending", "completed"] as const)(
       </LoggingProvider>,
     );
     const albumDesign = within(
-      screen.getByRole("button", { name: "Design do Álbum" }).closest("section") as HTMLElement,
+      screen.getByRole("button", { name: "Design do álbum" }).closest("section") as HTMLElement,
     );
-    fireEvent.change(albumDesign.getByLabelText("Cor do Background"), {
+    fireEvent.change(albumDesign.getByLabelText("Cor do fundo"), {
       target: { value: "#f7f5f0" },
     });
     fireEvent.click(albumDesign.getByRole("button", { name: "Aplicar" }));
@@ -141,7 +141,7 @@ test.each(["pending", "completed"] as const)(
     await waitFor(() => expect(corePort.save).toHaveBeenCalledWith(appliedProjection.state.revision));
 
     if (savePhase === "pending") {
-      fireEvent.click(getApplicationCommand("Arquivo", "Fechar Projeto"));
+      fireEvent.click(getApplicationCommand("Arquivo", "Fechar projeto"));
       expect(invoke).not.toHaveBeenCalled();
       expect(events.map(({ event }) => event)).toEqual(["project_close_requested"]);
     }
@@ -150,7 +150,7 @@ test.each(["pending", "completed"] as const)(
       await pendingSave.promise;
     });
     if (savePhase === "completed") {
-      fireEvent.click(getApplicationCommand("Arquivo", "Fechar Projeto"));
+      fireEvent.click(getApplicationCommand("Arquivo", "Fechar projeto"));
     }
 
     await waitFor(() =>

@@ -75,31 +75,31 @@ const DEFINITIONS = [
   command({
     id: "toggle-photo-black-and-white",
     label: "Preto e branco",
-    description: "Alterna o efeito Preto e branco das Fotos selecionadas.",
+    description: "Alterna o efeito Preto e branco das fotos selecionadas.",
     kind: "domain", contexts: ["frame", "frame-photo"], availability: "implemented", shortcuts: [],
   }),
   command({
     id: "rotate-photo-counterclockwise",
     label: "Girar 90° à esquerda",
-    description: "Gira as Fotos selecionadas 90° no sentido anti-horário.",
+    description: "Gira as fotos selecionadas 90° no sentido anti-horário.",
     kind: "domain", contexts: ["frame", "frame-photo"], availability: "implemented", shortcuts: [],
   }),
   command({
     id: "reset-photo-rotation",
     label: "Restaurar giro",
-    description: "Retorna o Giro das Fotos selecionadas a 0°.",
+    description: "Retorna o giro das fotos selecionadas a 0°.",
     kind: "domain", contexts: ["frame", "frame-photo"], availability: "implemented", shortcuts: [],
   }),
   command({
     id: "mirror-photo-horizontal",
     label: "Espelhar horizontalmente",
-    description: "Alterna o espelhamento horizontal das Fotos selecionadas.",
+    description: "Alterna o espelhamento horizontal das fotos selecionadas.",
     kind: "domain", contexts: ["frame", "frame-photo"], availability: "implemented", shortcuts: [],
   }),
   command({
     id: "new-project",
-    label: "Novo Projeto…",
-    description: "Inicia a criação de um novo Projeto.",
+    label: "Novo projeto…",
+    description: "Inicia a criação de um novo projeto.",
     kind: "application",
     bindings: [
       implementedBinding("welcome"),
@@ -109,8 +109,8 @@ const DEFINITIONS = [
   }),
   command({
     id: "open-project",
-    label: "Abrir Projeto…",
-    description: "Abre outro Projeto existente.",
+    label: "Abrir projeto…",
+    description: "Abre outro projeto existente.",
     kind: "application",
     bindings: [
       implementedBinding("welcome"),
@@ -121,7 +121,7 @@ const DEFINITIONS = [
   command({
     id: "save",
     label: "Salvar",
-    description: "Salva a revisão atual do Projeto.",
+    description: "Salva as alterações do projeto.",
     kind: "application",
     contexts: ["project-window"],
     availability: "implemented",
@@ -130,7 +130,7 @@ const DEFINITIONS = [
   command({
     id: "save-as",
     label: "Salvar como…",
-    description: "Salva o Projeto em uma nova Localização.",
+    description: "Salva uma cópia independente do projeto em outro arquivo.",
     kind: "application",
     contexts: ["project-window"],
     availability: "implemented",
@@ -140,8 +140,8 @@ const DEFINITIONS = [
   }),
   command({
     id: "export-sheet",
-    label: "Exportar Lâmina…",
-    description: "Exporta a Lâmina centralizada no Canvas.",
+    label: "Exportar lâmina…",
+    description: "Exporta a lâmina centralizada na área de edição.",
     kind: "application",
     contexts: ["sheet"],
     availability: "implemented",
@@ -150,7 +150,7 @@ const DEFINITIONS = [
   command({
     id: "export",
     label: "Exportar…",
-    description: "Abre o fluxo normal de Exportação do Projeto.",
+    description: "Escolha o que exportar e onde salvar os arquivos.",
     kind: "application",
     contexts: ["project-window"],
     availability: "implemented",
@@ -158,8 +158,8 @@ const DEFINITIONS = [
   }),
   command({
     id: "close",
-    label: "Fechar Projeto",
-    description: "Fecha a Janela do Projeto com proteção de alterações.",
+    label: "Fechar projeto",
+    description: "Fecha o projeto e avisa se houver alterações não salvas.",
     kind: "application",
     contexts: ["project-window"],
     availability: "implemented",
@@ -168,7 +168,7 @@ const DEFINITIONS = [
   command({
     id: "undo",
     label: "Desfazer",
-    description: "Desfaz a última alteração de domínio do Projeto.",
+    description: "Desfaz a última alteração.",
     kind: "domain",
     contexts: ["project-window"],
     availability: "implemented",
@@ -177,7 +177,7 @@ const DEFINITIONS = [
   command({
     id: "redo",
     label: "Refazer",
-    description: "Refaz a última alteração de domínio desfeita.",
+    description: "Refaz a alteração desfeita.",
     kind: "domain",
     contexts: ["project-window"],
     availability: "implemented",
@@ -189,7 +189,7 @@ const DEFINITIONS = [
   command({
     id: "copy-frames",
     label: "Copiar",
-    description: "Copia os Frames selecionados.",
+    description: "Copia os quadros selecionados.",
     kind: "domain",
     contexts: ["frame"],
     availability: "implemented",
@@ -198,7 +198,7 @@ const DEFINITIONS = [
   command({
     id: "paste-frames",
     label: "Colar",
-    description: "Cola Frames copiados na Lâmina ativa.",
+    description: "Cola quadros copiados na lâmina ativa.",
     kind: "domain",
     contexts: ["frame"],
     availability: "implemented",
@@ -206,8 +206,8 @@ const DEFINITIONS = [
   }),
   command({
     id: "swap-frame-contents",
-    label: "Trocar conteúdo dos Frames",
-    description: "Troca o conteúdo entre os Frames selecionados.",
+    label: "Trocar conteúdo dos quadros",
+    description: "Troca o conteúdo entre os quadros selecionados.",
     kind: "domain",
     contexts: ["frame"],
     availability: "implemented",
@@ -216,7 +216,7 @@ const DEFINITIONS = [
   command({
     id: "swap-sheet-sides",
     label: "Trocar lados",
-    description: "Troca os Frames de Página dentro da Lâmina dupla.",
+    description: "Troca os quadros de página dentro da lâmina dupla.",
     kind: "domain",
     contexts: ["sheet"],
     availability: "implemented",
@@ -224,8 +224,8 @@ const DEFINITIONS = [
   }),
   command({
     id: "add-frame",
-    label: "Adicionar Frame",
-    description: "Adiciona um novo Frame à Lâmina ativa.",
+    label: "Adicionar quadro",
+    description: "Adiciona um novo quadro à lâmina ativa.",
     kind: "domain",
     contexts: ["frame"],
     availability: "implemented",
@@ -234,7 +234,7 @@ const DEFINITIONS = [
   command({
     id: "delete-frames",
     label: "Excluir",
-    description: "Exclui os Frames selecionados no Modo de edição da Lâmina.",
+    description: "Exclui os quadros selecionados no Modo de edição da lâmina.",
     kind: "domain",
     contexts: ["frame"],
     availability: "implemented",
@@ -243,37 +243,37 @@ const DEFINITIONS = [
   command({
     id: "import-media",
     label: "Importar",
-    description: "Escolhe como importar imagens para a aba ativa do Painel.",
+    description: "Escolhe como importar imagens para a aba ativa do painel.",
     kind: "interface", contexts: ["media-panel"], availability: "implemented", shortcuts: [],
   }),
   command({
     id: "import-media-files",
     label: "Arquivos…",
-    description: "Importa os arquivos de imagem escolhidos para a aba ativa do Painel.",
+    description: "Importa os arquivos de imagem escolhidos para a aba ativa do painel.",
     kind: "application", contexts: ["media-panel"], availability: "implemented", shortcuts: [],
   }),
   command({
     id: "import-media-folder",
     label: "Pasta…",
-    description: "Importa as imagens da pasta escolhida para a aba ativa do Painel.",
+    description: "Importa as imagens da pasta escolhida para a aba ativa do painel.",
     kind: "application", contexts: ["media-panel"], availability: "implemented", shortcuts: [],
   }),
   command({
     id: "relink-media",
-    label: "Religar",
-    description: "Religa a imagem ausente na pasta escolhida pelo usuário.",
+    label: "Localizar imagem…",
+    description: "Escolha a pasta onde está a imagem.",
     kind: "application", contexts: ["media-panel"], availability: "implemented", shortcuts: [],
   }),
   command({
     id: "replace-media",
-    label: "Substituir Imagem",
-    description: "Substitui o vínculo da imagem contextual por outro arquivo.",
+    label: "Substituir imagem",
+    description: "Troca a imagem selecionada por outro arquivo.",
     kind: "application", contexts: ["media-panel"], availability: "implemented", shortcuts: [],
   }),
   command({
     id: "create-media-folder",
     label: "Nova pasta",
-    description: "Cria uma pasta de organização na aba ativa do Painel de imagens.",
+    description: "Cria uma pasta de organização na aba ativa do painel de imagens.",
     kind: "domain", contexts: ["media-panel"], availability: "implemented", shortcuts: [],
   }),
   command({
@@ -291,13 +291,13 @@ const DEFINITIONS = [
   command({
     id: "delete-media-folder",
     label: "Excluir pasta",
-    description: "Exclui a pasta de organização preservando suas imagens no Projeto.",
+    description: "Exclui a pasta de organização preservando suas imagens no projeto.",
     kind: "domain", contexts: ["media-folder"], availability: "implemented", shortcuts: [],
   }),
   command({
     id: "remove-media",
     label: "Remover",
-    description: "Remove as imagens selecionadas na aba ativa do Painel.",
+    description: "Remove as imagens selecionadas na aba ativa do painel.",
     kind: "domain",
     contexts: ["media-panel"],
     availability: "implemented",
@@ -306,7 +306,7 @@ const DEFINITIONS = [
   command({
     id: "bring-frames-to-front",
     label: "Trazer para frente",
-    description: "Move os Frames selecionados para a frente.",
+    description: "Move os quadros selecionados para a frente.",
     kind: "domain",
     contexts: ["frame"],
     availability: "implemented",
@@ -315,7 +315,7 @@ const DEFINITIONS = [
   command({
     id: "advance-frames",
     label: "Avançar uma posição",
-    description: "Avança os Frames selecionados uma posição.",
+    description: "Avança os quadros selecionados uma posição.",
     kind: "domain",
     contexts: ["frame"],
     availability: "implemented",
@@ -324,7 +324,7 @@ const DEFINITIONS = [
   command({
     id: "recede-frames",
     label: "Recuar uma posição",
-    description: "Recua os Frames selecionados uma posição.",
+    description: "Recua os quadros selecionados uma posição.",
     kind: "domain",
     contexts: ["frame"],
     availability: "implemented",
@@ -333,7 +333,7 @@ const DEFINITIONS = [
   command({
     id: "send-frames-to-back",
     label: "Enviar para trás",
-    description: "Move os Frames selecionados para trás.",
+    description: "Move os quadros selecionados para trás.",
     kind: "domain",
     contexts: ["frame"],
     availability: "implemented",
@@ -341,8 +341,8 @@ const DEFINITIONS = [
   }),
   command({
     id: "save-frame-arrangement-as-layout",
-    label: "Salvar disposição como Layout",
-    description: "Salva a disposição atual dos Frames como Layout.",
+    label: "Salvar disposição como layout",
+    description: "Salva a disposição atual dos quadros como layout.",
     kind: "application",
     contexts: ["frame"],
     availability: "implemented",
@@ -361,8 +361,8 @@ const DEFINITIONS = [
   }),
   command({
     id: "enter-sheet-editing",
-    label: "Editar Lâmina",
-    description: "Isola a Lâmina centralizada para editar seus Frames e Fotos.",
+    label: "Editar lâmina",
+    description: "Isola a lâmina centralizada para editar seus quadros e fotos.",
     kind: "interface",
     contexts: ["sheet"],
     availability: "implemented",
@@ -371,7 +371,7 @@ const DEFINITIONS = [
   command({
     id: "previous-sheet",
     label: "Lâmina anterior",
-    description: "Centraliza a Lâmina física anterior no Canvas.",
+    description: "Centraliza a lâmina física anterior na área de edição.",
     kind: "interface",
     contexts: ["sheet"],
     availability: "implemented",
@@ -379,8 +379,8 @@ const DEFINITIONS = [
   }),
   command({
     id: "next-sheet",
-    label: "Próxima Lâmina",
-    description: "Centraliza a próxima Lâmina física no Canvas.",
+    label: "Próxima lâmina",
+    description: "Centraliza a próxima lâmina física na área de edição.",
     kind: "interface",
     contexts: ["sheet"],
     availability: "implemented",
@@ -389,7 +389,7 @@ const DEFINITIONS = [
   command({
     id: "add-before",
     label: "Adicionar antes",
-    description: "Adiciona uma Lâmina antes da Lâmina ativa.",
+    description: "Adiciona uma lâmina antes da lâmina ativa.",
     kind: "domain",
     contexts: ["sheet"],
     availability: "implemented",
@@ -398,7 +398,7 @@ const DEFINITIONS = [
   command({
     id: "add-after",
     label: "Adicionar depois",
-    description: "Adiciona uma Lâmina depois da Lâmina ativa.",
+    description: "Adiciona uma lâmina depois da lâmina ativa.",
     kind: "domain",
     contexts: ["sheet"],
     availability: "implemented",
@@ -406,8 +406,8 @@ const DEFINITIONS = [
   }),
   command({
     id: "duplicate-sheet",
-    label: "Duplicar Lâmina",
-    description: "Duplica a Lâmina ativa.",
+    label: "Duplicar lâmina",
+    description: "Duplica a lâmina ativa.",
     kind: "domain",
     contexts: ["sheet"],
     availability: "implemented",
@@ -416,7 +416,7 @@ const DEFINITIONS = [
   command({
     id: "delete-sheet",
     label: "Excluir",
-    description: "Exclui a Lâmina ativa.",
+    description: "Exclui a lâmina ativa.",
     kind: "domain",
     contexts: ["sheet"],
     availability: "implemented",
@@ -425,7 +425,7 @@ const DEFINITIONS = [
   command({
     id: "convert-edge",
     label: "Converter extremidade",
-    description: "Converte a configuração da Lâmina de extremidade.",
+    description: "Converte a configuração da lâmina de extremidade.",
     kind: "domain",
     contexts: ["sheet"],
     availability: "implemented",
@@ -434,7 +434,7 @@ const DEFINITIONS = [
   command({
     id: "media-panel",
     label: "Painel de imagens",
-    description: "Mostra ou oculta o Painel de imagens.",
+    description: "Mostra ou oculta o painel de imagens.",
     kind: "interface",
     contexts: ["project-window"],
     availability: "implemented",
@@ -443,7 +443,7 @@ const DEFINITIONS = [
   command({
     id: "contextual-panel",
     label: "Painel contextual",
-    description: "Mostra ou oculta o Painel contextual.",
+    description: "Mostra ou oculta o painel contextual.",
     kind: "interface",
     contexts: ["project-window"],
     availability: "implemented",
@@ -451,31 +451,31 @@ const DEFINITIONS = [
   }),
   command({
     id: "fit-sheet",
-    label: "Ajustar Lâmina",
-    description: "Ajusta a Lâmina ativa ao espaço disponível.",
+    label: "Ajustar lâmina",
+    description: "Ajusta a lâmina ativa ao espaço disponível.",
     kind: "interface",
     contexts: ["sheet"],
     availability: "implemented",
     shortcuts: [shortcut("0", "Ctrl+0", { ctrlKey: true })],
   }),
   command({
-    id: "canvas-zoom-in", label: "Ampliar Lâmina",
-    description: "Amplia a visualização da Lâmina em edição.",
+    id: "canvas-zoom-in", label: "Ampliar lâmina",
+    description: "Amplia a visualização da lâmina em edição.",
     kind: "interface", contexts: ["sheet"], availability: "implemented",
     shortcuts: [shortcut("+", "Ctrl++", { ctrlKey: true }),
       shortcut("+", undefined, { ctrlKey: true, shiftKey: true }),
       shortcut("=", undefined, { ctrlKey: true })],
   }),
   command({
-    id: "canvas-zoom-out", label: "Reduzir Lâmina",
-    description: "Reduz a visualização até o enquadramento completo da Lâmina.",
+    id: "canvas-zoom-out", label: "Reduzir lâmina",
+    description: "Reduz a visualização até o enquadramento completo da lâmina.",
     kind: "interface", contexts: ["sheet"], availability: "implemented",
     shortcuts: [shortcut("-", "Ctrl+−", { ctrlKey: true })],
   }),
   command({
     id: "generate-projects",
-    label: "Gerar Projetos em lote…",
-    description: "Cria Projetos independentes usando o estado atual como modelo.",
+    label: "Gerar projetos em lote…",
+    description: "Cria projetos independentes usando o estado atual como modelo.",
     kind: "application", contexts: ["project-window"], availability: "implemented", shortcuts: [],
   }),
   command({
@@ -520,7 +520,7 @@ const DEFINITIONS = [
   command({
     id: "open-in-photoshop",
     label: "Abrir no Photoshop",
-    description: "Abre a Foto contextual original no Photoshop.",
+    description: "Abre a foto contextual original no Photoshop.",
     kind: "application",
     contexts: ["frame-photo", "media-photo"],
     availability: "implemented",

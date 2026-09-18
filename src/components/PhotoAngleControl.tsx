@@ -18,7 +18,7 @@ function formatAngle(tenths: number) {
 
 export function PhotoAngleControl(props: PhotoAngleControlProps) {
   return <NumericPropertyControl {...props}
-    label="Ângulo" numberLabel="Ângulo em graus" sliderLabel="Ângulo da Foto" unit="°"
+    label="Ângulo" numberLabel="Ângulo em graus" sliderLabel="Ângulo da foto" unit="°"
     minimum={-450} maximum={450} step={1} resetValue={0} sliderScale={10}
     formatValue={formatAngle} parseValue={parseAngle} valueText={(value) => `${formatAngle(value)} graus`}
     help="−45° a 45° · dois cliques para zerar" invalidHelp="Use −45° a 45°, com uma casa decimal."

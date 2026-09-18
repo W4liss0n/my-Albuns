@@ -5,7 +5,7 @@ import { OpeningProgressDialog } from "./OpeningProgressDialog";
 test("opening switches from window preparation to measured image preparation", () => {
   const { rerender } = render(<OpeningProgressDialog />);
   const bar = screen.getByRole("progressbar");
-  expect(screen.getByRole("status")).toHaveTextContent("Preparando a Janela do Projeto");
+  expect(screen.getByRole("status")).toHaveTextContent("Preparando a Janela do projeto");
   expect(bar).not.toHaveAttribute("aria-valuenow");
   expect(screen.queryByText(/%/)).not.toBeInTheDocument();
 

@@ -11,7 +11,7 @@ test("shows the shared progress while the initial preparation state is pending",
     progress: () => new Promise(() => {}), onProgress: async () => () => {}, cancel: async () => {},
   };
   render(<GenerationProgressWindow port={port} />);
-  expect(screen.getByRole("progressbar", { name: "Progresso de Gerando Projetos" })).toBeVisible();
+  expect(screen.getByRole("progressbar", { name: "Progresso de Gerando projetos" })).toBeVisible();
   expect(screen.getByRole("button", { name: "Cancelar" })).toBeEnabled();
 });
 
@@ -30,5 +30,5 @@ test("changes from unknown work to the shared project counter in the same dialog
   expect(screen.getByRole("progressbar")).toBe(bar);
   expect(bar).toHaveAttribute("aria-valuenow", "1");
   expect(screen.getByText("25%")).toBeVisible();
-  expect(screen.getByText("1 Projeto de 4")).toBeVisible();
+  expect(screen.getByText("1 projeto de 4")).toBeVisible();
 });

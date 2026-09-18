@@ -192,7 +192,7 @@ export function SheetBarOverlay(
   return (
     <div
       aria-disabled={!reorderEnabled}
-      aria-label="Reordenação pela Barra da Lâmina"
+      aria-label="Reordenação pela Barra da lâmina"
       className="sheet-bar-overlay"
       data-preview-order={props.representation.order.join(",")}
       data-reorder-state={props.status}
@@ -250,7 +250,7 @@ export function SheetBarOverlay(
         } satisfies CSSProperties;
         return [
           <button
-            aria-label={`Reordenar Lâmina ${String(sheet.number).padStart(2, "0")} pela Barra`}
+            aria-label={`Reordenar lâmina ${String(sheet.number).padStart(2, "0")} pela Barra`}
             className="sheet-bar-overlay__handle"
             data-reorder-ghost={ghostSheetId === sheet.sheetId || undefined}
             data-reorder-shift={
@@ -321,7 +321,7 @@ export function SheetBarOverlay(
             }}
           >
             <button
-              aria-label={`${projectCommandDescriptor("swap-sheet-sides").label} da Lâmina ${String(sheet.number).padStart(2, "0")}`}
+              aria-label={`${projectCommandDescriptor("swap-sheet-sides").label} da lâmina ${String(sheet.number).padStart(2, "0")}`}
               disabled={!sheetBarMetadataById.get(sheet.sheetId)?.canSwapSides}
               onClick={(event) => { event.stopPropagation(); props.onSwapSides?.(sheet.sheetId); }}
               onKeyDown={(event) => {
@@ -351,7 +351,7 @@ export function SheetBarOverlay(
             }}
           >
             <button
-              aria-label={`Layouts da Lâmina ${String(sheet.number).padStart(2, "0")}`}
+              aria-label={`Layouts da lâmina ${String(sheet.number).padStart(2, "0")}`}
               aria-expanded={props.layouts?.activeSheetId === sheet.sheetId}
               aria-controls="layout-panel"
               disabled={!props.layouts || props.layouts.disabled}
@@ -363,7 +363,7 @@ export function SheetBarOverlay(
               }}
               onFocus={() => props.onLayoutFocus?.(sheet.sheetId, true)}
               onBlur={() => props.onLayoutFocus?.(sheet.sheetId, false)}
-              title="Abrir Painel de Layouts"
+              title="Abrir painel de layouts"
               type="button"
             />
           </span>,

@@ -75,15 +75,15 @@ test("keeps the preview panel shared while the sheet content changes", async () 
   );
 
   const previewPanel = () =>
-    screen.getByRole("region", { name: "Prévia da Lâmina aberta" });
+    screen.getByRole("region", { name: "Prévia da lâmina aberta" });
 
   expect(within(previewPanel()).getByText("Lâmina aberta")).toBeVisible();
-  expect(within(previewPanel()).getByText(/18 Lâminas/)).toBeVisible();
+  expect(within(previewPanel()).getByText(/18 lâminas/)).toBeVisible();
   expect(
-    within(previewPanel()).getByText("Proporção real da Lâmina aberta."),
+    within(previewPanel()).getByText("Proporção real da lâmina aberta."),
   ).toBeVisible();
   expect(
-    within(previewPanel()).getByLabelText("Guias técnicas da Lâmina"),
+    within(previewPanel()).getByLabelText("Guias de dobra, corte e segurança da lâmina"),
   ).toBeInTheDocument();
   expect(
     within(previewPanel()).getByRole("img", { name: "Prévia das Dimensões" }),
@@ -92,16 +92,16 @@ test("keeps the preview panel shared while the sheet content changes", async () 
   await user.click(screen.getByRole("button", { name: "Continuar" }));
 
   expect(within(previewPanel()).getByText("Lâmina aberta")).toBeVisible();
-  expect(within(previewPanel()).getByText(/18 Lâminas/)).toBeVisible();
+  expect(within(previewPanel()).getByText(/18 lâminas/)).toBeVisible();
   expect(
-    within(previewPanel()).getByText("Proporção real da Lâmina aberta."),
+    within(previewPanel()).getByText("Proporção real da lâmina aberta."),
   ).toBeVisible();
   expect(
-    within(previewPanel()).getByLabelText("Guias técnicas da Lâmina"),
+    within(previewPanel()).getByLabelText("Guias de dobra, corte e segurança da lâmina"),
   ).toBeInTheDocument();
   expect(
     within(previewPanel()).getByRole("img", {
-      name: "Reprodução da Lâmina",
+      name: "Reprodução da lâmina",
     }),
   ).toBeInTheDocument();
   expect(
@@ -197,8 +197,8 @@ test("keeps every New Project action label in its accessible name", async () => 
     return action;
   };
 
-  const create = actionForVisibleLabel("Criar Projeto");
-  expect(create).toHaveAccessibleName("Criar Projeto");
+  const create = actionForVisibleLabel("Criar projeto");
+  expect(create).toHaveAccessibleName("Criar projeto");
 
   const chooseBackground = actionForVisibleLabel("Usar imagem…");
   expect(chooseBackground).toHaveAccessibleName(/Usar imagem…/);
@@ -225,14 +225,14 @@ test("validates and creates with the complete neutral configuration", async () =
     "true",
   );
   expect(
-    screen.getByRole("textbox", { name: "Largura da Lâmina fechada" }),
+    screen.getByRole("textbox", { name: "Largura da lâmina fechada" }),
   ).toHaveValue("300");
   expect(
-    screen.getByRole("textbox", { name: "Altura da Lâmina fechada" }),
+    screen.getByRole("textbox", { name: "Altura da lâmina fechada" }),
   ).toHaveValue("300");
   expect(screen.getByRole("textbox", { name: "DPI" })).toHaveValue("300");
   expect(
-    screen.getByRole("textbox", { name: "Quantidade de Lâminas" }),
+    screen.getByRole("textbox", { name: "Quantidade de lâminas" }),
   ).toHaveValue("18");
   expect(
     screen
@@ -241,15 +241,15 @@ test("validates and creates with the complete neutral configuration", async () =
   ).toHaveAttribute("data-placeholder-feature", "new-project-presets");
   await user.click(
     screen.getByRole("button", {
-      name: "Aumentar quantidade de Lâminas",
+      name: "Aumentar quantidade de lâminas",
     }),
   );
   expect(
-    screen.getByRole("textbox", { name: "Quantidade de Lâminas" }),
+    screen.getByRole("textbox", { name: "Quantidade de lâminas" }),
   ).toHaveValue("20");
   await user.click(
     screen.getByRole("button", {
-      name: "Diminuir quantidade de Lâminas",
+      name: "Diminuir quantidade de lâminas",
     }),
   );
   expect(screen.getByRole("textbox", { name: "Sangria" })).toHaveValue("3");
@@ -258,23 +258,23 @@ test("validates and creates with the complete neutral configuration", async () =
   ).toHaveValue("3");
   expect(
     screen.queryByText(
-      "Lâmina 600 × 300 mm · Página 300 × 300 mm · 300 DPI",
+      "Lâmina 600 × 300 mm · página 300 × 300 mm · 300 DPI",
     ),
   ).not.toBeInTheDocument();
   expect(screen.queryByText("Configurações avançadas")).not.toBeInTheDocument();
   expect(
-    screen.getByRole("heading", { name: "Resolução do Projeto" }),
+    screen.getByRole("heading", { name: "Resolução do projeto" }),
   ).toBeVisible();
   expect(
-    screen.getByRole("heading", { name: "Configuração das extremidades" }),
+    screen.getByRole("heading", { name: "Primeira e última lâmina" }),
   ).toBeVisible();
   expect(
     screen.queryByText(
-      "Medidas, Sangria e Área de segurança valem para o Álbum inteiro e podem ser alteradas depois nas Configurações do Projeto.",
+      "Medidas, sangria e Área de segurança valem para o álbum inteiro e podem ser alteradas depois nas Configurações do projeto.",
     ),
   ).not.toBeInTheDocument();
   expect(
-    screen.queryByLabelText("Reprodução da Lâmina"),
+    screen.queryByLabelText("Reprodução da lâmina"),
   ).not.toBeInTheDocument();
 
   await user.click(screen.getByRole("button", { name: "Continuar" }));
@@ -299,7 +299,7 @@ test("validates and creates with the complete neutral configuration", async () =
   } satisfies NewProjectConfiguration;
   expect(onValidate).toHaveBeenCalledWith(expectedConfiguration);
 
-  await user.click(screen.getByRole("button", { name: "Criar Projeto" }));
+  await user.click(screen.getByRole("button", { name: "Criar projeto" }));
   expect(onCreate).toHaveBeenCalledWith({
     ...expectedConfiguration,
     visualDefaults: neutralVisualDefaults,
@@ -335,12 +335,12 @@ test("isolates cancellation and keeps backwards navigation beside the primary ac
   expect(footerActionNames()).toEqual(["Cancelar", "Continuar"]);
 
   await user.click(screen.getByRole("button", { name: "Continuar" }));
-  await screen.findByRole("button", { name: "Criar Projeto" });
+  await screen.findByRole("button", { name: "Criar projeto" });
 
   expect(footerActionNames()).toEqual([
     "Cancelar",
     "Voltar",
-    "Criar Projeto",
+    "Criar projeto",
   ]);
 });
 
@@ -363,14 +363,14 @@ test("creates from the neutral visual defaults without copying the demonstrative
   await user.click(screen.getByRole("button", { name: "Continuar" }));
 
   expect(
-    await screen.findByRole("img", { name: "Reprodução da Lâmina" }),
+    await screen.findByRole("img", { name: "Reprodução da lâmina" }),
   ).toBeInTheDocument();
-  expect(screen.getByLabelText("Base branca canônica")).toHaveAttribute(
+  expect(screen.getByLabelText("Fundo branco")).toHaveAttribute(
     "fill",
     "#FFFFFF",
   );
   const demonstrativeFrames = screen.getAllByLabelText(
-    /Frame demonstrativo (esquerdo|direito) [12]/,
+    /Quadro de exemplo [12], lado (esquerdo|direito)/,
   );
   expect(demonstrativeFrames).toHaveLength(4);
   for (const frame of demonstrativeFrames) {
@@ -378,50 +378,50 @@ test("creates from the neutral visual defaults without copying the demonstrative
     expect(frame).toHaveAttribute("fill-opacity", "0.24");
     expect(frame).toHaveAttribute("stroke", "none");
   }
-  expect(screen.getByLabelText("Cor do Background")).toHaveValue("#ffffff");
+  expect(screen.getByLabelText("Cor do fundo")).toHaveValue("#ffffff");
   expect(
-    screen.queryByRole("checkbox", { name: "Borda dos Frames" }),
+    screen.queryByRole("checkbox", { name: "Borda dos quadros" }),
   ).not.toBeInTheDocument();
   expect(
-    screen.getByRole("slider", { name: "Espessura da Borda padrão" }),
+    screen.getByRole("slider", { name: "Espessura da borda padrão" }),
   ).toHaveValue("0");
   expect(screen.getByText("sem borda")).toBeVisible();
   const borderColors = within(
-    screen.getByRole("group", { name: "Cores da Borda" }),
+    screen.getByRole("group", { name: "Cores da borda" }),
   ).getAllByRole("button");
   expect(
-    screen.getByRole("group", { name: "Cores da Borda" }),
+    screen.getByRole("group", { name: "Cores da borda" }),
   ).toHaveClass("new-project-color-swatches");
   expect(borderColors).toHaveLength(3);
   expect(borderColors[0]).toHaveAttribute("aria-pressed", "true");
   expect(
-    screen.getByRole("slider", { name: "Espaço entre Frames" }),
+    screen.getByRole("slider", { name: "Espaço entre quadros" }),
   ).toHaveValue("5000");
   expect(screen.getByText("5 mm")).toBeVisible();
   expect(
     screen
-      .getByRole("slider", { name: "Espaço entre Frames" })
+      .getByRole("slider", { name: "Espaço entre quadros" })
       .closest("div"),
   ).not.toHaveAttribute("data-placeholder-feature");
-  const secondFrame = screen.getByLabelText("Frame demonstrativo esquerdo 2");
+  const secondFrame = screen.getByLabelText("Quadro de exemplo 2, lado esquerdo");
   const initialSecondFrameX = Number(secondFrame.getAttribute("x"));
   fireEvent.change(
-    screen.getByRole("slider", { name: "Espaço entre Frames" }),
+    screen.getByRole("slider", { name: "Espaço entre quadros" }),
     { target: { value: "18000" } },
   );
   expect(
-    screen.getByRole("slider", { name: "Espaço entre Frames" }),
+    screen.getByRole("slider", { name: "Espaço entre quadros" }),
   ).toHaveValue("18000");
   expect(screen.getByText("18 mm")).toBeVisible();
   expect(Number(secondFrame.getAttribute("x"))).toBeGreaterThan(
     initialSecondFrameX,
   );
-  expect(screen.getByLabelText("Background de ambos os lados")).toHaveAttribute(
+  expect(screen.getByLabelText("Fundo de ambos os lados")).toHaveAttribute(
     "fill",
     "#FFFFFF",
   );
 
-  await user.click(screen.getByRole("button", { name: "Criar Projeto" }));
+  await user.click(screen.getByRole("button", { name: "Criar projeto" }));
 
   expect(onCreate).toHaveBeenCalledWith(
     expect.objectContaining({
@@ -452,7 +452,7 @@ test("formats the Project Frame spacing in the configured Unit", async () => {
   await user.click(screen.getByRole("button", { name: "Continuar" }));
 
   expect(
-    screen.getByRole("slider", { name: "Espaço entre Frames" }),
+    screen.getByRole("slider", { name: "Espaço entre quadros" }),
   ).toHaveValue("5000");
   expect(screen.getByText("0.5 cm")).toBeVisible();
 });
@@ -502,14 +502,14 @@ test("selects both sides from the preview area outside the sheet", async () => {
   await user.click(screen.getByRole("button", { name: "Continuar" }));
 
   const sheetSurface = await screen.findByLabelText(
-    "Prévia do formato da Lâmina",
+    "Prévia do formato da lâmina",
   );
   const both = screen.getByRole("button", { name: "Ambos os lados" });
   expect(
     within(sheetSurface).queryByRole("button", { name: "Ambos os lados" }),
   ).not.toBeInTheDocument();
   const sideControls = within(sheetSurface).getByRole("group", {
-    name: "Escopo da personalização",
+    name: "Aplicar personalização em",
   });
   expect(within(sideControls).getAllByRole("button")).toHaveLength(2);
   expect(
@@ -527,7 +527,7 @@ test("selects both sides from the preview area outside the sheet", async () => {
       screen.getByLabelText("Foco de teclado de ambos os lados"),
     ).toHaveAttribute("stroke", "#73A9CE"),
   );
-  expect(screen.getByLabelText("Frame demonstrativo direito 1")).toHaveAttribute(
+  expect(screen.getByLabelText("Quadro de exemplo 1, lado direito")).toHaveAttribute(
     "fill-opacity",
     "0.15",
   );
@@ -563,12 +563,12 @@ test("selects both sides from the preview legends outside the sheet", async () =
 
   await user.click(left);
   expect(both).toHaveAttribute("aria-pressed", "false");
-  await user.click(screen.getByText("Proporção real da Lâmina aberta."));
+  await user.click(screen.getByText("Proporção real da lâmina aberta."));
   expect(both).toHaveAttribute("aria-pressed", "true");
 
   await user.click(left);
   expect(both).toHaveAttribute("aria-pressed", "false");
-  await user.click(screen.getByLabelText("Prévia do formato da Lâmina"));
+  await user.click(screen.getByLabelText("Prévia do formato da lâmina"));
   expect(both).toHaveAttribute("aria-pressed", "false");
 });
 
@@ -602,18 +602,18 @@ test("hover fills only an unselected candidate without changing the fixed scope"
   expect(document.querySelector(".visual-preview-fixed-selection")).toHaveClass(
     "visual-preview-fixed-selection--both",
   );
-  expect(screen.getByLabelText("Frame demonstrativo esquerdo 1")).toHaveAttribute(
+  expect(screen.getByLabelText("Quadro de exemplo 1, lado esquerdo")).toHaveAttribute(
     "fill-opacity",
     "0.24",
   );
-  expect(screen.getByLabelText("Frame demonstrativo direito 1")).toHaveAttribute(
+  expect(screen.getByLabelText("Quadro de exemplo 1, lado direito")).toHaveAttribute(
     "fill-opacity",
     "0.24",
   );
-  fireEvent.change(screen.getByLabelText("Cor do Background"), {
+  fireEvent.change(screen.getByLabelText("Cor do fundo"), {
     target: { value: "#123456" },
   });
-  expect(screen.getByLabelText("Background de ambos os lados")).toHaveAttribute(
+  expect(screen.getByLabelText("Fundo de ambos os lados")).toHaveAttribute(
     "fill",
     "#123456",
   );
@@ -637,19 +637,19 @@ test("hover fills only an unselected candidate without changing the fixed scope"
     "stroke",
     "none",
   );
-  fireEvent.change(screen.getByLabelText("Cor do Background"), {
+  fireEvent.change(screen.getByLabelText("Cor do fundo"), {
     target: { value: "#abcdef" },
   });
-  expect(screen.getByLabelText("Background do lado esquerdo")).toHaveAttribute(
+  expect(screen.getByLabelText("Fundo do lado esquerdo")).toHaveAttribute(
     "fill",
     "#ABCDEF",
   );
-  expect(screen.getByLabelText("Background do lado direito")).toHaveAttribute(
+  expect(screen.getByLabelText("Fundo do lado direito")).toHaveAttribute(
     "fill",
     "#123456",
   );
 
-  await user.click(screen.getByRole("button", { name: "Criar Projeto" }));
+  await user.click(screen.getByRole("button", { name: "Criar projeto" }));
   expect(onCreate).toHaveBeenCalledWith(
     expect.objectContaining({
       visualDefaults: expect.objectContaining({
@@ -678,32 +678,32 @@ test("presents divergent side values as mixed when returning to both sides", asy
   await user.click(
     await screen.findByRole("button", { name: "Lado esquerdo" }),
   );
-  fireEvent.change(screen.getByLabelText("Cor do Background"), {
+  fireEvent.change(screen.getByLabelText("Cor do fundo"), {
     target: { value: "#abcdef" },
   });
   await user.click(screen.getByRole("button", { name: "Lado direito" }));
-  fireEvent.change(screen.getByLabelText("Cor do Background"), {
+  fireEvent.change(screen.getByLabelText("Cor do fundo"), {
     target: { value: "#123456" },
   });
   await user.click(screen.getByRole("button", { name: "Ambos os lados" }));
 
   const backgroundSection = screen
-    .getByRole("heading", { name: "Background" })
+    .getByRole("heading", { name: "Fundo" })
     .closest("section") as HTMLElement;
   expect(within(backgroundSection).getByText("Valores diferentes")).toBeVisible();
   expect(
     within(backgroundSection)
-      .getAllByRole("button", { name: /Usar Background/ })
+      .getAllByRole("button", { name: /Usar fundo/ })
       .some((button) => button.getAttribute("aria-pressed") === "true"),
   ).toBe(false);
 
-  fireEvent.change(within(backgroundSection).getByLabelText("Cor do Background"), {
+  fireEvent.change(within(backgroundSection).getByLabelText("Cor do fundo"), {
     target: { value: "#eeeeee" },
   });
   expect(
     within(backgroundSection).queryByText("Valores diferentes"),
   ).not.toBeInTheDocument();
-  expect(screen.getByLabelText("Background de ambos os lados")).toHaveAttribute(
+  expect(screen.getByLabelText("Fundo de ambos os lados")).toHaveAttribute(
     "fill",
     "#EEEEEE",
   );
@@ -728,19 +728,19 @@ test("hover tint keeps the fixed selection and Frame contrast independent", asyn
     screen.queryByLabelText("Foco de teclado do lado direito"),
   ).not.toBeInTheDocument();
 
-  expect(screen.getByLabelText("Atenuação do lado esquerdo")).toHaveAttribute(
+  expect(screen.getByLabelText("Lado não selecionado: esquerdo")).toHaveAttribute(
     "fill",
     "#E3E0DA",
   );
-  expect(screen.getByLabelText("Atenuação do lado esquerdo")).toHaveAttribute(
+  expect(screen.getByLabelText("Lado não selecionado: esquerdo")).toHaveAttribute(
     "fill-opacity",
     "0.42",
   );
-  expect(screen.getByLabelText("Atenuação do lado esquerdo")).toHaveAttribute(
+  expect(screen.getByLabelText("Lado não selecionado: esquerdo")).toHaveAttribute(
     "stroke",
     "none",
   );
-  expect(screen.getByLabelText("Atenuação do lado esquerdo")).toHaveAttribute(
+  expect(screen.getByLabelText("Lado não selecionado: esquerdo")).toHaveAttribute(
     "width",
     "300000",
   );
@@ -754,11 +754,11 @@ test("hover tint keeps the fixed selection and Frame contrast independent", asyn
   expect(fixedSelection).toHaveClass(
     "visual-preview-fixed-selection--right",
   );
-  expect(screen.getByLabelText("Frame demonstrativo direito 1")).toHaveAttribute(
+  expect(screen.getByLabelText("Quadro de exemplo 1, lado direito")).toHaveAttribute(
     "fill-opacity",
     "0.24",
   );
-  expect(screen.getByLabelText("Frame demonstrativo esquerdo 1")).toHaveAttribute(
+  expect(screen.getByLabelText("Quadro de exemplo 1, lado esquerdo")).toHaveAttribute(
     "fill-opacity",
     "0.08",
   );
@@ -770,7 +770,7 @@ test("hover tint keeps the fixed selection and Frame contrast independent", asyn
     "stroke",
     "none",
   );
-  expect(screen.getByLabelText("Atenuação do lado esquerdo")).toHaveAttribute(
+  expect(screen.getByLabelText("Lado não selecionado: esquerdo")).toHaveAttribute(
     "fill-opacity",
     "0.18",
   );
@@ -828,23 +828,23 @@ test("shows a solid Frame border immediately and sends its canonical values", as
   fireEvent.click(screen.getByRole("button", { name: "Continuar" }));
   fireEvent.change(
     await screen.findByRole("slider", {
-      name: "Espessura da Borda padrão",
+      name: "Espessura da borda padrão",
     }),
     {
       target: { value: "2500" },
     },
   );
   fireEvent.click(
-    screen.getByRole("button", { name: "Usar cor da Borda #C5A46D" }),
+    screen.getByRole("button", { name: "Usar cor da borda #C5A46D" }),
   );
 
   expect(screen.getByText("2.5 mm")).toBeVisible();
   expect(
-    screen.getByRole("button", { name: "Usar cor da Borda #C5A46D" }),
+    screen.getByRole("button", { name: "Usar cor da borda #C5A46D" }),
   ).toHaveAttribute("aria-pressed", "true");
 
   const frameBorders = screen.getAllByLabelText(
-    /Borda do Frame (esquerdo|direito) [12]/,
+    /Borda do quadro (esquerdo|direito) [12]/,
   );
   expect(frameBorders).toHaveLength(4);
   for (const frameBorder of frameBorders) {
@@ -855,7 +855,7 @@ test("shows a solid Frame border immediately and sends its canonical values", as
     }
   }
   const firstFrameSegments = screen
-    .getByLabelText("Borda do Frame esquerdo 1")
+    .getByLabelText("Borda do quadro esquerdo 1")
     .querySelectorAll("rect");
   expect(firstFrameSegments[0]).toHaveAttribute("x", "12000");
   expect(firstFrameSegments[0]).toHaveAttribute("y", "12000");
@@ -864,7 +864,7 @@ test("shows a solid Frame border immediately and sends its canonical values", as
   expect(firstFrameSegments[3]).toHaveAttribute("x", "145000");
   expect(firstFrameSegments[3]).toHaveAttribute("width", "2500");
 
-  fireEvent.click(screen.getByRole("button", { name: "Criar Projeto" }));
+  fireEvent.click(screen.getByRole("button", { name: "Criar projeto" }));
   await waitFor(() =>
     expect(onCreate).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -893,11 +893,11 @@ test("restores the chosen Frame border color after passing through zero", async 
   );
   await user.click(screen.getByRole("button", { name: "Continuar" }));
   const width = await screen.findByRole("slider", {
-    name: "Espessura da Borda padrão",
+    name: "Espessura da borda padrão",
   });
   fireEvent.change(width, { target: { value: "2500" } });
   await user.click(
-    screen.getByRole("button", { name: "Usar cor da Borda #C5A46D" }),
+    screen.getByRole("button", { name: "Usar cor da borda #C5A46D" }),
   );
 
   fireEvent.change(width, { target: { value: "0" } });
@@ -905,15 +905,15 @@ test("restores the chosen Frame border color after passing through zero", async 
   fireEvent.change(width, { target: { value: "1250" } });
 
   expect(
-    screen.getByRole("button", { name: "Usar cor da Borda #C5A46D" }),
+    screen.getByRole("button", { name: "Usar cor da borda #C5A46D" }),
   ).toHaveAttribute("aria-pressed", "true");
   for (const segment of screen
-    .getByLabelText("Borda do Frame esquerdo 1")
+    .getByLabelText("Borda do quadro esquerdo 1")
     .querySelectorAll("rect")) {
     expect(segment).toHaveAttribute("fill", "#C5A46D");
   }
 
-  await user.click(screen.getByRole("button", { name: "Criar Projeto" }));
+  await user.click(screen.getByRole("button", { name: "Criar projeto" }));
   expect(onCreate).toHaveBeenCalledWith(
     expect.objectContaining({
       visualDefaults: expect.objectContaining({
@@ -938,17 +938,17 @@ test("keeps distinct provisional images by side and sends only their opaque ids"
     .fn()
     .mockResolvedValueOnce(selectedDecorative({
       selectionId: "selection-background-left",
-      displayName: "Background esquerdo.jpg",
+      displayName: "Fundo esquerdo.jpg",
       previewUrl: "blob:background-left",
     }))
     .mockResolvedValueOnce(selectedDecorative({
       selectionId: "selection-background-right",
-      displayName: "Background direito.jpg",
+      displayName: "Fundo direito.jpg",
       previewUrl: "blob:background-right",
     }))
     .mockResolvedValueOnce(selectedDecorative({
       selectionId: "selection-overlay-right",
-      displayName: "Overlay direito.png",
+      displayName: "Sobreposição direito.png",
       previewUrl: "blob:overlay-right",
     }));
 
@@ -967,15 +967,15 @@ test("keeps distinct provisional images by side and sends only their opaque ids"
     await screen.findByRole("button", { name: "Lado esquerdo" }),
   );
   await user.click(
-    screen.getByRole("button", { name: "Usar imagem… no Background" }),
+    screen.getByRole("button", { name: "Usar imagem… no fundo" }),
   );
-  expect(await screen.findByText("Background esquerdo.jpg")).toBeInTheDocument();
-  const leftBackground = screen.getByLabelText("Background do lado esquerdo");
+  expect(await screen.findByText("Fundo esquerdo.jpg")).toBeInTheDocument();
+  const leftBackground = screen.getByLabelText("Fundo do lado esquerdo");
   expect(leftBackground).toHaveAttribute(
     "href",
     "blob:background-left",
   );
-  const canonicalBase = screen.getByLabelText("Base branca canônica");
+  const canonicalBase = screen.getByLabelText("Fundo branco");
   expect(canonicalBase.parentElement).toBe(leftBackground.parentElement);
   expect(
     [...(canonicalBase.parentElement?.children ?? [])].indexOf(canonicalBase),
@@ -985,18 +985,18 @@ test("keeps distinct provisional images by side and sends only their opaque ids"
 
   await user.click(screen.getByRole("button", { name: "Lado direito" }));
   await user.click(
-    screen.getByRole("button", { name: "Usar imagem… no Background" }),
+    screen.getByRole("button", { name: "Usar imagem… no fundo" }),
   );
   await user.click(
-    screen.getByRole("button", { name: "Escolher imagem… de Overlay" }),
+    screen.getByRole("button", { name: "Escolher imagem… de sobreposição" }),
   );
-  expect(await screen.findByText("Overlay direito.png")).toBeInTheDocument();
-  expect(screen.getByLabelText("Overlay do lado direito")).toHaveAttribute(
+  expect(await screen.findByText("Sobreposição direito.png")).toBeInTheDocument();
+  expect(screen.getByLabelText("Sobreposição do lado direito")).toHaveAttribute(
     "href",
     "blob:overlay-right",
   );
 
-  await user.click(screen.getByRole("button", { name: "Criar Projeto" }));
+  await user.click(screen.getByRole("button", { name: "Criar projeto" }));
   expect(onCreate).toHaveBeenCalledWith(
     expect.objectContaining({
       visualDefaults: {
@@ -1021,7 +1021,7 @@ test("keeps distinct provisional images by side and sends only their opaque ids"
     "blob:background-left",
   );
   expect(JSON.stringify(onCreate.mock.calls[0]?.[0])).not.toContain(
-    "Background esquerdo.jpg",
+    "Fundo esquerdo.jpg",
   );
 });
 
@@ -1032,7 +1032,7 @@ test("preserves provisional personalization and releases it when creation is can
   const onOperationalFailure = vi.fn(async () => undefined);
   const selection = {
     selectionId: "selection-kept",
-    displayName: "Background preservado.jpg",
+    displayName: "Fundo preservado.jpg",
     previewUrl: "blob:background-kept",
   };
   const onChooseDecorative = vi
@@ -1052,13 +1052,13 @@ test("preserves provisional personalization and releases it when creation is can
   );
   await user.click(screen.getByRole("button", { name: "Continuar" }));
   await user.click(
-    screen.getByRole("button", { name: "Usar imagem… no Background" }),
+    screen.getByRole("button", { name: "Usar imagem… no fundo" }),
   );
   expect(await screen.findByText(selection.displayName)).toBeInTheDocument();
 
-  await user.click(screen.getByRole("button", { name: "Criar Projeto" }));
+  await user.click(screen.getByRole("button", { name: "Criar projeto" }));
   await user.click(
-    screen.getByRole("button", { name: "Usar imagem… no Background" }),
+    screen.getByRole("button", { name: "Usar imagem… no fundo" }),
   );
   expect(screen.getByText(selection.displayName)).toBeInTheDocument();
   expect(onReleaseDecorative).not.toHaveBeenCalled();
@@ -1090,10 +1090,10 @@ test("applies a reusable preset across both creation steps", async () => {
     "builtin-graphic-30",
   );
   expect(
-    screen.getByRole("textbox", { name: "Largura da Lâmina fechada" }),
+    screen.getByRole("textbox", { name: "Largura da lâmina fechada" }),
   ).toHaveValue("300");
   expect(
-    screen.getByRole("textbox", { name: "Quantidade de Lâminas" }),
+    screen.getByRole("textbox", { name: "Quantidade de lâminas" }),
   ).toHaveValue("18");
   expect(
     screen.getByRole("textbox", { name: "Área de segurança" }),
@@ -1104,7 +1104,7 @@ test("applies a reusable preset across both creation steps", async () => {
   );
   expect(
     await screen.findByRole("button", {
-      name: "Usar Background #f7f5f0",
+      name: "Usar fundo #f7f5f0",
     }),
   ).toHaveAttribute("aria-pressed", "true");
 });
@@ -1122,12 +1122,12 @@ test("keeps a custom preset across both steps for the current placeholder sessio
   await user.click(screen.getByRole("button", { name: "Continuar" }));
   fireEvent.click(
     await screen.findByRole("button", {
-      name: "Usar Background #1d2a3a",
+      name: "Usar fundo #1d2a3a",
     }),
   );
   fireEvent.click(screen.getByRole("button", { name: "Voltar" }));
   fireEvent.change(
-    screen.getByRole("textbox", { name: "Largura da Lâmina fechada" }),
+    screen.getByRole("textbox", { name: "Largura da lâmina fechada" }),
     { target: { value: "320" } },
   );
 
@@ -1152,14 +1152,14 @@ test("keeps a custom preset across both steps for the current placeholder sessio
   ).toHaveDisplayValue("Estúdio 32 × 30");
 
   fireEvent.change(
-    screen.getByRole("textbox", { name: "Largura da Lâmina fechada" }),
+    screen.getByRole("textbox", { name: "Largura da lâmina fechada" }),
     { target: { value: "300" } },
   );
   fireEvent.change(screen.getByRole("combobox", { name: "Modelo inicial" }), {
     target: { value: "custom-1" },
   });
   expect(
-    screen.getByRole("textbox", { name: "Largura da Lâmina fechada" }),
+    screen.getByRole("textbox", { name: "Largura da lâmina fechada" }),
   ).toHaveValue("320");
 
   await user.click(
@@ -1167,7 +1167,7 @@ test("keeps a custom preset across both steps for the current placeholder sessio
   );
   expect(
     await screen.findByRole("button", {
-      name: "Usar Background #1d2a3a",
+      name: "Usar fundo #1d2a3a",
     }),
   ).toHaveAttribute("aria-pressed", "true");
 });
@@ -1249,7 +1249,7 @@ test("shows a typed native picker failure without changing personalization", asy
   );
   await user.click(screen.getByRole("button", { name: "Continuar" }));
   await user.click(
-    screen.getByRole("button", { name: "Usar imagem… no Background" }),
+    screen.getByRole("button", { name: "Usar imagem… no fundo" }),
   );
 
   await waitFor(() =>
@@ -1260,19 +1260,19 @@ test("shows a typed native picker failure without changing personalization", asy
   );
   expect(onOperationalFailure).toHaveBeenCalledOnce();
   expect(screen.queryByRole("alert")).not.toBeInTheDocument();
-  expect(screen.getByText("Cor do Background")).toBeInTheDocument();
+  expect(screen.getByText("Cor do fundo")).toBeInTheDocument();
 });
 
 test("releases a provisional image as soon as it is no longer referenced", async () => {
   const user = userEvent.setup();
   const firstSelection = {
     selectionId: "selection-replaced",
-    displayName: "Primeiro Background.jpg",
+    displayName: "Primeiro fundo.jpg",
     previewUrl: "blob:first-background",
   };
   const secondSelection = {
     selectionId: "selection-current",
-    displayName: "Background atual.jpg",
+    displayName: "Fundo atual.jpg",
     previewUrl: "blob:current-background",
   };
   const onReleaseDecorative = vi.fn();
@@ -1291,7 +1291,7 @@ test("releases a provisional image as soon as it is no longer referenced", async
   );
   await user.click(screen.getByRole("button", { name: "Continuar" }));
   const chooseBackground = await screen.findByRole("button", {
-    name: "Usar imagem… no Background",
+    name: "Usar imagem… no fundo",
   });
   await user.click(chooseBackground);
   expect(await screen.findByText(firstSelection.displayName)).toBeInTheDocument();
@@ -1317,10 +1317,10 @@ test("converts periodic display values without changing physical values and keep
   );
 
   const width = screen.getByRole("textbox", {
-    name: "Largura da Lâmina fechada",
+    name: "Largura da lâmina fechada",
   });
   const height = screen.getByRole("textbox", {
-    name: "Altura da Lâmina fechada",
+    name: "Altura da lâmina fechada",
   });
   await user.click(screen.getByRole("button", { name: "pol" }));
   expect(width).toHaveValue("11.811");
@@ -1351,11 +1351,11 @@ test("converts periodic display values without changing physical values and keep
     target: { value: "600" },
   });
   fireEvent.change(
-    screen.getByRole("textbox", { name: "Quantidade de Lâminas" }),
+    screen.getByRole("textbox", { name: "Quantidade de lâminas" }),
     { target: { value: "4" } },
   );
   await user.selectOptions(
-    screen.getByRole("combobox", { name: "Primeira Lâmina" }),
+    screen.getByRole("combobox", { name: "Primeira lâmina" }),
     "singlePage",
   );
   fireEvent.change(screen.getByRole("textbox", { name: "Sangria" }), {
@@ -1364,9 +1364,9 @@ test("converts periodic display values without changing physical values and keep
 
   await user.click(screen.getByRole("button", { name: "Continuar" }));
   expect(
-    await screen.findByLabelText("Prévia do formato da Lâmina"),
+    await screen.findByLabelText("Prévia do formato da lâmina"),
   ).toHaveStyle({ aspectRatio: "508000 / 254000" });
-  await user.click(screen.getByRole("button", { name: "Criar Projeto" }));
+  await user.click(screen.getByRole("button", { name: "Criar projeto" }));
   expect(onCreate).toHaveBeenCalledWith({
     document: {
       displayUnit: "cm",
@@ -1398,7 +1398,7 @@ test("blocks locally unrepresentable text, then revalidates through the Core aft
     />,
   );
   const width = screen.getByRole("textbox", {
-    name: "Largura da Lâmina fechada",
+    name: "Largura da lâmina fechada",
   });
   fireEvent.change(width, { target: { value: "60.0001" } });
   expect(screen.queryByText(/medida válida em mm/i)).not.toBeInTheDocument();
@@ -1443,10 +1443,10 @@ test("shows every Core error, focuses the first field and refreshes errors after
 
   const alert = await screen.findByRole("alert");
   expect(alert).toHaveTextContent(/altura.*maior que zero/i);
-  expect(alert).toHaveTextContent(/DPI inteiro entre 1 e 1\.200/i);
-  expect(alert).toHaveTextContent(/pelo menos 2 Lâminas/i);
+  expect(alert).toHaveTextContent(/número inteiro entre 1 e 1\.200 DPI/i);
+  expect(alert).toHaveTextContent(/pelo menos 2 lâminas/i);
   const height = screen.getByRole("textbox", {
-    name: "Altura da Lâmina fechada",
+    name: "Altura da lâmina fechada",
   });
   const descriptionId = height.getAttribute("aria-describedby");
   expect(descriptionId).toBe(alert.id);
@@ -1455,12 +1455,12 @@ test("shows every Core error, focuses the first field and refreshes errors after
     descriptionId,
   );
   expect(
-    screen.getByRole("textbox", { name: "Quantidade de Lâminas" }),
+    screen.getByRole("textbox", { name: "Quantidade de lâminas" }),
   ).toHaveAttribute("aria-describedby", descriptionId);
   expect(height).not.toHaveAttribute("title");
   expect(screen.getAllByRole("alert")).toHaveLength(1);
   expect(screen.getByRole("tooltip")).toHaveTextContent(
-    "A altura da Lâmina deve ser maior que zero.",
+    "A altura da lâmina deve ser maior que zero.",
   );
   expect(height).toHaveFocus();
 
@@ -1472,7 +1472,7 @@ test("shows every Core error, focuses the first field and refreshes errors after
 
   fireEvent.focus(screen.getByRole("textbox", { name: "DPI" }));
   expect(screen.getByRole("tooltip")).toHaveTextContent(
-    "Informe um DPI inteiro entre 1 e 1.200.",
+    "Use um número inteiro entre 1 e 1.200 DPI.",
   );
   fireEvent.pointerDown(
     screen.getByRole("heading", { name: "Configurações" }),
@@ -1480,7 +1480,7 @@ test("shows every Core error, focuses the first field and refreshes errors after
   expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
 
   fireEvent.change(
-    screen.getByRole("textbox", { name: "Altura da Lâmina fechada" }),
+    screen.getByRole("textbox", { name: "Altura da lâmina fechada" }),
     { target: { value: "250" } },
   );
   await waitFor(() => expect(onValidate).toHaveBeenCalledTimes(2));
@@ -1510,7 +1510,7 @@ test("presents creation raster limits in the selected Unit and closed Sheet meas
 
   const tooltip = await screen.findByRole("tooltip");
   expect(tooltip).toHaveTextContent(
-    "Para 300 DPI, informe a largura da Lâmina fechada entre 0.0043 cm e 277.4336 cm.",
+    "Para 300 DPI, informe a largura da lâmina fechada entre 0.0043 cm e 277.4336 cm.",
   );
   expect(tooltip).not.toHaveTextContent(/pixels?/i);
 });
@@ -1536,7 +1536,7 @@ test("anchors validation to the first invalid field in visual order", async () =
   const bleed = screen.getByRole("textbox", { name: "Sangria" });
   const tooltip = await screen.findByRole("tooltip");
   expect(bleed).toHaveFocus();
-  expect(tooltip).toHaveTextContent("A Sangria não pode ser negativa.");
+  expect(tooltip).toHaveTextContent("A sangria não pode ser negativa.");
   const summary = tooltip.textContent ?? "";
   expect(summary.indexOf("Sangria")).toBeLessThan(summary.indexOf("DPI"));
 });
@@ -1562,28 +1562,28 @@ test("preserves errors from untouched fields during live validation", async () =
   await user.click(screen.getByRole("button", { name: "Continuar" }));
 
   const alert = await screen.findByRole("alert");
-  expect(alert).toHaveTextContent(/DPI inteiro entre 1 e 1\.200/i);
-  expect(alert).toHaveTextContent(/pelo menos 2 Lâminas/i);
+  expect(alert).toHaveTextContent(/número inteiro entre 1 e 1\.200 DPI/i);
+  expect(alert).toHaveTextContent(/pelo menos 2 lâminas/i);
 
   fireEvent.change(
-    screen.getByRole("textbox", { name: "Altura da Lâmina fechada" }),
+    screen.getByRole("textbox", { name: "Altura da lâmina fechada" }),
     { target: { value: "250" } },
   );
   await waitFor(() => expect(onValidate).toHaveBeenCalledTimes(2));
   expect(screen.getByRole("alert")).toHaveTextContent(
-    /DPI inteiro entre 1 e 1\.200/i,
+    /número inteiro entre 1 e 1\.200 DPI/i,
   );
-  expect(screen.getByRole("alert")).toHaveTextContent(/pelo menos 2 Lâminas/i);
+  expect(screen.getByRole("alert")).toHaveTextContent(/pelo menos 2 lâminas/i);
 
   fireEvent.change(
-    screen.getByRole("textbox", { name: "Largura da Lâmina fechada" }),
+    screen.getByRole("textbox", { name: "Largura da lâmina fechada" }),
     { target: { value: "600.0001" } },
   );
   expect(screen.getByRole("alert")).toHaveTextContent(/medida válida em mm/i);
   expect(screen.getByRole("alert")).toHaveTextContent(
-    /DPI inteiro entre 1 e 1\.200/i,
+    /número inteiro entre 1 e 1\.200 DPI/i,
   );
-  expect(screen.getByRole("alert")).toHaveTextContent(/pelo menos 2 Lâminas/i);
+  expect(screen.getByRole("alert")).toHaveTextContent(/pelo menos 2 lâminas/i);
   expect(onValidate).toHaveBeenCalledTimes(2);
 
   await act(async () => {
@@ -1591,9 +1591,9 @@ test("preserves errors from untouched fields during live validation", async () =
   });
   expect(screen.getByRole("alert")).toHaveTextContent(/medida válida em mm/i);
   expect(screen.getByRole("alert")).toHaveTextContent(
-    /DPI inteiro entre 1 e 1\.200/i,
+    /número inteiro entre 1 e 1\.200 DPI/i,
   );
-  expect(screen.getByRole("alert")).toHaveTextContent(/pelo menos 2 Lâminas/i);
+  expect(screen.getByRole("alert")).toHaveTextContent(/pelo menos 2 lâminas/i);
 });
 
 test("ignores a late validation response after a newer edit", async () => {
@@ -1615,7 +1615,7 @@ test("ignores a late validation response after a newer edit", async () => {
   await user.click(screen.getByRole("button", { name: "Continuar" }));
   await waitFor(() => expect(onValidate).toHaveBeenCalledOnce());
   fireEvent.change(
-    screen.getByRole("textbox", { name: "Largura da Lâmina fechada" }),
+    screen.getByRole("textbox", { name: "Largura da lâmina fechada" }),
     { target: { value: "500" } },
   );
   await waitFor(() => expect(onValidate).toHaveBeenCalledTimes(2));
@@ -1627,14 +1627,14 @@ test("ignores a late validation response after a newer edit", async () => {
     });
   });
   expect(screen.getByRole("alert")).toHaveTextContent(
-    /duas Páginas com a mesma medida/i,
+    /duas páginas com a mesma medida/i,
   );
 
   await act(async () => {
     first.resolve({ status: "valid" });
   });
   expect(screen.getByRole("alert")).toHaveTextContent(
-    /duas Páginas com a mesma medida/i,
+    /duas páginas com a mesma medida/i,
   );
   expect(
     screen.getByRole("heading", { name: "Configurações" }),
@@ -1725,23 +1725,23 @@ test("preserves the draft after native cancellation and structured creation fail
     />,
   );
   fireEvent.change(
-    screen.getByRole("textbox", { name: "Largura da Lâmina fechada" }),
+    screen.getByRole("textbox", { name: "Largura da lâmina fechada" }),
     { target: { value: "500" } },
   );
   await user.click(screen.getByRole("button", { name: "Continuar" }));
   await user.click(
-    await screen.findByRole("button", { name: "Criar Projeto" }),
+    await screen.findByRole("button", { name: "Criar projeto" }),
   );
   await act(async () => nativeCreation.resolve({ status: "cancelled" }));
   expect(onOperationalFailure).not.toHaveBeenCalled();
 
   await user.click(screen.getByRole("button", { name: "Voltar" }));
   expect(
-    screen.getByRole("textbox", { name: "Largura da Lâmina fechada" }),
+    screen.getByRole("textbox", { name: "Largura da lâmina fechada" }),
   ).toHaveValue("500");
   await user.click(screen.getByRole("button", { name: "Continuar" }));
   await user.click(
-    await screen.findByRole("button", { name: "Criar Projeto" }),
+    await screen.findByRole("button", { name: "Criar projeto" }),
   );
   await waitFor(() =>
     expect(onOperationalFailure).toHaveBeenCalledWith({
@@ -1753,6 +1753,6 @@ test("preserves the draft after native cancellation and structured creation fail
   expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   await user.click(screen.getByRole("button", { name: "Voltar" }));
   expect(
-    screen.getByRole("textbox", { name: "Largura da Lâmina fechada" }),
+    screen.getByRole("textbox", { name: "Largura da lâmina fechada" }),
   ).toHaveValue("500");
 });
