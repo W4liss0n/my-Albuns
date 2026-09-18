@@ -35,7 +35,7 @@ test("closes on Escape and restores focus to the trigger", async () => {
   expect(trigger).toHaveFocus();
 });
 
-test("closes on an outside pointer and restores focus to the trigger", async () => {
+test("closes on an outside pointer and preserves focus on the chosen control", async () => {
   const user = userEvent.setup();
   render(
     <>
@@ -53,6 +53,15 @@ test("closes on an outside pointer and restores focus to the trigger", async () 
   expect(
     screen.queryByRole("menu", { name: "Decorativos para fundo" }),
   ).not.toBeInTheDocument();
+  await waitFor(() => expect(screen.getByRole("button", { name: "Fora do seletor" })).toHaveFocus());
+});
+
+test("restores focus when an outside pointer leaves no focused control", async () => {
+  const user = userEvent.setup();
+  renderPicker();
+  const trigger = screen.getByRole("button", { name: "Escolher decorativo para fundo" });
+  await user.click(trigger);
+  await user.click(document.body);
   await waitFor(() => expect(trigger).toHaveFocus());
 });
 

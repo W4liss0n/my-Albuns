@@ -31,13 +31,13 @@ test.each([false, true])("clips decorative previews with Cache available: %s", (
   expect(clipPaths.size).toBe(3);
 });
 
-test("shows the clipped Decorative belonging to each Inspector side", () => {
+test("describes the clipped Decorative belonging to each Inspector side", () => {
   const sheet = decorativeCorpus.states.split.composition.sheets[0];
-  const { container } = render(<SheetDesignInspector sheet={sheet} scope="both" mediaPreviewUrls={{}} onScopeChange={() => {}} />);
-  const labels = Array.from(container.querySelectorAll(".sheet-design-role:first-of-type .sheet-design-value__copy"), (node) => node.textContent);
-  expect(labels).toHaveLength(2);
-  sheet.backgrounds.forEach((background, index) => {
-    if (background.kind === "media") expect(labels[index]).toContain(background.name);
+  render(<SheetDesignInspector sheet={sheet} scope="both" mediaPreviewUrls={{}} onScopeChange={() => {}} />);
+  const options = screen.getByRole("group", { name: "Opções de fundo" });
+  expect(options).toHaveAccessibleDescription(/Esquerda:.*Direita:/);
+  sheet.backgrounds.forEach((background) => {
+    if (background.kind === "media") expect(options).toHaveAccessibleDescription(new RegExp(background.name));
   });
 });
 

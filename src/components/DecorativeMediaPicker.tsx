@@ -63,10 +63,9 @@ export function DecorativeMediaPicker({
       };
       if (reason === "pointerOutside") {
         onOpenChange(false);
-        const openingAnotherPicker =
-          event.target instanceof Element &&
-          event.target.closest("[data-decorative-picker-trigger]");
-        if (!openingAnotherPicker) window.setTimeout(restoreTrigger, 0);
+        window.setTimeout(() => {
+          if (document.activeElement === document.body) restoreTrigger();
+        }, 0);
         return;
       }
       event.preventDefault();

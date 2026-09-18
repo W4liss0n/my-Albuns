@@ -38,6 +38,9 @@ existente de aplicação de decorativo para o lado escolhido.
   os seletores e descarta a cor ainda não aplicada.
 - Uma operação em andamento conserva seu alvo e bloqueia novas alterações dos
   dois controles até concluir, inclusive se a seleção do lado mudar.
+- Ao fechar um seletor por clique em outro controle, o foco acompanha o controle
+  escolhido. Escape ou clique em uma área sem controle devolvem o foco ao botão
+  do seletor. Abrir a cor após o seletor de imagem não fecha o editor de cor.
 
 As regras de herança, remoção, histórico e salvamento continuam nas operações
 existentes. A lâmina de página única mantém apenas seu lado ativo. Esta decisão

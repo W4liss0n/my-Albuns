@@ -11814,6 +11814,74 @@
           "selector": ".canvas-host:has(canvas):not(:has(.canvas-loading))"
         }
       ]
+    },
+    {
+      "id": "workspace-sheet-design-picker-to-color",
+      "title": "Design da lâmina — trocar imagem por cor",
+      "implementationPath": "/workspace-preview.html?frame=decorations&context=sheet&decoration-state=neutral",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "sheet-design",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "Design 0044: controles compactos compartilhados com o álbum, preservando o escopo e as operações existentes."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "readySelector": ".sheet-design-inspector",
+      "actions": [
+        {
+          "type": "assert",
+          "selector": ".canvas-host:has(canvas):not(:has(.canvas-loading))"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label=\"Escolher decorativo para fundo\"]"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label=\"Cor do fundo da lâmina\"]"
+        },
+        {
+          "type": "assert",
+          "selector": "[role=\"dialog\"][aria-label=\"Escolher cor do fundo da lâmina\"]"
+        }
+      ]
+    },
+    {
+      "id": "workspace-sheet-design-color-to-picker",
+      "title": "Design da lâmina — trocar cor por imagem",
+      "implementationPath": "/workspace-preview.html?frame=decorations&context=sheet&decoration-state=neutral",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "sheet-design",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "Design 0044: controles compactos compartilhados com o álbum, preservando o escopo e as operações existentes."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "readySelector": ".sheet-design-inspector",
+      "actions": [
+        {
+          "type": "assert",
+          "selector": ".canvas-host:has(canvas):not(:has(.canvas-loading))"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label=\"Cor do fundo da lâmina\"]"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label=\"Escolher decorativo para fundo\"]"
+        },
+        {
+          "type": "assert",
+          "selector": "[role=\"menu\"][aria-label=\"Decorativos para fundo\"]"
+        }
+      ]
     }
   ]
 }

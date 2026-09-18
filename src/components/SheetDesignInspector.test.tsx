@@ -133,3 +133,12 @@ test("one decorative picker is open at a time and changing scope discards the op
   expect(screen.queryByRole("menu")).toBeNull();
   expect(input.actions!.onApplyDecorative).not.toHaveBeenCalled();
 });
+
+test("switching directly from decorative selection to color keeps the color editor open", async () => {
+  const user = userEvent.setup();
+  render(<SheetDesignInspector {...props("neutral")} />);
+  await user.click(screen.getByRole("button", { name: "Escolher decorativo para fundo" }));
+  await user.click(screen.getByRole("button", { name: "Cor do fundo da lâmina" }));
+  expect(screen.queryByRole("menu")).toBeNull();
+  expect(screen.getByRole("textbox", { name: "Código da cor do fundo da lâmina" })).toHaveFocus();
+});
