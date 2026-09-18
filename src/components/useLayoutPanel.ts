@@ -32,11 +32,11 @@ export function useLayoutPanel(input: LayoutPanelInput) {
   const visible = sheetId !== null && !editing;
   const sheet = projection.state.album.sheets.find((sheet) => sheet.id === sheetId);
   const frameCount = sheet?.frames.length ?? 0;
-  const minimumPositionCount = sheet?.frames.filter((frame) => frame.photo !== null).length ?? 0;
+  const positionRange = sheet?.layoutPositionRange ?? null;
   const [requestedPositions, setRequestedPositions] = useState<{ projectId: string; sheetId: string; count: number } | null>(null);
   const request = requestedPositions?.projectId === projectId && requestedPositions.sheetId === sheetId ? requestedPositions : null;
-  const positionCount = sheet?.layoutLocked || minimumPositionCount > 30 ? frameCount : Math.max(minimumPositionCount, request?.count ?? frameCount);
-  const explicitPositionCount = request && !sheet?.layoutLocked && positionCount <= 30 ? positionCount : null;
+  const positionCount = positionRange ? Math.max(positionRange.minimum, request?.count ?? frameCount) : frameCount;
+  const explicitPositionCount = request && positionRange && positionCount <= positionRange.maximum ? positionCount : null;
   const [refresh, setRefresh] = useState(0);
   const scope = useMemo(() => ({ active: false }),
     [projectId, projection.state.revision, projection.composition, sheetId, editing, disabled, input.port.queryLayouts, input.catalogRevision, refresh, positionCount, explicitPositionCount]);
@@ -109,7 +109,7 @@ export function useLayoutPanel(input: LayoutPanelInput) {
   }
 
   return {
-    visible, sheetId, composition, committing, positionCount, minimumPositionCount,
+    visible, sheetId, composition, committing, positionCount, positionRange,
     query: data?.query ?? null,
     displayQuery: displayData?.query ?? null,
     previews: displayData?.previews ?? [],
@@ -122,7 +122,7 @@ export function useLayoutPanel(input: LayoutPanelInput) {
     close() { setHover(null); setTarget(null); },
     refresh() { setHover(null); setRefresh((value) => value + 1); },
     configurePositions(count: number) {
-      if (!sheetId || disabled || committingRef.current || sheet?.layoutLocked || !Number.isSafeInteger(count) || count < minimumPositionCount || count > 30) return;
+      if (!sheetId || disabled || committingRef.current || !positionRange || !Number.isSafeInteger(count) || count < positionRange.minimum || count > positionRange.maximum) return;
       setHover(null);
       setRequestedPositions({ projectId, sheetId, count });
     },
@@ -131,7 +131,7 @@ export function useLayoutPanel(input: LayoutPanelInput) {
     },
     cancelPreview() { setHover(null); },
     apply(index: number) {
-      if (!data?.previews[index] || data.query.locked || data.query.listing.candidates[index].layout.definition.positions.length > data.query.frameCount) return Promise.resolve(false);
+      if (!data?.previews[index] || data.query.locked || data.query.candidateRequiresLock[index]) return Promise.resolve(false);
       return commit({ kind: "applyLayout", selection: { queryId: data.query.queryId, candidateIndex: index } });
     },
     lock(index: number) {

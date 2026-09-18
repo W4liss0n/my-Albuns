@@ -43,10 +43,9 @@ export function LayoutPanel({ controller, sheet, catalog }: LayoutPanelProps) {
     } });
   const query = controller.displayQuery;
   const busy = controller.committing || controller.query === null;
-  const count = sheet.frames.length;
-  const minimumCount = controller.minimumPositionCount;
-  const counts = Array.from({ length: Math.max(0, 31 - minimumCount) }, (_, index) => minimumCount + index);
-  if (controller.positionCount > 30) counts.push(controller.positionCount);
+  const range = controller.positionRange;
+  const counts = range ? Array.from({ length: range.maximum - range.minimum + 1 }, (_, index) => range.minimum + index) : [];
+  if (!counts.includes(controller.positionCount)) counts.push(controller.positionCount);
   const emptyMessage = query?.listing.generationStatus === "empty"
     ? "Escolha a quantidade de Frames para preparar um Layout."
     : query?.listing.generationStatus === "outsideCoverage"
@@ -57,7 +56,7 @@ export function LayoutPanel({ controller, sheet, catalog }: LayoutPanelProps) {
       <div className="layout-panel__header">
         <label className="layout-panel__positions">Frames
           <select aria-label="Quantidade de Frames" value={controller.positionCount}
-            disabled={controller.committing || query?.locked || minimumCount > 30}
+            disabled={controller.committing || !range}
             onChange={(event) => controller.configurePositions(Number(event.target.value))}>
             {counts.map((value) =>
               <option key={value} value={value}>{value}</option>)}
@@ -73,16 +72,16 @@ export function LayoutPanel({ controller, sheet, catalog }: LayoutPanelProps) {
             {candidates.map(({ candidate, index }) => {
               const locked = query!.locked && index === 0;
               const unavailable = query!.locked && !locked;
-              const extraPositions = candidate.layout.definition.positions.length - count;
+              const requiresLock = query!.candidateRequiresLock[index];
               return <div className={`layout-panel__candidate${locked ? " layout-panel__candidate--locked" : ""}${unavailable ? " layout-panel__candidate--unavailable" : ""}${candidate.customId && candidate.customId === highlightId ? " layout-panel__candidate--revealed" : ""}`}
                 data-custom-layout-id={candidate.customId ?? undefined}
                 key={JSON.stringify(candidate.layout)} onPointerEnter={() => controller.preview(index)}>
               <button
               aria-label={`Aplicar Layout ${index + 1}${candidate.isLastApplied ? " — último aplicado" : ""}`}
-              className="layout-panel__preview" disabled={busy || query!.locked || extraPositions > 0} type="button"
+              className="layout-panel__preview" disabled={busy || query!.locked || requiresLock} type="button"
               onFocus={() => controller.preview(index)} onBlur={controller.cancelPreview}
               onClick={() => { void controller.apply(index); }}
-              title={extraPositions > 0 ? "Use o cadeado para aplicar e criar as posições adicionais." : `${candidate.layout.definition.scope === "page" ? "Por Página" : "Por Lâmina"}${candidate.isLastApplied ? " · Último aplicado" : ""}`}>
+              title={requiresLock ? "Use o cadeado para aplicar e criar as posições adicionais." : `${candidate.layout.definition.scope === "page" ? "Por Página" : "Por Lâmina"}${candidate.isLastApplied ? " · Último aplicado" : ""}`}>
               <LayoutThumbnail sheet={sheet} frames={controller.previews[index]} />
               </button>
               <button className="layout-panel__lock layout-panel__favorite" type="button" disabled={busy || unavailable}

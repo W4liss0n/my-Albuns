@@ -50,6 +50,7 @@ function harness(pendingKind: "applyLayout" | "lockLayout" | "unlockLayout" | "s
     load: async () => initial, apply, save, undo, redo: async () => applied,
     ...emptyLayoutCatalogPort,
     readFrameDragThreshold: async () => ({ x: 5, y: 5 }), readSliderDoubleClickTime: async () => 500,
+    validateMediaFolderName: async () => { throw new Error("Folder validation is not configured in this fixture."); },
     queryLayouts: async (target) => {
       const query = { ...structuredClone(sample.before.queries[target].query),
         queryId: `prepared-${++querySequence}`, revision: authoritative.state.revision,

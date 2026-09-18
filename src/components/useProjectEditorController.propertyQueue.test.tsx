@@ -36,6 +36,7 @@ test.each([
     ...emptyLayoutCatalogPort,
     readFrameDragThreshold: async () => ({ x: 5, y: 5 }),
     readSliderDoubleClickTime: async () => 500,
+    validateMediaFolderName: async () => { throw new Error("Folder validation is not configured in this fixture."); },
     queryLayouts: unsupported, previewLayout: unsupported, previewDecorativeDrop: unsupported,
     previewPhotoZoom: unsupported, previewFrameStyle: unsupported,
     previewPhotoAngle: unsupported, previewFrameGeometry: unsupported, saveAs: unsupported,
@@ -51,7 +52,8 @@ test.each([
     return { runner, ...useProjectEditorController({ projectDialogPort: unusedLayoutDialogPort,
       projection, projectCorePort: port, runProjectMutation: runner, onProjectionChange: setProjection }) };
   });
-  act(() => {    view.result.current.photoZoom.onPreview((baseline + 0.5) * 100);
+  act(() => {
+    view.result.current.photoZoom.onPreview((baseline + 0.5) * 100);
     view.result.current.photoZoom.onCommit((baseline + 0.5) * 100);
   });
   expect(view.result.current.photoZoom.disabled).toBe(true);

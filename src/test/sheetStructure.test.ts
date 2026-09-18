@@ -18,7 +18,7 @@ function sheet(
     id,
     number: 0,
     pageNumbers: [],
-    layoutLocked: false,
+    layoutLocked: false, layoutPositionRange: { minimum: 0, maximum: 30 },
     role: "internal",
     widthUm: activeSides === "both" ? 600_000 : 300_000,
   };

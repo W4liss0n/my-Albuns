@@ -283,6 +283,7 @@ export interface MediaDropPort {
 }
 
 export interface ProjectCorePort {
+  validateMediaFolderName(request: import("../domain/project").MediaFolderNameRequest): Promise<import("../domain/project").MediaFolderNameValidation>;
   previewDecorativeDrop(request: import("../domain/project").DecorativeDropRequest): Promise<import("../domain/project").DecorativeDropPreview | null>;
   refreshLayoutCatalog(): Promise<number>;
   saveCustomLayout(sheetId: string): Promise<SaveCustomLayoutResult>;

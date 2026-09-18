@@ -17,6 +17,7 @@
           "prepare_project_startup_images",
           "project_state",
           "validate_album_information",
+          "validate_media_folder_name",
           "apply_project_intent",
           "import_media",
           "photo_drop_target",

@@ -227,6 +227,18 @@ fn cross_sheet_swap_is_one_edit_preserving_occurrences_frames_and_saved_composit
         let mut expected = before.state.album.clone();
         expected.sheets[0].frames[0].photo = target.photo.clone();
         expected.sheets[1].frames[destination].photo = source.photo.clone();
+        if target.photo.is_none() {
+            expected.sheets[0]
+                .layout_position_range
+                .as_mut()
+                .unwrap()
+                .minimum -= 1;
+            expected.sheets[1]
+                .layout_position_range
+                .as_mut()
+                .unwrap()
+                .minimum += 1;
+        }
         assert_eq!(swapped.state.album, expected);
         assert_eq!(swapped.media_usage, before.media_usage);
         assert_eq!(swapped.state.revision, before.state.revision + 1);

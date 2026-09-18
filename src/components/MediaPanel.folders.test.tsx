@@ -1,8 +1,8 @@
 import { createRef, useState } from "react";
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, expect, test, vi } from "vitest";
-import type { MediaCatalogItem, MediaFolder, MediaFolderEdit } from "../domain/project";
+import type { MediaCatalogItem, MediaFolder, MediaFolderEdit, MediaFolderNameRequest, MediaFolderNameValidation } from "../domain/project";
 import { MediaPanel, type MediaPanelHandle } from "./MediaPanel";
 
 const items: MediaCatalogItem[] = [
@@ -17,14 +17,17 @@ const folders: MediaFolder[] = [
 ];
 function harness(initial = folders) {
   const edit = vi.fn<(edit: MediaFolderEdit) => Promise<boolean>>(async () => true);
+  const validate = vi.fn(async (request: MediaFolderNameRequest): Promise<MediaFolderNameValidation> => ({
+    name: request.name, error: request.name === "" ? "empty" : request.name === "turma a" ? "nameInUse" : null,
+  }));
   const remove = vi.fn();
   const ref = createRef<MediaPanelHandle>();
-  const props = { ref, mediaItems: items, mediaUsage: [], mediaFolders: initial, onEditMediaFolder: edit,
+  const props = { ref, mediaItems: items, mediaUsage: [], mediaFolders: initial, onEditMediaFolder: edit, onValidateMediaFolderName: validate,
     onFillPhoto: vi.fn(), onApplyDecorative: vi.fn(), onImportMedia: vi.fn(), onRemoveMedia: remove,
     onMediaDragChange: vi.fn(), onRelinkMedia: vi.fn(), onReplaceMedia: vi.fn(), onRetryUnavailableMedia: async () => {},
     previewSource: { kind: "static" as const }, preferences: { kind: "local" as const } };
   const view = render(<MediaPanel {...props} />);
-  return { view, edit, remove, ref, props };
+  return { view, edit, validate, remove, ref, props };
 }
 function gridItems() { return [...document.querySelectorAll<HTMLElement>("[data-media-id]")].map((item) => item.dataset.mediaId); }
 
@@ -356,4 +359,55 @@ test("moving the focused thumbnail out of the active folder restores connected p
   await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
   expect(gridItems()).toEqual([]);
   await waitFor(() => expect(screen.getByRole("region", { name: "Painel de imagens" })).toHaveFocus());
+});
+
+test("folder submission uses the Core normalized name and cannot submit twice during validation", async () => {
+  const h = harness(); const user = userEvent.setup();
+  let resolve!: (result: MediaFolderNameValidation) => void;
+  h.validate.mockImplementationOnce(() => new Promise((done) => { resolve = done; }));
+  await user.click(screen.getByRole("button", { name: "Nova pasta de organização" }));
+  const input = screen.getByRole("textbox", { name: "Nome" });
+  await user.type(input, "  Nome enviado  ");
+  const form = input.closest("form")!;
+  fireEvent.submit(form); fireEvent.submit(form);
+  expect(h.validate).toHaveBeenCalledOnce();
+  expect(h.validate).toHaveBeenCalledWith({ name: "  Nome enviado  ", mediaKind: "photo", folderId: null });
+  expect(h.edit).not.toHaveBeenCalled();
+  await act(async () => resolve({ name: "Nome normalizado pelo Core", error: null }));
+  expect(h.edit).toHaveBeenCalledExactlyOnceWith({ kind: "create", mediaKind: "photo", name: "Nome normalizado pelo Core" });
+});
+
+test("a validation response from an older document cannot submit; a failed lookup stays in the tooltip", async () => {
+  const h = harness(); const user = userEvent.setup();
+  let resolve!: (result: MediaFolderNameValidation) => void;
+  h.validate.mockImplementationOnce(() => new Promise((done) => { resolve = done; }));
+  await user.click(screen.getByRole("button", { name: "Nova pasta de organização" }));
+  const input = screen.getByRole("textbox", { name: "Nome" });
+  await user.type(input, "Nova");
+  fireEvent.submit(input.closest("form")!);
+  h.view.rerender(<MediaPanel {...h.props} folderValidationKey="next-revision" />);
+  await act(async () => resolve({ name: "Nova", error: null }));
+  expect(h.edit).not.toHaveBeenCalled();
+  h.validate.mockRejectedValueOnce(new Error("offline"));
+  await user.click(screen.getByRole("button", { name: "Criar" }));
+  expect(await screen.findByRole("tooltip")).toHaveTextContent("Não foi possível validar o nome");
+  expect(input).toHaveAttribute("aria-invalid", "true");
+  expect(input).toHaveFocus();
+  expect(h.edit).not.toHaveBeenCalled();
+});
+
+test("late name advice cannot replace the error for the current draft", async () => {
+  const h = harness(); const user = userEvent.setup();
+  await user.click(screen.getByRole("button", { name: "Nova pasta de organização" }));
+  await user.click(screen.getByRole("button", { name: "Criar" }));
+  const input = screen.getByRole("textbox", { name: "Nome" });
+  let resolve!: (result: MediaFolderNameValidation) => void;
+  h.validate.mockImplementationOnce(() => new Promise((done) => { resolve = done; }));
+  fireEvent.change(input, { target: { value: "Anterior" } });
+  h.validate.mockResolvedValueOnce({ name: "Atual", error: "nameInUse" });
+  fireEvent.change(input, { target: { value: "Atual" } });
+  await waitFor(() => expect(screen.getByRole("tooltip")).toHaveTextContent("Esse nome já está em uso nesta aba."));
+  await act(async () => resolve({ name: "Anterior", error: null }));
+  expect(screen.getByRole("tooltip")).toHaveTextContent("Esse nome já está em uso nesta aba.");
+  expect(h.edit).not.toHaveBeenCalled();
 });

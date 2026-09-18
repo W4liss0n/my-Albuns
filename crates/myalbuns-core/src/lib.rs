@@ -6,7 +6,10 @@ mod frame_snap;
 mod layouts;
 mod media_folders;
 mod model;
-pub use media_folders::{MediaFolder, MediaFolderEdit};
+pub use media_folders::{
+    MediaFolder, MediaFolderEdit, MediaFolderNameError, MediaFolderNameRequest,
+    MediaFolderNameValidation,
+};
 mod persistent_project;
 mod persistent_projection;
 mod persistent_session;
@@ -33,9 +36,10 @@ pub use layouts::{
     CustomLayout, CustomLayoutId, FavoriteLayout, FrameOrientation, GeneratedLayout,
     LayoutCandidate, LayoutCatalogSnapshot, LayoutDefinition, LayoutExportProblem,
     LayoutFavoriteId, LayoutFrameRequest, LayoutGeneration, LayoutGenerationStatus, LayoutListing,
-    LayoutOrigin, LayoutParameters, LayoutPatch, LayoutPermission, LayoutQuery, LayoutQueryResult,
-    LayoutRules, LayoutScope, LayoutSelection, LayoutSettings, LayoutSources, LayoutSurface,
-    LayoutSurfaceKind, SaveCustomLayoutResult, StoredLayout, generate_layouts,
+    LayoutOrigin, LayoutParameters, LayoutPatch, LayoutPermission, LayoutPositionRange,
+    LayoutQuery, LayoutQueryResult, LayoutRules, LayoutScope, LayoutSelection, LayoutSettings,
+    LayoutSources, LayoutSurface, LayoutSurfaceKind, SaveCustomLayoutResult, StoredLayout,
+    generate_layouts,
 };
 
 pub use model::{

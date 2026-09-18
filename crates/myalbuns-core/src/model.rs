@@ -387,6 +387,7 @@ pub struct SheetSnapshot {
     pub visuals: Option<crate::SheetVisuals>,
     pub id: String,
     pub layout_locked: bool,
+    pub layout_position_range: Option<crate::LayoutPositionRange>,
     pub number: usize,
     pub role: SheetRole,
     pub active_sides: ProjectedActiveSides,

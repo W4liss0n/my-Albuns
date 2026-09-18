@@ -848,6 +848,8 @@ export function ProjectWorkspace({
           ref={mediaPanelRef}
           mediaFolders={projection.state.album.mediaFolders}
           onEditMediaFolder={controller.editMediaFolder}
+          onValidateMediaFolderName={projectCorePort.validateMediaFolderName}
+          folderValidationKey={`${projection.state.projectId}:${projection.state.revision}`}
           mediaItems={projection.state.album.media}
           mediaUsage={projection.mediaUsage}
           onFillPhoto={controller.fillMedia}

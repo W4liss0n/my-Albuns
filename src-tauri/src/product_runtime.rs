@@ -276,6 +276,7 @@ pub(crate) fn run(
             prepare_project_startup_images,
             crate::project_commands::project_state,
             crate::project_commands::validate_album_information,
+            crate::project_commands::validate_media_folder_name,
             crate::project_commands::apply_project_intent,
             crate::project_commands::import_media,
             crate::project_commands::photo_drop_target,

@@ -62,6 +62,126 @@ fn create(project: &mut EditableProject, name: &str, kind: MediaKind) -> String 
 }
 
 #[test]
+fn name_advice_and_edits_share_unicode_limits_namespaces_and_rename_rules() {
+    use myalbuns_core::{MediaFolderNameError as Error, MediaFolderNameRequest};
+    let root = tempfile::tempdir().unwrap();
+    let mut project = project(root.path());
+    let own = create(&mut project, "Turma", MediaKind::Photo);
+    create(&mut project, "Extra", MediaKind::Photo);
+    project.undo().unwrap();
+    for (name, error) in [
+        ("".to_owned(), Some(Error::Empty)),
+        ("  \t ".to_owned(), Some(Error::Empty)),
+        ("TURMA".to_owned(), Some(Error::NameInUse)),
+        (" Todas ".to_owned(), Some(Error::NameInUse)),
+        ("aUsEnTeS".to_owned(), Some(Error::NameInUse)),
+        (
+            "a\u{0085}b".to_owned(),
+            Some(Error::InvalidCharactersOrLength),
+        ),
+        (
+            "line\nbreak".to_owned(),
+            Some(Error::InvalidCharactersOrLength),
+        ),
+        ("📷".repeat(81), Some(Error::InvalidCharactersOrLength)),
+        ("📷".repeat(80), None),
+        ("  Retratos  ".to_owned(), None),
+    ] {
+        let before = project.projection();
+        let advice = project
+            .project()
+            .validate_media_folder_name(&MediaFolderNameRequest {
+                media_kind: MediaKind::Photo,
+                name: name.clone(),
+                folder_id: None,
+            });
+        assert_eq!(advice.error, error, "{name}");
+        assert_eq!(advice.name, name.trim());
+        assert_eq!(
+            project.projection(),
+            before,
+            "advice must preserve revision, dirty state and redo"
+        );
+        let result = project.apply(ProjectIntent::EditMediaFolder {
+            edit: MediaFolderEdit::Create {
+                media_kind: MediaKind::Photo,
+                name,
+            },
+        });
+        assert_eq!(result.is_err(), error.is_some());
+        if result.is_ok() {
+            project.undo().unwrap();
+        } else {
+            assert_eq!(project.projection(), before);
+        }
+    }
+    for request in [
+        MediaFolderNameRequest {
+            media_kind: MediaKind::Photo,
+            name: " turma ".into(),
+            folder_id: Some(own.clone()),
+        },
+        MediaFolderNameRequest {
+            media_kind: MediaKind::Decorative,
+            name: "Turma".into(),
+            folder_id: None,
+        },
+    ] {
+        let before = project.projection();
+        assert_eq!(
+            project.project().validate_media_folder_name(&request).error,
+            None
+        );
+        assert_eq!(project.projection(), before);
+        let edit = match request.folder_id {
+            Some(folder_id) => MediaFolderEdit::Rename {
+                folder_id,
+                name: request.name,
+            },
+            None => MediaFolderEdit::Create {
+                media_kind: request.media_kind,
+                name: request.name,
+            },
+        };
+        project
+            .apply(ProjectIntent::EditMediaFolder { edit })
+            .unwrap();
+    }
+    let request = MediaFolderNameRequest {
+        media_kind: MediaKind::Photo,
+        name: "Novo".into(),
+        folder_id: None,
+    };
+    assert_eq!(
+        project.project().validate_media_folder_name(&request).error,
+        None
+    );
+    create(&mut project, "Novo", MediaKind::Photo);
+    assert!(
+        project
+            .apply(ProjectIntent::EditMediaFolder {
+                edit: MediaFolderEdit::Create {
+                    media_kind: request.media_kind,
+                    name: request.name,
+                }
+            })
+            .is_err(),
+        "execution revalidates a previously valid name"
+    );
+    assert_eq!(
+        project
+            .project()
+            .validate_media_folder_name(&MediaFolderNameRequest {
+                media_kind: MediaKind::Photo,
+                name: "Novo".into(),
+                folder_id: Some("missing".into()),
+            })
+            .error,
+        Some(Error::FolderNotFound)
+    );
+}
+
+#[test]
 fn folder_operations_are_atomic_undoable_and_do_not_change_composition_or_originals() {
     let root = tempfile::tempdir().unwrap();
     let mut project = project(root.path());

@@ -15,7 +15,7 @@ function panel(overrides: Partial<LayoutPanelController> = {}, caseName = "mixed
     toggle: vi.fn(), close: vi.fn(), refresh: vi.fn(), preview: vi.fn(), cancelPreview: vi.fn(),
     apply: vi.fn(async () => true), toggleFavorite: vi.fn(async () => true),
     lock: vi.fn(async () => true), unlock: vi.fn(async () => true),
-    positionCount: sheet.frames.length, minimumPositionCount: sheet.frames.filter((frame) => frame.photo !== null).length,
+    positionCount: sheet.frames.length, positionRange: sample.projection.state.album.sheets[0].layoutPositionRange,
     configurePositions: vi.fn(),
     ...overrides,
   };

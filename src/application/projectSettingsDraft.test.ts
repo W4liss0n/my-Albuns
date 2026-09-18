@@ -74,7 +74,7 @@ const representativeProjection: EditorProjection = {
           role: "initial",
           activeSides: "both",
           pageNumbers: [1, 2],
-          layoutLocked: false,
+          layoutLocked: false, layoutPositionRange: { minimum: 0, maximum: 30 },
           widthUm: 600_000,
           heightUm: 300_000,
           frames: [],

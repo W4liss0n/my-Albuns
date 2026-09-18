@@ -19,6 +19,10 @@ fn main() {
 
     EditorProjection::export_all(&config).expect("EditorProjection bindings should be generated");
     ProjectIntent::export_all(&config).expect("ProjectIntent bindings should be generated");
+    myalbuns_core::MediaFolderNameRequest::export_all(&config)
+        .expect("Folder request bindings should be generated");
+    myalbuns_core::MediaFolderNameValidation::export_all(&config)
+        .expect("Folder validation bindings should be generated");
     myalbuns_core::FrameGeometryPreview::export_all(&config)
         .expect("Frame geometry preview bindings should be generated");
     AlbumInformationValidation::export_all(&config)

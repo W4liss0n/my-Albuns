@@ -12,7 +12,7 @@ const sheetId = initial.state.album.sheets[0].id;
 const frames = initial.composition.sheets[0].frames;
 function query(id: string, target = sheetId, revision = initial.state.revision): LayoutQueryResult {
   return { queryId: id, projectId: initial.state.projectId, revision, catalogRevision: 0, sheetId: target,
-    frameCount: frames.length, locked: false, settings: { permission: "pagesAndSheet", marginUm: 15000, gapUm: 5000, minimumSideUm: 20000 },
+    frameCount: frames.length, locked: false, candidateRequiresLock: [false], settings: { permission: "pagesAndSheet", marginUm: 15000, gapUm: 5000, minimumSideUm: 20000 },
     listing: { algorithmVersion: 1, generationStatus: "candidates", candidates: [
       { isLastApplied: false, customId: null, favoriteId: null, layout: { origin: "automatic", definition: {
         surface: { type: "doubleSheet", widthUm: 600000, heightUm: 300000 }, scope: "page",
@@ -62,7 +62,7 @@ test("hover uses the Core composition without mutation; exit, close and edit mod
 test("only the lock confirms extra positions, and a locked query only allows unlocking", async () => {
   const { view, commit, queryLayouts } = harness();
   const expanded = query("expanded");
-  expanded.frameCount = frames.length - 1;
+  expanded.candidateRequiresLock = [true];
   queryLayouts.mockResolvedValueOnce(expanded);
   act(() => view.result.current.panel.toggle(sheetId));
   await waitFor(() => expect(view.result.current.panel.query?.queryId).toBe("expanded"));
@@ -124,7 +124,7 @@ test("after unlocking, the requested count may drop to filled Frames and apply t
   act(() => h.view.result.current.panel.toggle(sheetId));
   await waitFor(() => expect(h.view.result.current.panel.query).not.toBeNull());
   expect(h.view.result.current.panel.positionCount).toBe(6);
-  expect(h.view.result.current.panel.minimumPositionCount).toBe(2);
+  expect(h.view.result.current.panel.positionRange?.minimum).toBe(2);
   h.queryLayouts.mockResolvedValue(reduced.query);
   h.previewLayout.mockResolvedValue(reduced.previews[0]);
   act(() => h.view.result.current.panel.configurePositions(2));
@@ -187,6 +187,7 @@ test("adding Photos beyond automatic coverage releases an earlier count request"
   const expanded = structuredClone(initial);
   const sheet = expanded.state.album.sheets[0];
   const filled = sheet.frames.find((frame) => frame.photo !== null)!;
+  sheet.layoutPositionRange = null;
   sheet.frames = Array.from({ length: 31 }, (_, index) => ({ ...filled, id: `filled-${index}` }));
   expanded.state.revision += 1;
   act(() => h.view.result.current.setProjection(expanded));
@@ -229,4 +230,17 @@ test.each([false, true])("starring retains its captured handle and rejects adjac
   expect(commit).toHaveBeenCalledExactlyOnceWith({ kind: "toggleLayoutFavorite", selection: { queryId: `query-${sheetId}`, candidateIndex: 0 } });
   await waitFor(() => expect(queryLayouts).toHaveBeenCalledTimes(2));
   expect(view.result.current.panel.committing).toBe(false);
+});
+
+test("position choices consume the Core range instead of reconstructing photo counts or coverage", async () => {
+  const projection = structuredClone(initial);
+  projection.state.album.sheets[0].layoutPositionRange = { minimum: 7, maximum: 9 };
+  const h = harness(projection);
+  act(() => h.view.result.current.panel.toggle(sheetId));
+  expect(h.view.result.current.panel.positionRange).toEqual({ minimum: 7, maximum: 9 });
+  expect(h.view.result.current.panel.positionCount).toBe(7);
+  act(() => h.view.result.current.panel.configurePositions(8));
+  await waitFor(() => expect(h.queryLayouts).toHaveBeenLastCalledWith(sheetId, { frameCount: 8, orientation: "horizontal" }));
+  act(() => h.view.result.current.panel.configurePositions(10));
+  expect(h.view.result.current.panel.positionCount).toBe(8);
 });

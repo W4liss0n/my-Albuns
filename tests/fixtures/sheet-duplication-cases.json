@@ -745,6 +745,7 @@
             "heightUm": 300000,
             "id": "dup-sheet-1",
             "layoutLocked": true,
+            "layoutPositionRange": null,
             "number": 1,
             "pageNumbers": [
               1,
@@ -875,6 +876,7 @@
             "heightUm": 300000,
             "id": "dup-sheet-2",
             "layoutLocked": true,
+            "layoutPositionRange": null,
             "number": 2,
             "pageNumbers": [
               3,
@@ -931,6 +933,10 @@
             "heightUm": 300000,
             "id": "dup-sheet-3",
             "layoutLocked": false,
+            "layoutPositionRange": {
+              "maximum": 30,
+              "minimum": 0
+            },
             "number": 3,
             "pageNumbers": [
               5,
@@ -1464,6 +1470,7 @@
             "heightUm": 300000,
             "id": "dup-sheet-1",
             "layoutLocked": true,
+            "layoutPositionRange": null,
             "number": 1,
             "pageNumbers": [
               1,
@@ -1520,6 +1527,10 @@
             "heightUm": 300000,
             "id": "dup-sheet-3",
             "layoutLocked": false,
+            "layoutPositionRange": {
+              "maximum": 30,
+              "minimum": 0
+            },
             "number": 2,
             "pageNumbers": [
               3,
@@ -2329,6 +2340,7 @@
             "heightUm": 300000,
             "id": "dup-sheet-1",
             "layoutLocked": true,
+            "layoutPositionRange": null,
             "number": 1,
             "pageNumbers": [
               1,
@@ -2459,6 +2471,10 @@
             "heightUm": 300000,
             "id": "dup-sheet-2",
             "layoutLocked": false,
+            "layoutPositionRange": {
+              "maximum": 30,
+              "minimum": 2
+            },
             "number": 2,
             "pageNumbers": [
               3,
@@ -2515,6 +2531,10 @@
             "heightUm": 300000,
             "id": "dup-sheet-3",
             "layoutLocked": false,
+            "layoutPositionRange": {
+              "maximum": 30,
+              "minimum": 0
+            },
             "number": 3,
             "pageNumbers": [
               5,
@@ -3327,6 +3347,7 @@
               "heightUm": 300000,
               "id": "dup-sheet-1",
               "layoutLocked": true,
+              "layoutPositionRange": null,
               "number": 1,
               "pageNumbers": [
                 1,
@@ -3457,6 +3478,7 @@
               "heightUm": 300000,
               "id": "dup-sheet-2",
               "layoutLocked": true,
+              "layoutPositionRange": null,
               "number": 2,
               "pageNumbers": [
                 3,
@@ -3513,6 +3535,10 @@
               "heightUm": 300000,
               "id": "dup-sheet-3",
               "layoutLocked": false,
+              "layoutPositionRange": {
+                "maximum": 30,
+                "minimum": 0
+              },
               "number": 3,
               "pageNumbers": [
                 5,
@@ -4323,6 +4349,7 @@
             "heightUm": 300000,
             "id": "dup-sheet-1",
             "layoutLocked": true,
+            "layoutPositionRange": null,
             "number": 1,
             "pageNumbers": [
               1,
@@ -4453,6 +4480,7 @@
             "heightUm": 300000,
             "id": "dup-sheet-2",
             "layoutLocked": true,
+            "layoutPositionRange": null,
             "number": 2,
             "pageNumbers": [
               3,
@@ -4509,6 +4537,10 @@
             "heightUm": 300000,
             "id": "dup-sheet-3",
             "layoutLocked": false,
+            "layoutPositionRange": {
+              "maximum": 30,
+              "minimum": 0
+            },
             "number": 3,
             "pageNumbers": [
               5,
@@ -5273,6 +5305,10 @@
             "heightUm": 300000,
             "id": "dup-sheet-1",
             "layoutLocked": false,
+            "layoutPositionRange": {
+              "maximum": 30,
+              "minimum": 2
+            },
             "number": 1,
             "pageNumbers": [
               1
@@ -5391,6 +5427,10 @@
             "heightUm": 300000,
             "id": "dup-sheet-2",
             "layoutLocked": false,
+            "layoutPositionRange": {
+              "maximum": 30,
+              "minimum": 2
+            },
             "number": 2,
             "pageNumbers": [
               2,
@@ -5447,6 +5487,10 @@
             "heightUm": 300000,
             "id": "dup-sheet-3",
             "layoutLocked": false,
+            "layoutPositionRange": {
+              "maximum": 30,
+              "minimum": 0
+            },
             "number": 3,
             "pageNumbers": [
               4,

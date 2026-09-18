@@ -417,6 +417,10 @@
                   "heightUm": 300000,
                   "id": "sheet-001",
                   "layoutLocked": false,
+                  "layoutPositionRange": {
+                    "maximum": 30,
+                    "minimum": 2
+                  },
                   "number": 1,
                   "pageNumbers": [
                     1,
@@ -443,6 +447,10 @@
                   "heightUm": 300000,
                   "id": "sheet-002",
                   "layoutLocked": false,
+                  "layoutPositionRange": {
+                    "maximum": 30,
+                    "minimum": 0
+                  },
                   "number": 2,
                   "pageNumbers": [
                     3,
@@ -3136,6 +3144,20 @@
               ]
             ],
             "query": {
+              "candidateRequiresLock": [
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false
+              ],
               "catalogRevision": 1,
               "frameCount": 4,
               "listing": {
@@ -3797,6 +3819,10 @@
               ]
             ],
             "query": {
+              "candidateRequiresLock": [
+                true,
+                true
+              ],
               "catalogRevision": 1,
               "frameCount": 0,
               "listing": {
@@ -4320,6 +4346,10 @@
                   "heightUm": 300000,
                   "id": "sheet-001",
                   "layoutLocked": false,
+                  "layoutPositionRange": {
+                    "maximum": 30,
+                    "minimum": 2
+                  },
                   "number": 1,
                   "pageNumbers": [
                     1,
@@ -4346,6 +4376,10 @@
                   "heightUm": 300000,
                   "id": "sheet-002",
                   "layoutLocked": false,
+                  "layoutPositionRange": {
+                    "maximum": 30,
+                    "minimum": 0
+                  },
                   "number": 2,
                   "pageNumbers": [
                     3,
@@ -7039,6 +7073,20 @@
               ]
             ],
             "query": {
+              "candidateRequiresLock": [
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false
+              ],
               "catalogRevision": 1,
               "frameCount": 4,
               "listing": {
@@ -7700,6 +7748,10 @@
               ]
             ],
             "query": {
+              "candidateRequiresLock": [
+                true,
+                true
+              ],
               "catalogRevision": 1,
               "frameCount": 0,
               "listing": {
@@ -8223,6 +8275,10 @@
                   "heightUm": 300000,
                   "id": "sheet-001",
                   "layoutLocked": false,
+                  "layoutPositionRange": {
+                    "maximum": 30,
+                    "minimum": 2
+                  },
                   "number": 1,
                   "pageNumbers": [
                     1,
@@ -8249,6 +8305,10 @@
                   "heightUm": 300000,
                   "id": "sheet-002",
                   "layoutLocked": false,
+                  "layoutPositionRange": {
+                    "maximum": 30,
+                    "minimum": 0
+                  },
                   "number": 2,
                   "pageNumbers": [
                     3,
@@ -10723,6 +10783,19 @@
               ]
             ],
             "query": {
+              "candidateRequiresLock": [
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false
+              ],
               "catalogRevision": 2,
               "frameCount": 4,
               "listing": {
@@ -11276,6 +11349,9 @@
               ]
             ],
             "query": {
+              "candidateRequiresLock": [
+                true
+              ],
               "catalogRevision": 2,
               "frameCount": 0,
               "listing": {
@@ -11757,6 +11833,10 @@
                   "heightUm": 300000,
                   "id": "sheet-001",
                   "layoutLocked": false,
+                  "layoutPositionRange": {
+                    "maximum": 30,
+                    "minimum": 2
+                  },
                   "number": 1,
                   "pageNumbers": [
                     1,
@@ -11783,6 +11863,10 @@
                   "heightUm": 300000,
                   "id": "sheet-002",
                   "layoutLocked": false,
+                  "layoutPositionRange": {
+                    "maximum": 30,
+                    "minimum": 0
+                  },
                   "number": 2,
                   "pageNumbers": [
                     3,
@@ -14476,6 +14560,20 @@
               ]
             ],
             "query": {
+              "candidateRequiresLock": [
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false
+              ],
               "catalogRevision": 1,
               "frameCount": 4,
               "listing": {
@@ -15137,6 +15235,10 @@
               ]
             ],
             "query": {
+              "candidateRequiresLock": [
+                true,
+                true
+              ],
               "catalogRevision": 1,
               "frameCount": 0,
               "listing": {
@@ -15668,6 +15770,10 @@
                   "heightUm": 300000,
                   "id": "sheet-001",
                   "layoutLocked": false,
+                  "layoutPositionRange": {
+                    "maximum": 30,
+                    "minimum": 2
+                  },
                   "number": 1,
                   "pageNumbers": [
                     1,
@@ -15694,6 +15800,10 @@
                   "heightUm": 300000,
                   "id": "sheet-002",
                   "layoutLocked": false,
+                  "layoutPositionRange": {
+                    "maximum": 30,
+                    "minimum": 0
+                  },
                   "number": 2,
                   "pageNumbers": [
                     3,
@@ -17949,6 +18059,18 @@
               ]
             ],
             "query": {
+              "candidateRequiresLock": [
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false
+              ],
               "catalogRevision": 0,
               "frameCount": 4,
               "listing": {
@@ -18393,6 +18515,7 @@
           "sheet-002": {
             "previews": [],
             "query": {
+              "candidateRequiresLock": [],
               "catalogRevision": 0,
               "frameCount": 0,
               "listing": {
@@ -18831,6 +18954,10 @@
                   "heightUm": 300000,
                   "id": "sheet-001",
                   "layoutLocked": false,
+                  "layoutPositionRange": {
+                    "maximum": 30,
+                    "minimum": 2
+                  },
                   "number": 1,
                   "pageNumbers": [
                     1,
@@ -18857,6 +18984,10 @@
                   "heightUm": 300000,
                   "id": "sheet-002",
                   "layoutLocked": false,
+                  "layoutPositionRange": {
+                    "maximum": 30,
+                    "minimum": 0
+                  },
                   "number": 2,
                   "pageNumbers": [
                     3,
@@ -21331,6 +21462,19 @@
               ]
             ],
             "query": {
+              "candidateRequiresLock": [
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false
+              ],
               "catalogRevision": 2,
               "frameCount": 4,
               "listing": {
@@ -21884,6 +22028,9 @@
               ]
             ],
             "query": {
+              "candidateRequiresLock": [
+                true
+              ],
               "catalogRevision": 2,
               "frameCount": 0,
               "listing": {
@@ -22365,6 +22512,10 @@
                   "heightUm": 300000,
                   "id": "sheet-001",
                   "layoutLocked": false,
+                  "layoutPositionRange": {
+                    "maximum": 30,
+                    "minimum": 2
+                  },
                   "number": 1,
                   "pageNumbers": [
                     1,
@@ -22391,6 +22542,10 @@
                   "heightUm": 300000,
                   "id": "sheet-002",
                   "layoutLocked": false,
+                  "layoutPositionRange": {
+                    "maximum": 30,
+                    "minimum": 0
+                  },
                   "number": 2,
                   "pageNumbers": [
                     3,
@@ -25084,6 +25239,20 @@
               ]
             ],
             "query": {
+              "candidateRequiresLock": [
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false
+              ],
               "catalogRevision": 1,
               "frameCount": 4,
               "listing": {
@@ -25745,6 +25914,10 @@
               ]
             ],
             "query": {
+              "candidateRequiresLock": [
+                true,
+                true
+              ],
               "catalogRevision": 1,
               "frameCount": 0,
               "listing": {
@@ -25967,6 +26140,10 @@
                   "heightUm": 300000,
                   "id": "sheet-001",
                   "layoutLocked": false,
+                  "layoutPositionRange": {
+                    "maximum": 30,
+                    "minimum": 0
+                  },
                   "number": 1,
                   "pageNumbers": [
                     1,
@@ -25993,6 +26170,10 @@
                   "heightUm": 300000,
                   "id": "sheet-002",
                   "layoutLocked": false,
+                  "layoutPositionRange": {
+                    "maximum": 30,
+                    "minimum": 0
+                  },
                   "number": 2,
                   "pageNumbers": [
                     3,
@@ -26057,6 +26238,7 @@
           "sheet-001": {
             "previews": [],
             "query": {
+              "candidateRequiresLock": [],
               "catalogRevision": 0,
               "frameCount": 0,
               "listing": {
@@ -26080,6 +26262,7 @@
           "sheet-002": {
             "previews": [],
             "query": {
+              "candidateRequiresLock": [],
               "catalogRevision": 0,
               "frameCount": 0,
               "listing": {
@@ -26212,6 +26395,10 @@
                   "heightUm": 300000,
                   "id": "sheet-001",
                   "layoutLocked": false,
+                  "layoutPositionRange": {
+                    "maximum": 30,
+                    "minimum": 0
+                  },
                   "number": 1,
                   "pageNumbers": [
                     1,
@@ -26238,6 +26425,10 @@
                   "heightUm": 300000,
                   "id": "sheet-002",
                   "layoutLocked": false,
+                  "layoutPositionRange": {
+                    "maximum": 30,
+                    "minimum": 0
+                  },
                   "number": 2,
                   "pageNumbers": [
                     3,
@@ -26302,6 +26493,7 @@
           "sheet-001": {
             "previews": [],
             "query": {
+              "candidateRequiresLock": [],
               "catalogRevision": 0,
               "frameCount": 0,
               "listing": {
@@ -26325,6 +26517,7 @@
           "sheet-002": {
             "previews": [],
             "query": {
+              "candidateRequiresLock": [],
               "catalogRevision": 0,
               "frameCount": 0,
               "listing": {
@@ -26596,6 +26789,7 @@
                   "heightUm": 300000,
                   "id": "sheet-001",
                   "layoutLocked": true,
+                  "layoutPositionRange": null,
                   "number": 1,
                   "pageNumbers": [
                     1,
@@ -26622,6 +26816,10 @@
                   "heightUm": 300000,
                   "id": "sheet-002",
                   "layoutLocked": false,
+                  "layoutPositionRange": {
+                    "maximum": 30,
+                    "minimum": 0
+                  },
                   "number": 2,
                   "pageNumbers": [
                     3,
@@ -26784,6 +26982,9 @@
               ]
             ],
             "query": {
+              "candidateRequiresLock": [
+                false
+              ],
               "catalogRevision": 0,
               "frameCount": 2,
               "listing": {
@@ -26838,6 +27039,7 @@
           "sheet-002": {
             "previews": [],
             "query": {
+              "candidateRequiresLock": [],
               "catalogRevision": 0,
               "frameCount": 0,
               "listing": {
@@ -27197,6 +27399,7 @@
                   "heightUm": 300000,
                   "id": "sheet-001",
                   "layoutLocked": true,
+                  "layoutPositionRange": null,
                   "number": 1,
                   "pageNumbers": [
                     1,
@@ -27223,6 +27426,10 @@
                   "heightUm": 300000,
                   "id": "sheet-002",
                   "layoutLocked": false,
+                  "layoutPositionRange": {
+                    "maximum": 30,
+                    "minimum": 0
+                  },
                   "number": 2,
                   "pageNumbers": [
                     3,
@@ -27448,6 +27655,9 @@
               ]
             ],
             "query": {
+              "candidateRequiresLock": [
+                false
+              ],
               "catalogRevision": 0,
               "frameCount": 2,
               "listing": {
@@ -27502,6 +27712,7 @@
           "sheet-002": {
             "previews": [],
             "query": {
+              "candidateRequiresLock": [],
               "catalogRevision": 0,
               "frameCount": 0,
               "listing": {
@@ -27631,6 +27842,10 @@
                   "heightUm": 300000,
                   "id": "sheet-001",
                   "layoutLocked": false,
+                  "layoutPositionRange": {
+                    "maximum": 30,
+                    "minimum": 0
+                  },
                   "number": 1,
                   "pageNumbers": [
                     1,
@@ -27657,6 +27872,10 @@
                   "heightUm": 300000,
                   "id": "sheet-002",
                   "layoutLocked": false,
+                  "layoutPositionRange": {
+                    "maximum": 30,
+                    "minimum": 0
+                  },
                   "number": 2,
                   "pageNumbers": [
                     3,
@@ -27756,6 +27975,9 @@
               ]
             ],
             "query": {
+              "candidateRequiresLock": [
+                true
+              ],
               "catalogRevision": 0,
               "frameCount": 0,
               "listing": {
@@ -27810,6 +28032,7 @@
           "sheet-002": {
             "previews": [],
             "query": {
+              "candidateRequiresLock": [],
               "catalogRevision": 0,
               "frameCount": 0,
               "listing": {
@@ -28007,6 +28230,7 @@
                   "heightUm": 300000,
                   "id": "sheet-001",
                   "layoutLocked": true,
+                  "layoutPositionRange": null,
                   "number": 1,
                   "pageNumbers": [
                     1,
@@ -28033,6 +28257,10 @@
                   "heightUm": 300000,
                   "id": "sheet-002",
                   "layoutLocked": false,
+                  "layoutPositionRange": {
+                    "maximum": 30,
+                    "minimum": 0
+                  },
                   "number": 2,
                   "pageNumbers": [
                     3,
@@ -28132,6 +28360,9 @@
               ]
             ],
             "query": {
+              "candidateRequiresLock": [
+                false
+              ],
               "catalogRevision": 0,
               "frameCount": 2,
               "listing": {
@@ -28186,6 +28417,7 @@
           "sheet-002": {
             "previews": [],
             "query": {
+              "candidateRequiresLock": [],
               "catalogRevision": 0,
               "frameCount": 0,
               "listing": {
@@ -28383,6 +28615,10 @@
                   "heightUm": 300000,
                   "id": "sheet-001",
                   "layoutLocked": false,
+                  "layoutPositionRange": {
+                    "maximum": 30,
+                    "minimum": 0
+                  },
                   "number": 1,
                   "pageNumbers": [
                     1,
@@ -28409,6 +28645,10 @@
                   "heightUm": 300000,
                   "id": "sheet-002",
                   "layoutLocked": false,
+                  "layoutPositionRange": {
+                    "maximum": 30,
+                    "minimum": 0
+                  },
                   "number": 2,
                   "pageNumbers": [
                     3,
@@ -28508,6 +28748,9 @@
               ]
             ],
             "query": {
+              "candidateRequiresLock": [
+                false
+              ],
               "catalogRevision": 0,
               "frameCount": 2,
               "listing": {
@@ -28562,6 +28805,7 @@
           "sheet-002": {
             "previews": [],
             "query": {
+              "candidateRequiresLock": [],
               "catalogRevision": 0,
               "frameCount": 0,
               "listing": {
@@ -29003,6 +29247,10 @@
                   "heightUm": 300000,
                   "id": "sheet-001",
                   "layoutLocked": false,
+                  "layoutPositionRange": {
+                    "maximum": 30,
+                    "minimum": 2
+                  },
                   "number": 1,
                   "pageNumbers": [
                     1,
@@ -29029,6 +29277,10 @@
                   "heightUm": 300000,
                   "id": "sheet-002",
                   "layoutLocked": false,
+                  "layoutPositionRange": {
+                    "maximum": 30,
+                    "minimum": 0
+                  },
                   "number": 2,
                   "pageNumbers": [
                     3,
@@ -31284,6 +31536,18 @@
               ]
             ],
             "query": {
+              "candidateRequiresLock": [
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false
+              ],
               "catalogRevision": 0,
               "frameCount": 4,
               "listing": {
@@ -31728,6 +31992,7 @@
           "sheet-002": {
             "previews": [],
             "query": {
+              "candidateRequiresLock": [],
               "catalogRevision": 0,
               "frameCount": 0,
               "listing": {
@@ -32454,6 +32719,7 @@
                   "heightUm": 300000,
                   "id": "sheet-001",
                   "layoutLocked": true,
+                  "layoutPositionRange": null,
                   "number": 1,
                   "pageNumbers": [
                     1,
@@ -32480,6 +32746,10 @@
                   "heightUm": 300000,
                   "id": "sheet-002",
                   "layoutLocked": false,
+                  "layoutPositionRange": {
+                    "maximum": 30,
+                    "minimum": 0
+                  },
                   "number": 2,
                   "pageNumbers": [
                     3,
@@ -36945,6 +37215,18 @@
               ]
             ],
             "query": {
+              "candidateRequiresLock": [
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false
+              ],
               "catalogRevision": 0,
               "frameCount": 6,
               "listing": {
@@ -37509,6 +37791,7 @@
           "sheet-002": {
             "previews": [],
             "query": {
+              "candidateRequiresLock": [],
               "catalogRevision": 0,
               "frameCount": 0,
               "listing": {
@@ -38335,6 +38618,7 @@
                   "heightUm": 300000,
                   "id": "sheet-001",
                   "layoutLocked": true,
+                  "layoutPositionRange": null,
                   "number": 1,
                   "pageNumbers": [
                     1,
@@ -38361,6 +38645,10 @@
                   "heightUm": 300000,
                   "id": "sheet-002",
                   "layoutLocked": false,
+                  "layoutPositionRange": {
+                    "maximum": 30,
+                    "minimum": 0
+                  },
                   "number": 2,
                   "pageNumbers": [
                     3,
@@ -43456,6 +43744,18 @@
               ]
             ],
             "query": {
+              "candidateRequiresLock": [
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false
+              ],
               "catalogRevision": 0,
               "frameCount": 6,
               "listing": {
@@ -44020,6 +44320,7 @@
           "sheet-002": {
             "previews": [],
             "query": {
+              "candidateRequiresLock": [],
               "catalogRevision": 0,
               "frameCount": 0,
               "listing": {
@@ -44458,6 +44759,10 @@
                   "heightUm": 300000,
                   "id": "sheet-001",
                   "layoutLocked": false,
+                  "layoutPositionRange": {
+                    "maximum": 30,
+                    "minimum": 2
+                  },
                   "number": 1,
                   "pageNumbers": [
                     1,
@@ -44484,6 +44789,10 @@
                   "heightUm": 300000,
                   "id": "sheet-002",
                   "layoutLocked": false,
+                  "layoutPositionRange": {
+                    "maximum": 30,
+                    "minimum": 0
+                  },
                   "number": 2,
                   "pageNumbers": [
                     3,
@@ -47059,6 +47368,18 @@
               ]
             ],
             "query": {
+              "candidateRequiresLock": [
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true
+              ],
               "catalogRevision": 0,
               "frameCount": 4,
               "listing": {
@@ -47623,6 +47944,7 @@
           "sheet-002": {
             "previews": [],
             "query": {
+              "candidateRequiresLock": [],
               "catalogRevision": 0,
               "frameCount": 0,
               "listing": {
@@ -48127,6 +48449,7 @@
                   "heightUm": 300000,
                   "id": "sheet-001",
                   "layoutLocked": true,
+                  "layoutPositionRange": null,
                   "number": 1,
                   "pageNumbers": [
                     1,
@@ -48153,6 +48476,10 @@
                   "heightUm": 300000,
                   "id": "sheet-002",
                   "layoutLocked": false,
+                  "layoutPositionRange": {
+                    "maximum": 30,
+                    "minimum": 0
+                  },
                   "number": 2,
                   "pageNumbers": [
                     3,
@@ -50728,6 +51055,18 @@
               ]
             ],
             "query": {
+              "candidateRequiresLock": [
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false
+              ],
               "catalogRevision": 0,
               "frameCount": 6,
               "listing": {
@@ -51292,6 +51631,7 @@
           "sheet-002": {
             "previews": [],
             "query": {
+              "candidateRequiresLock": [],
               "catalogRevision": 0,
               "frameCount": 0,
               "listing": {
@@ -51664,6 +52004,10 @@
                   "heightUm": 300000,
                   "id": "sheet-001",
                   "layoutLocked": false,
+                  "layoutPositionRange": {
+                    "maximum": 30,
+                    "minimum": 2
+                  },
                   "number": 1,
                   "pageNumbers": [
                     1,
@@ -51690,6 +52034,10 @@
                   "heightUm": 300000,
                   "id": "sheet-002",
                   "layoutLocked": false,
+                  "layoutPositionRange": {
+                    "maximum": 30,
+                    "minimum": 0
+                  },
                   "number": 2,
                   "pageNumbers": [
                     3,
@@ -52503,6 +52851,12 @@
               ]
             ],
             "query": {
+              "candidateRequiresLock": [
+                false,
+                false,
+                false,
+                false
+              ],
               "catalogRevision": 0,
               "frameCount": 2,
               "listing": {
@@ -52647,6 +53001,7 @@
           "sheet-002": {
             "previews": [],
             "query": {
+              "candidateRequiresLock": [],
               "catalogRevision": 0,
               "frameCount": 0,
               "listing": {
@@ -53019,6 +53374,7 @@
                   "heightUm": 300000,
                   "id": "sheet-001",
                   "layoutLocked": true,
+                  "layoutPositionRange": null,
                   "number": 1,
                   "pageNumbers": [
                     1,
@@ -53045,6 +53401,10 @@
                   "heightUm": 300000,
                   "id": "sheet-002",
                   "layoutLocked": false,
+                  "layoutPositionRange": {
+                    "maximum": 30,
+                    "minimum": 0
+                  },
                   "number": 2,
                   "pageNumbers": [
                     3,
@@ -53858,6 +54218,12 @@
               ]
             ],
             "query": {
+              "candidateRequiresLock": [
+                false,
+                false,
+                false,
+                false
+              ],
               "catalogRevision": 0,
               "frameCount": 2,
               "listing": {
@@ -54002,6 +54368,7 @@
           "sheet-002": {
             "previews": [],
             "query": {
+              "candidateRequiresLock": [],
               "catalogRevision": 0,
               "frameCount": 0,
               "listing": {
@@ -54506,6 +54873,10 @@
                   "heightUm": 300000,
                   "id": "sheet-001",
                   "layoutLocked": false,
+                  "layoutPositionRange": {
+                    "maximum": 30,
+                    "minimum": 2
+                  },
                   "number": 1,
                   "pageNumbers": [
                     1,
@@ -54532,6 +54903,10 @@
                   "heightUm": 300000,
                   "id": "sheet-002",
                   "layoutLocked": false,
+                  "layoutPositionRange": {
+                    "maximum": 30,
+                    "minimum": 0
+                  },
                   "number": 2,
                   "pageNumbers": [
                     3,
@@ -55345,6 +55720,12 @@
               ]
             ],
             "query": {
+              "candidateRequiresLock": [
+                false,
+                false,
+                false,
+                false
+              ],
               "catalogRevision": 0,
               "frameCount": 6,
               "listing": {
@@ -55489,6 +55870,7 @@
           "sheet-002": {
             "previews": [],
             "query": {
+              "candidateRequiresLock": [],
               "catalogRevision": 0,
               "frameCount": 0,
               "listing": {
@@ -55993,6 +56375,10 @@
                   "heightUm": 300000,
                   "id": "sheet-001",
                   "layoutLocked": false,
+                  "layoutPositionRange": {
+                    "maximum": 30,
+                    "minimum": 2
+                  },
                   "number": 1,
                   "pageNumbers": [
                     1,
@@ -56019,6 +56405,10 @@
                   "heightUm": 300000,
                   "id": "sheet-002",
                   "layoutLocked": false,
+                  "layoutPositionRange": {
+                    "maximum": 30,
+                    "minimum": 0
+                  },
                   "number": 2,
                   "pageNumbers": [
                     3,
@@ -58594,6 +58984,18 @@
               ]
             ],
             "query": {
+              "candidateRequiresLock": [
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false
+              ],
               "catalogRevision": 0,
               "frameCount": 6,
               "listing": {
@@ -59158,6 +59560,7 @@
           "sheet-002": {
             "previews": [],
             "query": {
+              "candidateRequiresLock": [],
               "catalogRevision": 0,
               "frameCount": 0,
               "listing": {
@@ -59599,6 +60002,10 @@
                   "heightUm": 300000,
                   "id": "sheet-001",
                   "layoutLocked": false,
+                  "layoutPositionRange": {
+                    "maximum": 30,
+                    "minimum": 2
+                  },
                   "number": 1,
                   "pageNumbers": [
                     1,
@@ -59625,6 +60032,10 @@
                   "heightUm": 300000,
                   "id": "sheet-002",
                   "layoutLocked": false,
+                  "layoutPositionRange": {
+                    "maximum": 30,
+                    "minimum": 0
+                  },
                   "number": 2,
                   "pageNumbers": [
                     3,
@@ -62099,6 +62510,19 @@
               ]
             ],
             "query": {
+              "candidateRequiresLock": [
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false
+              ],
               "catalogRevision": 1,
               "frameCount": 4,
               "listing": {
@@ -62652,6 +63076,9 @@
               ]
             ],
             "query": {
+              "candidateRequiresLock": [
+                true
+              ],
               "catalogRevision": 1,
               "frameCount": 0,
               "listing": {
@@ -63134,6 +63561,10 @@
                     "heightUm": 300000,
                     "id": "sheet-001",
                     "layoutLocked": false,
+                    "layoutPositionRange": {
+                      "maximum": 30,
+                      "minimum": 2
+                    },
                     "number": 1,
                     "pageNumbers": [
                       1,
@@ -63160,6 +63591,10 @@
                     "heightUm": 300000,
                     "id": "sheet-002",
                     "layoutLocked": false,
+                    "layoutPositionRange": {
+                      "maximum": 30,
+                      "minimum": 0
+                    },
                     "number": 2,
                     "pageNumbers": [
                       3,
@@ -65634,6 +66069,19 @@
                 ]
               ],
               "query": {
+                "candidateRequiresLock": [
+                  false,
+                  false,
+                  false,
+                  false,
+                  false,
+                  false,
+                  false,
+                  false,
+                  false,
+                  false,
+                  false
+                ],
                 "catalogRevision": 1,
                 "frameCount": 4,
                 "listing": {
@@ -66253,6 +66701,10 @@
                 ]
               ],
               "query": {
+                "candidateRequiresLock": [
+                  true,
+                  true
+                ],
                 "catalogRevision": 1,
                 "frameCount": 0,
                 "listing": {
@@ -66776,6 +67228,10 @@
                     "heightUm": 300000,
                     "id": "sheet-001",
                     "layoutLocked": false,
+                    "layoutPositionRange": {
+                      "maximum": 30,
+                      "minimum": 2
+                    },
                     "number": 1,
                     "pageNumbers": [
                       1,
@@ -66802,6 +67258,10 @@
                     "heightUm": 300000,
                     "id": "sheet-002",
                     "layoutLocked": false,
+                    "layoutPositionRange": {
+                      "maximum": 30,
+                      "minimum": 0
+                    },
                     "number": 2,
                     "pageNumbers": [
                       3,
@@ -69276,6 +69736,19 @@
                 ]
               ],
               "query": {
+                "candidateRequiresLock": [
+                  false,
+                  false,
+                  false,
+                  false,
+                  false,
+                  false,
+                  false,
+                  false,
+                  false,
+                  false,
+                  false
+                ],
                 "catalogRevision": 1,
                 "frameCount": 4,
                 "listing": {
@@ -69829,6 +70302,9 @@
                 ]
               ],
               "query": {
+                "candidateRequiresLock": [
+                  true
+                ],
                 "catalogRevision": 1,
                 "frameCount": 0,
                 "listing": {
@@ -70310,6 +70786,10 @@
                     "heightUm": 300000,
                     "id": "sheet-001",
                     "layoutLocked": false,
+                    "layoutPositionRange": {
+                      "maximum": 30,
+                      "minimum": 2
+                    },
                     "number": 1,
                     "pageNumbers": [
                       1,
@@ -70336,6 +70816,10 @@
                     "heightUm": 300000,
                     "id": "sheet-002",
                     "layoutLocked": false,
+                    "layoutPositionRange": {
+                      "maximum": 30,
+                      "minimum": 0
+                    },
                     "number": 2,
                     "pageNumbers": [
                       3,
@@ -72810,6 +73294,19 @@
                 ]
               ],
               "query": {
+                "candidateRequiresLock": [
+                  false,
+                  false,
+                  false,
+                  false,
+                  false,
+                  false,
+                  false,
+                  false,
+                  false,
+                  false,
+                  false
+                ],
                 "catalogRevision": 1,
                 "frameCount": 4,
                 "listing": {
@@ -73429,6 +73926,10 @@
                 ]
               ],
               "query": {
+                "candidateRequiresLock": [
+                  true,
+                  true
+                ],
                 "catalogRevision": 1,
                 "frameCount": 0,
                 "listing": {
@@ -73952,6 +74453,10 @@
                     "heightUm": 300000,
                     "id": "sheet-001",
                     "layoutLocked": false,
+                    "layoutPositionRange": {
+                      "maximum": 30,
+                      "minimum": 2
+                    },
                     "number": 1,
                     "pageNumbers": [
                       1,
@@ -73978,6 +74483,10 @@
                     "heightUm": 300000,
                     "id": "sheet-002",
                     "layoutLocked": false,
+                    "layoutPositionRange": {
+                      "maximum": 30,
+                      "minimum": 0
+                    },
                     "number": 2,
                     "pageNumbers": [
                       3,
@@ -76452,6 +76961,19 @@
                 ]
               ],
               "query": {
+                "candidateRequiresLock": [
+                  false,
+                  false,
+                  false,
+                  false,
+                  false,
+                  false,
+                  false,
+                  false,
+                  false,
+                  false,
+                  false
+                ],
                 "catalogRevision": 2,
                 "frameCount": 4,
                 "listing": {
@@ -77071,6 +77593,10 @@
                 ]
               ],
               "query": {
+                "candidateRequiresLock": [
+                  true,
+                  true
+                ],
                 "catalogRevision": 2,
                 "frameCount": 0,
                 "listing": {
@@ -77594,6 +78120,10 @@
                     "heightUm": 300000,
                     "id": "sheet-001",
                     "layoutLocked": false,
+                    "layoutPositionRange": {
+                      "maximum": 30,
+                      "minimum": 2
+                    },
                     "number": 1,
                     "pageNumbers": [
                       1,
@@ -77620,6 +78150,10 @@
                     "heightUm": 300000,
                     "id": "sheet-002",
                     "layoutLocked": false,
+                    "layoutPositionRange": {
+                      "maximum": 30,
+                      "minimum": 0
+                    },
                     "number": 2,
                     "pageNumbers": [
                       3,
@@ -79875,6 +80409,18 @@
                 ]
               ],
               "query": {
+                "candidateRequiresLock": [
+                  false,
+                  false,
+                  false,
+                  false,
+                  false,
+                  false,
+                  false,
+                  false,
+                  false,
+                  false
+                ],
                 "catalogRevision": 2,
                 "frameCount": 4,
                 "listing": {
@@ -80386,6 +80932,9 @@
                 ]
               ],
               "query": {
+                "candidateRequiresLock": [
+                  true
+                ],
                 "catalogRevision": 2,
                 "frameCount": 0,
                 "listing": {
@@ -80887,6 +81436,10 @@
                   "heightUm": 300000,
                   "id": "sheet-001",
                   "layoutLocked": false,
+                  "layoutPositionRange": {
+                    "maximum": 30,
+                    "minimum": 2
+                  },
                   "number": 1,
                   "pageNumbers": [
                     1,
@@ -80913,6 +81466,10 @@
                   "heightUm": 300000,
                   "id": "sheet-002",
                   "layoutLocked": false,
+                  "layoutPositionRange": {
+                    "maximum": 30,
+                    "minimum": 0
+                  },
                   "number": 2,
                   "pageNumbers": [
                     3,
@@ -83168,6 +83725,18 @@
               ]
             ],
             "query": {
+              "candidateRequiresLock": [
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false
+              ],
               "catalogRevision": 0,
               "frameCount": 4,
               "listing": {
@@ -83612,6 +84181,7 @@
           "sheet-002": {
             "previews": [],
             "query": {
+              "candidateRequiresLock": [],
               "catalogRevision": 0,
               "frameCount": 0,
               "listing": {
@@ -84050,6 +84620,10 @@
                   "heightUm": 300000,
                   "id": "sheet-001",
                   "layoutLocked": false,
+                  "layoutPositionRange": {
+                    "maximum": 30,
+                    "minimum": 2
+                  },
                   "number": 1,
                   "pageNumbers": [
                     1,
@@ -84076,6 +84650,10 @@
                   "heightUm": 300000,
                   "id": "sheet-002",
                   "layoutLocked": false,
+                  "layoutPositionRange": {
+                    "maximum": 30,
+                    "minimum": 0
+                  },
                   "number": 2,
                   "pageNumbers": [
                     3,
@@ -86331,6 +86909,18 @@
               ]
             ],
             "query": {
+              "candidateRequiresLock": [
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false
+              ],
               "catalogRevision": 0,
               "frameCount": 4,
               "listing": {
@@ -86775,6 +87365,7 @@
           "sheet-002": {
             "previews": [],
             "query": {
+              "candidateRequiresLock": [],
               "catalogRevision": 0,
               "frameCount": 0,
               "listing": {
@@ -87287,6 +87878,7 @@
                   "heightUm": 300000,
                   "id": "sheet-001",
                   "layoutLocked": true,
+                  "layoutPositionRange": null,
                   "number": 1,
                   "pageNumbers": [
                     1,
@@ -87313,6 +87905,10 @@
                   "heightUm": 300000,
                   "id": "sheet-002",
                   "layoutLocked": false,
+                  "layoutPositionRange": {
+                    "maximum": 30,
+                    "minimum": 0
+                  },
                   "number": 2,
                   "pageNumbers": [
                     3,
@@ -90198,6 +90794,18 @@
               ]
             ],
             "query": {
+              "candidateRequiresLock": [
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false
+              ],
               "catalogRevision": 0,
               "frameCount": 4,
               "listing": {
@@ -90642,6 +91250,7 @@
           "sheet-002": {
             "previews": [],
             "query": {
+              "candidateRequiresLock": [],
               "catalogRevision": 0,
               "frameCount": 0,
               "listing": {
@@ -91242,6 +91851,7 @@
                   "heightUm": 300000,
                   "id": "sheet-001",
                   "layoutLocked": true,
+                  "layoutPositionRange": null,
                   "number": 1,
                   "pageNumbers": [
                     1,
@@ -91268,6 +91878,10 @@
                   "heightUm": 300000,
                   "id": "sheet-002",
                   "layoutLocked": false,
+                  "layoutPositionRange": {
+                    "maximum": 30,
+                    "minimum": 0
+                  },
                   "number": 2,
                   "pageNumbers": [
                     3,
@@ -94783,6 +95397,18 @@
               ]
             ],
             "query": {
+              "candidateRequiresLock": [
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false
+              ],
               "catalogRevision": 0,
               "frameCount": 4,
               "listing": {
@@ -95227,6 +95853,7 @@
           "sheet-002": {
             "previews": [],
             "query": {
+              "candidateRequiresLock": [],
               "catalogRevision": 0,
               "frameCount": 0,
               "listing": {
@@ -95665,6 +96292,10 @@
                   "heightUm": 300000,
                   "id": "sheet-001",
                   "layoutLocked": false,
+                  "layoutPositionRange": {
+                    "maximum": 30,
+                    "minimum": 2
+                  },
                   "number": 1,
                   "pageNumbers": [
                     1,
@@ -95691,6 +96322,10 @@
                   "heightUm": 300000,
                   "id": "sheet-002",
                   "layoutLocked": false,
+                  "layoutPositionRange": {
+                    "maximum": 30,
+                    "minimum": 0
+                  },
                   "number": 2,
                   "pageNumbers": [
                     3,
@@ -97946,6 +98581,18 @@
               ]
             ],
             "query": {
+              "candidateRequiresLock": [
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false
+              ],
               "catalogRevision": 0,
               "frameCount": 4,
               "listing": {
@@ -98390,6 +99037,7 @@
           "sheet-002": {
             "previews": [],
             "query": {
+              "candidateRequiresLock": [],
               "catalogRevision": 0,
               "frameCount": 0,
               "listing": {
@@ -98828,6 +99476,7 @@
                   "heightUm": 300000,
                   "id": "sheet-001",
                   "layoutLocked": true,
+                  "layoutPositionRange": null,
                   "number": 1,
                   "pageNumbers": [
                     1,
@@ -98854,6 +99503,10 @@
                   "heightUm": 300000,
                   "id": "sheet-002",
                   "layoutLocked": false,
+                  "layoutPositionRange": {
+                    "maximum": 30,
+                    "minimum": 0
+                  },
                   "number": 2,
                   "pageNumbers": [
                     3,
@@ -101109,6 +101762,18 @@
               ]
             ],
             "query": {
+              "candidateRequiresLock": [
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false
+              ],
               "catalogRevision": 0,
               "frameCount": 4,
               "listing": {
@@ -101553,6 +102218,7 @@
           "sheet-002": {
             "previews": [],
             "query": {
+              "candidateRequiresLock": [],
               "catalogRevision": 0,
               "frameCount": 0,
               "listing": {
@@ -101991,6 +102657,10 @@
                   "heightUm": 300000,
                   "id": "sheet-001",
                   "layoutLocked": false,
+                  "layoutPositionRange": {
+                    "maximum": 30,
+                    "minimum": 2
+                  },
                   "number": 1,
                   "pageNumbers": [
                     1,
@@ -102017,6 +102687,10 @@
                   "heightUm": 300000,
                   "id": "sheet-002",
                   "layoutLocked": false,
+                  "layoutPositionRange": {
+                    "maximum": 30,
+                    "minimum": 0
+                  },
                   "number": 2,
                   "pageNumbers": [
                     3,
@@ -104272,6 +104946,18 @@
               ]
             ],
             "query": {
+              "candidateRequiresLock": [
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false
+              ],
               "catalogRevision": 0,
               "frameCount": 4,
               "listing": {
@@ -104716,6 +105402,7 @@
           "sheet-002": {
             "previews": [],
             "query": {
+              "candidateRequiresLock": [],
               "catalogRevision": 0,
               "frameCount": 0,
               "listing": {
@@ -107084,6 +107771,10 @@
                   "heightUm": 300000,
                   "id": "sheet-001",
                   "layoutLocked": false,
+                  "layoutPositionRange": {
+                    "maximum": 30,
+                    "minimum": 16
+                  },
                   "number": 1,
                   "pageNumbers": [
                     1,
@@ -107110,6 +107801,10 @@
                   "heightUm": 300000,
                   "id": "sheet-002",
                   "layoutLocked": false,
+                  "layoutPositionRange": {
+                    "maximum": 30,
+                    "minimum": 0
+                  },
                   "number": 2,
                   "pageNumbers": [
                     3,
@@ -107174,6 +107869,7 @@
           "sheet-001": {
             "previews": [],
             "query": {
+              "candidateRequiresLock": [],
               "catalogRevision": 0,
               "frameCount": 31,
               "listing": {
@@ -107197,6 +107893,7 @@
           "sheet-002": {
             "previews": [],
             "query": {
+              "candidateRequiresLock": [],
               "catalogRevision": 0,
               "frameCount": 0,
               "listing": {
@@ -107637,6 +108334,10 @@
                   "heightUm": 300000,
                   "id": "sheet-001",
                   "layoutLocked": false,
+                  "layoutPositionRange": {
+                    "maximum": 30,
+                    "minimum": 2
+                  },
                   "number": 1,
                   "pageNumbers": [
                     1
@@ -107662,6 +108363,10 @@
                   "heightUm": 300000,
                   "id": "sheet-002",
                   "layoutLocked": false,
+                  "layoutPositionRange": {
+                    "maximum": 30,
+                    "minimum": 0
+                  },
                   "number": 2,
                   "pageNumbers": [
                     2,
@@ -108165,6 +108870,10 @@
               ]
             ],
             "query": {
+              "candidateRequiresLock": [
+                false,
+                false
+              ],
               "catalogRevision": 0,
               "frameCount": 4,
               "listing": {
@@ -108273,6 +108982,7 @@
           "sheet-002": {
             "previews": [],
             "query": {
+              "candidateRequiresLock": [],
               "catalogRevision": 0,
               "frameCount": 0,
               "listing": {
@@ -108711,6 +109421,10 @@
                   "heightUm": 300000,
                   "id": "sheet-001",
                   "layoutLocked": false,
+                  "layoutPositionRange": {
+                    "maximum": 30,
+                    "minimum": 2
+                  },
                   "number": 1,
                   "pageNumbers": [
                     1
@@ -108736,6 +109450,10 @@
                   "heightUm": 300000,
                   "id": "sheet-002",
                   "layoutLocked": false,
+                  "layoutPositionRange": {
+                    "maximum": 30,
+                    "minimum": 0
+                  },
                   "number": 2,
                   "pageNumbers": [
                     2,
@@ -109239,6 +109957,10 @@
               ]
             ],
             "query": {
+              "candidateRequiresLock": [
+                false,
+                false
+              ],
               "catalogRevision": 0,
               "frameCount": 4,
               "listing": {
@@ -109347,6 +110069,7 @@
           "sheet-002": {
             "previews": [],
             "query": {
+              "candidateRequiresLock": [],
               "catalogRevision": 0,
               "frameCount": 0,
               "listing": {

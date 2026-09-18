@@ -90,6 +90,8 @@ type MediaPanelPreviewSource =
     };
 
 interface MediaPanelProps {
+  folderValidationKey?: string;
+  onValidateMediaFolderName?: import("../application/projectPorts").ProjectCorePort["validateMediaFolderName"];
   mediaFolders?: readonly MediaFolder[];
   onEditMediaFolder?(edit: MediaFolderEdit): Promise<boolean>;
   photoshopAvailable?: boolean;
@@ -124,6 +126,8 @@ const EMPTY_FOLDERS: readonly MediaFolder[] = [];
 const EMPTY_MEDIA_FILES: Readonly<Record<string, MediaFileInfo>> = {};
 
 export function MediaPanel({
+  folderValidationKey = "",
+  onValidateMediaFolderName,
   mediaFolders = EMPTY_FOLDERS,
   onEditMediaFolder,
   photoshopAvailable = false,
@@ -184,7 +188,7 @@ export function MediaPanel({
     restoreFolderFocus.current = null;
     (anchor.isConnected ? anchor : panelHostRef.current)?.focus({ preventScroll: true });
   }, [folderPrompt, mediaFolders]);
-  const foldersDisabled = relinkDisabled || importPending || !onEditMediaFolder;
+  const foldersDisabled = relinkDisabled || importPending || !onEditMediaFolder || !onValidateMediaFolderName;
   function closeFolderPrompt() {
     restoreFolderFocus.current = folderPrompt?.anchor ?? panelHostRef.current;
     setFolderPrompt(null);
@@ -782,7 +786,8 @@ export function MediaPanel({
           setFolderMenu(null); panelHostRef.current?.focus({ preventScroll: true });
         }}>{projectCommandDescriptor("delete-media-folder").label}</button>
       </ContextMenuSurface>}
-      {folderPrompt && onEditMediaFolder && <MediaFolderPopover prompt={folderPrompt} folders={mediaFolders}
+      {folderPrompt && onEditMediaFolder && onValidateMediaFolderName && <MediaFolderPopover prompt={folderPrompt} folders={mediaFolders}
+        validationKey={folderValidationKey} onValidate={onValidateMediaFolderName}
         onSubmit={(edit) => foldersDisabled ? Promise.resolve(false) : onEditMediaFolder(edit)} onClose={closeFolderPrompt} />}
     </section>
   );

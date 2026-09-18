@@ -95,6 +95,13 @@ pub struct LayoutFrameRequest {
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
+pub struct LayoutPositionRange {
+    pub minimum: usize,
+    pub maximum: usize,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
 pub struct LayoutExportProblem {
     pub sheet_id: String,
     pub sheet_number: usize,
@@ -112,6 +119,8 @@ pub struct LayoutQueryResult {
     pub sheet_id: String,
     pub frame_count: usize,
     pub locked: bool,
+    // Indexed by the candidate's position in listing; derived from its prepared patch.
+    pub candidate_requires_lock: Vec<bool>,
     pub settings: LayoutSettings,
     pub listing: LayoutListing,
 }

@@ -203,7 +203,8 @@ const projectCorePort: ProjectCorePort = {
     layoutCatalogStage = "deleted";
     return 2;
   },
-  queryLayouts: async (sheetId, frameRequest) => {
+  validateMediaFolderName: async () => { throw new Error("Folder validation is not configured in this fixture."); },
+    queryLayouts: async (sheetId, frameRequest) => {
     const currentSamples = layoutCase.favoriteStates ? [layoutCase.favoriteStates[layoutFavoriteStage]] : layoutCatalogStage === "saved" ? [layoutCase.catalogSaved]
       : layoutCatalogStage === "deleted" ? [layoutCase.catalogDeleted]
       : [layoutCase.before, layoutCase.applied, layoutCase.locked, layoutCase.unlocked, layoutCase.reduced, layoutCase.reducedLocked, layoutCase.filled, layoutCase.cleared];
@@ -546,7 +547,7 @@ function configurePhysicalPreview(
     return {
       id,
       number: index + 1,
-      layoutLocked: false,
+      layoutLocked: false, layoutPositionRange: { minimum: 0, maximum: 30 },
       role:
         index === 0
           ? "initial"
@@ -805,7 +806,7 @@ function applyPreviewIntent(intent: ProjectIntent): ProjectMutationOutcome {
       role: "internal" as const,
       activeSides: "both" as const,
       pageNumbers: [] as number[],
-      layoutLocked: false,
+      layoutLocked: false, layoutPositionRange: { minimum: 0, maximum: 30 },
       widthUm: next.state.document.sheetWidthUm,
       heightUm: next.state.document.sheetHeightUm,
       frames: [],

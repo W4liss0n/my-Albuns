@@ -48,15 +48,69 @@ fn invalid(message: &str) -> CoreError {
     CoreError::InvalidProject(message.into())
 }
 
-fn valid_name(name: &str) -> bool {
-    !name.is_empty()
-        && name == name.trim()
-        && name.chars().count() <= 80
-        && !name.chars().any(char::is_control)
-        && !["todas", "ausentes"].contains(&name.to_lowercase().as_str())
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct MediaFolderNameRequest {
+    pub media_kind: MediaKind,
+    pub name: String,
+    pub folder_id: Option<String>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub enum MediaFolderNameError {
+    Empty,
+    InvalidCharactersOrLength,
+    NameInUse,
+    FolderNotFound,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub struct MediaFolderNameValidation {
+    pub name: String,
+    pub error: Option<MediaFolderNameError>,
+}
+
+fn name_error(name: &str, name_in_use: bool) -> Option<MediaFolderNameError> {
+    if name.is_empty() {
+        Some(MediaFolderNameError::Empty)
+    } else if name.chars().count() > 80 || name.chars().any(char::is_control) {
+        Some(MediaFolderNameError::InvalidCharactersOrLength)
+    } else if name_in_use || ["todas", "ausentes"].contains(&name.to_lowercase().as_str()) {
+        Some(MediaFolderNameError::NameInUse)
+    } else {
+        None
+    }
 }
 
 impl ProjectDocument {
+    /// Read-only advice; edits revalidate against the document at execution time.
+    pub fn validate_media_folder_name(
+        &self,
+        request: &MediaFolderNameRequest,
+    ) -> MediaFolderNameValidation {
+        let name = request.name.trim().to_owned();
+        let error = if request.folder_id.as_ref().is_some_and(|id| {
+            !self
+                .media_folders
+                .iter()
+                .any(|folder| &folder.id == id && folder.kind == request.media_kind)
+        }) {
+            Some(MediaFolderNameError::FolderNotFound)
+        } else {
+            name_error(
+                &name,
+                self.media_folders.iter().any(|folder| {
+                    folder.kind == request.media_kind
+                        && Some(&folder.id) != request.folder_id.as_ref()
+                        && folder.name.to_lowercase() == name.to_lowercase()
+                }),
+            )
+        };
+        MediaFolderNameValidation { name, error }
+    }
+
     pub fn media_folders(&self) -> &[MediaFolder] {
         &self.media_folders
     }
@@ -74,8 +128,12 @@ impl ProjectDocument {
             Uuid::parse_str(&folder.id)
                 .is_ok_and(|id| id.get_version_num() == 4 && id.to_string() == folder.id)
                 && ids.insert(&folder.id)
-                && valid_name(&folder.name)
-                && names.insert((folder.kind, folder.name.to_lowercase()))
+                && folder.name == folder.name.trim()
+                && name_error(
+                    &folder.name,
+                    !names.insert((folder.kind, folder.name.to_lowercase())),
+                )
+                .is_none()
                 && folder.media_ids.iter().all(|id| {
                     members.insert(*id) && media_kinds.get(&id.into_uuid()) == Some(&folder.kind)
                 })

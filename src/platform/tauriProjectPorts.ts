@@ -285,6 +285,7 @@ function toSaveProjectResult(value: unknown): ApplicationSaveProjectResult {
 }
 
 export const tauriProjectCorePort: ProjectCorePort = {
+  validateMediaFolderName: (request) => invoke("validate_media_folder_name", { request }),
   readFrameDragThreshold: () => invoke<PointerDragThreshold>("frame_drag_threshold"),
   readSliderDoubleClickTime: () => invoke<number>("slider_double_click_time"),
   previewPhotoZoom: (edit) => invoke<ComposedFrame[]>("preview_photo_zoom", { edit }),

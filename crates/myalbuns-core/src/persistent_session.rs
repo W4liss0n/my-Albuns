@@ -460,20 +460,14 @@ impl PersistentProjectSession {
         let requested_count = frame_request
             .as_ref()
             .map_or(frame_count, |request| request.frame_count);
-        if frame_request.is_some() && requested_count > 30 {
-            return Err(CoreError::InvalidLayoutQuery);
-        }
-        if locked && frame_count != requested_count {
-            return Err(CoreError::LayoutLocked);
+        if frame_request.is_some() {
+            sheet.validate_layout_frame_count(requested_count)?;
         }
         let filled_count = sheet
             .frames()
             .iter()
             .filter(|frame| frame.photo().is_some())
             .count();
-        if requested_count < filled_count {
-            return Err(CoreError::InvalidLayoutQuery);
-        }
         let captured_ids: Vec<_> = sheet.frames().iter().map(|frame| frame.id()).collect();
         let mut ids = Vec::new();
         let mut orientations = Vec::new();
@@ -546,6 +540,10 @@ impl PersistentProjectSession {
             })
             .collect::<Result<Vec<_>, _>>()?;
         let id = Uuid::new_v4().to_string();
+        let candidate_requires_lock = patches
+            .iter()
+            .map(crate::LayoutPatch::requires_lock)
+            .collect();
         self.prepared_layout_query = Some(PreparedLayoutQuery {
             id: id.clone(),
             revision: self.revision(),
@@ -561,6 +559,7 @@ impl PersistentProjectSession {
             catalog_revision: self.layout_catalog.revision,
             frame_count,
             locked,
+            candidate_requires_lock,
             settings: self.project().layout_settings().clone(),
             listing,
         })

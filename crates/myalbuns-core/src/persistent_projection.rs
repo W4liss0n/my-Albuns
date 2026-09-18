@@ -100,6 +100,7 @@ pub(crate) fn album_snapshot(
                     visuals: (!sheet.visuals().is_default()).then(|| sheet.visuals().clone()),
                     id: sheet.id().hyphenated().to_string(),
                     layout_locked: sheet.layout_locked(),
+                    layout_position_range: sheet.layout_position_range(),
                     number: index + 1,
                     role: if index == 0 {
                         SheetRole::Initial

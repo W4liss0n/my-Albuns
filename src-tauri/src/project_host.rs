@@ -635,6 +635,16 @@ impl ProjectHost {
         Ok(self.project()?.validate_album_information(information))
     }
 
+    pub(crate) fn validate_media_folder_name(
+        &self,
+        request: &myalbuns_core::MediaFolderNameRequest,
+    ) -> Result<myalbuns_core::MediaFolderNameValidation, String> {
+        Ok(self
+            .project()?
+            .project()
+            .validate_media_folder_name(request))
+    }
+
     pub(crate) fn undo(&self) -> Result<EditorProjection, String> {
         let mut project = self.project()?;
         let projection = project

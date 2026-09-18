@@ -51,6 +51,9 @@ export type { ProjectConfigurationValidationError } from "./generated/ProjectCon
 export type { MediaCatalogItem } from "./generated/MediaCatalogItem";
 export type { MediaFolder } from "./generated/MediaFolder";
 export type { MediaFolderEdit } from "./generated/MediaFolderEdit";
+export type { MediaFolderNameRequest } from "./generated/MediaFolderNameRequest";
+export type { MediaFolderNameValidation } from "./generated/MediaFolderNameValidation";
+export type { MediaFolderNameError } from "./generated/MediaFolderNameError";
 export type { MediaKind } from "./generated/MediaKind";
 export type { MediaTransform } from "./generated/MediaTransform";
 export type { MediaUsage } from "./generated/MediaUsage";

@@ -915,3 +915,11 @@ test("normalizes typed unavailable-media retry failures at the IPC adapter", asy
     message: "A nova inspeção não pôde ser concluída.",
   });
 });
+
+test("folder name validation forwards the typed request and Core result unchanged", async () => {
+  const request = { name: "  Turma  ", mediaKind: "photo" as const, folderId: null };
+  const result = { name: "Turma", error: "nameInUse" as const };
+  vi.mocked(invoke).mockResolvedValueOnce(result);
+  expect(await tauriProjectCorePort.validateMediaFolderName(request)).toEqual(result);
+  expect(invoke).toHaveBeenCalledWith("validate_media_folder_name", { request });
+});

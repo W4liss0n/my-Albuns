@@ -23,6 +23,10 @@ impl LayoutPatch {
     pub fn placeholder_ids(&self) -> &[Uuid] {
         &self.placeholder_ids
     }
+
+    pub fn requires_lock(&self) -> bool {
+        !self.placeholder_ids.is_empty()
+    }
     pub fn last_layout(&self) -> Option<&StoredLayout> {
         self.last_layout.as_ref()
     }

@@ -39,6 +39,7 @@ function harness() {
     load: async () => initial, apply, applyWithOutcome: unsupported, save, undo, redo: async () => second,
     ...emptyLayoutCatalogPort,
     readFrameDragThreshold: async () => ({ x: 5, y: 5 }), readSliderDoubleClickTime: async () => 500,
+    validateMediaFolderName: async () => { throw new Error("Folder validation is not configured in this fixture."); },
     queryLayouts: async () => { throw new Error("Layouts are not configured in this fixture."); },
     previewLayout: async () => { throw new Error("Layouts are not configured in this fixture."); },
     previewDecorativeDrop: async () => { throw new Error("Decorative preview is not configured in this fixture."); },
@@ -110,7 +111,8 @@ test.each(["success", "failure"])("the individual Zoom flushes a style draft bef
   const view = renderHook(() => h.useHarness());
   const baseline = view.result.current.selectedFrame!.photo!.transform.userZoom;
   await act(async () => view.result.current.frameStyle.onPreview({ kind: "opacity", opacityPercent: 50 }));
-  act(() => {    view.result.current.photoZoom.onPreview((baseline + 0.25) * 100);
+  act(() => {
+    view.result.current.photoZoom.onPreview((baseline + 0.25) * 100);
     void view.result.current.save();
     void view.result.current.undo();
   });

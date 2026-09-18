@@ -5,6 +5,36 @@ use crate::{
 };
 
 impl ProjectSheet {
+    fn layout_count_range(&self) -> crate::LayoutPositionRange {
+        crate::LayoutPositionRange {
+            minimum: self
+                .frames()
+                .iter()
+                .filter(|frame| frame.photo().is_some())
+                .count(),
+            maximum: 30,
+        }
+    }
+
+    pub(crate) fn layout_position_range(&self) -> Option<crate::LayoutPositionRange> {
+        let range = self.layout_count_range();
+        (!self.layout_locked() && range.minimum <= range.maximum).then_some(range)
+    }
+
+    pub(crate) fn validate_layout_frame_count(&self, count: usize) -> Result<(), CoreError> {
+        let range = self.layout_count_range();
+        if count > range.maximum {
+            return Err(CoreError::InvalidLayoutQuery);
+        }
+        if self.layout_locked() && count != self.frames().len() {
+            return Err(CoreError::LayoutLocked);
+        }
+        if count < range.minimum {
+            return Err(CoreError::InvalidLayoutQuery);
+        }
+        Ok(())
+    }
+
     pub fn layout_locked(&self) -> bool {
         self.layout_locked
     }
@@ -244,7 +274,7 @@ impl ProjectDocument {
         patch: &LayoutPatch,
     ) -> Result<Self, CoreError> {
         self.ensure_layout_unlocked(sheet_id)?;
-        if !patch.placeholder_ids().is_empty() {
+        if patch.requires_lock() {
             return Err(CoreError::LayoutRequiresLock);
         }
         self.with_layout_preview(sheet_id, patch)

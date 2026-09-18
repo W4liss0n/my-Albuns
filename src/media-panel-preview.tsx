@@ -47,6 +47,7 @@ ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
         onOpenInPhotoshop={() => undefined}
         mediaFolders={folders}
         onEditMediaFolder={async () => true}
+        onValidateMediaFolderName={async () => ({ name: "", error: "empty" })}
         mediaItems={displayedMediaItems}
         mediaUsage={mediaUsage}
         mediaFiles={mediaFiles}

@@ -40,6 +40,13 @@ fn reducing_after_expansion_and_unlock_preserves_photos_and_is_one_undoable_edit
             .cloned()
             .collect();
         assert_eq!(filled.len(), 2);
+        assert_eq!(
+            before.state.album.sheets[0].layout_position_range,
+            Some(myalbuns_core::LayoutPositionRange {
+                minimum: 2,
+                maximum: 30
+            })
+        );
 
         let query = project
             .query_layouts_with_frame_request(&sheet, request(count))
@@ -56,6 +63,12 @@ fn reducing_after_expansion_and_unlock_preserves_photos_and_is_one_undoable_edit
             query_id: query.query_id,
             candidate_index: 0,
         };
+        assert!(
+            query
+                .candidate_requires_lock
+                .iter()
+                .all(|requires_lock| !requires_lock)
+        );
         let preview = project.preview_layout(&selection).unwrap();
         assert_eq!(preview.len(), count);
         assert_eq!(
@@ -75,6 +88,10 @@ fn reducing_after_expansion_and_unlock_preserves_photos_and_is_one_undoable_edit
         assert_eq!(after.composition.sheets[0].frames, preview);
         assert_eq!(after.state.revision, before.state.revision + 1);
         assert_eq!(after.state.album.sheets[0].layout_locked, lock);
+        assert_eq!(
+            after.state.album.sheets[0].layout_position_range.is_none(),
+            lock
+        );
         assert_eq!(after.media_usage, before.media_usage);
         for original in &filled {
             let retained = frames.iter().find(|frame| frame.id == original.id).unwrap();
@@ -169,4 +186,83 @@ fn filling_a_placeholder_invalidates_a_prepared_reduction() {
         Err(CoreError::StaleLayoutPreview)
     );
     assert_eq!(project.projection(), filled);
+}
+
+#[test]
+fn projected_layout_eligibility_matches_prepared_patches_and_execution_guards() {
+    let root = tempfile::tempdir().unwrap();
+    let mut project = super::visual_corpus::fixture_project(root.path(), 4);
+    let before = project.projection();
+    let sheet = before.state.album.sheets[0].id.clone();
+    assert_eq!(
+        before.state.album.sheets[0].layout_position_range,
+        Some(myalbuns_core::LayoutPositionRange {
+            minimum: 2,
+            maximum: 30
+        })
+    );
+    for (count, allowed) in [(0, false), (1, false), (2, true), (30, true), (31, false)] {
+        assert_eq!(
+            project
+                .query_layouts_with_frame_request(&sheet, request(count))
+                .is_ok(),
+            allowed
+        );
+        assert_eq!(
+            project.projection(),
+            before,
+            "eligibility queries are read-only"
+        );
+    }
+    let expanded = project
+        .query_layouts_with_frame_request(&sheet, request(6))
+        .unwrap();
+    assert_eq!(
+        expanded.candidate_requires_lock.len(),
+        expanded.listing.candidates.len()
+    );
+    assert!(
+        expanded
+            .candidate_requires_lock
+            .iter()
+            .all(|requires_lock| *requires_lock)
+    );
+    let selection = LayoutSelection {
+        query_id: expanded.query_id,
+        candidate_index: 0,
+    };
+    assert!(matches!(
+        project.apply(ProjectIntent::ApplyLayout {
+            selection: selection.clone()
+        }),
+        Err(CoreError::LayoutRequiresLock)
+    ));
+    assert_eq!(project.projection(), before);
+    let locked = project
+        .apply(ProjectIntent::LockLayout { selection })
+        .unwrap();
+    assert_eq!(locked.state.album.sheets[0].layout_position_range, None);
+    let current = project.query_layouts(&sheet).unwrap();
+    assert!(current.locked);
+    assert!(!current.candidate_requires_lock[0]);
+    assert_eq!(
+        project.undo().unwrap().state.album.sheets[0].layout_position_range,
+        before.state.album.sheets[0].layout_position_range
+    );
+    assert_eq!(
+        project.redo().unwrap().state.album.sheets[0].layout_position_range,
+        None
+    );
+    for (count, expected_minimum) in [(31, Some(16)), (61, None)] {
+        let other_root = tempfile::tempdir().unwrap();
+        let crowded = super::visual_corpus::fixture_project(other_root.path(), count);
+        let projection = crowded.projection();
+        assert_eq!(
+            projection.state.album.sheets[0]
+                .layout_position_range
+                .as_ref()
+                .map(|range| range.minimum),
+            expected_minimum
+        );
+    }
 }

@@ -34,7 +34,7 @@ const initialSheetStates: readonly SheetSnapshot[] = renumberSheetStates(
       id: `sheet-${String(number).padStart(3, "0")}`,
       number,
       pageNumbers: [],
-      layoutLocked: false,
+      layoutLocked: false, layoutPositionRange: { minimum: 0, maximum: 30 },
       role: roleFor(number),
       widthUm: activeSides === "both" ? 600_000 : 300_000,
     };
@@ -148,8 +148,10 @@ export function SheetGridPreview() {
         onApplyAlbumDesign={async (draft) => {
           setVisualDefaults(draft.value);
           return true;
-        }}        onNavigateToSheet={setFocusedSheetId}
-        onPresentationUnitChange={changePresentationUnit}        onValidateAlbumInformation={async () => ({ rasterLimits: rasterLimitsAt300Dpi,
+        }}
+        onNavigateToSheet={setFocusedSheetId}
+        onPresentationUnitChange={changePresentationUnit}
+        onValidateAlbumInformation={async () => ({ rasterLimits: rasterLimitsAt300Dpi,
           errors: [],
           impact: { conversionLosses: [],
             sheetWidthPx: 7_087,
@@ -159,7 +161,8 @@ export function SheetGridPreview() {
         })}
         sheetStates={sheetStates}
         sheets={sheets}
-        visualDefaults={visualDefaults}      />
+        visualDefaults={visualDefaults}
+      />
     </main>
   );
 }

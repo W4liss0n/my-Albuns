@@ -562,6 +562,14 @@ pub(crate) fn validate_album_information(
 }
 
 #[tauri::command]
+pub(crate) fn validate_media_folder_name(
+    request: myalbuns_core::MediaFolderNameRequest,
+    state: State<'_, ProjectHost>,
+) -> Result<myalbuns_core::MediaFolderNameValidation, String> {
+    state.validate_media_folder_name(&request)
+}
+
+#[tauri::command]
 pub(crate) async fn undo_project(
     app: AppHandle,
     window: WebviewWindow,
