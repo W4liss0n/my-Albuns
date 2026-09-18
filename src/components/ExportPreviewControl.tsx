@@ -307,7 +307,7 @@ export const ExportPreviewControl = forwardRef<
     if (!exportMediaPort || !selected || current?.kind !== "exportMediaProblems" || current.busy) return;
     const generation = ++recoveryGeneration.current;
     recoveryPending.current = true;
-    presentDialog({ ...current, busy: true, message: relink ? "Procurando e processando os Arquivos da pasta escolhida…" : "Verificando os Arquivos…" });
+    presentDialog({ ...current, busy: true });
     try {
       let problems;
       let message = "";

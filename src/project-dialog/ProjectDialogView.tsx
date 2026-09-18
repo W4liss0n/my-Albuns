@@ -60,7 +60,7 @@ export function ProjectDialogView({
         confirmAction={{ label: "Converter", onClick: () => onAction("confirmEdgeConversion") }} />;
     case "exportMediaProblems":
       return <ProblemsDialog title="Problemas na Exportação"
-        description={state.message || (state.busy ? "Verificando os Arquivos…" : "Recupere os Arquivos necessários à Lâmina selecionada.")}
+        description={state.message || "Recupere os Arquivos necessários à Lâmina selecionada."}
         columns={["Projeto", "Problema", "Ações"]}
         rows={state.problems.map(problem => [state.projectName,
           `${problem.fileName}: Arquivo ${problem.state === "absent" ? "ausente" : "indisponível"}.`,

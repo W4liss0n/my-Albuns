@@ -44,7 +44,6 @@ export function ExternalCopyDecisionDialog({
         title="Cópia externa somente leitura"
       >
         {error ? <InlineNotice tone="error">{error}</InlineNotice> : null}
-        {resolving ? <p aria-live="polite">Concluindo…</p> : null}
       </ConfirmationDialog>
     </DialogFocusScope>
   );

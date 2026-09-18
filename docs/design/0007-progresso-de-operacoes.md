@@ -144,6 +144,13 @@ Quando não existe um total confiável, a mesma barra usa uma animação indeter
 
 ## Simplificação
 
+A espera por uma ação em um diálogo de decisão não acrescenta linhas como
+`Concluindo…`, `Verificando…` ou `Procurando…` ao corpo nem substitui a descrição
+por esses textos. Recuperação de sessão, Cópia externa e resolução de Arquivos
+da Exportação mantêm seu conteúdo enquanto as ações ficam desabilitadas.
+Erros e resultados continuam apresentados pelo fluxo correspondente; operações
+com progresso próprio continuam usando a representação geral de progresso.
+
 A janela não mostra:
 
 - tabela de Projetos ou arquivos;

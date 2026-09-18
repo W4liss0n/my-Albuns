@@ -84,7 +84,6 @@ export function ProjectRecoveryDialog({
         title="Recuperar trabalho não salvo?"
       >
         {error ? <InlineNotice tone="error">{error}</InlineNotice> : null}
-        {busy ? <p aria-live="polite">Concluindo…</p> : null}
       </ConfirmationDialog>
     </DialogFocusScope>
   );
