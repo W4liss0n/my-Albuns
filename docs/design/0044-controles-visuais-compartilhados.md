@@ -24,6 +24,10 @@ confirmação e tooltip de validação. O seletor de decorativos usa o catálogo
 importado, tanto no álbum quanto na lâmina. Na lâmina ele envia o comando
 existente de aplicação de decorativo para o lado escolhido.
 
+A área de rolagem ocupa a altura disponível do painel contextual. Assim, os
+seletores flutuantes não ficam recortados na altura do último controle quando
+o conteúdo do painel é curto.
+
 ## Estado e ações da lâmina
 
 - As duas linhas substituem a lista de amostras, códigos de cor e frases de
