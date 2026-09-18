@@ -1,3 +1,4 @@
+import { rasterLimitsAt300Dpi } from "../test/projectConfigurationFixtures";
 import { emptyLayoutCatalogPort } from "../test/layoutCatalogPorts";
 import {
   act,
@@ -356,7 +357,7 @@ function projectCorePortWithApply(
 ): ProjectCorePort {
   return {
     load: async () => projection,
-    validateAlbumInformation: async () => ({
+    validateAlbumInformation: async () => ({ rasterLimits: rasterLimitsAt300Dpi,
       errors: [],
       impact: { conversionLosses: [], sheetWidthPx: 7_087, pageWidthPx: 3_543, heightPx: 3_543 },
     }),
@@ -4836,8 +4837,8 @@ test("revalidates materialized Album Information after pending History and block
   >(async (information) =>
     information.sheetWidthUm === afterRedo.state.document.sheetWidthUm &&
     information.dpi === 600
-      ? { errors: ["sheetWidthRasterOutOfRange"], impact: null }
-      : {
+      ? { rasterLimits: rasterLimitsAt300Dpi, errors: ["sheetWidthRasterOutOfRange"], impact: null }
+      : { rasterLimits: rasterLimitsAt300Dpi,
           errors: [],
           impact: { conversionLosses: [],
             sheetWidthPx: 7_087,

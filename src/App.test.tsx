@@ -1,3 +1,4 @@
+import { rasterLimitsAt300Dpi } from "./test/projectConfigurationFixtures";
 import { emptyLayoutCatalogPort } from "./test/layoutCatalogPorts";
 import { useEffect, useState, type ComponentProps } from "react";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
@@ -108,7 +109,7 @@ const projection = createEmptyProjection();
 
 const projectCorePort: ProjectCorePort = {
   load: async () => projection,
-  validateAlbumInformation: async () => ({
+  validateAlbumInformation: async () => ({ rasterLimits: rasterLimitsAt300Dpi,
     errors: [],
     impact: { conversionLosses: [], sheetWidthPx: 7_087, pageWidthPx: 3_543, heightPx: 3_543 },
   }),

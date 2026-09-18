@@ -7,6 +7,7 @@ import {
   type ProvisionalDecorativeSelection,
 } from "../application/globalProjectPort";
 import { hasOnlyIpcKeys, isIpcRecord } from "../../platform/ipcGuards";
+import type { ProjectConfigurationRasterLimits } from "../../domain/generated/ProjectConfigurationRasterLimits";
 
 const validationCodes = new Set<ProjectConfigurationValidationCode>(
   PROJECT_CONFIGURATION_VALIDATION_CODES,
@@ -100,7 +101,7 @@ export async function settleConfigurationValidation(
       return { status: "failed", error: fallback };
     }
     const candidate = result as Record<string, unknown>;
-    if (!Array.isArray(candidate.errors)) {
+    if (!Array.isArray(candidate.errors) || !isRasterLimits(candidate.rasterLimits)) {
       return { status: "failed", error: fallback };
     }
     const errors = candidate.errors.flatMap((code) =>
@@ -109,18 +110,32 @@ export async function settleConfigurationValidation(
         ? [code as ProjectConfigurationValidationCode]
         : [],
     );
-    if (errors.length !== candidate.errors.length) {
+    if (errors.length !== candidate.errors.length || (
+      candidate.rasterLimits === null && errors.some((code) =>
+        code === "sheetWidthRasterOutOfRange" || code === "sheetHeightRasterOutOfRange",
+      )
+    )) {
       return { status: "failed", error: fallback };
     }
     return errors.length === 0
       ? { status: "valid" }
-      : { status: "invalid", errors };
+      : { status: "invalid", errors, rasterLimits: candidate.rasterLimits };
   } catch (error) {
     return {
       status: "failed",
       error: toProjectLaunchFailure(error, fallback),
     };
   }
+}
+
+function isRasterLimits(value: unknown): value is ProjectConfigurationRasterLimits | null {
+  if (value === null) return true;
+  if (!isIpcRecord(value)) return false;
+  return [value.sheetWidth, value.sheetHeight].every((range) =>
+    isIpcRecord(range) &&
+    typeof range.minimumUm === "number" && Number.isSafeInteger(range.minimumUm) && range.minimumUm > 0 &&
+    typeof range.maximumUm === "number" && Number.isSafeInteger(range.maximumUm) && range.maximumUm >= range.minimumUm,
+  );
 }
 
 export function toProvisionalDecorativeSelection(

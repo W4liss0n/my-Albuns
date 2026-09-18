@@ -1,3 +1,4 @@
+import { rasterLimitsAt300Dpi } from "../test/projectConfigurationFixtures";
 import { emptyLayoutCatalogPort } from "../test/layoutCatalogPorts";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { expect, test, vi } from "vitest";
@@ -47,7 +48,7 @@ const exportPipelinePort: ExportPipelinePort = {
 
 const projectCorePort: ProjectCorePort = {
   load: async () => representativeProjection,
-  validateAlbumInformation: async () => ({
+  validateAlbumInformation: async () => ({ rasterLimits: rasterLimitsAt300Dpi,
     errors: [],
     impact: { conversionLosses: [], heightPx: 3_543, pageWidthPx: 3_543, sheetWidthPx: 7_087 },
   }),

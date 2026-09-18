@@ -99,6 +99,7 @@ impl ProjectDocument {
             Err(errors) => AlbumInformationValidation {
                 errors,
                 impact: None,
+                raster_limits: configuration_raster_limits(i128::from(information.dpi)),
             },
         }
     }

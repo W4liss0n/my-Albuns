@@ -1,3 +1,4 @@
+import { rasterLimitsAt300Dpi } from "../test/projectConfigurationFixtures";
 import type { ProjectDialogAction, ProjectDialogPort, ProjectDialogState } from "../application/projectDialogPort";
 import { createAlbumInformationReview } from "../application/albumInformationReview";
 import { createAlbumInformationProjectDraft } from "../application/projectSettingsDraft";
@@ -37,7 +38,7 @@ function projectSessionPort(
 ): ProjectCorePort {
   return {
     load: async () => representativeProjection,
-    validateAlbumInformation: async () => ({
+    validateAlbumInformation: async () => ({ rasterLimits: rasterLimitsAt300Dpi,
       errors: [],
       impact: { conversionLosses: [], sheetWidthPx: 7_087, pageWidthPx: 3_543, heightPx: 3_543 },
     }),
@@ -676,7 +677,7 @@ test("Album information re-reviews newly discarded content after queued Undo, th
   const draft = createAlbumInformationProjectDraft(initial.state.revision, baseline).transition(information);
   const impact = { conversionLosses: [], sheetWidthPx: 7_087, pageWidthPx: 3_543, heightPx: 3_543 };
   const review = createAlbumInformationReview(baseline, information, impact);
-  harness.validateAlbumInformation.mockResolvedValue({ errors: [], impact: { ...impact, conversionLosses: [latest.state.album.sheets[0].edgeConversionLoss!] } });
+  harness.validateAlbumInformation.mockResolvedValue({ rasterLimits: rasterLimitsAt300Dpi, errors: [], impact: { ...impact, conversionLosses: [latest.state.album.sheets[0].edgeConversionLoss!] } });
   let commit!: ReturnType<typeof harness.result.current.applyAlbumInformation>;
   act(() => { harness.result.current.undo(); commit = harness.result.current.applyAlbumInformation(draft, review); });
   await act(async () => { pending.resolve(latest); await commit; });

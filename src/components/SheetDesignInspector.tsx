@@ -6,6 +6,7 @@ import type {
 } from "../domain/project";
 import { ActionButton } from "../ui";
 import { ColorPropertyControl } from "../ui/ColorPropertyControl";
+import { VisualScopeControls } from "../ui/visualPreview/VisualScopeControls";
 import { SheetPreview } from "./SheetPreview";
 import { SHEET_VISUAL_STYLE } from "./sheetVisualStyle";
 import "./SheetDesignInspector.css";
@@ -122,7 +123,6 @@ function SheetScopePreview({
   onHoveredScopeChange(scope: SheetDesignScope | null): void;
   onScopeChange(scope: SheetDesignScope): void;
 }) {
-  const scopes = availableScopes(sheet);
   const inactiveSide =
     sheet.activeSides === "both"
       ? null
@@ -145,7 +145,7 @@ function SheetScopePreview({
           "--sheet-design-aspect-ratio": `${visualWidthUm} / ${sheet.heightUm}`,
         } as CSSProperties
       }
-      onMouseLeave={() => onHoveredScopeChange(null)}
+      onPointerLeave={() => onHoveredScopeChange(null)}
     >
       <SheetPreview
         mediaPreviewUrls={mediaPreviewUrls}
@@ -170,22 +170,16 @@ function SheetScopePreview({
           data-scope={hoveredScope}
         />
       ) : null}
-      <div className="sheet-design-preview__targets">
-        {scopes.map((candidate) => (
-          <button
-            aria-label={scopeLabel(candidate)}
-            aria-pressed={scope === candidate}
-            className="sheet-design-preview__target"
-            data-scope={candidate}
-            key={candidate}
-            type="button"
-            onBlur={() => onHoveredScopeChange(null)}
-            onClick={() => onScopeChange(candidate)}
-            onFocus={() => onHoveredScopeChange(candidate)}
-            onMouseEnter={() => onHoveredScopeChange(candidate)}
-          />
-        ))}
-      </div>
+      <VisualScopeControls
+        activeSides={sheet.activeSides}
+        targetLayout="overlaidCenter"
+        labels={{ left: "Página esquerda", both: "Ambos os lados", right: "Página direita" }}
+        scope={scope}
+        focusPresentation="target"
+        onScopeChange={onScopeChange}
+        onHoveredScopeChange={onHoveredScopeChange}
+        onFocusedScopeChange={onHoveredScopeChange}
+      />
     </div>
   );
 }
@@ -267,11 +261,6 @@ function VisualSwatch({
       }
     />
   );
-}
-
-function availableScopes(sheet: ComposedSheet): SheetDesignScope[] {
-  if (sheet.activeSides === "both") return ["left", "both", "right"];
-  return [sheet.activeSides];
 }
 
 function visualValues(

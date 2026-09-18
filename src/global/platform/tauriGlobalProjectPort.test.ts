@@ -1,3 +1,4 @@
+import { rasterLimitsAt300Dpi } from "../../test/projectConfigurationFixtures";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { beforeEach, expect, test, vi } from "vitest";
@@ -182,7 +183,7 @@ test("releases one opaque provisional selection", async () => {
 });
 
 test("validates the normalized configuration through the Core boundary", async () => {
-  vi.mocked(invoke).mockResolvedValueOnce({ errors: [] });
+  vi.mocked(invoke).mockResolvedValueOnce({ rasterLimits: rasterLimitsAt300Dpi, errors: [] });
 
   await expect(
     tauriNewProjectPort.validateProjectConfiguration(configuration),
@@ -193,7 +194,7 @@ test("validates the normalized configuration through the Core boundary", async (
 });
 
 test("preserves all structured Core validation codes", async () => {
-  vi.mocked(invoke).mockResolvedValueOnce({
+  vi.mocked(invoke).mockResolvedValueOnce({ rasterLimits: rasterLimitsAt300Dpi,
     errors: [
       "sheetWidthNotEven",
       "safetyEliminatesSafeArea",
@@ -202,7 +203,7 @@ test("preserves all structured Core validation codes", async () => {
 
   await expect(
     tauriNewProjectPort.validateProjectConfiguration(configuration),
-  ).resolves.toEqual({
+  ).resolves.toEqual({ rasterLimits: rasterLimitsAt300Dpi,
     status: "invalid",
     errors: [
       "sheetWidthNotEven",
@@ -229,6 +230,22 @@ test("turns an unavailable Core validation into an actionable failure", async ()
     },
   });
 });
+
+test("carries physical limits from the Core through configuration validation", async () => {
+  vi.mocked(invoke).mockResolvedValueOnce({
+    errors: ["sheetWidthRasterOutOfRange"], rasterLimits: rasterLimitsAt300Dpi,
+  });
+  await expect(tauriNewProjectPort.validateProjectConfiguration(configuration)).resolves.toEqual({
+    status: "invalid", errors: ["sheetWidthRasterOutOfRange"], rasterLimits: rasterLimitsAt300Dpi,
+  });
+});
+
+test.each([undefined, {}, { sheetWidth: { minimumUm: 1, maximumUm: 0 }, sheetHeight: { minimumUm: 1, maximumUm: 2 } }, null])(
+  "rejects a raster error without usable Core limits (%j)", async (rasterLimits) => {
+    vi.mocked(invoke).mockResolvedValueOnce({ errors: ["sheetWidthRasterOutOfRange"], rasterLimits });
+    await expect(tauriNewProjectPort.validateProjectConfiguration(configuration)).resolves.toMatchObject({ status: "failed" });
+  },
+);
 
 test("keeps an unavailable creation distinct from an unavailable opening", async () => {
   vi.mocked(invoke).mockRejectedValueOnce(new Error("command unavailable"));

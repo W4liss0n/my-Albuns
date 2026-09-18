@@ -1,3 +1,4 @@
+import { rasterLimitsAt300Dpi } from "./test/projectConfigurationFixtures";
 import { useCallback, useMemo, useState } from "react";
 
 import { InspectorPanel } from "./components/InspectorPanel";
@@ -148,7 +149,7 @@ export function SheetGridPreview() {
           setVisualDefaults(draft.value);
           return true;
         }}        onNavigateToSheet={setFocusedSheetId}
-        onPresentationUnitChange={changePresentationUnit}        onValidateAlbumInformation={async () => ({
+        onPresentationUnitChange={changePresentationUnit}        onValidateAlbumInformation={async () => ({ rasterLimits: rasterLimitsAt300Dpi,
           errors: [],
           impact: { conversionLosses: [],
             sheetWidthPx: 7_087,

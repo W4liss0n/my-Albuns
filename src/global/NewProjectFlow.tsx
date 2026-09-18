@@ -162,6 +162,7 @@ export function NewProjectFlow({
     }
     if (outcome.status === "invalid") {
       const errors = presentConfigurationValidationErrors(outcome.errors, {
+        rasterLimits: outcome.rasterLimits,
         displayUnit: configuration.document.displayUnit,
         dpi: configuration.document.dpi,
         sheetWidthPresentation: "closedSheet",

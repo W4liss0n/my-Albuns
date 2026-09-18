@@ -1,3 +1,4 @@
+import { rasterLimitsAt300Dpi } from "../test/projectConfigurationFixtures";
 import { fireEvent, render, screen } from "@testing-library/react";
 import type { ComponentProps } from "react";
 import { expect, test, vi } from "vitest";
@@ -542,7 +543,7 @@ function props(): ComponentProps<typeof InspectorPanel> {
     mediaPreviews: {},
     onApplyAlbumDesign: vi.fn(),
     onApplyAlbumInformation: vi.fn(),    onNavigateToSheet: vi.fn(),
-    onPresentationUnitChange: vi.fn(),    onValidateAlbumInformation: vi.fn(async () => ({
+    onPresentationUnitChange: vi.fn(),    onValidateAlbumInformation: vi.fn(async () => ({ rasterLimits: rasterLimitsAt300Dpi,
       errors: [],
       impact: { conversionLosses: [], heightPx: 1, pageWidthPx: 1, sheetWidthPx: 2 },
     })),

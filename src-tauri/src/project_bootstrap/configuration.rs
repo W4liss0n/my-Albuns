@@ -1,10 +1,12 @@
+pub(crate) use myalbuns_core::ProjectConfigurationValidation;
+#[cfg(test)]
+use myalbuns_core::ProjectConfigurationValidationError as CoreValidationError;
 use myalbuns_core::{
     DisplayUnit, EndSheetFormat, InitialBackground as CoreInitialBackground,
     InitialBackgroundContent as CoreInitialBackgroundContent,
     InitialFrameBorder as CoreInitialFrameBorder, InitialOverlay as CoreInitialOverlay,
     InitialOverlayContent as CoreInitialOverlayContent, InitialProject,
-    InitialProjectConfiguration as CoreProjectConfiguration, InitialProjectPersonalization,
-    ProjectConfigurationValidationError as CoreValidationError, Rgb,
+    InitialProjectConfiguration as CoreProjectConfiguration, InitialProjectPersonalization, Rgb,
 };
 use myalbuns_paths::NativePathDto;
 use serde::{Deserialize, Serialize};
@@ -150,17 +152,10 @@ impl InitialProjectCreationConfiguration {
     }
 }
 
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub(crate) struct ProjectConfigurationValidation {
-    errors: Vec<CoreValidationError>,
-}
-
 pub(crate) fn validate_configuration(
     configuration: InitialProjectConfiguration,
 ) -> ProjectConfigurationValidation {
-    let errors = to_core_configuration(configuration).validation_errors();
-    ProjectConfigurationValidation { errors }
+    to_core_configuration(configuration).validation()
 }
 
 pub(crate) fn to_core_configuration(
@@ -324,7 +319,12 @@ mod tests {
     fn valid_configuration_has_no_structural_errors() {
         assert_eq!(
             validate_configuration(valid_configuration()),
-            ProjectConfigurationValidation { errors: vec![] }
+            ProjectConfigurationValidation {
+                errors: vec![],
+                raster_limits: to_core_configuration(valid_configuration())
+                    .validation()
+                    .raster_limits,
+            }
         );
     }
 
@@ -377,6 +377,7 @@ mod tests {
             serde_json::to_value(validate_configuration(invalid))
                 .expect("the validation response serializes"),
             json!({
+                "rasterLimits": null,
                 "errors": [
                     "sheetWidthNotPositive",
                     "sheetHeightNotPositive",

@@ -94,40 +94,6 @@
   opacity: 0.36;
 }
 
-.sheet-design-preview__targets {
-  position: absolute;
-  z-index: 4;
-  inset: 0;
-}
-
-.sheet-design-preview__target {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  width: 50%;
-  padding: 0;
-  border: 0;
-  background: transparent;
-}
-
-.sheet-design-preview__target[data-scope="left"] {
-  left: 0;
-}
-
-.sheet-design-preview__target[data-scope="right"] {
-  right: 0;
-}
-
-.sheet-design-preview__target[data-scope="both"] {
-  z-index: 1;
-  left: 40%;
-  width: 20%;
-}
-
-.sheet-design-preview__target:focus-visible {
-  box-shadow: inset 0 0 0 1px var(--ui-focus-neutral);
-}
-
 .sheet-design-scope-status {
   margin: 0;
   color: var(--ui-text-muted);

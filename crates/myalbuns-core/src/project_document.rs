@@ -896,7 +896,11 @@ impl ProjectDocument {
                 .collect();
                 impact
             });
-        AlbumInformationValidation { errors, impact }
+        AlbumInformationValidation {
+            errors,
+            impact,
+            raster_limits: configuration_raster_limits(i128::from(information.dpi)),
+        }
     }
 
     pub(crate) fn with_album_information(
@@ -1944,6 +1948,33 @@ pub enum ProjectConfigurationValidationError {
     SafetyEliminatesSafeArea,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub struct PhysicalRasterRange {
+    pub minimum_um: u64,
+    pub maximum_um: u64,
+}
+
+impl PhysicalRasterRange {
+    fn contains(self, micrometers: i128) -> bool {
+        (i128::from(self.minimum_um)..=i128::from(self.maximum_um)).contains(&micrometers)
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub struct ProjectConfigurationRasterLimits {
+    pub sheet_width: PhysicalRasterRange,
+    pub sheet_height: PhysicalRasterRange,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ProjectConfigurationValidation {
+    pub errors: Vec<ProjectConfigurationValidationError>,
+    pub raster_limits: Option<ProjectConfigurationRasterLimits>,
+}
+
 fn dimensions_keep_proportion(
     current_width_um: u64,
     current_height_um: u64,
@@ -1988,6 +2019,7 @@ impl AlbumInformation {
 pub struct AlbumInformationValidation {
     pub errors: Vec<ProjectConfigurationValidationError>,
     pub impact: Option<AlbumInformationImpact>,
+    pub raster_limits: Option<ProjectConfigurationRasterLimits>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, TS)]
@@ -2045,6 +2077,13 @@ impl InitialProjectConfiguration {
             sheet_count,
             first_sheet,
             last_sheet,
+        }
+    }
+
+    pub fn validation(&self) -> ProjectConfigurationValidation {
+        ProjectConfigurationValidation {
+            errors: self.validation_errors(),
+            raster_limits: configuration_raster_limits(i128::from(self.dpi)),
         }
     }
 
@@ -2273,7 +2312,8 @@ fn validation_errors(
 
     let mut errors = Vec::new();
     let safe_integer = i128::from(MAX_SAFE_INTEGER);
-    let dpi_is_valid = (1..=1_200).contains(&values.dpi);
+    let raster_limits = configuration_raster_limits(values.dpi);
+    let dpi_is_valid = raster_limits.is_some();
     let width_is_positive = values.sheet_width_um > 0;
     let width_is_safe = values.sheet_width_um <= safe_integer;
     let width_is_even = values.sheet_width_um % 2 == 0;
@@ -2286,9 +2326,8 @@ fn validation_errors(
         errors.push(Error::SheetWidthAboveSafeInteger);
     } else if !width_is_even {
         errors.push(Error::SheetWidthNotEven);
-    } else if dpi_is_valid
-        && (!raster_axis_is_valid(values.sheet_width_um, values.dpi)
-            || !raster_axis_is_valid(values.sheet_width_um / 2, values.dpi))
+    } else if raster_limits
+        .is_some_and(|limits| !limits.sheet_width.contains(values.sheet_width_um))
     {
         errors.push(Error::SheetWidthRasterOutOfRange);
     }
@@ -2297,7 +2336,9 @@ fn validation_errors(
         errors.push(Error::SheetHeightNotPositive);
     } else if !height_is_safe {
         errors.push(Error::SheetHeightAboveSafeInteger);
-    } else if dpi_is_valid && !raster_axis_is_valid(values.sheet_height_um, values.dpi) {
+    } else if raster_limits
+        .is_some_and(|limits| !limits.sheet_height.contains(values.sheet_height_um))
+    {
         errors.push(Error::SheetHeightRasterOutOfRange);
     }
 
@@ -2354,15 +2395,36 @@ fn validation_errors(
     errors
 }
 
-fn raster_axis_is_valid(micrometers: i128, dpi: i128) -> bool {
-    raster_axis_pixels(micrometers, dpi).is_some_and(|pixels| (1..=65_535).contains(&pixels))
+const MICROMETERS_PER_INCH: i128 = 25_400;
+const RASTER_ROUNDING_OFFSET: i128 = MICROMETERS_PER_INCH / 2;
+const MAX_RASTER_AXIS: i128 = 65_535;
+
+fn configuration_raster_limits(dpi: i128) -> Option<ProjectConfigurationRasterLimits> {
+    if !(1..=1_200).contains(&dpi) {
+        return None;
+    }
+    let minimum = u64::try_from((RASTER_ROUNDING_OFFSET + dpi - 1) / dpi).ok()?;
+    let maximum = u64::try_from(
+        ((MAX_RASTER_AXIS + 1) * MICROMETERS_PER_INCH - 1 - RASTER_ROUNDING_OFFSET) / dpi,
+    )
+    .ok()?;
+    Some(ProjectConfigurationRasterLimits {
+        sheet_width: PhysicalRasterRange {
+            minimum_um: minimum * 2,
+            maximum_um: maximum - maximum % 2,
+        },
+        sheet_height: PhysicalRasterRange {
+            minimum_um: minimum,
+            maximum_um: maximum,
+        },
+    })
 }
 
 fn raster_axis_pixels(micrometers: i128, dpi: i128) -> Option<i128> {
     micrometers
         .checked_mul(dpi)
-        .and_then(|numerator| numerator.checked_add(12_700))
-        .map(|numerator| numerator / 25_400)
+        .and_then(|numerator| numerator.checked_add(RASTER_ROUNDING_OFFSET))
+        .map(|numerator| numerator / MICROMETERS_PER_INCH)
 }
 
 fn active_sides_are_valid_at(sides: ActiveSides, index: usize, count: usize) -> bool {

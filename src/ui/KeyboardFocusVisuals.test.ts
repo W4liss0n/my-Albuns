@@ -52,9 +52,9 @@ test("uses a neutral ring around the focused range thumb", () => {
 });
 
 test("keeps keyboard focus distinct inside the selected Sheet design scope", () => {
-  const css = stylesheet("../components/SheetDesignInspector.css");
+  const css = stylesheet("./visualPreview/VisualScopeControls.css");
 
   expect(css).toMatch(
-    /\.sheet-design-preview__target:focus-visible\s*\{[^}]*box-shadow:\s*inset 0 0 0 1px var\(--ui-focus-neutral\);/s,
+    /\.visual-scope-controls__target:focus-visible\s*\{[^}]*box-shadow:\s*inset 0 0 0 1px var\(--ui-focus-neutral\);/s,
   );
 });

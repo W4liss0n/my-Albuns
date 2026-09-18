@@ -177,6 +177,7 @@ export function AlbumInformationForm({
         setValidated({
           key: validationKey,
           errors: presentConfigurationValidationErrors(result.errors, {
+            rasterLimits: result.rasterLimits,
             displayUnit: candidate.displayUnit,
             dpi: candidate.dpi,
             sheetWidthPresentation: "openSheet",

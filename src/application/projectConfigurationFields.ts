@@ -1,4 +1,5 @@
 import type { ProjectConfigurationValidationError } from "../domain/generated/ProjectConfigurationValidationError";
+import type { ProjectConfigurationRasterLimits } from "../domain/generated/ProjectConfigurationRasterLimits";
 import type { DisplayUnit } from "../domain/project";
 import {
   displayUnitLabel,
@@ -23,6 +24,7 @@ export interface ProjectConfigurationValidationPresentationContext {
   displayUnit: DisplayUnit;
   dpi: number;
   sheetWidthPresentation: "openSheet" | "closedSheet";
+  rasterLimits: ProjectConfigurationRasterLimits | null;
 }
 
 export function invalidPhysicalMeasurementMessage(unit: DisplayUnit): string {
@@ -31,9 +33,6 @@ export function invalidPhysicalMeasurementMessage(unit: DisplayUnit): string {
 
 const MAX_SAFE_INTEGER = BigInt(Number.MAX_SAFE_INTEGER);
 const MAX_NUMERIC_INPUT_LENGTH = 128;
-const MICROMETERS_PER_INCH = 25_400n;
-const RASTER_ROUNDING_OFFSET = 12_700n;
-const MAX_RASTER_AXIS = 65_535n;
 
 type ValidationMessage =
   | string
@@ -158,9 +157,9 @@ function rasterRangeMessage(
   axis: "width" | "height",
   context: ProjectConfigurationValidationPresentationContext,
 ): string {
-  const rangeKind =
-    axis === "height" ? "height" : context.sheetWidthPresentation;
-  const range = physicalRasterRange(context.dpi, rangeKind);
+  const range = axis === "height"
+    ? context.rasterLimits?.sheetHeight
+    : context.rasterLimits?.sheetWidth;
   const dimension =
     axis === "height"
       ? "altura da Lâmina"
@@ -171,46 +170,18 @@ function rasterRangeMessage(
     return `A ${dimension} precisa ser ajustada para o DPI informado.`;
   }
 
+  const divisor = axis === "width" && context.sheetWidthPresentation === "closedSheet" ? 2 : 1;
   const minimum = formatPhysicalMeasurement(
-    range.minimumUm,
+    range.minimumUm / divisor,
     context.displayUnit,
   );
   const maximum = formatPhysicalMeasurement(
-    range.maximumUm,
+    range.maximumUm / divisor,
     context.displayUnit,
   );
   const approximation =
     context.displayUnit === "in" ? "aproximadamente " : "";
   return `Para ${context.dpi} DPI, informe a ${dimension} entre ${approximation}${minimum} e ${maximum}.`;
-}
-
-function physicalRasterRange(
-  dpi: number,
-  kind: "height" | "openSheet" | "closedSheet",
-): { minimumUm: number; maximumUm: number } | null {
-  if (!Number.isSafeInteger(dpi) || dpi <= 0) return null;
-
-  const dpiValue = BigInt(dpi);
-  const minimumAxisUm =
-    (RASTER_ROUNDING_OFFSET + dpiValue - 1n) / dpiValue;
-  const maximumAxisUm =
-    ((MAX_RASTER_AXIS + 1n) * MICROMETERS_PER_INCH -
-      1n -
-      RASTER_ROUNDING_OFFSET) /
-    dpiValue;
-  let minimumUm = minimumAxisUm;
-  let maximumUm = maximumAxisUm;
-  if (kind === "openSheet") {
-    minimumUm *= 2n;
-    maximumUm -= maximumUm % 2n;
-  } else if (kind === "closedSheet") {
-    maximumUm /= 2n;
-  }
-
-  return {
-    minimumUm: Number(minimumUm),
-    maximumUm: Number(maximumUm),
-  };
 }
 
 export function parseIntegerText(text: string): number | null {

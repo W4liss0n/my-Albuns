@@ -1,3 +1,4 @@
+import { rasterLimitsAt300Dpi } from "./test/projectConfigurationFixtures";
 import React from "react";
 import retainedPhotoPreview from "./test/dev-media/serra-amanhecer.svg";
 import ReactDOM from "react-dom/client";
@@ -227,7 +228,7 @@ const projectCorePort: ProjectCorePort = {
     return structuredClone(preparedLayoutQuery.previews[selection.candidateIndex]);
   },
   load: async () => projection,
-  validateAlbumInformation: async () => ({
+  validateAlbumInformation: async () => ({ rasterLimits: rasterLimitsAt300Dpi,
     errors: [],
     impact: { conversionLosses: [],
       heightPx: 3_543,

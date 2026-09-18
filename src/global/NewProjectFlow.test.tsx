@@ -1,3 +1,4 @@
+import { rasterLimitsAt300Dpi } from "../test/projectConfigurationFixtures";
 import {
   act,
   fireEvent,
@@ -1421,7 +1422,7 @@ test("shows every Core error, focuses the first field and refreshes errors after
   const user = userEvent.setup();
   const onValidate = vi
     .fn<() => Promise<ProjectConfigurationValidationOutcome>>()
-    .mockResolvedValueOnce({
+    .mockResolvedValueOnce({ rasterLimits: rasterLimitsAt300Dpi,
       status: "invalid",
       errors: [
         "sheetHeightNotPositive",
@@ -1497,7 +1498,7 @@ test("presents creation raster limits in the selected Unit and closed Sheet meas
     <NewProjectFlow
       onCancel={vi.fn()}
       onCreate={vi.fn(async () => ({ status: "cancelled" as const }))}
-      onValidate={vi.fn(async () => ({
+      onValidate={vi.fn(async () => ({ rasterLimits: rasterLimitsAt300Dpi,
         status: "invalid" as const,
         errors: ["sheetWidthRasterOutOfRange" as const],
       }))}
@@ -1518,7 +1519,7 @@ test("anchors validation to the first invalid field in visual order", async () =
   const user = userEvent.setup();
   const onValidate = vi
     .fn<() => Promise<ProjectConfigurationValidationOutcome>>()
-    .mockResolvedValue({
+    .mockResolvedValue({ rasterLimits: rasterLimitsAt300Dpi,
       status: "invalid",
       errors: ["dpiOutOfRange", "bleedNegative"],
     });
@@ -1545,7 +1546,7 @@ test("preserves errors from untouched fields during live validation", async () =
   const liveValidation = deferred<ProjectConfigurationValidationOutcome>();
   const onValidate = vi
     .fn<() => Promise<ProjectConfigurationValidationOutcome>>()
-    .mockResolvedValueOnce({
+    .mockResolvedValueOnce({ rasterLimits: rasterLimitsAt300Dpi,
       status: "invalid",
       errors: ["dpiOutOfRange", "sheetCountTooSmall"],
     })
@@ -1620,7 +1621,7 @@ test("ignores a late validation response after a newer edit", async () => {
   await waitFor(() => expect(onValidate).toHaveBeenCalledTimes(2));
 
   await act(async () => {
-    second.resolve({
+    second.resolve({ rasterLimits: rasterLimitsAt300Dpi,
       status: "invalid",
       errors: ["sheetWidthNotEven"],
     });

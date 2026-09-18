@@ -1,3 +1,4 @@
+import { rasterLimitsAt300Dpi } from "../test/projectConfigurationFixtures";
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import type { ComponentProps } from "react";
 import { beforeEach, expect, test, vi } from "vitest";
@@ -25,7 +26,7 @@ function inspectorProps(
     mediaPreviews: {},
     onApplyAlbumDesign: vi.fn(),
     onApplyAlbumInformation: vi.fn(),    onNavigateToSheet: vi.fn(),
-    onPresentationUnitChange: vi.fn(),    onValidateAlbumInformation: vi.fn(async () => ({
+    onPresentationUnitChange: vi.fn(),    onValidateAlbumInformation: vi.fn(async () => ({ rasterLimits: rasterLimitsAt300Dpi,
       errors: [],
       impact: { conversionLosses: [],
         heightPx: 3_543,
@@ -168,10 +169,10 @@ test("shows Design da Lâmina and preserves its scope while Frame temporarily ow
   expect(both).toHaveAttribute("aria-pressed", "true");
 
   const preview = left.closest('[role="group"]') as HTMLElement;
-  fireEvent.mouseEnter(left);
+  fireEvent.pointerEnter(left);
   expect(preview).toHaveAttribute("data-hovered-scope", "left");
   expect(both).toHaveAttribute("aria-pressed", "true");
-  fireEvent.mouseLeave(preview);
+  fireEvent.pointerLeave(preview);
 
   fireEvent.click(left);
   expect(left).toHaveAttribute("aria-pressed", "true");

@@ -1,5 +1,6 @@
 import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { expect, test, vi } from "vitest";
+import userEvent from "@testing-library/user-event";
 import { decorativeCorpus } from "../test/decorativePreview";
 import { SheetDesignInspector } from "./SheetDesignInspector";
 import type { ComponentProps } from "react";
@@ -25,6 +26,26 @@ test("equal colors with different origins remain separate and restoration target
   expect(within(screen.getByRole("region", { name: "Overlay" })).queryByText("Voltar ao design do álbum")).toBeNull();
   await act(async () => fireEvent.click(background.getByRole("button", { name: "Voltar ao design do álbum" })));
   expect(input.actions!.onChange).toHaveBeenCalledExactlyOnceWith(input.sheet.sheetId, "bothSides", { kind: "restoreAlbum", role: "background" });
+});
+
+test("scope pointer and keyboard interaction only changes the transient selection", async () => {
+  const user = userEvent.setup();
+  const input = props("neutral");
+  render(<SheetDesignInspector {...input} />);
+  const preview = screen.getByRole("group", { name: "Selecionar escopo da Lâmina 01" });
+  const left = screen.getByRole("button", { name: "Página esquerda" });
+  const both = screen.getByRole("button", { name: "Ambos os lados" });
+  await user.hover(left);
+  expect(preview).toHaveAttribute("data-hovered-scope", "left");
+  expect(both).toHaveAttribute("aria-pressed", "true");
+  await user.unhover(left);
+  expect(preview).not.toHaveAttribute("data-hovered-scope");
+  await user.tab();
+  expect(left).toHaveFocus();
+  expect(preview).toHaveAttribute("data-hovered-scope", "left");
+  await user.keyboard("{Enter}");
+  expect(input.onScopeChange).toHaveBeenCalledExactlyOnceWith("left");
+  expect(input.actions!.onChange).not.toHaveBeenCalled();
 });
 
 test("a color draft commits once, while cancellation, invalid input and a scope change do not edit", async () => {

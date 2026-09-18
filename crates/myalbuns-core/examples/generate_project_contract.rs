@@ -23,6 +23,8 @@ fn main() {
         .expect("Frame geometry preview bindings should be generated");
     AlbumInformationValidation::export_all(&config)
         .expect("AlbumInformationValidation bindings should be generated");
+    myalbuns_core::ProjectConfigurationValidation::export_all(&config)
+        .expect("Project configuration validation bindings should be generated");
     ProjectMutationOutcome::export_all(&config)
         .expect("Project mutation outcome bindings should be generated");
     PhotoDropTarget::export_all(&config).expect("Photo drop target bindings should be generated");

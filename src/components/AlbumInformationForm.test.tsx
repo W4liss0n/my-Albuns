@@ -1,3 +1,4 @@
+import { rasterLimitsAt300Dpi } from "../test/projectConfigurationFixtures";
 import {
   act,
   fireEvent,
@@ -28,7 +29,7 @@ const emptySheetStates = representativeProjection.state.album.sheets.map(
 
 function renderForm({
   onApply = vi.fn(),
-  onValidate = vi.fn(async () => ({ errors: [], impact: validImpact })),
+  onValidate = vi.fn(async () => ({ rasterLimits: rasterLimitsAt300Dpi, errors: [], impact: validImpact })),
   sheetStates = emptySheetStates,
 }: {
   onApply?: ComponentProps<typeof AlbumInformationForm>["onApply"];
@@ -121,7 +122,7 @@ test("allows composed dimension drafts for Core validation", () => {
 
 test("revalidates a blocked crop when source observations arrive without a History revision", async () => {
   const onValidate = vi.fn<ComponentProps<typeof AlbumInformationForm>["onValidate"]>()
-    .mockResolvedValue({ errors: ["sheetDimensionsUnknownPhotoSize"], impact: null });
+    .mockResolvedValue({ rasterLimits: rasterLimitsAt300Dpi, errors: ["sheetDimensionsUnknownPhotoSize"], impact: null });
   const props = { document: representativeProjection.state.document,
     sheetStates: representativeProjection.state.album.sheets,
     onValidate, onPresentationUnitChange: vi.fn() };
@@ -130,7 +131,7 @@ test("revalidates a blocked crop when source observations arrive without a Histo
   fireEvent.change(screen.getByRole("textbox", { name: "Largura" }), { target: { value: "630" } });
   await waitFor(() => expect(onValidate).toHaveBeenCalled());
   expect(screen.getByRole("button", { name: "Aplicar" })).toBeDisabled();
-  onValidate.mockResolvedValue({ errors: [], impact: validImpact });
+  onValidate.mockResolvedValue({ rasterLimits: rasterLimitsAt300Dpi, errors: [], impact: validImpact });
   view.rerender(<ProjectionHarness {...props} photoSources={sources.map((source) => ({ ...source }))} />);
   await waitFor(() => expect(screen.getByRole("button", { name: "Aplicar" })).toBeEnabled());
 });
@@ -296,7 +297,7 @@ test("changing Unidade converts presentation without changing physical dimension
 });
 
 test("accepts the generated inch text again after a temporary exact edit", async () => {
-  const onValidate = vi.fn(async () => ({ errors: [], impact: validImpact }));
+  const onValidate = vi.fn(async () => ({ rasterLimits: rasterLimitsAt300Dpi, errors: [], impact: validImpact }));
   const onPresentationUnitChange = vi.fn<(unit: DisplayUnit | null) => void>();
   render(
     <ProjectionHarness
@@ -422,7 +423,7 @@ test("keeps the calculated Page dimension visible when DPI is invalid", () => {
 });
 
 test("shows validation from the core and blocks Apply", async () => {
-  const onValidate = vi.fn(async (): Promise<AlbumInformationValidation> => ({
+  const onValidate = vi.fn(async (): Promise<AlbumInformationValidation> => ({ rasterLimits: rasterLimitsAt300Dpi,
     errors: ["bleedEliminatesCutArea"],
     impact: null,
   }));
@@ -437,7 +438,7 @@ test("shows validation from the core and blocks Apply", async () => {
 });
 
 test("presents raster limits in the pending Unit instead of pixels", async () => {
-  const onValidate = vi.fn(async (): Promise<AlbumInformationValidation> => ({
+  const onValidate = vi.fn(async (): Promise<AlbumInformationValidation> => ({ rasterLimits: rasterLimitsAt300Dpi,
     errors: ["sheetWidthRasterOutOfRange"],
     impact: null,
   }));
@@ -455,7 +456,7 @@ test("presents raster limits in the pending Unit instead of pixels", async () =>
 });
 
 test("preserves an unapplied draft across a semantically equivalent projection", async () => {
-  const onValidate = vi.fn(async () => ({ errors: [], impact: validImpact }));
+  const onValidate = vi.fn(async () => ({ rasterLimits: rasterLimitsAt300Dpi, errors: [], impact: validImpact }));
   const onPresentationUnitChange =
     vi.fn<(unit: DisplayUnit | null) => void>();
   const view = render(
@@ -493,11 +494,11 @@ test("revalidates a pending dimension draft when composed geometry arrives", asy
   const onValidate = vi.fn(
     async (): Promise<AlbumInformationValidation> =>
       composed
-        ? {
+        ? { rasterLimits: rasterLimitsAt300Dpi,
             errors: ["sheetDimensionsRequireContentTransformation"],
             impact: null,
           }
-        : { errors: [], impact: validImpact },
+        : { rasterLimits: rasterLimitsAt300Dpi, errors: [], impact: validImpact },
   );
   const onPresentationUnitChange =
     vi.fn<(unit: DisplayUnit | null) => void>();
@@ -551,11 +552,11 @@ test("lets a pending edge conversion be restored when edge content arrives", asy
   const onValidate = vi.fn(
     async (): Promise<AlbumInformationValidation> =>
       composed
-        ? {
+        ? { rasterLimits: rasterLimitsAt300Dpi,
             errors: ["firstSheetConversionRequiresContentReorganization"],
             impact: null,
           }
-        : { errors: [], impact: validImpact },
+        : { rasterLimits: rasterLimitsAt300Dpi, errors: [], impact: validImpact },
   );
   const onPresentationUnitChange =
     vi.fn<(unit: DisplayUnit | null) => void>();
@@ -606,7 +607,7 @@ test("lets a pending edge conversion be restored when edge content arrives", asy
 });
 
 test("resets the draft when authoritative Album information really changes", async () => {
-  const onValidate = vi.fn(async () => ({ errors: [], impact: validImpact }));
+  const onValidate = vi.fn(async () => ({ rasterLimits: rasterLimitsAt300Dpi, errors: [], impact: validImpact }));
   const onPresentationUnitChange =
     vi.fn<(unit: DisplayUnit | null) => void>();
   const view = render(
@@ -647,7 +648,7 @@ test("preserves edits made after submit when the applied Album information proje
   const onApply = vi.fn<ComponentProps<typeof AlbumInformationForm>["onApply"]>(
     () => pendingApply,
   );
-  const onValidate = vi.fn(async () => ({ errors: [], impact: validImpact }));
+  const onValidate = vi.fn(async () => ({ rasterLimits: rasterLimitsAt300Dpi, errors: [], impact: validImpact }));
   const onPresentationUnitChange =
     vi.fn<(unit: DisplayUnit | null) => void>();
   const view = render(
@@ -706,7 +707,7 @@ test("keeps post-submit edits through two successful History predecessors", asyn
   const onApply = vi.fn<ComponentProps<typeof AlbumInformationForm>["onApply"]>(
     () => pendingApply,
   );
-  const onValidate = vi.fn(async () => ({ errors: [], impact: validImpact }));
+  const onValidate = vi.fn(async () => ({ rasterLimits: rasterLimitsAt300Dpi, errors: [], impact: validImpact }));
   const onPresentationUnitChange =
     vi.fn<(unit: DisplayUnit | null) => void>();
   const baselineDocument = representativeProjection.state.document;
@@ -774,7 +775,7 @@ test("reformats exact post-submit measurements when History changes only the pre
   const onApply = vi.fn<ComponentProps<typeof AlbumInformationForm>["onApply"]>(
     () => pendingApply,
   );
-  const onValidate = vi.fn(async () => ({ errors: [], impact: validImpact }));
+  const onValidate = vi.fn(async () => ({ rasterLimits: rasterLimitsAt300Dpi, errors: [], impact: validImpact }));
   const onPresentationUnitChange =
     vi.fn<(unit: DisplayUnit | null) => void>();
   const baselineDocument = representativeProjection.state.document;
@@ -841,7 +842,7 @@ test("treats unit reformatting as equal while rebasing concurrent measurements",
   const onApply = vi.fn<ComponentProps<typeof AlbumInformationForm>["onApply"]>(
     () => pendingApply,
   );
-  const onValidate = vi.fn(async () => ({ errors: [], impact: validImpact }));
+  const onValidate = vi.fn(async () => ({ rasterLimits: rasterLimitsAt300Dpi, errors: [], impact: validImpact }));
   const onPresentationUnitChange =
     vi.fn<(unit: DisplayUnit | null) => void>();
   const baselineDocument = representativeProjection.state.document;
@@ -903,7 +904,7 @@ test("continues following unedited concurrent fields across multiple predecessor
   const onApply = vi.fn<ComponentProps<typeof AlbumInformationForm>["onApply"]>(
     () => pendingApply,
   );
-  const onValidate = vi.fn(async () => ({ errors: [], impact: validImpact }));
+  const onValidate = vi.fn(async () => ({ rasterLimits: rasterLimitsAt300Dpi, errors: [], impact: validImpact }));
   const onPresentationUnitChange =
     vi.fn<(unit: DisplayUnit | null) => void>();
   const baselineDocument = representativeProjection.state.document;
@@ -967,7 +968,7 @@ test("clears a normalized invalid measurement marker when Unidade changes", asyn
   const onApply = vi.fn<ComponentProps<typeof AlbumInformationForm>["onApply"]>(
     () => pendingApply,
   );
-  const onValidate = vi.fn(async () => ({ errors: [], impact: validImpact }));
+  const onValidate = vi.fn(async () => ({ rasterLimits: rasterLimitsAt300Dpi, errors: [], impact: validImpact }));
   const onPresentationUnitChange =
     vi.fn<(unit: DisplayUnit | null) => void>();
   const baselineDocument = representativeProjection.state.document;

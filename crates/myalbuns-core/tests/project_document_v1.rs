@@ -1637,6 +1637,153 @@ fn initial_configuration_reports_independent_field_errors_in_form_order() {
 }
 
 #[test]
+fn projected_raster_limits_are_exact_for_every_supported_dpi() {
+    let configuration = |width, height, dpi| {
+        InitialProjectConfiguration::new(
+            DisplayUnit::Mm,
+            width,
+            height,
+            dpi,
+            0,
+            0,
+            2,
+            EndSheetFormat::Double,
+            EndSheetFormat::Double,
+        )
+    };
+    for dpi in 1..=1_200 {
+        let limits = configuration(600_000, 300_000, dpi)
+            .validation()
+            .raster_limits
+            .unwrap();
+        let min_w = limits.sheet_width.minimum_um as i64;
+        let max_w = limits.sheet_width.maximum_um as i64;
+        let min_h = limits.sheet_height.minimum_um as i64;
+        let max_h = limits.sheet_height.maximum_um as i64;
+        assert_eq!(min_w % 2, 0);
+        assert_eq!(max_w % 2, 0);
+        for width in [min_w, max_w] {
+            for height in [min_h, max_h] {
+                assert!(
+                    configuration(width, height, dpi)
+                        .validation_errors()
+                        .is_empty(),
+                    "{dpi}: {width} x {height}"
+                );
+            }
+        }
+        for width in [min_w - 2, max_w + 2] {
+            assert_eq!(
+                configuration(width, min_h, dpi).validation_errors(),
+                vec![ValidationError::SheetWidthRasterOutOfRange]
+            );
+        }
+        for width in [min_w - 1, max_w + 1] {
+            assert_eq!(
+                configuration(width, min_h, dpi).validation_errors(),
+                vec![ValidationError::SheetWidthNotEven]
+            );
+        }
+        for height in [min_h - 1, max_h + 1] {
+            assert_eq!(
+                configuration(min_w, height, dpi).validation_errors(),
+                vec![ValidationError::SheetHeightRasterOutOfRange]
+            );
+        }
+    }
+    for dpi in [i64::MIN, 0, 1_201, i64::MAX] {
+        let validation = configuration(600_000, 300_000, dpi).validation();
+        assert!(validation.raster_limits.is_none());
+        assert_eq!(validation.errors, vec![ValidationError::DpiOutOfRange]);
+    }
+}
+
+#[test]
+fn initial_creation_and_album_validation_share_raster_limits_without_mutation() {
+    let directory = tempfile::tempdir().unwrap();
+    let core = project_core_with_identity_storage(directory.path());
+    for dpi in [1, 300, 1_200] {
+        let configuration = |width, height| {
+            InitialProjectConfiguration::new(
+                DisplayUnit::Mm,
+                width,
+                height,
+                dpi,
+                0,
+                0,
+                2,
+                EndSheetFormat::Double,
+                EndSheetFormat::Double,
+            )
+        };
+        let limits = configuration(600_000, 300_000)
+            .validation()
+            .raster_limits
+            .unwrap();
+        for (case, width, height) in [
+            (
+                "minimum",
+                limits.sheet_width.minimum_um,
+                limits.sheet_height.minimum_um,
+            ),
+            (
+                "maximum",
+                limits.sheet_width.maximum_um,
+                limits.sheet_height.maximum_um,
+            ),
+        ] {
+            let location =
+                project_location(&directory.path().join(format!("{dpi}-{case}.myalbuns")));
+            let project = core
+                .create_editable(CreateProjectRequest::new(
+                    location,
+                    InitialProject::configured(configuration(width as i64, height as i64)),
+                    CreateAuthorization::CreateOnly,
+                ))
+                .expect("the projected endpoint creates a real Project");
+            let before = project.projection();
+            let information = AlbumInformation {
+                display_unit: DisplayUnit::Mm,
+                sheet_width_um: width as i64,
+                sheet_height_um: height as i64,
+                dpi,
+                bleed_um: 0,
+                safety_um: 0,
+                first_sheet: EndSheetFormat::Double,
+                last_sheet: EndSheetFormat::Double,
+            };
+            let validation = project.validate_album_information(&information);
+            assert!(validation.errors.is_empty());
+            assert_eq!(validation.raster_limits, Some(limits));
+            let impact = validation.impact.unwrap();
+            for pixels in [
+                impact.sheet_width_px,
+                impact.page_width_px,
+                impact.height_px,
+            ] {
+                assert!((1..=65_535).contains(&pixels));
+            }
+            let invalid_width = if case == "minimum" {
+                width as i64 - 2
+            } else {
+                width as i64 + 2
+            };
+            let invalid = project.validate_album_information(&AlbumInformation {
+                sheet_width_um: invalid_width,
+                ..information
+            });
+            assert_eq!(
+                invalid.errors,
+                vec![ValidationError::SheetWidthRasterOutOfRange]
+            );
+            assert_eq!(invalid.raster_limits, Some(limits));
+            assert!(invalid.impact.is_none());
+            assert_eq!(project.projection(), before);
+        }
+    }
+}
+
+#[test]
 fn an_unreservable_sheet_count_is_rejected_without_inventing_a_functional_maximum() {
     let directory = tempfile::tempdir().expect("temporary directory");
     let project_path = directory.path().join("quantidade-irreservavel.myalbuns");
@@ -1861,6 +2008,19 @@ fn changing_album_information_is_one_atomic_authoritative_revision() {
     assert_eq!(
         validation,
         myalbuns_core::AlbumInformationValidation {
+            raster_limits: InitialProjectConfiguration::new(
+                information.display_unit,
+                information.sheet_width_um,
+                information.sheet_height_um,
+                information.dpi,
+                information.bleed_um,
+                information.safety_um,
+                2,
+                information.first_sheet,
+                information.last_sheet,
+            )
+            .validation()
+            .raster_limits,
             errors: vec![],
             impact: Some(AlbumInformationImpact {
                 conversion_losses: Vec::new(),

@@ -1,3 +1,4 @@
+import { rasterLimitsAt300Dpi } from "../test/projectConfigurationFixtures";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { beforeEach, expect, test, vi } from "vitest";
@@ -366,7 +367,7 @@ test("maps the Project and media ports to the desktop commands", async () => {
 
   vi.mocked(invoke)
     .mockResolvedValueOnce(representativeProjection)
-    .mockResolvedValueOnce({
+    .mockResolvedValueOnce({ rasterLimits: rasterLimitsAt300Dpi,
       errors: [],
       impact: { conversionLosses: [], heightPx: 3_543, pageWidthPx: 3_543, sheetWidthPx: 7_087 },
     })

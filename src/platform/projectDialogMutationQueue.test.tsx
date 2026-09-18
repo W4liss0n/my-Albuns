@@ -1,3 +1,4 @@
+import { rasterLimitsAt300Dpi } from "../test/projectConfigurationFixtures";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { act, renderHook, waitFor } from "@testing-library/react";
@@ -41,7 +42,7 @@ test("conversion and Album information can share the owned dialog while Save is 
     applyWithOutcome: async (intent, progress) => ({
       projection: await apply(intent, progress), affectedFrameId: null, affectedSheetId: null,
     }),
-    validateAlbumInformation: async () => ({ errors: [], impact }),
+    validateAlbumInformation: async () => ({ rasterLimits: rasterLimitsAt300Dpi, errors: [], impact }),
     save: async (revision) => {
       await pendingSave;
       return { outcome: { kind: "saved", revision }, projection: initial };
@@ -100,7 +101,7 @@ test.each([false, true])("dimensional review follows queued Save and preserves i
   const pending = new Promise<void>((resolve) => { finishSave = resolve; });
   const apply = vi.fn<ProjectCorePort["apply"]>(async () => initial);
   const port: ProjectCorePort = { ...tauriProjectCorePort, apply,
-    validateAlbumInformation: async () => ({ errors: [], impact: impact("new-source") }),
+    validateAlbumInformation: async () => ({ rasterLimits: rasterLimitsAt300Dpi, errors: [], impact: impact("new-source") }),
     save: async (revision) => {
       await pending;
       if (failSave) throw new Error("Save failed");
@@ -144,7 +145,7 @@ test("a source observation racing the native commit reopens confirmation without
     throw new Error("The native dimensional guard rejected stale observations");
   });
   const port: ProjectCorePort = { ...tauriProjectCorePort, apply,
-    validateAlbumInformation: async () => ({ errors: [], impact: impact() }) };
+    validateAlbumInformation: async () => ({ rasterLimits: rasterLimitsAt300Dpi, errors: [], impact: impact() }) };
   const view = renderHook(() => useProjectMutations({ projection: initial,
     runProjectMutation: useProjectMutationRunner(initial.state.projectId, port),
     projectDialogPort: createTauriProjectDialogPort(), onProjectionChange: vi.fn(),

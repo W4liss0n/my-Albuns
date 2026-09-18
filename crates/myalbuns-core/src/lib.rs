@@ -66,7 +66,8 @@ pub use project_document::{
     BackgroundContent, DisplayUnit, DocumentSettings, EndSheetFormat, FrameBorder,
     InitialBackground, InitialBackgroundContent, InitialFrameBorder, InitialOverlay,
     InitialOverlayContent, InitialProject, InitialProjectConfiguration,
-    InitialProjectPersonalization, MediaRef, Overlay, OverlayContent,
+    InitialProjectPersonalization, MediaRef, Overlay, OverlayContent, PhysicalRasterRange,
+    ProjectConfigurationRasterLimits, ProjectConfigurationValidation,
     ProjectConfigurationValidationError, ProjectDocument, ProjectFrame, ProjectPhoto,
     ProjectPhotoTransform, ProjectRect, ProjectSheet, Rgb, VisualDefaults,
 };

@@ -123,6 +123,7 @@ export type ProjectConfigurationValidationOutcome =
   | {
       status: "invalid";
       errors: readonly ProjectConfigurationValidationCode[];
+      rasterLimits: import("../../domain/generated/ProjectConfigurationRasterLimits").ProjectConfigurationRasterLimits | null;
     }
   | { status: "failed"; error: ProjectLaunchFailure };
 

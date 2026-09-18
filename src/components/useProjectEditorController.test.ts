@@ -1,3 +1,4 @@
+import { rasterLimitsAt300Dpi } from "../test/projectConfigurationFixtures";
 import { emptyLayoutCatalogPort, unusedLayoutDialogPort } from "../test/layoutCatalogPorts";
 import { act, fireEvent, renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, expect, test, vi } from "vitest";
@@ -15,7 +16,7 @@ import type { ComposedFrame, EditorProjection, FrameGeometryEdit } from "../doma
 function projectCorePort(): ProjectCorePort {
   return {
     load: async () => representativeProjection,
-    validateAlbumInformation: async () => ({
+    validateAlbumInformation: async () => ({ rasterLimits: rasterLimitsAt300Dpi,
       errors: [],
       impact: { conversionLosses: [], sheetWidthPx: 7_087, pageWidthPx: 3_543, heightPx: 3_543 },
     }),

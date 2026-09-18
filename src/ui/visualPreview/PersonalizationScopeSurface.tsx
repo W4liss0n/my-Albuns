@@ -6,6 +6,7 @@ import type {
   VisualPreviewGeometry,
 } from "./types";
 import { PersonalizationPreview } from "./PersonalizationPreview";
+import { VisualScopeControls } from "./VisualScopeControls";
 import "./PersonalizationScopeSurface.css";
 
 interface PersonalizationScopeSurfacePresentation {
@@ -70,48 +71,16 @@ export function PersonalizationScopeSurface({
           className={`visual-preview-fixed-selection visual-preview-fixed-selection--${personalization.fixedScope}`}
         />
       ) : null}
-      <div
-        aria-label={presentation.scopeControlsLabel}
-        className={`visual-preview-scope-controls${
-          includeBothSidesControl
-            ? " visual-preview-scope-controls--with-both"
-            : ""
-        }`}
-        role="group"
-      >
-        {(
-          includeBothSidesControl
-            ? ([
-                ["left", "Lado esquerdo"],
-                ["both", "Ambos os lados"],
-                ["right", "Lado direito"],
-              ] as const)
-            : ([
-                ["left", "Lado esquerdo"],
-                ["right", "Lado direito"],
-              ] as const)
-        ).map(([scope, label]) => (
-          <button
-            aria-label={label}
-            aria-pressed={personalization.fixedScope === scope}
-            key={scope}
-            onBlur={() => setFocusedScope(null)}
-            onClick={() => onScopeChange(scope)}
-            onFocus={(event) =>
-              setFocusedScope(
-                event.currentTarget.matches(":focus-visible") ? scope : null,
-              )
-            }
-            onPointerEnter={() => setHoveredScope(scope)}
-            onPointerLeave={() =>
-              setHoveredScope(
-                hoveredScope === scope ? null : hoveredScope,
-              )
-            }
-            type="button"
-          />
-        ))}
-      </div>
+      <VisualScopeControls
+        groupLabel={presentation.scopeControlsLabel}
+        targetLayout={includeBothSidesControl ? "partitionedCenter" : "halves"}
+        labels={{ left: "Lado esquerdo", both: "Ambos os lados", right: "Lado direito" }}
+        scope={personalization.fixedScope}
+        focusPresentation="preview"
+        onScopeChange={onScopeChange}
+        onHoveredScopeChange={setHoveredScope}
+        onFocusedScopeChange={setFocusedScope}
+      />
     </>
   );
 }

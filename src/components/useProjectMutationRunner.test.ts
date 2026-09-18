@@ -1,3 +1,4 @@
+import { rasterLimitsAt300Dpi } from "../test/projectConfigurationFixtures";
 import { emptyLayoutCatalogPort } from "../test/layoutCatalogPorts";
 import {
   act,
@@ -32,7 +33,7 @@ function deferredProjection() {
 function projectCorePort(): ProjectCorePort {
   return {
     load: async () => representativeProjection,
-    validateAlbumInformation: async () => ({
+    validateAlbumInformation: async () => ({ rasterLimits: rasterLimitsAt300Dpi,
       errors: [],
       impact: { conversionLosses: [], sheetWidthPx: 7_087, pageWidthPx: 3_543, heightPx: 3_543 },
     }),
