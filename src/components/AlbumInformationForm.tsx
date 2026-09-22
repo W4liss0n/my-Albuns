@@ -440,7 +440,7 @@ export function AlbumInformationForm({
               changeUnit(value as DocumentSnapshot["displayUnit"])
             }
           />
-          <ValidatedTextField density="compact"
+          <ValidatedTextField density="compact" appearance="integrated"
             error={firstError(errors.dpi)}
             field="dpi"
             inputMode="numeric"
@@ -458,7 +458,7 @@ export function AlbumInformationForm({
         <fieldset className="album-information-dimension">
           <legend>Dimensão da lâmina</legend>
           <div className="inspector-readout-grid">
-            <ValidatedTextField density="compact" inputMode="decimal"
+            <ValidatedTextField density="compact" appearance="integrated" inputMode="decimal"
               error={firstError(errors.sheetWidth)}
               field="sheetWidth"
               label="Largura"
@@ -468,7 +468,7 @@ export function AlbumInformationForm({
               value={draft.sheetWidth.text}
               onChange={(value) => setMeasurement("sheetWidth", value)}
             />
-            <ValidatedTextField density="compact" inputMode="decimal"
+            <ValidatedTextField density="compact" appearance="integrated" inputMode="decimal"
               error={firstError(errors.sheetHeight)}
               field="sheetHeight"
               label="Altura"
@@ -509,7 +509,7 @@ export function AlbumInformationForm({
       <section className="inspector-subsection">
         <h3>Áreas técnicas</h3>
         <div className="inspector-readout-grid">
-          <ValidatedTextField density="compact" inputMode="decimal"
+          <ValidatedTextField density="compact" appearance="integrated" inputMode="decimal"
             error={firstError(errors.bleed)}
             field="bleed"
             label="Sangria"
@@ -519,7 +519,7 @@ export function AlbumInformationForm({
             value={draft.bleed.text}
             onChange={(value) => setMeasurement("bleed", value)}
           />
-          <ValidatedTextField density="compact" inputMode="decimal"
+          <ValidatedTextField density="compact" appearance="integrated" inputMode="decimal"
             error={firstError(errors.safety)}
             field="safety"
             label="Área de segurança"

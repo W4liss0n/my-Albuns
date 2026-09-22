@@ -1,0 +1,32 @@
+/* The integrated appearance belongs to editable fields, not actions. */
+input.ui-field-control.ui-text-input--integrated {
+  border: 1px solid transparent;
+  border-bottom-color: var(--ui-border-strong);
+  border-radius: 0;
+  color: var(--ui-text);
+  background: transparent;
+  box-shadow: none;
+}
+
+input.ui-field-control.ui-text-input--integrated:hover:not(:disabled) {
+  border-bottom-color: var(--ui-text-muted);
+  background: var(--ui-surface-muted);
+}
+
+input.ui-field-control.ui-text-input--integrated:focus:not(:disabled) {
+  border-bottom-color: var(--ui-focus-neutral);
+  background: var(--ui-surface-muted);
+  box-shadow: inset 0 -1px var(--ui-focus-neutral);
+  outline: 0;
+}
+
+input.ui-field-control.ui-text-input--integrated[aria-invalid="true"]:not(:disabled) {
+  border-color: transparent;
+  border-bottom-color: var(--ui-danger);
+  box-shadow: inset 0 -1px var(--ui-danger);
+}
+
+input.ui-field-control.ui-text-input--integrated:disabled {
+  border-bottom-color: transparent;
+  box-shadow: none;
+}

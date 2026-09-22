@@ -428,7 +428,7 @@ export function InspectorPanel({
                   disabled={!informationDirty}
                   form={ALBUM_INFORMATION_FORM_ID}
                   type="submit"
-                  variant="integrated"
+                  variant={informationDirty ? "primary" : "quiet"}
                 >
                   Aplicar
                 </ActionButton>
@@ -461,7 +461,7 @@ export function InspectorPanel({
                   disabled={!designDirty}
                   form={ALBUM_DESIGN_FORM_ID}
                   type="submit"
-                  variant="integrated"
+                  variant={designDirty ? "primary" : "quiet"}
                 >
                   Aplicar
                 </ActionButton>

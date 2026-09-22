@@ -1,7 +1,7 @@
 import { forwardRef, useId, type ReactNode } from "react";
 import { X } from "lucide-react";
 import { AppIcon } from "./AppIcon";
-import { TextInput } from "./TextInput";
+import { TextInput, type TextInputProps } from "./TextInput";
 import {
   FieldValidationAutoTooltip,
   fieldValidationTooltipAttributes,
@@ -10,6 +10,7 @@ import {
 import "./ValidatedTextField.css";
 
 interface ValidatedTextFieldProps {
+  appearance?: TextInputProps["appearance"];
   controls?: ReactNode;
   density?: "regular" | "compact";
   disabled?: boolean;
@@ -28,7 +29,7 @@ interface ValidatedTextFieldProps {
 /** Field composition only; the form owns drafts, conversion and validation timing. */
 export const ValidatedTextField = forwardRef<HTMLInputElement, ValidatedTextFieldProps>(
   function ValidatedTextField({
-    controls, density = "regular", disabled, error, field, hideLabel,
+    appearance, controls, density = "regular", disabled, error, field, hideLabel,
     inputMode, label, onChange, onReset, suffix, validationTooltip, value,
   }, ref) {
     const inputId = useId();
@@ -37,6 +38,7 @@ export const ValidatedTextField = forwardRef<HTMLInputElement, ValidatedTextFiel
         <label className={hideLabel ? "ui-visually-hidden" : undefined} htmlFor={inputId}>{label}</label>
         <span className={`ui-text-field__entry${suffix ? " ui-text-field__entry--suffix" : ""}${controls ? " ui-text-field__entry--controlled" : ""}`}>
           <TextInput
+            appearance={appearance}
             aria-label={label}
             className={density === "compact" ? "ui-field-control" : undefined}
             disabled={disabled}

@@ -1,7 +1,7 @@
 import { useId, useState } from "react";
 import { createPhysicalFieldDraft, editPhysicalFieldDraft, displayUnitLabel, formatMicrometers, formatPhysicalMeasurement, type PhysicalFieldDraft } from "../application/physicalMeasurements";
 import type { DisplayUnit } from "../domain/project";
-import { TextInput } from "../ui/TextInput";
+import { UnitInput } from "../ui/UnitInput";
 import { NumericRangeField } from "../ui/NumericRangeField";
 import { fieldValidationTooltipAttributes, useFieldValidationTooltip } from "../ui/FieldValidationTooltip";
 
@@ -48,8 +48,8 @@ export function FrameDefaultRangeControl({
     if (sentUm !== valueUm) onChange(sentUm);
   };
   return (
-    <NumericRangeField label={range.label} unit={unit} validation={validation}
-      numberInput={<TextInput className="ui-field-control" type="text" inputMode="decimal" role="spinbutton"
+    <NumericRangeField label={range.label} validation={validation}
+      numberInput={<UnitInput unit={unit} type="text" inputMode="decimal" role="spinbutton"
         aria-label={`${accessibleLabel} em ${unit}`} value={field.text}
         aria-valuemin={0} aria-valuemax={Number(formatMicrometers(maximum, displayUnit))}
         aria-valuenow={Number(formatMicrometers(valueUm, displayUnit))}

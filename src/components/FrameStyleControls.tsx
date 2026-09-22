@@ -58,7 +58,7 @@ export function FrameStyleControls({ frames, unit, ...actions }: FrameStyleContr
       <p>{source === "album" ? "Usando o padrão do álbum" : source === "custom"
         ? frames.length === 1 ? "Definido neste quadro" : "Definido nestes quadros"
         : "Parte da seleção usa o design do álbum"}</p>
-      {customized && <ActionButton density="compact" variant="integrated" disabled={actions.disabled}
+      {customized && <ActionButton density="compact" variant="quiet" disabled={actions.disabled}
         onClick={() => actions.onCommit({ kind: "restoreAlbum" })}>Usar padrão do álbum</ActionButton>}
     </div>
   </div>;

@@ -46,6 +46,56 @@
       "actions": []
     },
     {
+      "id": "album-entry-hover",
+      "title": "Informações do álbum — campo integrado ao passar o mouse",
+      "implementationPath": "/workspace-preview.html",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "album-information-inspector",
+        "implementationCaptureSelector": ".inspector-section:has(#album-information-settings)",
+        "reason": "Design 0048: somente as entradas adotam sublinhado e realce neutro; seletores e Aplicar mantêm sua aparência."
+      },
+      "viewport": { "width": 1440, "height": 900 },
+      "readySelector": "input[aria-label='DPI']:hover:not(:focus)",
+      "actions": [
+        { "type": "hover", "selector": "input[aria-label='DPI']" }
+      ]
+    },
+    {
+      "id": "album-entry-focus-125",
+      "title": "Informações do álbum — unidade clicável e foco a 125%",
+      "implementationPath": "/workspace-preview.html?scale=1.25",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "album-information-inspector",
+        "implementationCaptureSelector": ".inspector-section:has(#album-information-settings)",
+        "reason": "Design 0048: unidade permanece dentro da entrada e o clique sobre ela dá foco ao campo, com sublinhado neutro."
+      },
+      "viewport": { "width": 1800, "height": 1125 },
+      "readySelector": "input[aria-label='Largura']:focus",
+      "actions": [
+        { "type": "pointer-click", "selector": ".ui-text-field__entry:has(input[aria-label='Largura']) .ui-text-field__suffix" }
+      ]
+    },
+    {
+      "id": "album-entry-draft-150",
+      "title": "Informações do álbum — edição e restauração a 150%",
+      "implementationPath": "/workspace-preview.html?scale=1.5",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "album-information-inspector",
+        "implementationCaptureSelector": ".inspector-section:has(#album-information-settings)",
+        "reason": "Design 0048: a entrada integrada preserva o valor, a unidade, a restauração e o botão Aplicar sem sobreposição."
+      },
+      "viewport": { "width": 2160, "height": 1350 },
+      "readySelector": "button[form='album-information-settings']:not(:disabled)",
+      "actions": [
+        { "type": "focus", "selector": "input[aria-label='Largura']" },
+        { "type": "input", "selector": "input[aria-label='Largura']", "value": "620" },
+        { "type": "assert", "selector": "button[aria-label='Restaurar Largura']" }
+      ]
+    },
+    {
       "id": "generation-configuration", "title": "Geração de Projetos — configuração",
       "implementationPath": "/generation-preview.html?scenario=configuration",
       "comparison": { "kind": "implementation-only", "surface": "generation-window", "implementationCaptureSelector": ".ui-owned-window-shell", "reason": "Design 0008 e formulário de exportação aceito: modelo somente leitura, origem, destino, contagem e ações à direita." },
@@ -12512,40 +12562,6 @@
       "actions": [
         { "type": "key", "key": "Tab" },
         { "type": "focus", "selector": "[aria-label='Ângulo em graus']" }
-      ]
-    },
-    {
-      "id": "workspace-integrated-rotation-focus",
-      "title": "Ação integrada — foco no giro junto ao espelhamento ativo",
-      "implementationPath": "/workspace-preview.html?frame=orientation&orientation=single-both",
-      "comparison": {
-        "kind": "implementation-only",
-        "surface": "frame-integrated-actions",
-        "reason": "Design 0048: Girar e Espelhar compartilham o acabamento integrado dos campos, mantendo foco distinto do estado ativo e a divisória entre as ações."
-      },
-      "viewport": { "width": 1440, "height": 800 },
-      "readySelector": "[aria-label='Girar 90° à esquerda']:focus-visible",
-      "actions": [
-        { "type": "key", "key": "Tab" },
-        { "type": "focus", "selector": "[aria-label='Girar 90° à esquerda']" }
-      ]
-    },
-    {
-      "id": "workspace-integrated-apply-focus",
-      "title": "Ação integrada — Aplicar disponível e focado no design do álbum",
-      "implementationPath": "/workspace-preview.html",
-      "comparison": {
-        "kind": "implementation-only",
-        "surface": "album-integrated-actions",
-        "reason": "Design 0048: Aplicar habilitado usa o mesmo sublinhado e foco neutro dos outros controles integrados, preservando o rascunho do álbum."
-      },
-      "viewport": { "width": 1440, "height": 900 },
-      "readySelector": "button[form='album-design-settings']:not(:disabled):focus-visible",
-      "actions": [
-        { "type": "click", "selector": "button[aria-label='Informações do álbum']" },
-        { "type": "focus", "selector": "input[aria-label='Espaço entre quadros']" },
-        { "type": "key", "key": "ArrowRight" },
-        { "type": "focus", "selector": "button[form='album-design-settings']" }
       ]
     }
   ]

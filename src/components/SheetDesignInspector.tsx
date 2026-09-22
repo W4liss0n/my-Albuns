@@ -96,7 +96,7 @@ export function SheetDesignInspector({
               : "Salvar a disposição dos quadros em Personalizados."
           }
           type="button"
-          variant="integrated"
+          variant="secondary"
         >
           Salvar disposição como layout
         </ActionButton>
@@ -224,12 +224,12 @@ function SheetVisualControls({
           onSelect={(mediaId) => onSelectMedia(decorativeRole, mediaId)}
           actions={<>
             {background && <ActionButton aria-label="Remover" title="Remover fundo" density="compact" disabled={disabled}
-              type="button" variant="integrated" onClick={() => onChange({ kind: "remove", role: decorativeRole })}>
+              type="button" variant="quiet" onClick={() => onChange({ kind: "remove", role: decorativeRole })}>
               <AppIcon icon={X} size={14} />
             </ActionButton>}
             {values.some(value => value.custom) && <ActionButton aria-label="Usar padrão do álbum" title="Usar padrão do álbum"
               className="sheet-design-role__restore" density="compact" disabled={disabled}
-              type="button" variant="integrated" onClick={() => onChange({ kind: "restoreAlbum", role: decorativeRole })}>
+              type="button" variant="quiet" onClick={() => onChange({ kind: "restoreAlbum", role: decorativeRole })}>
               <AppIcon icon={RotateCcw} size={14} />
             </ActionButton>}
           </>}
