@@ -15,7 +15,7 @@
       "id": "welcome-secondary-settings-hover",
       "title": "Boas-vindas — hover em Configurações",
       "implementationPath": "/welcome-preview.html",
-      "comparison": { "kind": "implementation-only", "surface": "welcome-window", "reason": "Design 0002: texto secundário escurece e só o rótulo sublinha, sem fundo no botão." },
+      "comparison": { "kind": "implementation-only", "surface": "welcome-window", "reason": "Design 0002: texto secundário escurece sem sublinhado nem fundo no botão." },
       "viewport": { "width": 1000, "height": 760 },
       "readySelector": ".global-secondary-actions button:first-of-type:hover:not(:disabled) > span",
       "actions": [{ "type": "hover", "selector": ".global-secondary-actions button:first-of-type" }]
@@ -24,7 +24,7 @@
       "id": "welcome-secondary-batch-hover",
       "title": "Boas-vindas — hover em Exportação em lote",
       "implementationPath": "/welcome-preview.html",
-      "comparison": { "kind": "implementation-only", "surface": "welcome-window", "reason": "Design 0002: texto e ícone escurecem juntos, e só o rótulo sublinha." },
+      "comparison": { "kind": "implementation-only", "surface": "welcome-window", "reason": "Design 0002: texto e ícone escurecem juntos, sem sublinhado." },
       "viewport": { "width": 1000, "height": 760 },
       "readySelector": ".global-secondary-actions button:last-of-type:hover:not(:disabled) > span",
       "actions": [{ "type": "hover", "selector": ".global-secondary-actions button:last-of-type" }]
