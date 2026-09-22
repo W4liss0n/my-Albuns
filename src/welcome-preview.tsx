@@ -69,7 +69,8 @@ ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>
     <GlobalShell
       initialSurface={previewParameters.get("surface") === "newProject" ? "newProject" : "welcome"}
-      recentProjectsNow={previewParameters.get("recents") === "dates" ? welcomeDatesNow : undefined}
+      recentProjectsNow={["dates", "long-names"].includes(previewParameters.get("recents") ?? "")
+        ? welcomeDatesNow : undefined}
       onOpenBatch={async () => { window.location.href = "/batch-export-preview.html?scenario=configuration"; }}
       onOpenSettings={previewParameters.get("graphics") === "unsupported" ? undefined : async () => { window.location.href = "/settings-preview.html?section=performance"; }}
       failureDialogPort={failureDialogPort}

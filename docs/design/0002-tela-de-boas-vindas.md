@@ -104,7 +104,16 @@ quando conhecida, a data da última abertura à direita, menor e discreta.
 A data aparece como **Hoje**, **Ontem** ou **18/09/2026**. O tooltip compartilhado
 e a descrição acessível informam também o horário local, por exemplo
 **Última abertura: Hoje às 14:30**. O nome ocupa o espaço restante e usa reticências
-quando necessário; nome, data e seta não se sobrepõem.
+quando necessário; nome, data e seta não se sobrepõem. A data conserva seu
+espaço mesmo quando o nome é muito comprido ou não contém espaços.
+
+O hover do horário pertence apenas à data: sair dela para o nome, a miniatura ou
+outra parte do mesmo cartão fecha esse tooltip. Passar sobre um nome truncado
+mostra o nome completo no mesmo padrão visual, com quebra de palavras longas;
+nomes que já cabem não recebem uma dica redundante. Os tooltips não aumentam o
+cartão e devem permanecer dentro da área visível. A navegação por teclado usa
+o único botão de abrir o cartão, preserva acesso ao nome completo e ao horário
+conhecido e permite fechar a dica com Escape; não há um foco adicional na data.
 
 A linha “Projeto MyAlbuns” e a expressão genérica “Aberto recentemente” não
 aparecem. Os cartões têm 160 px de altura, com 126 px reservados à miniatura

@@ -5,7 +5,8 @@ import {
   useRef,
   useState,
 } from "react";
-import { useTooltip, useTooltipTrigger } from "react-aria";
+import { createPortal } from "react-dom";
+import { useHover, useTooltip, useTooltipTrigger } from "react-aria";
 import { useTooltipTriggerState } from "react-stately";
 import {
   ChevronRight,
@@ -119,12 +120,81 @@ function RecentProjectCard({
   onOpen(id: string): void;
 }) {
   const trigger = useRef<HTMLButtonElement>(null);
+  const name = useRef<HTMLElement>(null);
+  const nameTooltipElement = useRef<HTMLDivElement>(null);
+  const [nameTooltipPosition, setNameTooltipPosition] = useState<{
+    top: number;
+    left: number;
+    placement: "above" | "below";
+  } | null>(null);
   const openedAt = recentProjectOpeningTime(project.lastOpenedAtMs, now);
-  const options = { isDisabled: disabled || !openedAt, delay: 600, closeDelay: 100 };
-  const tooltip = useTooltipTriggerState(options);
-  const { triggerProps, tooltipProps: descriptionProps } =
-    useTooltipTrigger(options, tooltip, trigger);
-  const { tooltipProps } = useTooltip(descriptionProps, tooltip);
+  const dateOptions = {
+    isDisabled: disabled || !openedAt,
+    trigger: "focus" as const,
+    delay: 600,
+    closeDelay: 100,
+  };
+  const dateTooltip = useTooltipTriggerState(dateOptions);
+  const nameTooltip = useTooltipTriggerState({ delay: 600, closeDelay: 100 });
+  const closeNameTooltip = useRef(nameTooltip.close);
+  closeNameTooltip.current = nameTooltip.close;
+  const { triggerProps, tooltipProps: dateDescriptionProps } =
+    useTooltipTrigger(dateOptions, dateTooltip, trigger);
+  const { tooltipProps: dateTooltipProps } = useTooltip(dateDescriptionProps, dateTooltip);
+  const { tooltipProps: nameTooltipProps } = useTooltip({}, nameTooltip);
+  useEffect(() => {
+    if (!nameTooltip.isOpen) return;
+    const dismissOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.stopPropagation();
+        closeNameTooltip.current(true);
+      }
+    };
+    document.addEventListener("keydown", dismissOnEscape, true);
+    return () => document.removeEventListener("keydown", dismissOnEscape, true);
+  }, [nameTooltip.isOpen]);
+
+  useLayoutEffect(() => {
+    if (!nameTooltip.isOpen) return;
+    const anchor = name.current;
+    const tooltip = nameTooltipElement.current;
+    if (!anchor || !tooltip) return;
+    const position = () => {
+      const anchorRect = anchor.getBoundingClientRect();
+      const tooltipRect = tooltip.getBoundingClientRect();
+      const above = anchorRect.top - tooltipRect.height - 8;
+      const placement = above >= 8 ? "above" : "below";
+      const desiredTop = placement === "above" ? above : anchorRect.bottom + 8;
+      setNameTooltipPosition({
+        top: Math.max(8, Math.min(desiredTop, window.innerHeight - tooltipRect.height - 8)),
+        left: Math.max(8, Math.min(anchorRect.left, window.innerWidth - tooltipRect.width - 8)),
+        placement,
+      });
+    };
+    const dismissOnScroll = () => closeNameTooltip.current(true);
+    position();
+    window.addEventListener("resize", position);
+    window.addEventListener("scroll", dismissOnScroll, true);
+    return () => {
+      window.removeEventListener("resize", position);
+      window.removeEventListener("scroll", dismissOnScroll, true);
+    };
+  }, [nameTooltip.isOpen]);
+
+  const { hoverProps: dateHoverProps } = useHover({
+    isDisabled: disabled || !openedAt,
+    onHoverStart: () => dateTooltip.open(),
+    onHoverEnd: () => dateTooltip.close(true),
+  });
+  const { hoverProps: nameHoverProps } = useHover({
+    isDisabled: disabled,
+    onHoverStart: () => {
+      if (name.current && name.current.scrollWidth > name.current.clientWidth + 1) {
+        nameTooltip.open();
+      }
+    },
+    onHoverEnd: () => nameTooltip.close(true),
+  });
 
   return (
     <li>
@@ -139,9 +209,9 @@ function RecentProjectCard({
       >
         <RecentProjectThumbnail id={project.id} load={load} />
         <span className="global-project-summary">
-          <strong>{project.name}</strong>
+          <strong {...nameHoverProps} ref={name}>{project.name}</strong>
           {openedAt && (
-            <time className="global-project-when" dateTime={openedAt.dateTime}
+            <time {...dateHoverProps} className="global-project-when" dateTime={openedAt.dateTime}
               aria-label={`Última abertura: ${openedAt.fullLabel}`}>
               {openedAt.label}
             </time>
@@ -151,10 +221,26 @@ function RecentProjectCard({
           <AppIcon icon={ChevronRight} size={12} />
         </span>
       </button>
-      {openedAt && tooltip.isOpen && (
-        <div {...tooltipProps} className="ui-anchored-tooltip global-project-date-tooltip">
+      {openedAt && dateTooltip.isOpen && (
+        <div {...dateTooltipProps} className="ui-anchored-tooltip global-project-date-tooltip">
           {openedAt.fullLabel}
         </div>
+      )}
+      {nameTooltip.isOpen && createPortal(
+        <div
+          {...nameTooltipProps}
+          className="ui-anchored-tooltip global-project-name-tooltip"
+          data-placement={nameTooltipPosition?.placement}
+          ref={nameTooltipElement}
+          style={{
+            top: nameTooltipPosition?.top ?? 0,
+            left: nameTooltipPosition?.left ?? 0,
+            visibility: nameTooltipPosition ? "visible" : "hidden",
+          }}
+        >
+          {project.name}
+        </div>,
+        document.body,
       )}
     </li>
   );

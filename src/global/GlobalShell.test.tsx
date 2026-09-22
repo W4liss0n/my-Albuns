@@ -386,12 +386,118 @@ test("shows compact dates with a full accessible description and no filler for o
   expect(screen.getByText("18/09/2026").tagName).toBe("TIME");
   expect(screen.getByRole("button", { name: dates[0].name }))
     .toHaveAttribute("aria-description", "Última abertura: Hoje às 14:30");
-  await user.hover(screen.getByRole("button", { name: dates[0].name }));
+  const date = screen.getByRole("button", { name: dates[0].name }).querySelector("time");
+  fireEvent.pointerMove(document.body, { pointerType: "mouse" });
+  await user.hover(date!);
   expect(await screen.findByRole("tooltip")).toHaveTextContent("Hoje às 14:30");
   expect(container.querySelectorAll("time")).toHaveLength(3);
   expect(screen.getByRole("button", { name: dates[3].name }).querySelector("time")).toBeNull();
   expect(screen.getByRole("button", { name: dates[3].name }))
     .not.toHaveAttribute("aria-description");
+});
+
+test("hides the date tooltip when the pointer leaves the date for the same card preview", async () => {
+  const user = userEvent.setup();
+  const dates = welcomePreviewRecentProjects(new URLSearchParams("recents=dates"));
+  const { container } = render(
+    <GlobalShell
+      graphicsDiagnostic={supportedGraphics}
+      recentProjectsNow={welcomeDatesNow}
+      projectPort={createProjectPort({ listRecentProjects: async () => dates })}
+    />,
+  );
+  const button = await screen.findByRole("button", { name: dates[0].name });
+  const date = button.querySelector("time");
+  const thumbnail = button.querySelector(".global-project-thumbnail");
+  expect(date).not.toBeNull();
+  expect(thumbnail).not.toBeNull();
+
+  fireEvent.pointerMove(document.body, { pointerType: "mouse" });
+  await user.hover(date!);
+  expect(await screen.findByRole("tooltip")).toHaveTextContent("Hoje às 14:30");
+  await user.hover(thumbnail!);
+  await waitFor(() => expect(screen.queryByRole("tooltip")).not.toBeInTheDocument());
+  expect(container.querySelectorAll("time")).toHaveLength(3);
+});
+
+test("opens date details only over the date and switches to a truncated name tooltip", async () => {
+  const user = userEvent.setup();
+  const projects = welcomePreviewRecentProjects(new URLSearchParams("recents=long-names"));
+  render(
+    <GlobalShell
+      graphicsDiagnostic={supportedGraphics}
+      recentProjectsNow={welcomeDatesNow}
+      projectPort={createProjectPort({ listRecentProjects: async () => projects })}
+    />,
+  );
+  const first = await screen.findByRole("button", { name: projects[0].name });
+  const thumbnail = first.querySelector(".global-project-thumbnail")!;
+  const date = first.querySelector("time")!;
+  const name = first.querySelector("strong")!;
+  Object.defineProperties(name, {
+    clientWidth: { configurable: true, value: 40 },
+    scrollWidth: { configurable: true, value: 240 },
+  });
+  fireEvent.pointerMove(document.body, { pointerType: "mouse" });
+
+  await user.hover(thumbnail);
+  expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+  await user.hover(date);
+  expect(await screen.findByRole("tooltip")).toHaveClass("global-project-date-tooltip");
+  await user.hover(name);
+  expect(await screen.findByRole("tooltip")).toHaveClass("global-project-name-tooltip");
+  expect(screen.queryByText("18/09/2026 às 09:15")).not.toBeInTheDocument();
+  expect(screen.getByRole("tooltip")).toHaveTextContent(projects[0].name);
+  await user.hover(thumbnail);
+  await waitFor(() => expect(screen.queryByRole("tooltip")).not.toBeInTheDocument());
+});
+
+test("dismisses a truncated name tooltip with Escape", async () => {
+  const user = userEvent.setup();
+  const projects = welcomePreviewRecentProjects(new URLSearchParams("recents=long-names"));
+  render(
+    <GlobalShell
+      graphicsDiagnostic={supportedGraphics}
+      recentProjectsNow={welcomeDatesNow}
+      projectPort={createProjectPort({ listRecentProjects: async () => projects })}
+    />,
+  );
+  const first = await screen.findByRole("button", { name: projects[0].name });
+  const name = first.querySelector("strong")!;
+  Object.defineProperties(name, {
+    clientWidth: { configurable: true, value: 40 },
+    scrollWidth: { configurable: true, value: 240 },
+  });
+  fireEvent.pointerMove(document.body, { pointerType: "mouse" });
+  await user.hover(name);
+  expect(await screen.findByRole("tooltip")).toHaveClass("global-project-name-tooltip");
+  expect(screen.getByRole("tooltip").parentElement).toBe(document.body);
+  await user.keyboard("{Escape}");
+  await waitFor(() => expect(screen.queryByRole("tooltip")).not.toBeInTheDocument());
+  await user.unhover(name);
+  await user.hover(name);
+  expect(await screen.findByRole("tooltip")).toHaveClass("global-project-name-tooltip");
+  fireEvent.scroll(window);
+  await waitFor(() => expect(screen.queryByRole("tooltip")).not.toBeInTheDocument());
+});
+
+test("keeps the full date available from keyboard focus and dismisses it with Escape", async () => {
+  const user = userEvent.setup();
+  const dates = welcomePreviewRecentProjects(new URLSearchParams("recents=dates"));
+  render(
+    <GlobalShell
+      graphicsDiagnostic={supportedGraphics}
+      recentProjectsNow={welcomeDatesNow}
+      projectPort={createProjectPort({ listRecentProjects: async () => dates })}
+    />,
+  );
+  const first = await screen.findByRole("button", { name: dates[0].name });
+  for (let step = 0; step < 4; step += 1) await user.tab();
+  expect(first).toHaveFocus();
+  expect(await screen.findByRole("tooltip")).toHaveTextContent("Hoje às 14:30");
+  await user.keyboard("{Escape}");
+  await waitFor(() => expect(screen.queryByRole("tooltip")).not.toBeInTheDocument());
+  expect(first).toHaveFocus();
 });
 
 test("shows a real first Sheet and keeps an unavailable card usable", async () => {

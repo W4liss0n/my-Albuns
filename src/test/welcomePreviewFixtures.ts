@@ -21,6 +21,26 @@ export function welcomePreviewRecentProjects(
 ): readonly RecentProjectSummary[] {
   const variant = parameters.get("recents");
   if (variant === "empty") return [];
+  if (variant === "long-names") {
+    const [first, second, third, fourth] = populatedRecentProjects;
+    return [
+      {
+        ...first,
+        name: "Formatura Medicina 2026 — Turma B, cerimônia e comemoração de encerramento",
+        lastOpenedAtMs: new Date(2026, 8, 18, 9, 15).getTime(),
+      },
+      {
+        ...second,
+        name: "CasamentoMarinaETeoAlbumCompletoDaCerimoniaEFestaComTodosOsConvidados" +
+          "PreparativosDaNoivaEDoNoivoNaFazendaSantaClaraComFamiliaEAmigos" +
+          "CelebracaoAoPorDoSolJantarPrimeiraDancaEBrindeDosPadrinhos" +
+          "RetratosDaViagemEMemoriasEspeciaisDeTodoOFimDeSemana",
+        lastOpenedAtMs: new Date(2026, 8, 22, 14, 30).getTime(),
+      },
+      { ...third, name: "Ensaio de acompanhamento de Helena — memórias dos primeiros seis meses" },
+      { ...fourth, name: "15 anos", lastOpenedAtMs: new Date(2026, 8, 21, 9, 15).getTime() },
+    ];
+  }
   if (variant === "dates") {
     const [today, yesterday, older, unknown] = populatedRecentProjects;
     return [

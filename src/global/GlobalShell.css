@@ -297,6 +297,22 @@ body,
   transform: rotate(225deg);
 }
 
+.global-project-name-tooltip {
+  position: fixed;
+  right: auto;
+  bottom: auto;
+  width: max-content;
+  max-width: min(280px, calc(100vw - 16px));
+  overflow-wrap: anywhere;
+  pointer-events: none;
+}
+
+.global-project-name-tooltip[data-placement="above"]::before {
+  top: auto;
+  bottom: -5px;
+  transform: rotate(225deg);
+}
+
 .global-project-open {
   position: absolute;
   right: 5px;

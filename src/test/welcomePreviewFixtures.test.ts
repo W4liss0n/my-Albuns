@@ -52,3 +52,15 @@ test("date preview has a fixed local clock and a legacy card without a timestamp
   )).toEqual(["Hoje às 14:30", "Ontem às 09:15", "18/09/2026 às 09:15"]);
   expect(dates[3].lastOpenedAtMs).toBeNull();
 });
+
+test("long-name preview covers dates, an unbroken name and a legacy card", () => {
+  const projects = welcomePreviewRecentProjects(new URLSearchParams("recents=long-names"));
+  expect(projects).toHaveLength(4);
+  expect(projects[0].name).toContain("cerimônia e comemoração");
+  expect(projects[1].name).not.toContain(" ");
+  expect(projects[2].lastOpenedAtMs).toBeNull();
+  expect(projects[3].name).toBe("15 anos");
+  expect(projects.map(({ lastOpenedAtMs }) =>
+    recentProjectOpeningTime(lastOpenedAtMs, welcomeDatesNow)?.label ?? null,
+  )).toEqual(["18/09/2026", "Hoje", null, "Ontem"]);
+});

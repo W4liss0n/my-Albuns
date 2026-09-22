@@ -187,7 +187,7 @@
         "width": 896,
         "height": 720
       },
-      "readySelector": ".global-recent-list li:nth-child(2):has(button:focus-visible) [role=\"tooltip\"]",
+      "readySelector": "body:has(.global-recent-list li:nth-child(2) button:focus-visible) [role=\"tooltip\"]",
       "actions": [
         {
           "type": "focus",
@@ -196,6 +196,176 @@
         {
           "type": "key",
           "key": "Tab"
+        }
+      ]
+    },
+    {
+      "id": "welcome-long-names",
+      "title": "Boas-vindas — nomes longos com e sem data",
+      "implementationPath": "/welcome-preview.html?recents=long-names",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "welcome-window",
+        "reason": "Design 0002: nome e data permanecem na mesma linha; cada tooltip responde à sua área de texto e fecha ao sair dela, com acesso por teclado."
+      },
+      "viewport": {
+        "width": 896,
+        "height": 720
+      },
+      "readySelector": ".global-recent-list:has(li:nth-child(4)):has(time):has(.sheet-preview)",
+      "actions": []
+    },
+    {
+      "id": "welcome-long-name-tooltip-hover",
+      "title": "Boas-vindas — nome completo ao passar sobre as reticências",
+      "implementationPath": "/welcome-preview.html?recents=long-names",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "welcome-window",
+        "reason": "Design 0002: nome e data permanecem na mesma linha; cada tooltip responde à sua área de texto e fecha ao sair dela, com acesso por teclado."
+      },
+      "viewport": {
+        "width": 896,
+        "height": 720
+      },
+      "readySelector": ".global-project-name-tooltip",
+      "actions": [
+        {
+          "type": "hover",
+          "selector": ".global-recent-list li:first-child strong"
+        }
+      ]
+    },
+    {
+      "id": "welcome-date-hover",
+      "title": "Boas-vindas — horário ao passar somente sobre a data",
+      "implementationPath": "/welcome-preview.html?recents=long-names",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "welcome-window",
+        "reason": "Design 0002: nome e data permanecem na mesma linha; cada tooltip responde à sua área de texto e fecha ao sair dela, com acesso por teclado."
+      },
+      "viewport": {
+        "width": 896,
+        "height": 720
+      },
+      "readySelector": ".global-project-date-tooltip",
+      "actions": [
+        {
+          "type": "hover",
+          "selector": ".global-recent-list li:first-child time"
+        }
+      ]
+    },
+    {
+      "id": "welcome-date-leave-to-preview",
+      "title": "Boas-vindas — horário fecha ao mover para a miniatura",
+      "implementationPath": "/welcome-preview.html?recents=long-names",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "welcome-window",
+        "reason": "Design 0002: nome e data permanecem na mesma linha; cada tooltip responde à sua área de texto e fecha ao sair dela, com acesso por teclado."
+      },
+      "viewport": {
+        "width": 896,
+        "height": 720
+      },
+      "readySelector": "body:not(:has([role=\"tooltip\"])) .global-recent-list li:first-child .global-project-thumbnail:hover",
+      "actions": [
+        {
+          "type": "hover",
+          "selector": ".global-recent-list li:first-child time"
+        },
+        {
+          "type": "assert",
+          "selector": ".global-project-date-tooltip"
+        },
+        {
+          "type": "hover",
+          "selector": ".global-recent-list li:first-child .global-project-thumbnail"
+        }
+      ]
+    },
+    {
+      "id": "welcome-date-switch-to-name",
+      "title": "Boas-vindas — sair da data e consultar o nome completo",
+      "implementationPath": "/welcome-preview.html?recents=long-names",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "welcome-window",
+        "reason": "Design 0002: nome e data permanecem na mesma linha; cada tooltip responde à sua área de texto e fecha ao sair dela, com acesso por teclado."
+      },
+      "viewport": {
+        "width": 896,
+        "height": 720
+      },
+      "readySelector": "body:not(:has(.global-project-date-tooltip)) .global-project-name-tooltip",
+      "actions": [
+        {
+          "type": "hover",
+          "selector": ".global-recent-list li:first-child time"
+        },
+        {
+          "type": "assert",
+          "selector": ".global-project-date-tooltip"
+        },
+        {
+          "type": "hover",
+          "selector": ".global-recent-list li:first-child strong"
+        }
+      ]
+    },
+    {
+      "id": "welcome-date-dismiss-keyboard",
+      "title": "Boas-vindas — Escape fecha o tooltip do cartão focado",
+      "implementationPath": "/welcome-preview.html?recents=dates",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "welcome-window",
+        "reason": "Design 0002: nome e data permanecem na mesma linha; cada tooltip responde à sua área de texto e fecha ao sair dela, com acesso por teclado."
+      },
+      "viewport": {
+        "width": 896,
+        "height": 720
+      },
+      "readySelector": "body:not(:has([role=\"tooltip\"])) .global-recent-list li:nth-child(2) button:focus-visible",
+      "actions": [
+        {
+          "type": "focus",
+          "selector": ".global-recent-list li:first-child button"
+        },
+        {
+          "type": "key",
+          "key": "Tab"
+        },
+        {
+          "type": "assert",
+          "selector": "[role=\"tooltip\"]"
+        },
+        {
+          "type": "key",
+          "key": "Escape"
+        }
+      ]
+    },
+    {
+      "id": "welcome-unbroken-name-tooltip",
+      "title": "Boas-vindas — nome muito longo sem espaços",
+      "implementationPath": "/welcome-preview.html?recents=long-names",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "welcome-window",
+        "reason": "Design 0002: o nome completo sem espaços quebra dentro do tooltip e permanece visível, mantendo a data e o tamanho do cartão."
+      },
+      "viewport": {
+        "width": 896,
+        "height": 720
+      },
+      "readySelector": ".global-project-name-tooltip",
+      "actions": [
+        {
+          "type": "hover",
+          "selector": ".global-recent-list li:nth-child(2) strong"
         }
       ]
     },
