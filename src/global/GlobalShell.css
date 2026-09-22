@@ -169,7 +169,7 @@ body,
   display: grid;
   width: 100%;
   min-width: 0;
-  height: 190px;
+  height: 176px;
   padding: 0;
   overflow: hidden;
   border: 1px solid #e5e1d8;
@@ -256,7 +256,7 @@ body,
 .global-project-summary {
   display: grid;
   min-width: 0;
-  padding: 6px 8px;
+  padding: 7px 28px 7px 8px;
   align-content: start;
   gap: 2px;
 }
@@ -269,20 +269,18 @@ body,
   white-space: nowrap;
 }
 
-.global-project-summary small {
-  color: var(--ui-text-muted);
-  font-family: var(--ui-font-mono);
-  font-size: var(--ui-font-size-caption);
-}
-
 .global-project-summary .global-project-when {
-  font-family: inherit;
+  overflow: visible;
+  color: var(--ui-text-muted);
+  font-size: var(--ui-font-size-caption);
+  font-weight: 400;
+  white-space: nowrap;
 }
 
 .global-project-open {
   position: absolute;
   right: 5px;
-  bottom: 5px;
+  bottom: 15px;
   display: grid;
   width: 17px;
   height: 17px;

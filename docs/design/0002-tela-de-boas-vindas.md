@@ -55,7 +55,7 @@ As proporções, os espaçamentos e as dimensões seguem a referência visual ac
 ## Projetos recentes
 
 Os Projetos recentes aparecem em uma grade de cartões. Cada cartão reserva uma
-capa visual, o Nome do Projeto, metadados secundários e a indicação de abertura.
+capa visual, o Nome do Projeto, a última abertura conhecida e a indicação de abertura.
 Clicar em qualquer ponto do cartão abre o Projeto correspondente.
 
 O cartão mostra a **primeira lâmina salva do Projeto**, no lugar da representação
@@ -64,10 +64,11 @@ genérica da referência original. Essa decisão do autor, de 22 de setembro de
 da tela permanecem. A lâmina mantém sua proporção e cabe inteira na área
 reservada, sem cortar a composição para preencher o cartão.
 
-O frontend recebe o Nome do Projeto e uma Identidade opaca para solicitar sua
-reabertura e sua prévia. O pathname nativo permanece no backend e nunca é
-transportado como string Unicode para a interface. Fixação e metadados ainda
-sem contrato continuam marcados como placeholders de reprodução.
+O frontend recebe o Nome do Projeto, uma Identidade opaca para solicitar sua
+reabertura e sua prévia, e o instante da última abertura quando conhecido. O
+pathname nativo permanece no backend e nunca é transportado como string Unicode
+para a interface. Os cartões apresentam somente informações reais, sem
+metadados fictícios ou rótulos fixos de reprodução.
 
 A prévia é consultada sob demanda para os cartões visíveis. O Core lê a revisão
 persistida e fornece a composição da primeira lâmina, sem criar uma sessão
@@ -92,15 +93,29 @@ páginas. Ela ocupa o centro da mesma área reservada, sem texto de carregamento
 aviso ou animação. O álbum fechado distingue a ausência de prévia de uma lâmina
 realmente branca e evita deixar o cartão visualmente vazio.
 
-A altura dos cartões, o alinhamento dos nomes e a ação de abrir permanecem.
+Cartões com e sem prévia compartilham as mesmas dimensões e a ação de abrir.
 O hover e o foco pertencem ao cartão inteiro. Uma mídia sem prévia em uma
 composição disponível segue a apresentação degradada do desenho compartilhado.
 A ausência da miniatura não impede a tentativa normal de abertura. Alterações
 ainda não salvas em uma Janela de Projeto não aparecem na miniatura dos recentes.
 
-A lista usa a abertura mais recente como ordenação decrescente. A entrada passa
-para o topo somente depois que o Host independente confirma `Ready`; cancelamento
-ou falha anterior não cria nem reordena o item.
+A faixa inferior é compacta: mostra o Nome do Projeto e, quando disponível,
+uma única linha discreta com a última abertura. Usa o horário local e português
+simples: **Hoje às 14:30**, **Ontem às 09:15** ou **18/09/2026 às 09:15**.
+A linha “Projeto MyAlbuns” e a expressão genérica “Aberto recentemente” não
+aparecem. Os cartões têm 176 px de altura, com 126 px reservados à miniatura
+e uma faixa inferior de 48 px; o espaço da seta permanece reservado.
+
+A lista usa a abertura mais recente como ordenação decrescente. O backend
+registra o instante e promove a entrada somente depois que o Host independente
+confirma Ready; cancelamento ou falha anterior não cria, reordena ou atualiza
+a data. Consultar a lista não grava no armazenamento.
+
+Registros anteriores, sem instante de abertura, continuam disponíveis e
+mostram apenas o nome. A data passa a existir na próxima abertura concluída.
+Não se usa a data de modificação do arquivo nem o horário da consulta para
+simular esse histórico. O timestamp pertence ao estado local dos recentes,
+sem alterar o documento criativo ou o Cache.
 
 Os atalhos Windows `Ctrl+N` e `Ctrl+O` aparecem junto às ações e acionam,
 respectivamente, `Novo Projeto` e `Abrir Projeto`; não são legendas decorativas.

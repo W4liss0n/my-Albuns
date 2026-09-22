@@ -60,10 +60,15 @@ function toRecentProjectSummaries(
   return result.flatMap((item) => {
     if (typeof item !== "object" || item === null) return [];
     const candidate = item as Record<string, unknown>;
-    return typeof candidate.id === "string" &&
-      typeof candidate.name === "string"
-      ? [{ id: candidate.id, name: candidate.name }]
-      : [];
+    if (typeof candidate.id !== "string" || typeof candidate.name !== "string") {
+      return [];
+    }
+    const rawOpenedAt = candidate.lastOpenedAtMs;
+    const lastOpenedAtMs = typeof rawOpenedAt === "number" &&
+      Number.isSafeInteger(rawOpenedAt) && rawOpenedAt >= 0 &&
+      Number.isFinite(new Date(rawOpenedAt).getTime())
+      ? rawOpenedAt : null;
+    return [{ id: candidate.id, name: candidate.name, lastOpenedAtMs }];
   });
 }
 

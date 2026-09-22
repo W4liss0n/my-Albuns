@@ -331,14 +331,21 @@ test("lists only valid recent Project summaries without pathnames", async () => 
     {
       id: "recent-ana",
       name: "Álbum da Ana",
+      lastOpenedAtMs: 1_800_000_000_000,
       pathname: "C:\\Trabalho\\Ana.myalbuns",
     },
+    { id: "invalid-date", name: "Data inválida", lastOpenedAtMs: "hoje" },
+    { id: "unsafe-date", name: "Número inválido", lastOpenedAtMs: Number.MAX_SAFE_INTEGER + 1 },
+    { id: "legacy", name: "Legado" },
     { id: 42, name: "Inválido" },
     null,
   ]);
 
   await expect(tauriGlobalProjectPort.listRecentProjects()).resolves.toEqual([
-    { id: "recent-ana", name: "Álbum da Ana" },
+    { id: "recent-ana", name: "Álbum da Ana", lastOpenedAtMs: 1_800_000_000_000 },
+    { id: "invalid-date", name: "Data inválida", lastOpenedAtMs: null },
+    { id: "unsafe-date", name: "Número inválido", lastOpenedAtMs: null },
+    { id: "legacy", name: "Legado", lastOpenedAtMs: null },
   ]);
   expect(invoke).toHaveBeenCalledWith("recent_projects");
 });

@@ -4,20 +4,32 @@ import { representativeProjection } from "./projectFixtures";
 // Preview-only data. It must never be read from or written to the user's real
 // recent-Projects storage.
 const populatedRecentProjects = [
-  { id: "p1", name: "Formatura Medicina 2026 — Turma B" },
-  { id: "p2", name: "Casamento Marina & Téo" },
-  { id: "p3", name: "Ensaio Helena — 6 meses" },
-  { id: "p4", name: "15 anos Beatriz" },
-  { id: "p5", name: "Corporativo Vetra — relatório anual" },
-  { id: "p6", name: "Batizado Antônio" },
-  { id: "p7", name: "Retrospectiva Estúdio 2025" },
+  { id: "p1", name: "Formatura Medicina 2026 — Turma B", lastOpenedAtMs: null },
+  { id: "p2", name: "Casamento Marina & Téo", lastOpenedAtMs: null },
+  { id: "p3", name: "Ensaio Helena — 6 meses", lastOpenedAtMs: null },
+  { id: "p4", name: "15 anos Beatriz", lastOpenedAtMs: null },
+  { id: "p5", name: "Corporativo Vetra — relatório anual", lastOpenedAtMs: null },
+  { id: "p6", name: "Batizado Antônio", lastOpenedAtMs: null },
+  { id: "p7", name: "Retrospectiva Estúdio 2025", lastOpenedAtMs: null },
 ] satisfies readonly RecentProjectSummary[];
+
+// Fixed local calendar anchor keeps acceptance screenshots stable across runs.
+export const welcomeDatesNow = new Date(2026, 8, 22, 16, 0);
 
 export function welcomePreviewRecentProjects(
   parameters: URLSearchParams,
 ): readonly RecentProjectSummary[] {
   const variant = parameters.get("recents");
   if (variant === "empty") return [];
+  if (variant === "dates") {
+    const [today, yesterday, older, unknown] = populatedRecentProjects;
+    return [
+      { ...today, lastOpenedAtMs: new Date(2026, 8, 22, 14, 30).getTime() },
+      { ...yesterday, lastOpenedAtMs: new Date(2026, 8, 21, 9, 15).getTime() },
+      { ...older, lastOpenedAtMs: new Date(2026, 8, 18, 9, 15).getTime() },
+      unknown,
+    ];
+  }
   if (["single", "missing", "loading"].includes(variant ?? "")) {
     return populatedRecentProjects.slice(0, 1);
   }

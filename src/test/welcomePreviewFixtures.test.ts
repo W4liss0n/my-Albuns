@@ -1,6 +1,7 @@
 import { expect, test } from "vitest";
 
-import { welcomePreviewFirstSheet, welcomePreviewRecentProjects } from "./welcomePreviewFixtures";
+import { welcomeDatesNow, welcomePreviewFirstSheet, welcomePreviewRecentProjects } from "./welcomePreviewFixtures";
+import { recentProjectOpeningTime } from "../global/recentProjectOpeningTime";
 
 test("selects no recent Projects for the explicit empty welcome state", () => {
   expect(
@@ -41,4 +42,13 @@ test("mixed recent Projects include photo, white, warm-neutral, and unavailable 
 test("loading state keeps one recent Project card", () => {
   expect(welcomePreviewRecentProjects(new URLSearchParams("recents=loading")))
     .toHaveLength(1);
+});
+
+test("date preview has a fixed local clock and a legacy card without a timestamp", () => {
+  const dates = welcomePreviewRecentProjects(new URLSearchParams("recents=dates"));
+  expect(dates).toHaveLength(4);
+  expect(dates.slice(0, 3).map(({ lastOpenedAtMs }) =>
+    recentProjectOpeningTime(lastOpenedAtMs, welcomeDatesNow)?.label,
+  )).toEqual(["Hoje às 14:30", "Ontem às 09:15", "18/09/2026 às 09:15"]);
+  expect(dates[3].lastOpenedAtMs).toBeNull();
 });

@@ -1,6 +1,7 @@
 use std::{
     fs, io,
     path::{Path, PathBuf},
+    time::{SystemTime, UNIX_EPOCH},
 };
 
 use myalbuns_paths::{AppPaths, NativePathDto};
@@ -10,9 +11,11 @@ const RECENT_PROJECTS_SCHEMA_VERSION: u16 = 1;
 const MAX_RECENT_PROJECTS: usize = 20;
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct RecentProjectSummary {
     pub id: String,
     pub name: String,
+    pub last_opened_at_ms: Option<u64>,
 }
 
 #[derive(Debug)]
@@ -50,6 +53,8 @@ impl From<io::Error> for RecentProjectsError {
 struct RecentProjectRecord {
     project_id: String,
     path: NativePathDto,
+    #[serde(default)]
+    last_opened_at_ms: Option<u64>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -78,6 +83,7 @@ impl RecentProjectsStore {
             .map(|project| RecentProjectSummary {
                 id: project.project_id,
                 name: display_name(project.path.as_path()),
+                last_opened_at_ms: project.last_opened_at_ms,
             })
             .collect())
     }
@@ -105,6 +111,10 @@ impl RecentProjectsStore {
             RecentProjectRecord {
                 project_id: project_id.to_owned(),
                 path,
+                last_opened_at_ms: SystemTime::now()
+                    .duration_since(UNIX_EPOCH)
+                    .ok()
+                    .and_then(|duration| u64::try_from(duration.as_millis()).ok()),
             },
         );
         projects.truncate(MAX_RECENT_PROJECTS);
@@ -167,7 +177,7 @@ mod tests {
 
     use myalbuns_paths::{AppPaths, NativePathDto};
 
-    use super::{RecentProjectSummary, RecentProjectsStore};
+    use super::RecentProjectsStore;
 
     #[test]
     fn a_failed_promotion_keeps_the_previous_list_and_can_be_retried() {
@@ -181,6 +191,8 @@ mod tests {
             )
             .unwrap();
         let before = std::fs::read(paths.recent_projects_file()).unwrap();
+        let first_opened_at = store.list().unwrap()[0].last_opened_at_ms;
+        assert!(first_opened_at.is_some());
         let fault =
             myalbuns_paths::test_support::DiskFull::on_create(&paths.recent_projects_file());
         assert!(matches!(
@@ -193,6 +205,7 @@ mod tests {
         assert_eq!(fault.failure_count(), 1);
         assert_eq!(std::fs::read(paths.recent_projects_file()).unwrap(), before);
         assert_eq!(store.list().unwrap()[0].id, "first");
+        assert_eq!(store.list().unwrap()[0].last_opened_at_ms, first_opened_at);
         drop(fault);
         store
             .promote(
@@ -247,19 +260,18 @@ mod tests {
             )
             .expect("reopening updates and promotes the existing identity");
 
+        let recent = store.list().expect("the ordered list remains readable");
         assert_eq!(
-            store.list().expect("the ordered list remains readable"),
-            vec![
-                RecentProjectSummary {
-                    id: "project-horizon".into(),
-                    name: "Horizonte final".into(),
-                },
-                RecentProjectSummary {
-                    id: "project-aurora".into(),
-                    name: "Aurora".into(),
-                },
+            recent
+                .iter()
+                .map(|item| (item.id.as_str(), item.name.as_str()))
+                .collect::<Vec<_>>(),
+            [
+                ("project-horizon", "Horizonte final"),
+                ("project-aurora", "Aurora")
             ]
         );
+        assert!(recent.iter().all(|item| item.last_opened_at_ms.is_some()));
     }
 
     #[test]
@@ -277,12 +289,57 @@ mod tests {
             .promote("replacement-project", path)
             .expect("the replacement Project is promoted");
 
-        assert_eq!(
-            store.list().expect("the replacement remains readable"),
-            vec![RecentProjectSummary {
-                id: "replacement-project".into(),
-                name: "Horizonte".into(),
-            }]
-        );
+        let recent = store.list().expect("the replacement remains readable");
+        assert_eq!(recent.len(), 1);
+        assert_eq!(recent[0].id, "replacement-project");
+        assert_eq!(recent[0].name, "Horizonte");
+        assert!(recent[0].last_opened_at_ms.is_some());
+    }
+    #[test]
+    fn promoting_records_the_real_open_time_only_when_promoted() {
+        let root = tempfile::tempdir().unwrap();
+        let paths = AppPaths::from_roots(root.path(), root.path());
+        let store = RecentProjectsStore::new(&paths);
+        let before = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_millis() as u64;
+        store
+            .promote(
+                "first",
+                NativePathDto::from(root.path().join("First.myalbuns")),
+            )
+            .unwrap();
+        let after = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_millis() as u64;
+        let recorded = store.list().unwrap()[0].last_opened_at_ms.unwrap();
+        assert!(recorded >= before && recorded <= after);
+        let saved = std::fs::read(paths.recent_projects_file()).unwrap();
+        assert!(String::from_utf8_lossy(&saved).contains("lastOpenedAtMs"));
+        assert_eq!(store.list().unwrap()[0].last_opened_at_ms, Some(recorded));
+        assert_eq!(std::fs::read(paths.recent_projects_file()).unwrap(), saved);
+    }
+
+    #[test]
+    fn a_legacy_record_has_no_invented_open_time_and_listing_does_not_rewrite_it() {
+        let root = tempfile::tempdir().unwrap();
+        let paths = AppPaths::from_roots(root.path(), root.path());
+        let file = paths.recent_projects_file();
+        std::fs::create_dir_all(file.parent().unwrap()).unwrap();
+        let path = NativePathDto::from(root.path().join("Legacy.myalbuns"));
+        let legacy = serde_json::to_vec_pretty(&serde_json::json!({
+            "schemaVersion": 1,
+            "projects": [{ "projectId": "legacy", "path": path }],
+        }))
+        .unwrap();
+        std::fs::write(&file, &legacy).unwrap();
+        let listed = RecentProjectsStore::new(&paths).list().unwrap();
+        assert_eq!(listed.len(), 1);
+        assert_eq!(listed[0].id, "legacy");
+        assert_eq!(listed[0].name, "Legacy");
+        assert_eq!(listed[0].last_opened_at_ms, None);
+        assert_eq!(std::fs::read(file).unwrap(), legacy);
     }
 }

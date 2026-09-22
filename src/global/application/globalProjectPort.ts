@@ -130,6 +130,7 @@ export type ProjectConfigurationValidationOutcome =
 export interface RecentProjectSummary {
   id: string;
   name: string;
+  lastOpenedAtMs: number | null;
 }
 
 export interface RecentProjectFirstSheet {

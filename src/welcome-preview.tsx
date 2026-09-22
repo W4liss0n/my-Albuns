@@ -7,7 +7,7 @@ import type {
 } from "./global/application/globalProjectPort";
 import { GlobalShell } from "./global/GlobalShell";
 import { createNewProjectPortStub } from "./global/testing/newProjectPortStub";
-import { welcomePreviewRecentProjects, welcomePreviewFirstSheet } from "./test/welcomePreviewFixtures";
+import { welcomePreviewRecentProjects, welcomePreviewFirstSheet, welcomeDatesNow } from "./test/welcomePreviewFixtures";
 import "./ui/theme.css";
 import "./ui/ui.css";
 import "./global/GlobalShell.css";
@@ -69,6 +69,7 @@ ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>
     <GlobalShell
       initialSurface={previewParameters.get("surface") === "newProject" ? "newProject" : "welcome"}
+      recentProjectsNow={previewParameters.get("recents") === "dates" ? welcomeDatesNow : undefined}
       onOpenBatch={async () => { window.location.href = "/batch-export-preview.html?scenario=configuration"; }}
       onOpenSettings={previewParameters.get("graphics") === "unsupported" ? undefined : async () => { window.location.href = "/settings-preview.html?section=performance"; }}
       failureDialogPort={failureDialogPort}

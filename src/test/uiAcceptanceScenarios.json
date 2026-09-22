@@ -127,6 +127,38 @@
       ]
     },
     {
+      "id": "welcome-recent-dates",
+      "title": "Boas-vindas — última abertura real e projeto sem data",
+      "implementationPath": "/welcome-preview.html?recents=dates",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "welcome-window",
+        "reason": "Design 0002: faixa compacta com nome e última abertura real, incluindo hoje, ontem, data anterior e registro antigo sem data; sem textos genéricos."
+      },
+      "viewport": {
+        "width": 1000,
+        "height": 760
+      },
+      "readySelector": ".global-recent-list:has(time):has(li:nth-child(4) .global-project-summary):not(:has(li:nth-child(4) time)):has(.sheet-preview)",
+      "actions": []
+    },
+    {
+      "id": "welcome-recent-dates-narrow",
+      "title": "Boas-vindas — datas de abertura na largura reduzida",
+      "implementationPath": "/welcome-preview.html?recents=dates",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "welcome-window",
+        "reason": "Design 0002: nomes, data completa e seta permanecem legíveis sem sobreposição nos cartões compactos."
+      },
+      "viewport": {
+        "width": 640,
+        "height": 800
+      },
+      "readySelector": ".global-recent-list:has(time):has(li:nth-child(4) .global-project-summary):not(:has(li:nth-child(4) time)):has(.sheet-preview)",
+      "actions": []
+    },
+    {
       "id": "album-dimensional-confirmation",
       "title": "Mudança dimensional — confirmação do recorte",
       "implementationPath": "/project-dialog.html?state=%7B%22kind%22%3A%22albumInformationConfirmation%22%2C%22busy%22%3Afalse%2C%22details%22%3A%5B%7B%22label%22%3A%22Largura%20da%20l%C3%A2mina%22%2C%22value%22%3A%22600%20mm%20%E2%86%92%20630%20mm%22%7D%2C%7B%22label%22%3A%22Resolu%C3%A7%C3%A3o%20resultante%22%2C%22value%22%3A%22L%C3%A2mina%207.441%20%C3%97%203.543%20px%20%C2%B7%20p%C3%A1gina%203.720%20%C3%97%203.543%20px%22%7D%2C%7B%22label%22%3A%22Composi%C3%A7%C3%A3o%22%2C%22value%22%3A%22As%20fotos%20manter%C3%A3o%20a%20propor%C3%A7%C3%A3o.%20O%20recorte%20poder%C3%A1%20ser%20ajustado.%22%7D%5D%7D",

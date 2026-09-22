@@ -28,6 +28,7 @@ import type {
   RecentProjectFirstSheet,
 } from "./application/globalProjectPort";
 import { NewProjectFlow } from "./NewProjectFlow";
+import { recentProjectOpeningTime } from "./recentProjectOpeningTime";
 import { SheetPreviewShell } from "../components/SheetPreview";
 import {
   ActionButton,
@@ -39,6 +40,7 @@ import {
 
 interface GlobalShellProps {
   initialSurface?: "welcome" | "newProject";
+  recentProjectsNow?: Date;
   onNewProjectRequest?(listener: () => void): Promise<() => void>;
   onOpenBatch?(): Promise<void>;
   onOpenSettings?(): Promise<void>;
@@ -105,8 +107,22 @@ function RecentProjectThumbnail({
   );
 }
 
+function RecentProjectOpenedAt({ lastOpenedAtMs, now }: {
+  lastOpenedAtMs: number | null;
+  now: Date;
+}) {
+  const openedAt = recentProjectOpeningTime(lastOpenedAtMs, now);
+  return openedAt ? (
+    <time className="global-project-when" dateTime={openedAt.dateTime}
+      aria-label={`Última abertura: ${openedAt.label}`}>
+      {openedAt.label}
+    </time>
+  ) : null;
+}
+
 export function GlobalShell({
   initialSurface = "welcome",
+  recentProjectsNow,
   onNewProjectRequest,
   onOpenSettings,
   onOpenBatch,
@@ -331,6 +347,8 @@ export function GlobalShell({
     );
   }
 
+  const recentNow = recentProjectsNow ?? new Date();
+
   return (
     <div className="global-shell ui-chrome-selection-scope">
       <ApplicationHeader status="diagramação de álbuns" />
@@ -347,9 +365,7 @@ export function GlobalShell({
           <ul
             aria-label="Projetos recentes"
             className="global-recent-list"
-            data-placeholder-feature="recent-project-secondary-metadata"
           >
-            {/* PLACEHOLDER UI: fixação e metadados secundários ainda não existem no contrato de recentes. */}
             {recentProjects.map((project) => (
               <li key={project.id}>
                 <button
@@ -361,10 +377,7 @@ export function GlobalShell({
                   <RecentProjectThumbnail id={project.id} load={projectPort.firstRecentProjectSheet} />
                   <span className="global-project-summary">
                     <strong>{project.name}</strong>
-                    <small>Projeto MyAlbuns</small>
-                    <small className="global-project-when">
-                      Aberto recentemente
-                    </small>
+                    <RecentProjectOpenedAt lastOpenedAtMs={project.lastOpenedAtMs} now={recentNow} />
                   </span>
                   <span aria-hidden="true" className="global-project-open">
                     <AppIcon icon={ChevronRight} size={12} />

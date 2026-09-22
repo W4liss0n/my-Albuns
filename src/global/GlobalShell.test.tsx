@@ -12,6 +12,7 @@ import type {
 import type { GraphicsDiagnostic } from "../application/graphics";
 import { GlobalShell as ProductGlobalShell } from "./GlobalShell";
 import { createNewProjectPortStub } from "./testing/newProjectPortStub";
+import { welcomeDatesNow, welcomePreviewRecentProjects } from "../test/welcomePreviewFixtures";
 
 type GlobalShellProps = ComponentProps<typeof ProductGlobalShell>;
 
@@ -344,8 +345,8 @@ test("shows an actionable structured failure without exposing a pathname", async
 
 test("loads and renders recent Projects by name", async () => {
   const listRecentProjects = vi.fn(async () => [
-    { id: "recent-ana", name: "Álbum da Ana" },
-    { id: "recent-bia", name: "Álbum da Bia" },
+    { id: "recent-ana", name: "Álbum da Ana", lastOpenedAtMs: null },
+    { id: "recent-bia", name: "Álbum da Bia", lastOpenedAtMs: null },
   ]);
 
   render(
@@ -362,12 +363,28 @@ test("loads and renders recent Projects by name", async () => {
   expect(
     screen.getByRole("button", { name: "Álbum da Bia" }),
   ).toBeEnabled();
-  expect(screen.getByRole("list", { name: "Projetos recentes" })).toHaveAttribute(
-    "data-placeholder-feature",
-    "recent-project-secondary-metadata",
-  );
-  expect(screen.getAllByText("Aberto recentemente")).toHaveLength(2);
+  expect(screen.getByRole("list", { name: "Projetos recentes" })).toBeInTheDocument();
+  expect(screen.queryByText("Projeto MyAlbuns")).not.toBeInTheDocument();
+  expect(screen.queryByText("Aberto recentemente")).not.toBeInTheDocument();
+  expect(screen.queryByText(/Última abertura/)).not.toBeInTheDocument();
   expect(listRecentProjects).toHaveBeenCalledOnce();
+});
+
+test("shows the real last opening when known and no filler for older records", async () => {
+  const dates = welcomePreviewRecentProjects(new URLSearchParams("recents=dates"));
+  const { container } = render(
+    <GlobalShell
+      graphicsDiagnostic={supportedGraphics}
+      recentProjectsNow={welcomeDatesNow}
+      projectPort={createProjectPort({ listRecentProjects: async () => dates })}
+    />,
+  );
+  expect(await screen.findByRole("button", { name: dates[0].name })).toBeEnabled();
+  expect(screen.getByText("Hoje às 14:30").tagName).toBe("TIME");
+  expect(screen.getByText("Ontem às 09:15").tagName).toBe("TIME");
+  expect(screen.getByText("18/09/2026 às 09:15").tagName).toBe("TIME");
+  expect(container.querySelectorAll("time")).toHaveLength(3);
+  expect(screen.getByRole("button", { name: dates[3].name }).querySelector("time")).toBeNull();
 });
 
 test("shows a real first Sheet and keeps an unavailable card usable", async () => {
@@ -390,8 +407,8 @@ test("shows a real first Sheet and keeps an unavailable card usable", async () =
       newProjectPort={createNewProjectPortStub()}
       projectPort={createProjectPort({
         listRecentProjects: async () => [
-          { id: "recent-ana", name: "Álbum da Ana" },
-          { id: "recent-bia", name: "Álbum da Bia" },
+          { id: "recent-ana", name: "Álbum da Ana", lastOpenedAtMs: null },
+          { id: "recent-bia", name: "Álbum da Bia", lastOpenedAtMs: null },
         ],
         firstRecentProjectSheet,
         openRecentProject,
@@ -416,7 +433,7 @@ test("keeps a pending first Sheet represented without blocking its card", async 
     <GlobalShell
       graphicsDiagnostic={supportedGraphics}
       projectPort={createProjectPort({
-        listRecentProjects: async () => [{ id: "recent-ana", name: "Álbum da Ana" }],
+        listRecentProjects: async () => [{ id: "recent-ana", name: "Álbum da Ana", lastOpenedAtMs: null }],
         firstRecentProjectSheet,
       })}
     />,
@@ -439,7 +456,7 @@ test("reopens a recent Project using only its opaque id", async () => {
       newProjectPort={createNewProjectPortStub()}
       projectPort={createProjectPort({
         listRecentProjects: async () => [
-          { id: "recent-ana", name: "Álbum da Ana" },
+          { id: "recent-ana", name: "Álbum da Ana", lastOpenedAtMs: null },
         ],
         openProject,
         openRecentProject,
