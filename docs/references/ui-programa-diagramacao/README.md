@@ -18,3 +18,7 @@ O pacote define a base visual. Decisões posteriores já aceitas na especificaç
 ou nos documentos de design prevalecem em detalhes que foram refinados durante
 a implementação, como o padrão de janela do Windows. Não devem ser adicionadas
 capturas antigas como referências alternativas.
+
+As preferências permanentes do autor e os padrões reutilizáveis aceitos estão em
+[Direção visual do MyAlbuns](../../../.interface-design/system.md). Consulte essas
+diretrizes junto desta base antes de alterar ou avaliar a interface.

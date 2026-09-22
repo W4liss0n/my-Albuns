@@ -40,6 +40,11 @@ Before implementing or comparing application visuals, read
 `docs/references/ui-programa-diagramacao/README.md`; it identifies the only
 current visual reference and the precedence of later accepted decisions.
 
+Also read `.interface-design/system.md` before UI implementation or review. It
+records the author's accepted visual direction and reusable interaction patterns;
+apply them within their documented scope and keep them current when later explicit
+user decisions refine them.
+
 ### Issue tracker
 
 Issues are tracked as GitHub issues in `W4liss0n/my-Albuns` via the `gh` CLI. See `docs/agents/issue-tracker.md`.
