@@ -140,9 +140,12 @@ Cada Projeto aparece em somente um grupo; grupos vazios são omitidos. A ordem
 dentro de cada grupo continua sendo a da última abertura, sem reordenar o
 histórico quando a estrela é acionada. O mesmo cartão, miniatura e rodapé são
 usados nos dois grupos. A estrela de 16 px ocupa um botão de 28 px no canto
-superior direito: ligada, fica preenchida em grafite e sempre visível; desligada,
-aparece no hover ou foco. O botão possui nome acessível, estado pressionado e
-tooltip, sem acionar a abertura. O foco permanece na ação após a troca de grupo.
+superior direito: ligada, fica preenchida e sempre visível; desligada,
+aparece no hover do cartão ou no foco visível de teclado. A estrela usa o cinza
+quente secundário em repouso e escurece para grafite no hover do próprio botão ou
+no foco visível, sem fundo no botão. O botão possui nome acessível, estado
+pressionado e tooltip, sem acionar a abertura. O foco permanece na ação após a
+troca de grupo.
 
 O estado local de Projetos recentes guarda a marcação por identidade de Projeto,
 separado do arquivo criativo e do Cache. A consulta não grava. Registros legados

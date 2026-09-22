@@ -210,7 +210,7 @@ body,
   padding: 0;
   border: 0;
   border-radius: var(--ui-radius);
-  color: var(--ui-text);
+  color: var(--ui-text-secondary);
   background: transparent;
   opacity: 0;
   place-items: center;
@@ -225,7 +225,7 @@ body,
 
 .global-project-favorite:hover:not(:disabled),
 .global-project-favorite:focus-visible {
-  background: color-mix(in srgb, var(--ui-surface) 90%, transparent);
+  color: var(--ui-text);
 }
 
 .global-project-favorite:focus-visible {

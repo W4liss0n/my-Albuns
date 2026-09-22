@@ -39,6 +39,15 @@
       "actions": [{ "type": "hover", "selector": "ul[aria-label='Projetos recentes'] li:first-child .global-project-launch" }, { "type": "hover", "selector": "ul[aria-label='Projetos recentes'] li:first-child .global-project-favorite" }]
     },
     {
+      "id": "welcome-favorite-hover-marked",
+      "title": "Boas-vindas — hover na estrela favorita",
+      "implementationPath": "/welcome-preview.html?recents=favorites",
+      "comparison": { "kind": "implementation-only", "surface": "welcome-window", "reason": "Design 0002: estrela preenchida escurece no próprio ícone, sem fundo no botão." },
+      "viewport": { "width": 1000, "height": 760 },
+      "readySelector": "ul[aria-label='Favoritos'] li:first-child .global-project-favorite-tooltip[role='tooltip']",
+      "actions": [{ "type": "hover", "selector": "ul[aria-label='Favoritos'] li:first-child .global-project-favorite" }]
+    },
+    {
       "id": "welcome-favorite-focus",
       "title": "Boas-vindas — estrela pelo teclado e tooltip",
       "implementationPath": "/welcome-preview.html?recents=favorites",
