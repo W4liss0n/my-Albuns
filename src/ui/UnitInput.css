@@ -8,36 +8,13 @@
 .ui-unit-input > .ui-unit-input__field {
   width: 100%;
   padding-inline: var(--ui-space-2) 32px;
-  border: 1px solid transparent;
-  border-bottom-color: var(--ui-border-strong);
-  border-radius: 0;
-  background: transparent;
   text-align: right;
   font-family: var(--ui-font-mono);
   font-variant-numeric: tabular-nums;
   cursor: text;
 }
 
-.ui-unit-input > .ui-unit-input__field:hover:not(:disabled) {
-  border-bottom-color: var(--ui-text-muted);
-  background: var(--ui-surface-muted);
-}
-
-.ui-unit-input > .ui-unit-input__field:focus:not(:disabled) {
-  border-bottom-color: var(--ui-focus-neutral);
-  background: var(--ui-surface-muted);
-  box-shadow: inset 0 -1px var(--ui-focus-neutral);
-  outline: 0;
-}
-
-.ui-unit-input > .ui-unit-input__field[aria-invalid="true"]:not(:disabled) {
-  border-color: transparent;
-  border-bottom-color: var(--ui-danger);
-  box-shadow: inset 0 -1px var(--ui-danger);
-}
-
 .ui-unit-input > .ui-unit-input__field:disabled {
-  border-bottom-color: transparent;
   cursor: default;
 }
 

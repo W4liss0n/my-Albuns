@@ -26,21 +26,21 @@ visível. O nome da ação aparece no tooltip ao passar o mouse ou navegar pelo
 teclado, além de identificar o botão para leitores de tela. O estado faz parte
 do próprio botão, sem checkbox separado.
 
-O estado desligado usa superfície neutra e borda discreta. Após o usuário
-rejeitar o preenchimento azul, o estado ligado passa a parecer pressionado:
-fundo cinza quente, borda neutra, sombra interna suave e ícone em grafite.
+O estado desligado usa fundo transparente e sublinhado discreto. Após o usuário
+rejeitar o preenchimento azul, o estado ligado usa fundo cinza quente,
+sublinhado neutro mais escuro e ícone em grafite, sem contorno fechado.
 O ícone ganha um pouco de peso, de 1,4 px para 1,8 px, sem mudar suas dimensões.
 A indicação permanece ao passar o mouse e ao receber foco por teclado.
 Hover e foco no botão desligado mantêm a superfície clara, para não simular
 ativação. O estado nunca muda a largura ou a posição dos controles.
 
-Valores diferentes na seleção usam borda tracejada e superfície clara, sem
+Valores diferentes na seleção usam sublinhado tracejado e superfície clara, sem
 simular que a propriedade está ligada em todas as fotos. Os ícones vêm do
 componente compartilhado do programa.
 
 O componente reutiliza o botão compartilhado e os tokens de superfície,
 borda, tipografia e espaçamento do programa. O botão mede 28 × 28 px, com
-ícone centralizado de 16 px e cantos de 4 px. O tooltip reutiliza a superfície,
+ícone centralizado de 16 px. O tooltip reutiliza a superfície,
 a borda e a sombra compartilhadas; aparece ao lado, fora do fluxo do painel,
 e não desloca controles. A abertura, o fechamento e os atributos de
 acessibilidade usam `useTooltipTrigger`, `useTooltip` e `useTooltipTriggerState`
@@ -48,8 +48,9 @@ acessibilidade usam `useTooltipTrigger`, `useTooltip` e `useTooltipTriggerState`
 [documentação oficial](https://react-aria.adobe.com/Tooltip/useTooltipTrigger).
 O tooltip é ancorado pelo CSS ao próprio controle e acompanha sua escala,
 sem conversão manual de coordenadas ou posicionamento automático em portal.
-O foco por teclado recebe contorno neutro ao redor do botão, separado do estado
-ligado. Enter e Espaço acionam a mesma operação do clique. Nome acessível,
+O foco por teclado reforça o sublinhado, separado do preenchimento do estado
+ligado. No estado misto, uma segunda linha de foco preserva o tracejado.
+Enter e Espaço acionam a mesma operação do clique. Nome acessível,
 estado misto e bloqueio durante operações seguem o contrato existente.
 
 A composição contextual continua responsável por selecionar as fotos e
@@ -83,7 +84,7 @@ botão, ícone, tooltip ou gesto alternativo. Para voltar à posição inicial,
 o usuário continua usando Girar 90° até completar a volta.
 
 Valores diferentes exibem “—”. À direita, Girar 90° e Espelhar formam um
-grupo de 92 px, com contorno contínuo e uma divisória interna, sem espaço
+grupo de 92 px, com sublinhado contínuo e uma divisória interna, sem espaço
 entre os botões. Cada ação mantém seu foco e nome acessível; o estado
 pressionado neutro pertence apenas ao espelhamento. O tooltip fica voltado
 para dentro do painel e não é recortado pelo grupo. O Ângulo segue
@@ -94,3 +95,17 @@ ao lado. O slider ocupa toda a largura, sem recuo causado pela amostra. A
 origem e a restauração do padrão do álbum dividem a linha quando há espaço.
 Essas mudanças são de composição visual; comandos, seleção e histórico
 mantêm seus contratos existentes.
+
+## Padrão reutilizável de controles integrados
+
+`IntegratedControl.css` centraliza o acabamento dos campos `UnitInput` e da
+variante `integrated` de `ActionButton`: fundo transparente, sublinhado,
+realce ao passar o mouse, foco neutro, seleção, seleção mista, erro e bloqueio.
+Os componentes mantêm seus elementos nativos e cuidam apenas da composição,
+dimensões e conteúdo específicos; não copiam regras visuais de estado.
+
+Essa variante é usada em Girar 90°, Espelhar, Preto e branco, Usar padrão do
+álbum, Aplicar informações/design do álbum e nas ações de remover, restaurar
+e salvar disposição no design da lâmina. A disponibilidade de Aplicar segue
+os rascunhos existentes. Os seletores que apresentam cores, imagens e páginas
+mantêm sua representação visual específica.

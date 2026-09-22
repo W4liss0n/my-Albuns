@@ -12513,6 +12513,40 @@
         { "type": "key", "key": "Tab" },
         { "type": "focus", "selector": "[aria-label='Ângulo em graus']" }
       ]
+    },
+    {
+      "id": "workspace-integrated-rotation-focus",
+      "title": "Ação integrada — foco no giro junto ao espelhamento ativo",
+      "implementationPath": "/workspace-preview.html?frame=orientation&orientation=single-both",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "frame-integrated-actions",
+        "reason": "Design 0048: Girar e Espelhar compartilham o acabamento integrado dos campos, mantendo foco distinto do estado ativo e a divisória entre as ações."
+      },
+      "viewport": { "width": 1440, "height": 800 },
+      "readySelector": "[aria-label='Girar 90° à esquerda']:focus-visible",
+      "actions": [
+        { "type": "key", "key": "Tab" },
+        { "type": "focus", "selector": "[aria-label='Girar 90° à esquerda']" }
+      ]
+    },
+    {
+      "id": "workspace-integrated-apply-focus",
+      "title": "Ação integrada — Aplicar disponível e focado no design do álbum",
+      "implementationPath": "/workspace-preview.html",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "album-integrated-actions",
+        "reason": "Design 0048: Aplicar habilitado usa o mesmo sublinhado e foco neutro dos outros controles integrados, preservando o rascunho do álbum."
+      },
+      "viewport": { "width": 1440, "height": 900 },
+      "readySelector": "button[form='album-design-settings']:not(:disabled):focus-visible",
+      "actions": [
+        { "type": "click", "selector": "button[aria-label='Informações do álbum']" },
+        { "type": "focus", "selector": "input[aria-label='Espaço entre quadros']" },
+        { "type": "key", "key": "ArrowRight" },
+        { "type": "focus", "selector": "button[form='album-design-settings']" }
+      ]
     }
   ]
 }

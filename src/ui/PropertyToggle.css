@@ -6,46 +6,14 @@
 }
 
 .ui-action-button.ui-property-toggle {
-  width: var(--ui-compact-control-height);
+  width: 100%;
   height: var(--ui-compact-control-height);
   justify-self: start;
   padding: 0;
-  border-color: var(--ui-border);
-  color: var(--ui-text-secondary);
-  background: var(--ui-surface-muted);
-}
-
-.ui-action-button.ui-property-toggle:hover:not(:disabled),
-.ui-action-button.ui-property-toggle:focus-visible:not(:disabled) {
-  border-color: var(--ui-border-strong);
-  color: var(--ui-text);
-  background: var(--ui-surface-muted);
-}
-
-.ui-action-button.ui-property-toggle[aria-pressed="true"],
-.ui-action-button.ui-property-toggle[aria-pressed="true"]:hover:not(:disabled),
-.ui-action-button.ui-property-toggle[aria-pressed="true"]:focus-visible:not(:disabled) {
-  border-color: var(--ui-border-strong);
-  color: var(--ui-text);
-  background: var(--ui-canvas);
-  box-shadow: inset 0 1px 2px var(--ui-border-strong);
 }
 
 .ui-property-toggle[aria-pressed="true"] .ui-app-icon {
   stroke-width: 1.8;
-}
-
-.ui-action-button.ui-property-toggle[aria-pressed="mixed"] {
-  border-style: dashed;
-}
-
-.ui-action-button.ui-property-toggle:active:not(:disabled) {
-  border-color: var(--ui-text-secondary);
-}
-
-.ui-action-button.ui-property-toggle:focus-visible {
-  outline: 1px solid var(--ui-focus-neutral);
-  outline-offset: 2px;
 }
 
 .ui-anchored-tooltip.ui-property-toggle-tooltip {

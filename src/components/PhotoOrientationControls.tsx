@@ -46,6 +46,7 @@ export function PhotoOrientationControls({ frames, disabled, onAction, angle }: 
         <div className="photo-orientation-actions" role="group" aria-label="Orientação da foto">
           <ActionButton
             density="compact"
+            variant="integrated"
             aria-label={rotate.label}
             title={rotate.label}
             disabled={disabled}

@@ -27,7 +27,7 @@ export function PropertyToggle({ label, icon, pressed, disabled, onToggle, class
         {...triggerProps}
         className={["ui-property-toggle", className].filter(Boolean).join(" ")}
         density="compact"
-        variant="quiet"
+        variant="integrated"
         aria-label={label}
         aria-pressed={pressed}
         disabled={disabled}

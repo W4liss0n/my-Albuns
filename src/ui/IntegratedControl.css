@@ -1,0 +1,48 @@
+/* Shared chrome for native fields and actions embedded in a panel. */
+.ui-integrated-control:is(button, input) {
+  border: 1px solid transparent;
+  border-bottom-color: var(--ui-border-strong);
+  border-radius: 0;
+  color: var(--ui-text);
+  background: transparent;
+  box-shadow: none;
+}
+
+.ui-integrated-control:is(button, input):hover:not(:disabled) {
+  border-bottom-color: var(--ui-text-muted);
+  background: var(--ui-surface-muted);
+}
+
+.ui-integrated-control:is(input:focus, button:focus-visible):not(:disabled) {
+  border-bottom-color: var(--ui-focus-neutral);
+  background: var(--ui-surface-muted);
+  box-shadow: inset 0 -1px var(--ui-focus-neutral);
+  outline: 0;
+}
+
+button.ui-integrated-control:active:not(:disabled),
+button.ui-integrated-control[aria-pressed="true"],
+button.ui-integrated-control[aria-pressed="true"]:is(:hover, :focus-visible):not(:disabled) {
+  border-bottom-color: var(--ui-focus-neutral);
+  background: var(--ui-canvas);
+}
+
+button.ui-integrated-control[aria-pressed="mixed"] {
+  border-bottom-style: dashed;
+}
+
+button.ui-integrated-control[aria-pressed="mixed"]:focus-visible:not(:disabled) {
+  /* Keep the mixed underline visible while adding a separate focus line. */
+  box-shadow: 0 2px var(--ui-focus-neutral);
+}
+
+.ui-integrated-control:is(button, input)[aria-invalid="true"]:not(:disabled) {
+  border-color: transparent;
+  border-bottom-color: var(--ui-danger);
+  box-shadow: inset 0 -1px var(--ui-danger);
+}
+
+.ui-integrated-control:is(button, input):disabled {
+  border-bottom-color: transparent;
+  box-shadow: none;
+}
