@@ -68,7 +68,6 @@
       "comparison": {
         "kind": "implementation-only",
         "surface": "album-information-inspector",
-        "implementationCaptureSelector": ".inspector-section:has(#album-information-settings)",
         "reason": "Design 0048: unidade permanece dentro da entrada e o clique sobre ela dá foco ao campo, com sublinhado neutro."
       },
       "viewport": { "width": 1800, "height": 1125 },
@@ -84,7 +83,6 @@
       "comparison": {
         "kind": "implementation-only",
         "surface": "album-information-inspector",
-        "implementationCaptureSelector": ".inspector-section:has(#album-information-settings)",
         "reason": "Design 0048: a entrada integrada preserva o valor, a unidade, a restauração e o botão Aplicar sem sobreposição."
       },
       "viewport": { "width": 2160, "height": 1350 },
