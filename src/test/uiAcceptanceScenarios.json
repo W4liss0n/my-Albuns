@@ -12463,6 +12463,25 @@
         { "type": "assert", "selector": ".ui-property-toggle-tooltip[role=\"tooltip\"]" },
         { "type": "key", "key": "Escape" }
       ]
+    },
+    {
+      "id": "workspace-numeric-unit-focus",
+      "title": "Ajustes do quadro — unidade integrada também dá foco à entrada",
+      "implementationPath": "/workspace-preview.html?frame=orientation&orientation=single-both",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "frame-numeric-controls",
+        "reason": "Design 0048: %, graus e mm ficam dentro do campo reutilizável. Clicar na unidade alcança a entrada, sem alterar o valor ou gerar histórico. Giro e Espelhar compartilham o contorno."
+      },
+      "viewport": { "width": 1440, "height": 800 },
+      "readySelector": "body[data-photo-orientation-history='0,0'] [aria-label='Espessura da borda em mm']:focus",
+      "actions": [
+        { "type": "pointer-click", "selector": ".ui-unit-input:has([aria-label='Zoom da foto em porcentagem']) .ui-unit-input__unit" },
+        { "type": "assert", "selector": "[aria-label='Zoom da foto em porcentagem']:focus" },
+        { "type": "pointer-click", "selector": ".ui-unit-input:has([aria-label='Ângulo em graus']) .ui-unit-input__unit" },
+        { "type": "assert", "selector": "[aria-label='Ângulo em graus']:focus" },
+        { "type": "pointer-click", "selector": ".ui-unit-input:has([aria-label='Espessura da borda em mm']) .ui-unit-input__unit" }
+      ]
     }
   ]
 }

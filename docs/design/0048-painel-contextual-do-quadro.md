@@ -62,9 +62,13 @@ seleção mista, teclado e escalas de 125% e 150%.
 
 ## Alinhamento e agrupamento dos ajustes
 
-Os campos numéricos do quadro compartilham a mesma coluna: entrada de 64 px
-e espaço de 24 px para a unidade. Assim, porcentagens, graus e medidas físicas
-mantêm a mesma posição. Entre ajustes, o espaçamento é de 12 px.
+Os campos numéricos do quadro usam `UnitInput`, entrada reutilizável de 92 px
+com a unidade dentro da mesma borda. O número permanece editável e a unidade
+é fixa, sem fazer parte do valor digitado. Clicar sobre a unidade também dá
+foco ao campo. Zoom, ângulo, opacidade e borda compartilham esse componente;
+porcentagens, graus e medidas físicas mantêm a mesma coluna. Os estados de
+foco, erro, seleção mista e bloqueio preservam o contrato dos ajustes.
+Entre ajustes, o espaçamento é de 12 px.
 
 Na linha Giro, o valor atual é somente uma informação junto ao rótulo.
 Ele não recebe foco nem reage a cliques ou dois cliques. A ação de restaurar
@@ -72,8 +76,11 @@ o giro foi retirada do painel e do catálogo de comandos da interface, sem
 botão, ícone, tooltip ou gesto alternativo. Para voltar à posição inicial,
 o usuário continua usando Girar 90° até completar a volta.
 
-Valores diferentes exibem “—”. À direita ficam Girar 90° e Espelhar, com o
-tooltip de espelhamento voltado para dentro do painel. O Ângulo segue
+Valores diferentes exibem “—”. À direita, Girar 90° e Espelhar formam um
+grupo de 92 px, com contorno contínuo e uma divisória interna, sem espaço
+entre os botões. Cada ação mantém seu foco e nome acessível; o estado
+pressionado neutro pertence apenas ao espelhamento. O tooltip fica voltado
+para dentro do painel e não é recortado pelo grupo. O Ângulo segue
 independente do giro em passos de 90°.
 
 O nome Borda começa na mesma coluna dos demais rótulos, com a amostra de cor

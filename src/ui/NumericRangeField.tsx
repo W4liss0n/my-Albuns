@@ -6,7 +6,7 @@ import "./NumericRangeField.css";
 export function NumericRangeField({ label, labelAccessory, unit, numberInput, slider, validation, ref }: {
   label: string;
   labelAccessory?: ReactNode;
-  unit: string;
+  unit?: string;
   numberInput: ReactNode;
   slider: ReactNode;
   validation: FieldValidationTooltipModel;
@@ -17,7 +17,7 @@ export function NumericRangeField({ label, labelAccessory, unit, numberInput, sl
       <div className="ui-numeric-range-label"><span>{label}</span>{labelAccessory}</div>
       <div className="ui-numeric-range-number">
         {numberInput}
-        <span aria-hidden="true">{unit}</span>
+        {unit && <span className="ui-numeric-range-unit" aria-hidden="true">{unit}</span>}
       </div>
       <FieldValidationAutoTooltip field="value" tooltip={validation} />
     </div>

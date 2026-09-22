@@ -43,7 +43,7 @@ export function PhotoOrientationControls({ frames, disabled, onAction, angle }: 
             {turns === null ? "—" : `${((4 - turns) % 4) * 90}°`}
           </output>
         </div>
-        <div className="photo-orientation-actions">
+        <div className="photo-orientation-actions" role="group" aria-label="Orientação da foto">
           <ActionButton
             density="compact"
             aria-label={rotate.label}

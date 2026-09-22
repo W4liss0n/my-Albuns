@@ -1,0 +1,31 @@
+.ui-unit-input {
+  position: relative;
+  display: inline-flex;
+  width: 92px;
+  min-width: 0;
+}
+
+.ui-unit-input > .ui-unit-input__field {
+  width: 100%;
+  padding-inline: var(--ui-space-2) 32px;
+  text-align: right;
+  font-family: var(--ui-font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.ui-unit-input__unit {
+  position: absolute;
+  inset-block: 0;
+  inset-inline-end: var(--ui-space-1);
+  display: flex;
+  align-items: center;
+  width: 24px;
+  color: var(--ui-text-secondary);
+  font-size: var(--ui-font-size-support);
+  /* Clicking the suffix reaches the input underneath and focuses it normally. */
+  pointer-events: none;
+}
+
+.ui-unit-input:has(input:disabled) {
+  opacity: .52;
+}

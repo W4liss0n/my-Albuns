@@ -23,6 +23,7 @@ export { OwnedWindowShell } from "./OwnedWindowShell";
 export { ProblemsDialog } from "./ProblemsDialog";
 export { ProgressDialog } from "./ProgressDialog";
 export { TextInput } from "./TextInput";
+export { UnitInput } from "./UnitInput";
 export type { TextInputProps } from "./TextInput";
 export type { DialogAction } from "./DialogAction";
 export type { ProgressDialogState } from "./ProgressDialog";

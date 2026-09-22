@@ -16,7 +16,7 @@
   gap: var(--ui-space-2);
 }
 
-.ui-numeric-range-number > span {
+.ui-numeric-range-unit {
   width: var(--ui-numeric-range-unit-width, auto);
   flex-shrink: 0;
 }
@@ -31,7 +31,7 @@
   --ui-tooltip-pointer-inline-end: 40px;
 }
 
-.ui-numeric-range-number input {
+.ui-numeric-range-number > input {
   width: 64px;
   min-width: 0;
   padding: 3px 6px;

@@ -99,10 +99,6 @@
   text-overflow: ellipsis;
 }
 
-.inspector-section:has(.photo-orientation-controls, .frame-style-controls) {
-  --ui-numeric-range-unit-width: 24px;
-}
-
 .photo-orientation-controls {
   display: grid;
   gap: var(--ui-space-3);
@@ -125,6 +121,35 @@
 
 .photo-orientation-actions {
   margin-left: auto;
+  width: 92px;
+  gap: 0;
+}
+
+.photo-orientation-actions > .ui-action-button {
+  flex: 1;
+  padding-inline: var(--ui-space-1);
+  gap: var(--ui-space-1);
+  border-start-end-radius: 0;
+  border-end-end-radius: 0;
+}
+
+.photo-orientation-actions > .ui-property-toggle-anchor {
+  width: 32px;
+  flex-shrink: 0;
+}
+
+.photo-orientation-actions .photo-mirror-control {
+  width: 100%;
+  border-inline-start-width: 0;
+  border-start-start-radius: 0;
+  border-end-start-radius: 0;
+  border-color: var(--ui-border-strong);
+  background: var(--ui-surface-raised);
+}
+
+.photo-orientation-actions > .ui-action-button:focus-visible {
+  outline: 1px solid var(--ui-focus-neutral);
+  outline-offset: 2px;
 }
 
 .photo-rotation-readout {

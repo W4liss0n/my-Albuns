@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
-import { TextInput } from "../ui/TextInput";
+import { UnitInput } from "../ui/UnitInput";
 import { fieldValidationTooltipAttributes, useFieldValidationTooltip } from "../ui/FieldValidationTooltip";
 import { NumericRangeField } from "../ui/NumericRangeField";
 import type { PointerDragThreshold } from "../application/projectPorts";
@@ -138,11 +138,11 @@ export function NumericPropertyControl(props: NumericPropertyControlProps) {
   }, []);
 
   return (
-    <NumericRangeField ref={rootRef} label={props.label} labelAccessory={props.labelAccessory} unit={props.unit}
+    <NumericRangeField ref={rootRef} label={props.label} labelAccessory={props.labelAccessory}
       validation={validationTooltip}
-      numberInput={<TextInput
+      numberInput={<UnitInput
             ref={numberRef}
-            className="ui-field-control"
+            unit={props.unit}
             type="text"
             role="spinbutton"
             inputMode="decimal"
