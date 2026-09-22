@@ -18,7 +18,9 @@
   background: var(--ui-canvas);
 }
 
-.ui-action-button.ui-property-toggle[aria-pressed="true"] {
+.ui-action-button.ui-property-toggle[aria-pressed="true"],
+.ui-action-button.ui-property-toggle[aria-pressed="true"]:hover:not(:disabled),
+.ui-action-button.ui-property-toggle[aria-pressed="true"]:focus-visible:not(:disabled) {
   border-color: var(--ui-accent);
   color: var(--ui-accent-text);
   background: var(--ui-accent-soft);
