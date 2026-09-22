@@ -22,17 +22,70 @@ test("loads the persisted installation and commits an explicit alternative", asy
   expect(screen.getByText(installations[1].path)).toBeVisible();
 });
 
-test("an old focus refresh cannot overwrite a newer explicit selection", async () => {
+test.each(["success", "failure"])("an old focus refresh %s cannot overwrite a newer explicit selection", async (outcome) => {
+  const service = port();
+  let finish!: (status: PhotoshopStatus) => void;
+  let fail!: (error: Error) => void;
+  render(<PhotoshopSettings port={service} />);
+  await screen.findByText(installations[0].path);
+  vi.mocked(service.status).mockImplementationOnce(() => new Promise((resolve, reject) => { finish = resolve; fail = reject; }));
+  fireEvent.focus(window);
+  fireEvent.change(screen.getByRole("combobox"), { target: { value: "old" } });
+  await screen.findByText(installations[1].path);
+  await act(async () => { if (outcome === "success") finish(current); else fail(new Error("old read")); });
+  expect(screen.getByRole("combobox")).toHaveValue("old");
+  expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+});
+
+test("selection owns the pending period and can be retried after failure", async () => {
+  const service = port();
+  let fail!: (error: Error) => void;
+  vi.mocked(service.select).mockImplementationOnce(() => new Promise((_resolve, reject) => { fail = reject; }));
+  render(<PhotoshopSettings port={service} />);
+  await screen.findByText(installations[0].path);
+  fireEvent.change(screen.getByRole("combobox"), { target: { value: "old" } });
+  expect(screen.getByRole("combobox")).toBeDisabled();
+  const locate = screen.getByRole("button", { name: "Localizar…" });
+  expect(locate).toBeDisabled();
+  fireEvent.click(locate);
+  fireEvent.focus(window);
+  expect(service.locate).not.toHaveBeenCalled();
+  expect(service.status).toHaveBeenCalledOnce();
+  await act(async () => fail(new PhotoshopError("invalid_installation", "Escolha outra instalação.")));
+  expect(screen.getByRole("alert")).toHaveTextContent("Escolha outra instalação.");
+  expect(screen.getByRole("combobox")).toBeEnabled();
+  expect(screen.getByRole("combobox")).toHaveValue("new");
+  fireEvent.change(screen.getByRole("combobox"), { target: { value: "old" } });
+  await screen.findByText(installations[1].path);
+  expect(service.select).toHaveBeenCalledTimes(2);
+  expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+});
+
+test("a more recent focus refresh wins even if the earlier read finishes last", async () => {
   const service = port();
   let finish!: (status: PhotoshopStatus) => void;
   render(<PhotoshopSettings port={service} />);
   await screen.findByText(installations[0].path);
-  vi.mocked(service.status).mockImplementationOnce(() => new Promise((resolve) => { finish = resolve; }));
+  vi.mocked(service.status)
+    .mockImplementationOnce(() => new Promise((resolve) => { finish = resolve; }))
+    .mockResolvedValueOnce({ ...current, revision: 2, selectedInstallationId: "old" });
   fireEvent.focus(window);
-  fireEvent.change(screen.getByRole("combobox"), { target: { value: "old" } });
+  fireEvent.focus(window);
   await screen.findByText(installations[1].path);
   await act(async () => finish(current));
   expect(screen.getByRole("combobox")).toHaveValue("old");
+});
+
+test("closing settings stops focus reads while the initial request is still pending", async () => {
+  const service = port();
+  let fail!: (error: Error) => void;
+  vi.mocked(service.status).mockImplementationOnce(() => new Promise((_resolve, reject) => { fail = reject; }));
+  const view = render(<PhotoshopSettings port={service} />);
+  view.unmount();
+  fireEvent.focus(window);
+  await act(async () => fail(new Error("late failure")));
+  expect(service.status).toHaveBeenCalledOnce();
+  expect(screen.queryByRole("alert")).not.toBeInTheDocument();
 });
 
 test("manual cancellation preserves selection and an invalid executable displays a recoverable error", async () => {

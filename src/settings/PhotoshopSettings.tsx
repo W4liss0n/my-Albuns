@@ -1,40 +1,10 @@
-import { useCallback, useEffect, useRef, useState } from "react";
 import { photoshopErrorMessage, type PhotoshopSettingsPort, type PhotoshopStatus } from "../application/photoshop";
 import { ActionButton, InlineNotice } from "../ui";
+import { useSettingsStatus } from "./useSettingsStatus";
 
 export function PhotoshopSettings({ port }: { port: PhotoshopSettingsPort }) {
-  const [status, setStatus] = useState<PhotoshopStatus | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [pending, setPending] = useState(false);
-  const request = useRef(0);
-  const mutating = useRef(false);
-
-  const refresh = useCallback(async () => {
-    if (mutating.current) return;
-    const current = ++request.current;
-    try {
-      const status = await port.status();
-      if (current === request.current) { setStatus(status); setError(null); }
-    } catch (error) { if (current === request.current) setError(photoshopErrorMessage(error)); }
-  }, [port]);
-
-  useEffect(() => {
-    void refresh();
-    window.addEventListener("focus", refresh);
-    return () => { request.current += 1; window.removeEventListener("focus", refresh); };
-  }, [refresh]);
-
-  const update = async (operation: () => Promise<PhotoshopStatus | null>) => {
-    if (mutating.current) return;
-    mutating.current = true;
-    const current = ++request.current;
-    setPending(true); setError(null);
-    try {
-      const next = await operation();
-      if (next && current === request.current) setStatus(next);
-    } catch (error) { if (current === request.current) setError(photoshopErrorMessage(error)); }
-    finally { mutating.current = false; if (current === request.current) setPending(false); }
-  };
+  const { status, pending, error, update: updateStatus } = useSettingsStatus(port, photoshopErrorMessage);
+  const update = (operation: () => Promise<PhotoshopStatus | null>) => updateStatus(operation, (next) => next);
 
   const selected = status?.installations.find((installation) => installation.id === status.selectedInstallationId);
   return <section aria-label="Photoshop" className="application-settings-panel" aria-busy={pending}>

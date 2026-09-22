@@ -1,7 +1,11 @@
-import { useCallback, useEffect, useId, useRef, useState } from "react";
-import type { CacheSettingsPort, CacheSettingsStatus } from "../application/cacheSettings";
+import { useEffect, useId, useRef, useState } from "react";
+import type { CacheSettingsPort } from "../application/cacheSettings";
 import { ActionButton, InlineNotice } from "../ui";
 import { useDismissableSurface } from "../ui/useDismissableSurface";
+import { useSettingsStatus } from "./useSettingsStatus";
+
+const readErrorMessage = () => "Não foi possível consultar o uso das prévias temporárias. Tente novamente.";
+const clearErrorMessage = () => "Não foi possível concluir a limpeza das prévias temporárias. Tente novamente.";
 
 export function formatCacheBytes(bytes: number) {
   if (bytes < 1024 * 1024) return `${new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 1 }).format(bytes / 1024)} KB`;
@@ -9,13 +13,9 @@ export function formatCacheBytes(bytes: number) {
 }
 
 export function CacheSettings({ port }: { port: CacheSettingsPort }) {
-  const [status, setStatus] = useState<CacheSettingsStatus | null>(null);
+  const { status, pending, error, update } = useSettingsStatus(port, readErrorMessage, clearErrorMessage);
   const [confirmation, setConfirmation] = useState(false);
-  const [pending, setPending] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const sequence = useRef(0);
-  const running = useRef(false);
   const clearButton = useRef<HTMLButtonElement>(null);
   const cancelButton = useRef<HTMLButtonElement>(null);
   const confirmationAnchor = useRef<HTMLElement>(null);
@@ -39,30 +39,17 @@ export function CacheSettings({ port }: { port: CacheSettingsPort }) {
       } else setConfirmation(false);
     },
   });
-  const refresh = useCallback(async () => {
-    if (running.current) return;
-    const request = ++sequence.current;
-    try { const next = await port.status(); if (request === sequence.current) { setStatus(next); setError(null); } }
-    catch { if (request === sequence.current) setError("Não foi possível consultar o uso das prévias temporárias. Tente novamente."); }
-  }, [port]);
-  useEffect(() => {
-    void refresh(); window.addEventListener("focus", refresh);
-    return () => { sequence.current += 1; window.removeEventListener("focus", refresh); };
-  }, [refresh]);
   const confirm = async () => {
-    if (!confirmation || running.current) return;
-    running.current = true;
-    const request = ++sequence.current;
-    setPending(true); setMessage(null); setError(null);
-    try {
+    if (!confirmation) return;
+    setMessage(null);
+    await update(async () => {
       const outcome = await port.clearAll();
-      const next = await port.status();
-      if (request === sequence.current) {
-        setStatus(next); setConfirmation(false);
-        setMessage(outcome.kind === "scheduled" ? "As prévias serão limpas quando você abrir o MyAlbuns novamente." : `${formatCacheBytes(outcome.result.freedBytes)} liberados.`);
-      }
-    } catch { if (request === sequence.current) setError("Não foi possível concluir a limpeza das prévias temporárias. Tente novamente."); }
-    finally { running.current = false; if (request === sequence.current) setPending(false); }
+      return { outcome, status: await port.status() };
+    }, ({ outcome, status }) => {
+      setConfirmation(false);
+      setMessage(outcome.kind === "scheduled" ? "As prévias serão limpas quando você abrir o MyAlbuns novamente." : `${formatCacheBytes(outcome.result.freedBytes)} liberados.`);
+      return status;
+    });
   };
   const feedback = status?.clearAllScheduled ? "As prévias serão limpas quando você abrir o MyAlbuns novamente." : message;
   return <section aria-label="Prévias temporárias" className="application-settings-panel application-settings-panel--cache" aria-busy={pending}>
