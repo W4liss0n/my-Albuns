@@ -131,6 +131,7 @@ export interface RecentProjectSummary {
   id: string;
   name: string;
   lastOpenedAtMs: number | null;
+  favorite: boolean;
 }
 
 export interface RecentProjectFirstSheet {
@@ -147,6 +148,10 @@ export interface GlobalProjectPort {
   ): Promise<ProjectLaunchOutcome | null>;
   openProject(): Promise<OpenProjectOutcome>;
   listRecentProjects(): Promise<readonly RecentProjectSummary[]>;
+  setRecentProjectFavorite(id: string, favorite: boolean): Promise<
+    | { status: "saved"; projects: readonly RecentProjectSummary[] }
+    | { status: "failed"; error: ProjectLaunchFailure }
+  >;
   firstRecentProjectSheet(id: string): Promise<RecentProjectFirstSheet | null>;
   openRecentProject(id: string): Promise<OpenProjectOutcome>;
   startupOpenFailure(): Promise<OpenProjectFailure | null>;

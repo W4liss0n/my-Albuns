@@ -342,10 +342,10 @@ test("lists only valid recent Project summaries without pathnames", async () => 
   ]);
 
   await expect(tauriGlobalProjectPort.listRecentProjects()).resolves.toEqual([
-    { id: "recent-ana", name: "Álbum da Ana", lastOpenedAtMs: 1_800_000_000_000 },
-    { id: "invalid-date", name: "Data inválida", lastOpenedAtMs: null },
-    { id: "unsafe-date", name: "Número inválido", lastOpenedAtMs: null },
-    { id: "legacy", name: "Legado", lastOpenedAtMs: null },
+    { id: "recent-ana", name: "Álbum da Ana", lastOpenedAtMs: 1_800_000_000_000, favorite: false },
+    { id: "invalid-date", name: "Data inválida", lastOpenedAtMs: null, favorite: false },
+    { id: "unsafe-date", name: "Número inválido", lastOpenedAtMs: null, favorite: false },
+    { id: "legacy", name: "Legado", lastOpenedAtMs: null, favorite: false },
   ]);
   expect(invoke).toHaveBeenCalledWith("recent_projects");
 });
@@ -376,6 +376,26 @@ test("reopens a recent Project by opaque id only", async () => {
   expect(invoke).toHaveBeenCalledWith("open_recent_project", {
     projectId: "recent-ana",
   });
+});
+
+test("saves a favorite by opaque id and returns the persisted projection", async () => {
+  vi.mocked(invoke).mockResolvedValueOnce([{ id: "recent-ana", name: "Álbum da Ana",
+    lastOpenedAtMs: 100, favorite: true }]);
+  await expect(tauriGlobalProjectPort.setRecentProjectFavorite("recent-ana", true))
+    .resolves.toEqual({ status: "saved", projects: [{ id: "recent-ana", name: "Álbum da Ana",
+      lastOpenedAtMs: 100, favorite: true }] });
+  expect(invoke).toHaveBeenCalledWith("set_recent_project_favorite", {
+    projectId: "recent-ana", favorite: true,
+  });
+  expect(invoke).not.toHaveBeenCalledWith("open_recent_project", expect.anything());
+});
+
+test("does not report a favorite as saved when the IPC write fails", async () => {
+  vi.mocked(invoke).mockRejectedValueOnce(new Error("disk full"));
+  await expect(tauriGlobalProjectPort.setRecentProjectFavorite("recent-ana", true))
+    .resolves.toMatchObject({ status: "failed", error: {
+      code: "recent_project_favorite_unavailable",
+    } });
 });
 
 test("reads a structured startup failure without its pathname", async () => {

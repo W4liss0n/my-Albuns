@@ -13,6 +13,7 @@ import "./ui/ui.css";
 import "./global/GlobalShell.css";
 
 const previewParameters = new URLSearchParams(window.location.search);
+let previewProjects = welcomePreviewRecentProjects(previewParameters);
 
 const projectPort: GlobalProjectPort = {
   onActivationTerminal: async () => () => undefined,
@@ -23,8 +24,12 @@ const projectPort: GlobalProjectPort = {
     }
     return { status: "cancelled" };
   },
-  listRecentProjects: async () =>
-    welcomePreviewRecentProjects(previewParameters),
+  listRecentProjects: async () => previewProjects,
+  setRecentProjectFavorite: async (id, favorite) => {
+    previewProjects = previewProjects.map((project) => project.id === id
+      ? { ...project, favorite } : project);
+    return { status: "saved", projects: previewProjects };
+  },
   firstRecentProjectSheet: async (id) => {
     if (previewParameters.get("recents") === "loading") {
       return new Promise<never>(() => undefined);
@@ -69,7 +74,7 @@ ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>
     <GlobalShell
       initialSurface={previewParameters.get("surface") === "newProject" ? "newProject" : "welcome"}
-      recentProjectsNow={["dates", "long-names"].includes(previewParameters.get("recents") ?? "")
+      recentProjectsNow={["dates", "long-names", "favorites", "favorites-only", "favorites-long-names"].includes(previewParameters.get("recents") ?? "")
         ? welcomeDatesNow : undefined}
       onOpenBatch={async () => { window.location.href = "/batch-export-preview.html?scenario=configuration"; }}
       onOpenSettings={previewParameters.get("graphics") === "unsupported" ? undefined : async () => { window.location.href = "/settings-preview.html?section=performance"; }}

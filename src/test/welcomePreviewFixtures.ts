@@ -4,13 +4,13 @@ import { representativeProjection } from "./projectFixtures";
 // Preview-only data. It must never be read from or written to the user's real
 // recent-Projects storage.
 const populatedRecentProjects = [
-  { id: "p1", name: "Formatura Medicina 2026 — Turma B", lastOpenedAtMs: null },
-  { id: "p2", name: "Casamento Marina & Téo", lastOpenedAtMs: null },
-  { id: "p3", name: "Ensaio Helena — 6 meses", lastOpenedAtMs: null },
-  { id: "p4", name: "15 anos Beatriz", lastOpenedAtMs: null },
-  { id: "p5", name: "Corporativo Vetra — relatório anual", lastOpenedAtMs: null },
-  { id: "p6", name: "Batizado Antônio", lastOpenedAtMs: null },
-  { id: "p7", name: "Retrospectiva Estúdio 2025", lastOpenedAtMs: null },
+  { id: "p1", name: "Formatura Medicina 2026 — Turma B", lastOpenedAtMs: null, favorite: false },
+  { id: "p2", name: "Casamento Marina & Téo", lastOpenedAtMs: null, favorite: false },
+  { id: "p3", name: "Ensaio Helena — 6 meses", lastOpenedAtMs: null, favorite: false },
+  { id: "p4", name: "15 anos Beatriz", lastOpenedAtMs: null, favorite: false },
+  { id: "p5", name: "Corporativo Vetra — relatório anual", lastOpenedAtMs: null, favorite: false },
+  { id: "p6", name: "Batizado Antônio", lastOpenedAtMs: null, favorite: false },
+  { id: "p7", name: "Retrospectiva Estúdio 2025", lastOpenedAtMs: null, favorite: false },
 ] satisfies readonly RecentProjectSummary[];
 
 // Fixed local calendar anchor keeps acceptance screenshots stable across runs.
@@ -21,24 +21,36 @@ export function welcomePreviewRecentProjects(
 ): readonly RecentProjectSummary[] {
   const variant = parameters.get("recents");
   if (variant === "empty") return [];
+  if (variant === "favorites-long-names") {
+    return welcomePreviewRecentProjects(new URLSearchParams("recents=long-names"))
+      .map((project, index) => ({ ...project, favorite: index === 0 }));
+  }
+  if (variant === "favorites" || variant === "favorites-only") {
+    const projects = populatedRecentProjects.slice(0, 4).map((project, index) => ({
+      ...project,
+      lastOpenedAtMs: new Date(2026, 8, 22 - index, 14, 30).getTime(),
+      favorite: index === 0 || index === 2,
+    }));
+    return variant === "favorites-only" ? projects.filter((project) => project.favorite) : projects;
+  }
   if (variant === "long-names") {
     const [first, second, third, fourth] = populatedRecentProjects;
     return [
       {
-        ...first,
+        ...first!,
         name: "Formatura Medicina 2026 — Turma B, cerimônia e comemoração de encerramento",
         lastOpenedAtMs: new Date(2026, 8, 18, 9, 15).getTime(),
       },
       {
-        ...second,
+        ...second!,
         name: "CasamentoMarinaETeoAlbumCompletoDaCerimoniaEFestaComTodosOsConvidados" +
           "PreparativosDaNoivaEDoNoivoNaFazendaSantaClaraComFamiliaEAmigos" +
           "CelebracaoAoPorDoSolJantarPrimeiraDancaEBrindeDosPadrinhos" +
           "RetratosDaViagemEMemoriasEspeciaisDeTodoOFimDeSemana",
         lastOpenedAtMs: new Date(2026, 8, 22, 14, 30).getTime(),
       },
-      { ...third, name: "Ensaio de acompanhamento de Helena — memórias dos primeiros seis meses" },
-      { ...fourth, name: "15 anos", lastOpenedAtMs: new Date(2026, 8, 21, 9, 15).getTime() },
+      { ...third!, name: "Ensaio de acompanhamento de Helena — memórias dos primeiros seis meses" },
+      { ...fourth!, name: "15 anos", lastOpenedAtMs: new Date(2026, 8, 21, 9, 15).getTime() },
     ];
   }
   if (variant === "dates") {

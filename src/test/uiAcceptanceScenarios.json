@@ -12,6 +12,78 @@
       "actions": []
     },
     {
+      "id": "welcome-favorites-mixed",
+      "title": "Boas-vindas — favoritos e projetos recentes",
+      "implementationPath": "/welcome-preview.html?recents=favorites",
+      "comparison": { "kind": "implementation-only", "surface": "welcome-window", "reason": "Design 0002: favoritos precedem os recentes sem duplicar cartões e conservam a ordem cronológica em cada grupo." },
+      "viewport": { "width": 1000, "height": 760 },
+      "readySelector": "main:has(ul[aria-label='Favoritos'] li:nth-child(2)):has(ul[aria-label='Projetos recentes'] li:nth-child(2)) .global-project-thumbnail[data-preview-state='ready']",
+      "actions": []
+    },
+    {
+      "id": "welcome-favorites-only",
+      "title": "Boas-vindas — apenas favoritos",
+      "implementationPath": "/welcome-preview.html?recents=favorites-only",
+      "comparison": { "kind": "implementation-only", "surface": "welcome-window", "reason": "Design 0002: um grupo vazio desaparece sem mensagem nem espaço adicional." },
+      "viewport": { "width": 1000, "height": 720 },
+      "readySelector": "main:has(ul[aria-label='Favoritos']):not(:has(ul[aria-label='Projetos recentes'])) .global-project-thumbnail[data-preview-state='ready']",
+      "actions": []
+    },
+    {
+      "id": "welcome-favorite-hover",
+      "title": "Boas-vindas — estrela disponível no hover",
+      "implementationPath": "/welcome-preview.html?recents=favorites",
+      "comparison": { "kind": "implementation-only", "surface": "welcome-window", "reason": "Design 0002: estrela discreta no hover e preenchida no favorito, sem competir com a primeira lâmina." },
+      "viewport": { "width": 1000, "height": 760 },
+      "readySelector": ".global-project-card:hover .global-project-favorite[aria-pressed='false']",
+      "actions": [{ "type": "hover", "selector": "ul[aria-label='Projetos recentes'] li:first-child .global-project-launch" }]
+    },
+    {
+      "id": "welcome-favorite-focus",
+      "title": "Boas-vindas — estrela pelo teclado e tooltip",
+      "implementationPath": "/welcome-preview.html?recents=favorites",
+      "comparison": { "kind": "implementation-only", "surface": "welcome-window", "reason": "Design 0002: botão nativo com foco e dica acessível sem alterar o cartão." },
+      "viewport": { "width": 1000, "height": 760 },
+      "readySelector": ".global-project-favorite[aria-pressed='false']:focus-visible",
+      "actions": [{ "type": "focus", "selector": "ul[aria-label='Projetos recentes'] li:first-child .global-project-launch" }, { "type": "key", "key": "Tab" }]
+    },
+    {
+      "id": "welcome-favorite-add",
+      "title": "Boas-vindas — marcar favorito",
+      "implementationPath": "/welcome-preview.html?recents=favorites",
+      "comparison": { "kind": "implementation-only", "surface": "welcome-window", "reason": "Design 0002: a estrela move o cartão ao grupo de favoritos e conserva seu foco." },
+      "viewport": { "width": 1000, "height": 760 },
+      "readySelector": "ul[aria-label='Favoritos'] .global-project-card[data-project-id='p2'] .global-project-favorite[aria-pressed='true']:focus",
+      "actions": [{ "type": "hover", "selector": "ul[aria-label='Projetos recentes'] li:first-child .global-project-launch" }, { "type": "click", "selector": "ul[aria-label='Projetos recentes'] li:first-child .global-project-favorite" }]
+    },
+    {
+      "id": "welcome-favorite-remove-last",
+      "title": "Boas-vindas — desmarcar o último favorito",
+      "implementationPath": "/welcome-preview.html?recents=favorites-only",
+      "comparison": { "kind": "implementation-only", "surface": "welcome-window", "reason": "Design 0002: o grupo some quando o último favorito é removido e o foco acompanha a estrela." },
+      "viewport": { "width": 1000, "height": 720 },
+      "readySelector": "main:not(:has(ul[aria-label='Favoritos'])) ul[aria-label='Projetos recentes'] .global-project-card[data-project-id='p3'] .global-project-favorite[aria-pressed='false']:focus",
+      "actions": [{ "type": "click", "selector": "ul[aria-label='Favoritos'] li:first-child .global-project-favorite" }, { "type": "click", "selector": "ul[aria-label='Favoritos'] li:first-child .global-project-favorite" }]
+    },
+    {
+      "id": "welcome-favorites-narrow",
+      "title": "Boas-vindas — favoritos em janela estreita",
+      "implementationPath": "/welcome-preview.html?recents=favorites",
+      "comparison": { "kind": "implementation-only", "surface": "welcome-window", "reason": "Design 0002: grupos e rodapé preservam a composição na largura reduzida." },
+      "viewport": { "width": 640, "height": 800 },
+      "readySelector": "main:has(ul[aria-label='Favoritos']):has(ul[aria-label='Projetos recentes']) .global-project-thumbnail[data-preview-state='ready']",
+      "actions": []
+    },
+    {
+      "id": "welcome-favorites-long-name-date",
+      "title": "Boas-vindas — favorito com nome longo e data",
+      "implementationPath": "/welcome-preview.html?recents=favorites-long-names",
+      "comparison": { "kind": "implementation-only", "surface": "welcome-window", "reason": "Design 0002: estrela, nome truncado e data compartilham o cartão sem sobreposição." },
+      "viewport": { "width": 896, "height": 720 },
+      "readySelector": "ul[aria-label='Favoritos'] .global-project-card:has(.global-project-favorite[aria-pressed='true']):has(time):has(.global-project-thumbnail[data-preview-state='ready'])",
+      "actions": []
+    },
+    {
       "id": "welcome-first-sheet-single",
       "title": "Boas-vindas — primeira lâmina com página única",
       "implementationPath": "/welcome-preview.html?recents=single",
@@ -61,11 +133,15 @@
         "width": 1280,
         "height": 720
       },
-      "readySelector": ".global-recent-list li:nth-child(2) button:focus-visible .global-project-thumbnail[data-preview-state=\"ready\"] .sheet-preview",
+      "readySelector": ".global-recent-list li:nth-child(2) .global-project-launch:focus-visible .global-project-thumbnail[data-preview-state=\"ready\"] .sheet-preview",
       "actions": [
         {
           "type": "focus",
-          "selector": ".global-recent-list li:first-child button"
+          "selector": ".global-recent-list li:first-child .global-project-launch"
+        },
+        {
+          "type": "key",
+          "key": "Tab"
         },
         {
           "type": "key",
@@ -187,11 +263,15 @@
         "width": 896,
         "height": 720
       },
-      "readySelector": "body:has(.global-recent-list li:nth-child(2) button:focus-visible) [role=\"tooltip\"]",
+      "readySelector": "body:has(.global-recent-list li:nth-child(2) .global-project-launch:focus-visible) .global-project-date-tooltip[role=\"tooltip\"]",
       "actions": [
         {
           "type": "focus",
-          "selector": ".global-recent-list li:first-child button"
+          "selector": ".global-recent-list li:first-child .global-project-launch"
+        },
+        {
+          "type": "key",
+          "key": "Tab"
         },
         {
           "type": "key",
@@ -328,11 +408,15 @@
         "width": 896,
         "height": 720
       },
-      "readySelector": "body:not(:has([role=\"tooltip\"])) .global-recent-list li:nth-child(2) button:focus-visible",
+      "readySelector": "body:not(:has([role=\"tooltip\"])) .global-recent-list li:nth-child(2) .global-project-launch:focus-visible",
       "actions": [
         {
           "type": "focus",
-          "selector": ".global-recent-list li:first-child button"
+          "selector": ".global-recent-list li:first-child .global-project-launch"
+        },
+        {
+          "type": "key",
+          "key": "Tab"
         },
         {
           "type": "key",

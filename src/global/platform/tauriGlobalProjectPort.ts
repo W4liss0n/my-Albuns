@@ -68,7 +68,8 @@ function toRecentProjectSummaries(
       Number.isSafeInteger(rawOpenedAt) && rawOpenedAt >= 0 &&
       Number.isFinite(new Date(rawOpenedAt).getTime())
       ? rawOpenedAt : null;
-    return [{ id: candidate.id, name: candidate.name, lastOpenedAtMs }];
+    return [{ id: candidate.id, name: candidate.name, lastOpenedAtMs,
+      favorite: candidate.favorite === true }];
   });
 }
 
@@ -119,6 +120,19 @@ export const tauriGlobalProjectPort: GlobalProjectPort = {
       );
     } catch {
       return [];
+    }
+  },
+  setRecentProjectFavorite: async (id, favorite) => {
+    try {
+      return { status: "saved", projects: toRecentProjectSummaries(
+        await invoke<unknown>("set_recent_project_favorite", { projectId: id, favorite }),
+      ) };
+    } catch (error) {
+      return { status: "failed", error: toProjectLaunchFailure(error, {
+        code: "recent_project_favorite_unavailable",
+        message: "Não foi possível atualizar os favoritos.",
+        action: "Tente novamente.",
+      }) };
     }
   },
   firstRecentProjectSheet: async (id) => {

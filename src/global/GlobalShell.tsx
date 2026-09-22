@@ -13,6 +13,7 @@ import {
   Download,
   FolderOpen,
   Plus,
+  Star,
 } from "lucide-react";
 
 import type { GraphicsDiagnostic } from "../application/graphics";
@@ -111,17 +112,24 @@ function RecentProjectThumbnail({
 }
 
 function RecentProjectCard({
-  project, now, disabled, load, onOpen,
+  project, now, disabled, load, onOpen, onFavorite,
 }: {
   project: RecentProjectSummary;
   now: Date;
   disabled: boolean;
   load(id: string): Promise<RecentProjectFirstSheet | null>;
   onOpen(id: string): void;
+  onFavorite(id: string, favorite: boolean): void;
 }) {
   const trigger = useRef<HTMLButtonElement>(null);
   const name = useRef<HTMLElement>(null);
   const nameTooltipElement = useRef<HTMLDivElement>(null);
+  const favoriteTrigger = useRef<HTMLButtonElement>(null);
+  const favoriteLabel = project.favorite ? "Remover dos favoritos" : "Adicionar aos favoritos";
+  const favoriteTooltip = useTooltipTriggerState({ delay: 600, closeDelay: 100 });
+  const { triggerProps: favoriteTriggerProps, tooltipProps: favoriteDescriptionProps } =
+    useTooltipTrigger({ delay: 600, closeDelay: 100 }, favoriteTooltip, favoriteTrigger);
+  const { tooltipProps: favoriteTooltipProps } = useTooltip(favoriteDescriptionProps, favoriteTooltip);
   const [nameTooltipPosition, setNameTooltipPosition] = useState<{
     top: number;
     left: number;
@@ -197,7 +205,7 @@ function RecentProjectCard({
   });
 
   return (
-    <li>
+    <li className="global-project-card" data-project-id={project.id}>
       <button
         {...triggerProps}
         aria-label={project.name}
@@ -206,6 +214,7 @@ function RecentProjectCard({
         onClick={() => onOpen(project.id)}
         ref={trigger}
         type="button"
+        className="global-project-launch"
       >
         <RecentProjectThumbnail id={project.id} load={load} />
         <span className="global-project-summary">
@@ -221,6 +230,23 @@ function RecentProjectCard({
           <AppIcon icon={ChevronRight} size={12} />
         </span>
       </button>
+      <button
+        {...favoriteTriggerProps}
+        aria-label={favoriteLabel}
+        aria-pressed={project.favorite}
+        className="global-project-favorite"
+        disabled={disabled}
+        onClick={() => onFavorite(project.id, !project.favorite)}
+        ref={favoriteTrigger}
+        type="button"
+      >
+        <AppIcon icon={Star} size={16} />
+      </button>
+      {favoriteTooltip.isOpen && (
+        <div {...favoriteTooltipProps} className="ui-anchored-tooltip global-project-favorite-tooltip">
+          {favoriteLabel}
+        </div>
+      )}
       {openedAt && dateTooltip.isOpen && (
         <div {...dateTooltipProps} className="ui-anchored-tooltip global-project-date-tooltip">
           {openedAt.fullLabel}
@@ -265,6 +291,8 @@ export function GlobalShell({
   const [recentProjects, setRecentProjects] = useState<
     readonly RecentProjectSummary[]
   >([]);
+  const [favoritePending, setFavoritePending] = useState<string | null>(null);
+  const restoreFavoriteFocus = useRef<string | null>(null);
   const openingAttempt = useRef(0);
   const graphicsGateReported = useRef(false);
   const newProjectTriggerRef = useRef<HTMLButtonElement>(null);
@@ -371,6 +399,28 @@ export function GlobalShell({
   const openRecentProject = (id: string) =>
     runOpening(() => projectPort.openRecentProject(id));
 
+  const setFavorite = async (id: string, favorite: boolean) => {
+    if (favoritePending) return;
+    setFavoritePending(id);
+    const outcome = await projectPort.setRecentProjectFavorite(id, favorite);
+    if (outcome.status === "saved") {
+      restoreFavoriteFocus.current = id;
+      setRecentProjects(outcome.projects);
+    } else {
+      await failureDialogPort.present({ context: "projectOpening", error: outcome.error });
+    }
+    setFavoritePending(null);
+  };
+
+  useLayoutEffect(() => {
+    const id = restoreFavoriteFocus.current;
+    if (!id) return;
+    restoreFavoriteFocus.current = null;
+    const card = Array.from(document.querySelectorAll<HTMLElement>(".global-project-card"))
+      .find((element) => element.dataset.projectId === id);
+    card?.querySelector<HTMLButtonElement>(".global-project-favorite")?.focus({ preventScroll: true });
+  }, [recentProjects]);
+
   const startCreation = useCallback(() => {
     openingAttempt.current += 1;
     setSurface("newProject");
@@ -474,36 +524,40 @@ export function GlobalShell({
   }
 
   const recentNow = recentProjectsNow ?? new Date();
+  const favorites = recentProjects.filter((project) => project.favorite);
+  const nonFavorites = recentProjects.filter((project) => !project.favorite);
+  const renderProjects = (projects: readonly RecentProjectSummary[]) => projects.map((project) => (
+    <RecentProjectCard
+      key={project.id}
+      project={project}
+      now={recentNow}
+      disabled={isOpening || favoritePending === project.id}
+      load={projectPort.firstRecentProjectSheet}
+      onOpen={openRecentProject}
+      onFavorite={setFavorite}
+    />
+  ));
 
   return (
     <div className="global-shell ui-chrome-selection-scope">
       <ApplicationHeader status="diagramação de álbuns" />
 
       <main className="global-recent-projects">
-        <h1 className="ui-section-eyebrow">Projetos recentes</h1>
         {recentProjects.length === 0 ? (
           <EmptyState
             className="global-empty-state"
             description="Crie um projeto ou abra um arquivo .myalbuns."
             title="Nenhum projeto recente"
           />
-        ) : (
-          <ul
-            aria-label="Projetos recentes"
-            className="global-recent-list"
-          >
-            {recentProjects.map((project) => (
-              <RecentProjectCard
-                key={project.id}
-                project={project}
-                now={recentNow}
-                disabled={isOpening}
-                load={projectPort.firstRecentProjectSheet}
-                onOpen={openRecentProject}
-              />
-            ))}
-          </ul>
-        )}
+        ) : null}
+        {favorites.length > 0 && <section className="global-project-section">
+          <h1 className="ui-section-eyebrow">Favoritos</h1>
+          <ul aria-label="Favoritos" className="global-recent-list">{renderProjects(favorites)}</ul>
+        </section>}
+        {nonFavorites.length > 0 && <section className="global-project-section">
+          <h1 className="ui-section-eyebrow">Projetos recentes</h1>
+          <ul aria-label="Projetos recentes" className="global-recent-list">{renderProjects(nonFavorites)}</ul>
+        </section>}
       </main>
 
       <aside aria-label="Ações principais" className="global-primary-actions">

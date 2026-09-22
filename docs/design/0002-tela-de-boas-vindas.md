@@ -133,6 +133,27 @@ Não se usa a data de modificação do arquivo nem o horário da consulta para
 simular esse histórico. O timestamp pertence ao estado local dos recentes,
 sem alterar o documento criativo ou o Cache.
 
+## Favoritos
+
+A Tela de Boas-vindas apresenta **Favoritos** antes de **Projetos recentes**.
+Cada Projeto aparece em somente um grupo; grupos vazios são omitidos. A ordem
+dentro de cada grupo continua sendo a da última abertura, sem reordenar o
+histórico quando a estrela é acionada. O mesmo cartão, miniatura e rodapé são
+usados nos dois grupos. A estrela de 16 px ocupa um botão de 28 px no canto
+superior direito: ligada, fica preenchida em grafite e sempre visível; desligada,
+aparece no hover ou foco. O botão possui nome acessível, estado pressionado e
+tooltip, sem acionar a abertura. O foco permanece na ação após a troca de grupo.
+
+O estado local de Projetos recentes guarda a marcação por identidade de Projeto,
+separado do arquivo criativo e do Cache. A consulta não grava. Registros legados
+sem a marcação são tratados como não favoritos; a próxima mutação publica o
+campo opcional no mesmo esquema, sem migração em leitura. Favoritos persistem e
+ficam fora do limite de 20 entradas não favoritas. Ao desfavoritar, aplica-se
+esse limite em ordem cronológica, o que pode retirar da lista uma entrada antiga
+sem excluir seu arquivo. Reabrir a mesma identidade conserva a marcação; uma
+nova identidade no mesmo caminho não a herda. Falhas de gravação conservam a
+lista anterior e usam o aviso operacional existente.
+
 Os atalhos Windows `Ctrl+N` e `Ctrl+O` aparecem junto às ações e acionam,
 respectivamente, `Novo Projeto` e `Abrir Projeto`; não são legendas decorativas.
 

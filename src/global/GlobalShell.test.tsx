@@ -66,6 +66,7 @@ function createProjectPort(
     completeGraphicsGate: async () => null,
     openProject: async () => ({ status: "cancelled" }),
     listRecentProjects: async () => [],
+    setRecentProjectFavorite: async () => ({ status: "saved", projects: [] }),
     firstRecentProjectSheet: async () => null,
     openRecentProject: async () => ({ status: "cancelled" }),
     startupOpenFailure: async () => null,
@@ -87,7 +88,7 @@ test("shows the global welcome surface without a Project workspace", () => {
   );
 
   expect(
-    screen.getByRole("heading", { name: "Projetos recentes" }),
+    screen.getByRole("status", { name: "Nenhum projeto recente" }),
   ).toBeInTheDocument();
   const newProjectButton = screen.getByRole("button", {
     name: "Novo projeto",
@@ -238,8 +239,8 @@ test("replaces welcome with New Project in the same window and restores welcome 
   await user.click(screen.getByRole("button", { name: "Cancelar" }));
 
   expect(
-    screen.getByRole("heading", { name: "Projetos recentes" }),
-  ).toHaveClass("ui-section-eyebrow");
+    screen.getByRole("status", { name: "Nenhum projeto recente" }),
+  ).toHaveClass("global-empty-state");
 });
 
 test("routes New Project operational failures through its owned native dialog port", async () => {
@@ -345,8 +346,8 @@ test("shows an actionable structured failure without exposing a pathname", async
 
 test("loads and renders recent Projects by name", async () => {
   const listRecentProjects = vi.fn(async () => [
-    { id: "recent-ana", name: "Álbum da Ana", lastOpenedAtMs: null },
-    { id: "recent-bia", name: "Álbum da Bia", lastOpenedAtMs: null },
+    { id: "recent-ana", name: "Álbum da Ana", lastOpenedAtMs: null, favorite: false },
+    { id: "recent-bia", name: "Álbum da Bia", lastOpenedAtMs: null, favorite: false },
   ]);
 
   render(
@@ -520,8 +521,8 @@ test("shows a real first Sheet and keeps an unavailable card usable", async () =
       newProjectPort={createNewProjectPortStub()}
       projectPort={createProjectPort({
         listRecentProjects: async () => [
-          { id: "recent-ana", name: "Álbum da Ana", lastOpenedAtMs: null },
-          { id: "recent-bia", name: "Álbum da Bia", lastOpenedAtMs: null },
+          { id: "recent-ana", name: "Álbum da Ana", lastOpenedAtMs: null, favorite: false },
+          { id: "recent-bia", name: "Álbum da Bia", lastOpenedAtMs: null, favorite: false },
         ],
         firstRecentProjectSheet,
         openRecentProject,
@@ -546,7 +547,7 @@ test("keeps a pending first Sheet represented without blocking its card", async 
     <GlobalShell
       graphicsDiagnostic={supportedGraphics}
       projectPort={createProjectPort({
-        listRecentProjects: async () => [{ id: "recent-ana", name: "Álbum da Ana", lastOpenedAtMs: null }],
+        listRecentProjects: async () => [{ id: "recent-ana", name: "Álbum da Ana", lastOpenedAtMs: null, favorite: false }],
         firstRecentProjectSheet,
       })}
     />,
@@ -569,7 +570,7 @@ test("reopens a recent Project using only its opaque id", async () => {
       newProjectPort={createNewProjectPortStub()}
       projectPort={createProjectPort({
         listRecentProjects: async () => [
-          { id: "recent-ana", name: "Álbum da Ana", lastOpenedAtMs: null },
+          { id: "recent-ana", name: "Álbum da Ana", lastOpenedAtMs: null, favorite: false },
         ],
         openProject,
         openRecentProject,
@@ -586,6 +587,58 @@ test("reopens a recent Project using only its opaque id", async () => {
   expect(openProject).not.toHaveBeenCalled();
   expect(recentProject).toBeDisabled();
   expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+});
+
+test("moves favorites between groups without opening and restores focus after the last favorite is removed", async () => {
+  const user = userEvent.setup();
+  const projects = [
+    { id: "newer", name: "Mais recente", lastOpenedAtMs: 200, favorite: false },
+    { id: "older", name: "Preferido", lastOpenedAtMs: 100, favorite: false },
+  ];
+  const openRecentProject = vi.fn(async () => ({ status: "cancelled" as const }));
+  const setRecentProjectFavorite = vi.fn(async (id: string, favorite: boolean) => ({
+    status: "saved" as const,
+    projects: projects.map((project) => project.id === id ? { ...project, favorite } : project),
+  }));
+  render(<GlobalShell graphicsDiagnostic={supportedGraphics} projectPort={createProjectPort({
+    listRecentProjects: async () => projects,
+    setRecentProjectFavorite,
+    openRecentProject,
+  })} />);
+  await screen.findByRole("button", { name: "Preferido" });
+  const olderCard = screen.getByRole("button", { name: "Preferido" }).closest("li")!;
+  const olderStar = olderCard.querySelector<HTMLButtonElement>(".global-project-favorite")!;
+  olderStar.focus();
+  await user.keyboard("{Enter}");
+  expect(setRecentProjectFavorite).toHaveBeenCalledWith("older", true);
+  expect(openRecentProject).not.toHaveBeenCalled();
+  expect(screen.getByRole("list", { name: "Favoritos" })).toHaveTextContent("Preferido");
+  expect(screen.getByRole("list", { name: "Projetos recentes" })).toHaveTextContent("Mais recente");
+  const unmark = screen.getByRole("button", { name: "Remover dos favoritos" });
+  expect(unmark).toHaveAttribute("aria-pressed", "true");
+  expect(unmark).toHaveFocus();
+  await user.keyboard(" ");
+  expect(setRecentProjectFavorite).toHaveBeenCalledWith("older", false);
+  expect(screen.queryByRole("heading", { name: "Favoritos" })).not.toBeInTheDocument();
+  expect(screen.getAllByRole("button", { name: "Adicionar aos favoritos" })).toHaveLength(2);
+  expect(screen.getByRole("button", { name: "Preferido" }).closest("li")?.querySelector(".global-project-favorite")).toHaveFocus();
+});
+
+test("keeps the saved favorite when the update fails and reports the operational error", async () => {
+  const present = vi.fn(async () => undefined);
+  const openRecentProject = vi.fn(async () => ({ status: "cancelled" as const }));
+  render(<GlobalShell graphicsDiagnostic={supportedGraphics}
+    failureDialogPort={{ present }} projectPort={createProjectPort({
+      listRecentProjects: async () => [{ id: "one", name: "Um projeto", lastOpenedAtMs: 100, favorite: true }],
+      setRecentProjectFavorite: async () => ({ status: "failed", error: {
+        code: "recent_project_favorite_unavailable", message: "Falha", action: "Tente novamente.",
+      } }),
+      openRecentProject,
+    })} />);
+  await userEvent.setup().click(await screen.findByRole("button", { name: "Remover dos favoritos" }));
+  expect(screen.getByRole("list", { name: "Favoritos" })).toHaveTextContent("Um projeto");
+  expect(present).toHaveBeenCalledOnce();
+  expect(openRecentProject).not.toHaveBeenCalled();
 });
 
 test("shows the startup failure from a direct Windows opening", async () => {
@@ -766,7 +819,7 @@ test("editor entry opens directly in New Project and repeated activation preserv
   act(() => activate());
   expect(count).toHaveValue("23");
   fireEvent.click(screen.getByRole("button", { name: "Cancelar" }));
-  expect(screen.getByRole("heading", { name: "Projetos recentes" })).toBeInTheDocument();
+  expect(screen.getByRole("status", { name: "Nenhum projeto recente" })).toBeInTheDocument();
   act(() => activate());
   expect(screen.getByRole("textbox", { name: "Quantidade de lâminas" })).toBeVisible();
   unmount();

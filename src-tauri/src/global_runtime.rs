@@ -736,6 +736,19 @@ async fn recent_projects(
         .map_err(|_| state_failure())
 }
 
+#[tauri::command]
+async fn set_recent_project_favorite(
+    project_id: String,
+    favorite: bool,
+    state: tauri::State<'_, GlobalRuntimeState>,
+) -> Result<Vec<RecentProjectSummary>, ProjectLaunchFailure> {
+    let store = state.recent_projects.clone();
+    tauri::async_runtime::spawn_blocking(move || store.set_favorite(&project_id, favorite))
+        .await
+        .map_err(|_| state_failure())?
+        .map_err(|_| state_failure())
+}
+
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 struct RecentProjectFirstSheet {
@@ -2183,6 +2196,7 @@ pub(crate) fn run(
             create_project,
             open_project,
             recent_projects,
+            set_recent_project_favorite,
             first_recent_project_sheet,
             open_recent_project,
             show_project_failure_dialog,

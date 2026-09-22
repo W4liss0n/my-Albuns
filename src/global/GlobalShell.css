@@ -141,7 +141,11 @@ body,
   grid-area: recent;
 }
 
-.global-recent-projects > .ui-section-eyebrow {
+.global-project-section + .global-project-section {
+  margin-top: 24px;
+}
+
+.global-project-section > .ui-section-eyebrow {
   margin-bottom: 8px;
   padding: 0 2px;
   letter-spacing: 0.13em;
@@ -165,7 +169,7 @@ body,
   min-width: 0;
 }
 
-.global-recent-list button {
+.global-recent-list .global-project-launch {
   position: relative;
   display: grid;
   width: 100%;
@@ -181,18 +185,66 @@ body,
   text-align: left;
 }
 
-.global-recent-list button:hover:not(:disabled) {
+.global-recent-list .global-project-launch:hover:not(:disabled) {
   border-color: #cfc9bd;
 }
 
-.global-recent-list button:focus-visible {
+.global-recent-list .global-project-launch:focus-visible {
   border-color: var(--ui-border-strong);
   background: var(--ui-surface-muted);
 }
 
-.global-recent-list button:disabled {
+.global-recent-list .global-project-launch:disabled {
   cursor: wait;
   opacity: 0.58;
+}
+
+.global-project-favorite {
+  position: absolute;
+  z-index: 1;
+  top: 6px;
+  right: 6px;
+  display: grid;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--ui-radius);
+  color: var(--ui-text);
+  background: transparent;
+  opacity: 0;
+  place-items: center;
+  transition: opacity 120ms ease;
+}
+
+.global-project-card:hover .global-project-favorite,
+.global-project-card:focus-within .global-project-favorite,
+.global-project-favorite[aria-pressed="true"] {
+  opacity: 1;
+}
+
+.global-project-favorite:hover:not(:disabled),
+.global-project-favorite:focus-visible {
+  background: color-mix(in srgb, var(--ui-surface) 90%, transparent);
+}
+
+.global-project-favorite:focus-visible {
+  outline: 2px solid var(--ui-border-strong);
+  outline-offset: 1px;
+}
+
+.global-project-favorite:disabled { cursor: wait; }
+
+.global-project-favorite[aria-pressed="true"] svg {
+  fill: currentColor;
+  filter: drop-shadow(0 0 2px var(--ui-surface));
+}
+
+.global-project-favorite-tooltip {
+  top: 38px;
+  right: 0;
+  width: max-content;
+  pointer-events: none;
 }
 
 .global-project-thumbnail {

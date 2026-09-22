@@ -1,6 +1,7 @@
 use std::{
     fs, io,
     path::{Path, PathBuf},
+    sync::{Arc, Mutex},
     time::{SystemTime, UNIX_EPOCH},
 };
 
@@ -16,6 +17,7 @@ pub struct RecentProjectSummary {
     pub id: String,
     pub name: String,
     pub last_opened_at_ms: Option<u64>,
+    pub favorite: bool,
 }
 
 #[derive(Debug)]
@@ -55,6 +57,8 @@ struct RecentProjectRecord {
     path: NativePathDto,
     #[serde(default)]
     last_opened_at_ms: Option<u64>,
+    #[serde(default)]
+    favorite: bool,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -67,12 +71,14 @@ struct RecentProjectsEnvelope {
 #[derive(Clone, Debug)]
 pub struct RecentProjectsStore {
     file: PathBuf,
+    mutation_lock: Arc<Mutex<()>>,
 }
 
 impl RecentProjectsStore {
     pub fn new(app_paths: &AppPaths) -> Self {
         Self {
             file: app_paths.recent_projects_file(),
+            mutation_lock: Arc::new(Mutex::new(())),
         }
     }
 
@@ -84,6 +90,7 @@ impl RecentProjectsStore {
                 id: project.project_id,
                 name: display_name(project.path.as_path()),
                 last_opened_at_ms: project.last_opened_at_ms,
+                favorite: project.favorite,
             })
             .collect())
     }
@@ -104,7 +111,15 @@ impl RecentProjectsStore {
         if project_id.is_empty() {
             return Err(RecentProjectsError::InvalidState);
         }
+        let _guard = self
+            .mutation_lock
+            .lock()
+            .map_err(|_| RecentProjectsError::InvalidState)?;
         let mut projects = self.load_records()?;
+        let favorite = projects
+            .iter()
+            .find(|project| project.project_id == project_id)
+            .is_some_and(|project| project.favorite);
         projects.retain(|project| project.project_id != project_id && project.path != path);
         projects.insert(
             0,
@@ -115,13 +130,39 @@ impl RecentProjectsStore {
                     .duration_since(UNIX_EPOCH)
                     .ok()
                     .and_then(|duration| u64::try_from(duration.as_millis()).ok()),
+                favorite,
             },
         );
-        projects.truncate(MAX_RECENT_PROJECTS);
+        retain_recent_and_favorites(&mut projects);
         self.publish(&RecentProjectsEnvelope {
             schema_version: RECENT_PROJECTS_SCHEMA_VERSION,
             projects,
         })
+    }
+
+    pub fn set_favorite(
+        &self,
+        project_id: &str,
+        favorite: bool,
+    ) -> Result<Vec<RecentProjectSummary>, RecentProjectsError> {
+        let _guard = self
+            .mutation_lock
+            .lock()
+            .map_err(|_| RecentProjectsError::InvalidState)?;
+        let mut projects = self.load_records()?;
+        let project = projects
+            .iter_mut()
+            .find(|project| project.project_id == project_id)
+            .ok_or(RecentProjectsError::InvalidState)?;
+        if project.favorite != favorite {
+            project.favorite = favorite;
+            retain_recent_and_favorites(&mut projects);
+            self.publish(&RecentProjectsEnvelope {
+                schema_version: RECENT_PROJECTS_SCHEMA_VERSION,
+                projects,
+            })?;
+        }
+        self.list()
     }
 
     fn load_records(&self) -> Result<Vec<RecentProjectRecord>, RecentProjectsError> {
@@ -133,7 +174,12 @@ impl RecentProjectsStore {
         let envelope: RecentProjectsEnvelope =
             serde_json::from_slice(&bytes).map_err(|_| RecentProjectsError::InvalidState)?;
         if envelope.schema_version != RECENT_PROJECTS_SCHEMA_VERSION
-            || envelope.projects.len() > MAX_RECENT_PROJECTS
+            || envelope
+                .projects
+                .iter()
+                .filter(|project| !project.favorite)
+                .count()
+                > MAX_RECENT_PROJECTS
             || envelope
                 .projects
                 .iter()
@@ -161,6 +207,17 @@ impl RecentProjectsStore {
         crate::local_store_io::write_atomically(&self.file, &bytes, "recent-projects.json")?;
         Ok(())
     }
+}
+
+fn retain_recent_and_favorites(projects: &mut Vec<RecentProjectRecord>) {
+    let mut non_favorites = 0;
+    projects.retain(|project| {
+        if project.favorite {
+            return true;
+        }
+        non_favorites += 1;
+        non_favorites <= MAX_RECENT_PROJECTS
+    });
 }
 
 fn display_name(path: &Path) -> String {
@@ -342,6 +399,106 @@ mod tests {
         assert_eq!(listed[0].id, "legacy");
         assert_eq!(listed[0].name, "Legacy");
         assert_eq!(listed[0].last_opened_at_ms, None);
+        assert!(!listed[0].favorite);
         assert_eq!(std::fs::read(file).unwrap(), legacy);
+    }
+
+    #[test]
+    fn favorites_persist_without_changing_open_time_or_order_and_survive_reopen() {
+        let root = tempfile::tempdir().unwrap();
+        let paths = AppPaths::from_roots(root.path(), root.path());
+        let store = RecentProjectsStore::new(&paths);
+        for id in ["first", "second", "third"] {
+            store
+                .promote(
+                    id,
+                    NativePathDto::from(root.path().join(format!("{id}.myalbuns"))),
+                )
+                .unwrap();
+        }
+        let before = store.list().unwrap();
+        store.set_favorite("first", true).unwrap();
+        assert_eq!(
+            store
+                .list()
+                .unwrap()
+                .iter()
+                .map(|item| item.id.as_str())
+                .collect::<Vec<_>>(),
+            ["third", "second", "first"]
+        );
+        assert_eq!(
+            store.list().unwrap()[2].last_opened_at_ms,
+            before[2].last_opened_at_ms
+        );
+        assert!(RecentProjectsStore::new(&paths).list().unwrap()[2].favorite);
+        store
+            .promote(
+                "first",
+                NativePathDto::from(root.path().join("first.myalbuns")),
+            )
+            .unwrap();
+        assert!(store.list().unwrap()[0].favorite);
+        store.set_favorite("first", true).unwrap();
+        assert!(store.list().unwrap()[0].favorite);
+    }
+
+    #[test]
+    fn favorite_retention_and_unfavorite_apply_chronological_limit() {
+        let root = tempfile::tempdir().unwrap();
+        let paths = AppPaths::from_roots(root.path(), root.path());
+        let store = RecentProjectsStore::new(&paths);
+        store
+            .promote(
+                "keeper",
+                NativePathDto::from(root.path().join("keeper.myalbuns")),
+            )
+            .unwrap();
+        store.set_favorite("keeper", true).unwrap();
+        for index in 0..25 {
+            let id = format!("other-{index}");
+            store
+                .promote(
+                    &id,
+                    NativePathDto::from(root.path().join(format!("{id}.myalbuns"))),
+                )
+                .unwrap();
+        }
+        assert_eq!(store.list().unwrap().len(), 21);
+        assert!(store.list().unwrap().last().unwrap().favorite);
+        store.set_favorite("keeper", false).unwrap();
+        assert_eq!(store.list().unwrap().len(), 20);
+        assert!(!store.list().unwrap().iter().any(|item| item.id == "keeper"));
+        assert!(matches!(
+            store.set_favorite("missing", true),
+            Err(super::RecentProjectsError::InvalidState)
+        ));
+    }
+
+    #[test]
+    fn replacement_identity_does_not_inherit_favorite_and_failed_write_keeps_state() {
+        let root = tempfile::tempdir().unwrap();
+        let paths = AppPaths::from_roots(root.path(), root.path());
+        let store = RecentProjectsStore::new(&paths);
+        let path = NativePathDto::from(root.path().join("shared.myalbuns"));
+        store.promote("old", path.clone()).unwrap();
+        let original = std::fs::read(paths.recent_projects_file()).unwrap();
+        let fault =
+            myalbuns_paths::test_support::DiskFull::on_create(&paths.recent_projects_file());
+        assert!(matches!(
+            store.set_favorite("old", true),
+            Err(super::RecentProjectsError::Io(_))
+        ));
+        assert_eq!(fault.failure_count(), 1);
+        assert_eq!(
+            std::fs::read(paths.recent_projects_file()).unwrap(),
+            original
+        );
+        assert!(!store.list().unwrap()[0].favorite);
+        drop(fault);
+        store.set_favorite("old", true).unwrap();
+        store.promote("new", path).unwrap();
+        assert_eq!(store.list().unwrap().len(), 1);
+        assert!(!store.list().unwrap()[0].favorite);
     }
 }
