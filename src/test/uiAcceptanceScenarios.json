@@ -133,7 +133,7 @@
       "comparison": {
         "kind": "implementation-only",
         "surface": "welcome-window",
-        "reason": "Design 0002: faixa compacta com nome e última abertura real, incluindo hoje, ontem, data anterior e registro antigo sem data; sem textos genéricos."
+        "reason": "Design 0002: faixa única com nome e data compacta da última abertura, incluindo hoje, ontem, data anterior e registro antigo sem data; sem segunda linha."
       },
       "viewport": {
         "width": 1000,
@@ -149,7 +149,7 @@
       "comparison": {
         "kind": "implementation-only",
         "surface": "welcome-window",
-        "reason": "Design 0002: nomes, data completa e seta permanecem legíveis sem sobreposição nos cartões compactos."
+        "reason": "Design 0002: nomes, data compacta e seta permanecem na mesma linha sem sobreposição na janela estreita."
       },
       "viewport": {
         "width": 640,
@@ -157,6 +157,47 @@
       },
       "readySelector": ".global-recent-list:has(time):has(li:nth-child(4) .global-project-summary):not(:has(li:nth-child(4) time)):has(.sheet-preview)",
       "actions": []
+    },
+    {
+      "id": "welcome-recent-dates-compact-cards",
+      "title": "Boas-vindas — nome e data em cartões próximos à largura mínima",
+      "implementationPath": "/welcome-preview.html?recents=dates",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "welcome-window",
+        "reason": "Design 0002: nome, data compacta e seta cabem na mesma linha em cartões próximos à largura mínima; registro sem data não reserva uma segunda linha."
+      },
+      "viewport": {
+        "width": 896,
+        "height": 720
+      },
+      "readySelector": ".global-recent-list:has(time):has(li:nth-child(4) .global-project-summary):not(:has(li:nth-child(4) time)):has(.sheet-preview)",
+      "actions": []
+    },
+    {
+      "id": "welcome-recent-date-tooltip",
+      "title": "Boas-vindas — horário completo pelo foco de teclado",
+      "implementationPath": "/welcome-preview.html?recents=dates",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "welcome-window",
+        "reason": "Design 0002: a data compacta preserva o horário completo no tooltip compartilhado, acessível pelo mesmo cartão e sem aumentar o rodapé."
+      },
+      "viewport": {
+        "width": 896,
+        "height": 720
+      },
+      "readySelector": ".global-recent-list li:nth-child(2):has(button:focus-visible) [role=\"tooltip\"]",
+      "actions": [
+        {
+          "type": "focus",
+          "selector": ".global-recent-list li:first-child button"
+        },
+        {
+          "type": "key",
+          "key": "Tab"
+        }
+      ]
     },
     {
       "id": "album-dimensional-confirmation",

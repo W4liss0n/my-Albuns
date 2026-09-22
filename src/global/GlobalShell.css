@@ -161,6 +161,7 @@ body,
 }
 
 .global-recent-list li {
+  position: relative;
   min-width: 0;
 }
 
@@ -169,7 +170,7 @@ body,
   display: grid;
   width: 100%;
   min-width: 0;
-  height: 176px;
+  height: 160px;
   padding: 0;
   overflow: hidden;
   border: 1px solid #e5e1d8;
@@ -256,9 +257,10 @@ body,
 .global-project-summary {
   display: grid;
   min-width: 0;
-  padding: 7px 28px 7px 8px;
-  align-content: start;
-  gap: 2px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: 8px;
+  padding: 0 28px 0 8px;
 }
 
 .global-project-summary strong {
@@ -270,17 +272,35 @@ body,
 }
 
 .global-project-summary .global-project-when {
-  overflow: visible;
   color: var(--ui-text-muted);
   font-size: var(--ui-font-size-caption);
   font-weight: 400;
   white-space: nowrap;
 }
 
+.global-project-date-tooltip {
+  --ui-tooltip-pointer-inline-start: auto;
+  --ui-tooltip-pointer-inline-end: 32px;
+
+  top: auto;
+  right: 0;
+  bottom: calc(32px + var(--ui-space-2));
+  left: auto;
+  width: max-content;
+  max-width: min(220px, calc(100vw - 32px));
+  pointer-events: none;
+}
+
+.global-project-date-tooltip::before {
+  top: auto;
+  bottom: -5px;
+  transform: rotate(225deg);
+}
+
 .global-project-open {
   position: absolute;
   right: 5px;
-  bottom: 15px;
+  bottom: 7px;
   display: grid;
   width: 17px;
   height: 17px;

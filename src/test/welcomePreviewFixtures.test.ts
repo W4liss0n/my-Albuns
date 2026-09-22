@@ -48,7 +48,7 @@ test("date preview has a fixed local clock and a legacy card without a timestamp
   const dates = welcomePreviewRecentProjects(new URLSearchParams("recents=dates"));
   expect(dates).toHaveLength(4);
   expect(dates.slice(0, 3).map(({ lastOpenedAtMs }) =>
-    recentProjectOpeningTime(lastOpenedAtMs, welcomeDatesNow)?.label,
+    recentProjectOpeningTime(lastOpenedAtMs, welcomeDatesNow)?.fullLabel,
   )).toEqual(["Hoje às 14:30", "Ontem às 09:15", "18/09/2026 às 09:15"]);
   expect(dates[3].lastOpenedAtMs).toBeNull();
 });

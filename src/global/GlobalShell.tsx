@@ -5,6 +5,8 @@ import {
   useRef,
   useState,
 } from "react";
+import { useTooltip, useTooltipTrigger } from "react-aria";
+import { useTooltipTriggerState } from "react-stately";
 import {
   ChevronRight,
   Download,
@@ -107,17 +109,55 @@ function RecentProjectThumbnail({
   );
 }
 
-function RecentProjectOpenedAt({ lastOpenedAtMs, now }: {
-  lastOpenedAtMs: number | null;
+function RecentProjectCard({
+  project, now, disabled, load, onOpen,
+}: {
+  project: RecentProjectSummary;
   now: Date;
+  disabled: boolean;
+  load(id: string): Promise<RecentProjectFirstSheet | null>;
+  onOpen(id: string): void;
 }) {
-  const openedAt = recentProjectOpeningTime(lastOpenedAtMs, now);
-  return openedAt ? (
-    <time className="global-project-when" dateTime={openedAt.dateTime}
-      aria-label={`Última abertura: ${openedAt.label}`}>
-      {openedAt.label}
-    </time>
-  ) : null;
+  const trigger = useRef<HTMLButtonElement>(null);
+  const openedAt = recentProjectOpeningTime(project.lastOpenedAtMs, now);
+  const options = { isDisabled: disabled || !openedAt, delay: 600, closeDelay: 100 };
+  const tooltip = useTooltipTriggerState(options);
+  const { triggerProps, tooltipProps: descriptionProps } =
+    useTooltipTrigger(options, tooltip, trigger);
+  const { tooltipProps } = useTooltip(descriptionProps, tooltip);
+
+  return (
+    <li>
+      <button
+        {...triggerProps}
+        aria-label={project.name}
+        aria-description={openedAt ? `Última abertura: ${openedAt.fullLabel}` : undefined}
+        disabled={disabled}
+        onClick={() => onOpen(project.id)}
+        ref={trigger}
+        type="button"
+      >
+        <RecentProjectThumbnail id={project.id} load={load} />
+        <span className="global-project-summary">
+          <strong>{project.name}</strong>
+          {openedAt && (
+            <time className="global-project-when" dateTime={openedAt.dateTime}
+              aria-label={`Última abertura: ${openedAt.fullLabel}`}>
+              {openedAt.label}
+            </time>
+          )}
+        </span>
+        <span aria-hidden="true" className="global-project-open">
+          <AppIcon icon={ChevronRight} size={12} />
+        </span>
+      </button>
+      {openedAt && tooltip.isOpen && (
+        <div {...tooltipProps} className="ui-anchored-tooltip global-project-date-tooltip">
+          {openedAt.fullLabel}
+        </div>
+      )}
+    </li>
+  );
 }
 
 export function GlobalShell({
@@ -367,23 +407,14 @@ export function GlobalShell({
             className="global-recent-list"
           >
             {recentProjects.map((project) => (
-              <li key={project.id}>
-                <button
-                  aria-label={project.name}
-                  disabled={isOpening}
-                  onClick={() => openRecentProject(project.id)}
-                  type="button"
-                >
-                  <RecentProjectThumbnail id={project.id} load={projectPort.firstRecentProjectSheet} />
-                  <span className="global-project-summary">
-                    <strong>{project.name}</strong>
-                    <RecentProjectOpenedAt lastOpenedAtMs={project.lastOpenedAtMs} now={recentNow} />
-                  </span>
-                  <span aria-hidden="true" className="global-project-open">
-                    <AppIcon icon={ChevronRight} size={12} />
-                  </span>
-                </button>
-              </li>
+              <RecentProjectCard
+                key={project.id}
+                project={project}
+                now={recentNow}
+                disabled={isOpening}
+                load={projectPort.firstRecentProjectSheet}
+                onOpen={openRecentProject}
+              />
             ))}
           </ul>
         )}

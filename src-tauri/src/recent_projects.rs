@@ -316,6 +316,8 @@ mod tests {
             .as_millis() as u64;
         let recorded = store.list().unwrap()[0].last_opened_at_ms.unwrap();
         assert!(recorded >= before && recorded <= after);
+        let summary = serde_json::to_value(&store.list().unwrap()[0]).unwrap();
+        assert_eq!(summary["lastOpenedAtMs"].as_u64(), Some(recorded));
         let saved = std::fs::read(paths.recent_projects_file()).unwrap();
         assert!(String::from_utf8_lossy(&saved).contains("lastOpenedAtMs"));
         assert_eq!(store.list().unwrap()[0].last_opened_at_ms, Some(recorded));

@@ -370,7 +370,8 @@ test("loads and renders recent Projects by name", async () => {
   expect(listRecentProjects).toHaveBeenCalledOnce();
 });
 
-test("shows the real last opening when known and no filler for older records", async () => {
+test("shows compact dates with a full accessible description and no filler for older records", async () => {
+  const user = userEvent.setup();
   const dates = welcomePreviewRecentProjects(new URLSearchParams("recents=dates"));
   const { container } = render(
     <GlobalShell
@@ -380,11 +381,17 @@ test("shows the real last opening when known and no filler for older records", a
     />,
   );
   expect(await screen.findByRole("button", { name: dates[0].name })).toBeEnabled();
-  expect(screen.getByText("Hoje às 14:30").tagName).toBe("TIME");
-  expect(screen.getByText("Ontem às 09:15").tagName).toBe("TIME");
-  expect(screen.getByText("18/09/2026 às 09:15").tagName).toBe("TIME");
+  expect(screen.getByText("Hoje").tagName).toBe("TIME");
+  expect(screen.getByText("Ontem").tagName).toBe("TIME");
+  expect(screen.getByText("18/09/2026").tagName).toBe("TIME");
+  expect(screen.getByRole("button", { name: dates[0].name }))
+    .toHaveAttribute("aria-description", "Última abertura: Hoje às 14:30");
+  await user.hover(screen.getByRole("button", { name: dates[0].name }));
+  expect(await screen.findByRole("tooltip")).toHaveTextContent("Hoje às 14:30");
   expect(container.querySelectorAll("time")).toHaveLength(3);
   expect(screen.getByRole("button", { name: dates[3].name }).querySelector("time")).toBeNull();
+  expect(screen.getByRole("button", { name: dates[3].name }))
+    .not.toHaveAttribute("aria-description");
 });
 
 test("shows a real first Sheet and keeps an unavailable card usable", async () => {

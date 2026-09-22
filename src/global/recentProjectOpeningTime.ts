@@ -1,5 +1,6 @@
 export interface RecentProjectOpeningTime {
   label: string;
+  fullLabel: string;
   dateTime: string;
 }
 
@@ -36,7 +37,8 @@ export function recentProjectOpeningTime(
       ? "Ontem"
       : localDate.format(openedAt);
   return {
-    label: `${day} às ${localTime.format(openedAt)}`,
+    label: day,
+    fullLabel: `${day} às ${localTime.format(openedAt)}`,
     dateTime: openedAt.toISOString(),
   };
 }

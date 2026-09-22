@@ -99,12 +99,19 @@ composição disponível segue a apresentação degradada do desenho compartilha
 A ausência da miniatura não impede a tentativa normal de abertura. Alterações
 ainda não salvas em uma Janela de Projeto não aparecem na miniatura dos recentes.
 
-A faixa inferior é compacta: mostra o Nome do Projeto e, quando disponível,
-uma única linha discreta com a última abertura. Usa o horário local e português
-simples: **Hoje às 14:30**, **Ontem às 09:15** ou **18/09/2026 às 09:15**.
+A faixa inferior usa **uma única linha**: Nome do Projeto à esquerda e,
+quando conhecida, a data da última abertura à direita, menor e discreta.
+A data aparece como **Hoje**, **Ontem** ou **18/09/2026**. O tooltip compartilhado
+e a descrição acessível informam também o horário local, por exemplo
+**Última abertura: Hoje às 14:30**. O nome ocupa o espaço restante e usa reticências
+quando necessário; nome, data e seta não se sobrepõem.
+
 A linha “Projeto MyAlbuns” e a expressão genérica “Aberto recentemente” não
-aparecem. Os cartões têm 176 px de altura, com 126 px reservados à miniatura
-e uma faixa inferior de 48 px; o espaço da seta permanece reservado.
+aparecem. Os cartões têm 160 px de altura, com 126 px reservados à miniatura
+e uma faixa inferior de 32 px; o espaço da seta permanece reservado.
+Sem data conhecida, a mesma linha mostra apenas o nome, sem uma linha vazia
+abaixo nem texto substituto. Essa decisão do autor, de 22 de setembro de 2026,
+substitui a apresentação inicial do rodapé em duas linhas.
 
 A lista usa a abertura mais recente como ordenação decrescente. O backend
 registra o instante e promove a entrada somente depois que o Host independente
