@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { TextInput } from "../ui/TextInput";
 import { fieldValidationTooltipAttributes, useFieldValidationTooltip } from "../ui/FieldValidationTooltip";
 import { NumericRangeField } from "../ui/NumericRangeField";
@@ -18,6 +18,7 @@ export interface NumericPropertyControlActions {
 interface NumericPropertyControlProps extends NumericPropertyControlActions {
   value: number | null;
   label: string;
+  labelAccessory?: ReactNode;
   numberLabel: string;
   sliderLabel: string;
   unit: string;
@@ -137,7 +138,7 @@ export function NumericPropertyControl(props: NumericPropertyControlProps) {
   }, []);
 
   return (
-    <NumericRangeField ref={rootRef} label={props.label} unit={props.unit}
+    <NumericRangeField ref={rootRef} label={props.label} labelAccessory={props.labelAccessory} unit={props.unit}
       validation={validationTooltip}
       numberInput={<TextInput
             ref={numberRef}

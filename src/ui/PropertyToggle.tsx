@@ -7,13 +7,14 @@ import { AppIcon } from "./AppIcon";
 import "./PropertyToggle.css";
 
 /** An icon tool whose whole surface reflects the property's state. */
-export function PropertyToggle({ label, icon, pressed, disabled, onToggle, className }: {
+export function PropertyToggle({ label, icon, pressed, disabled, onToggle, className, tooltipSide = "right" }: {
   label: string;
   icon: LucideIcon;
   pressed: boolean | "mixed";
   disabled: boolean;
   onToggle(): void;
   className?: string;
+  tooltipSide?: "left" | "right";
 }) {
   const trigger = useRef<HTMLButtonElement>(null);
   const options = { isDisabled: disabled, delay: 600, closeDelay: 100 };
@@ -21,7 +22,7 @@ export function PropertyToggle({ label, icon, pressed, disabled, onToggle, class
   const { triggerProps, tooltipProps: descriptionProps } = useTooltipTrigger(options, tooltip, trigger);
   const { tooltipProps } = useTooltip(descriptionProps, tooltip);
   return (
-    <div className="ui-property-toggle-anchor">
+    <div className="ui-property-toggle-anchor" data-tooltip-side={tooltipSide}>
       <ActionButton
         {...triggerProps}
         className={["ui-property-toggle", className].filter(Boolean).join(" ")}

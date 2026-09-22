@@ -19,7 +19,8 @@ continuam na validação por tooltip. A origem da borda e a ação para usar o
 padrão do álbum continuam disponíveis porque informam a herança do design.
 
 Espelhar horizontalmente e Preto e branco usam `PropertyToggle`, componente
-neutro de UI com ícone em um botão compacto, alinhado à esquerda. Após a
+neutro de UI com ícone em um botão compacto. Espelhar fica junto ao giro;
+Preto e branco permanece à esquerda em Ajustes e Efeitos. Após a
 aprovação do estado pressionado neutro, o usuário pediu a retirada do texto
 visível. O nome da ação aparece no tooltip ao passar o mouse ou navegar pelo
 teclado, além de identificar o botão para leitores de tela. O estado faz parte
@@ -58,3 +59,23 @@ duplica regras de edição, seleção, histórico ou persistência.
 A validação usa os testes existentes de orientação, efeitos, sliders e
 integração do painel, além das capturas declaradas do painel individual,
 seleção mista, teclado e escalas de 125% e 150%.
+
+## Alinhamento e agrupamento dos ajustes
+
+Os campos numéricos do quadro compartilham a mesma coluna: entrada de 64 px
+e espaço de 24 px para a unidade. Assim, porcentagens, graus e medidas físicas
+mantêm a mesma posição. Entre ajustes, o espaçamento é de 12 px.
+
+Na linha Giro, a ação de girar 90° e o valor atual formam um controle único,
+com separação interna discreta. O próprio valor atual acompanha o ícone de
+restauração; não existe outro botão avulso com “0°”. Restaurar continua
+indisponível quando todas as fotos já estão em zero, mantendo o valor legível
+e a geometria estável. Valores diferentes exibem “—”. O espelhamento fica ao
+lado desse grupo, com o tooltip voltado para dentro do painel. O Ângulo segue
+independente do giro em passos de 90°.
+
+O nome Borda começa na mesma coluna dos demais rótulos, com a amostra de cor
+ao lado. O slider ocupa toda a largura, sem recuo causado pela amostra. A
+origem e a restauração do padrão do álbum dividem a linha quando há espaço.
+Essas mudanças são de composição visual; comandos, seleção e histórico
+mantêm seus contratos existentes.

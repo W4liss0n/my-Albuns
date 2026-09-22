@@ -42,20 +42,18 @@ export function FrameStyleControls({ frames, unit, ...actions }: FrameStyleContr
       formatValue={String} parseValue={(text) => /^\d+$/.test(text.trim()) ? Number(text) : null}
       valueText={(value) => `${value}%`} invalidHelp="Use um número inteiro entre 0 e 100."
     />
-    <div className="frame-style-border-row">
-      <ColorPropertyControl rgb={rgb} label="da borda" disabled={actions.disabled}
+    <NumericPropertyControl {...number((widthUm) => ({ kind: "borderWidth", widthUm }))}
+      value={width} label="Borda" numberLabel={`Espessura da borda em ${displayUnitLabel(unit)}`} sliderLabel="Espessura da borda"
+      labelAccessory={<ColorPropertyControl rgb={rgb} label="da borda" disabled={actions.disabled}
         onPreview={(value) => actions.onPreview({ kind: "borderColor", rgb: value })}
         onCommit={(value) => actions.onCommit({ kind: "borderColor", rgb: value })}
-        onCancel={actions.onCancel} />
-      <NumericPropertyControl {...number((widthUm) => ({ kind: "borderWidth", widthUm }))}
-        value={width} label="Borda" numberLabel={`Espessura da borda em ${displayUnitLabel(unit)}`} sliderLabel="Espessura da borda"
-        unit={displayUnitLabel(unit)} minimum={0} maximum={Number.MAX_SAFE_INTEGER} step={250} resetValue={0}
-        sliderMaximum={Math.max(5_000, ...frames.map((frame) => frame.style.borderWidthUm))}
-        formatValue={(value) => formatMicrometers(value, unit)} parseValue={parseWidth}
-        valueText={(value) => value === 0 ? "sem borda" : formatPhysicalMeasurement(value, unit)}
-        invalidHelp={`Use uma medida positiva ou zero em ${displayUnitLabel(unit)}.`}
-      />
-    </div>
+        onCancel={actions.onCancel} />}
+      unit={displayUnitLabel(unit)} minimum={0} maximum={Number.MAX_SAFE_INTEGER} step={250} resetValue={0}
+      sliderMaximum={Math.max(5_000, ...frames.map((frame) => frame.style.borderWidthUm))}
+      formatValue={(value) => formatMicrometers(value, unit)} parseValue={parseWidth}
+      valueText={(value) => value === 0 ? "sem borda" : formatPhysicalMeasurement(value, unit)}
+      invalidHelp={`Use uma medida positiva ou zero em ${displayUnitLabel(unit)}.`}
+    />
     <div className="frame-style-origin">
       <p>{source === "album" ? "Usando o padrão do álbum" : source === "custom"
         ? frames.length === 1 ? "Definido neste quadro" : "Definido nestes quadros"

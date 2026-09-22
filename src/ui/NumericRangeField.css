@@ -4,11 +4,21 @@
 }
 
 .ui-numeric-range-heading,
+.ui-numeric-range-label,
 .ui-numeric-range-number {
   display: flex;
   align-items: center;
   gap: var(--ui-space-1);
   font-size: var(--ui-font-size-control);
+}
+
+.ui-numeric-range-label {
+  gap: var(--ui-space-2);
+}
+
+.ui-numeric-range-number > span {
+  width: var(--ui-numeric-range-unit-width, auto);
+  flex-shrink: 0;
 }
 
 .ui-numeric-range-heading {

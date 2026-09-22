@@ -1,7 +1,7 @@
-import { FlipHorizontal2, RotateCcw } from "lucide-react";
+import { FlipHorizontal2, RotateCcw, Undo2 } from "lucide-react";
 import type { FrameSnapshot, PhotoOrientationAction } from "../domain/project";
 import { projectCommandDescriptor } from "../application/projectCommandCatalog";
-import { ActionButton, PropertyToggle } from "../ui";
+import { ActionButton, AppIcon, PropertyToggle } from "../ui";
 import { PhotoAngleControl, type PhotoAngleControlActions } from "./PhotoAngleControl";
 
 export interface PhotoOrientationControlActions {
@@ -36,35 +36,41 @@ export function PhotoOrientationControls({ frames, disabled, onAction, angle }: 
       )}
       <div className="photo-orientation-row">
         <span>Giro</span>
-        <output aria-label="Giro das fotos">{turns === null ? "—" : `${((4 - turns) % 4) * 90}°`}</output>
-        <ActionButton
-          density="compact"
-          aria-label={rotate.label}
-          title={rotate.label}
-          disabled={disabled}
-          onClick={() => onAction("rotateCounterClockwise")}
-        >
-          <RotateCcw size={14} aria-hidden="true" /> 90°
-        </ActionButton>
-        <ActionButton
-          density="compact"
-          aria-label={reset.label}
-          title={reset.label}
-          disabled={disabled || turns === 0}
-          onClick={() => onAction("resetRotation")}
-        >
-          0°
-        </ActionButton>
+        <div className="photo-orientation-actions">
+          <div className="photo-rotation-control" role="group" aria-label="Giro da foto">
+            <ActionButton
+              density="compact"
+              aria-label={rotate.label}
+              title={rotate.label}
+              disabled={disabled}
+              onClick={() => onAction("rotateCounterClockwise")}
+            >
+              <AppIcon icon={RotateCcw} size={16} /> 90°
+            </ActionButton>
+            <ActionButton
+              className="photo-rotation-reset"
+              density="compact"
+              aria-label={reset.label}
+              title={reset.label}
+              disabled={disabled || turns === 0}
+              onClick={() => onAction("resetRotation")}
+            >
+              <output aria-label="Giro das fotos">{turns === null ? "—" : `${((4 - turns) % 4) * 90}°`}</output>
+              <AppIcon icon={Undo2} size={14} />
+            </ActionButton>
+          </div>
+          <PropertyToggle
+            className="photo-mirror-control"
+            label={mirror.label}
+            icon={FlipHorizontal2}
+            pressed={mirrored}
+            disabled={disabled}
+            onToggle={() => onAction("toggleHorizontalMirror")}
+            tooltipSide="left"
+          />
+        </div>
       </div>
       {angle && <PhotoAngleControl key={angle.scopeKey} value={angleTenths} {...angle} />}
-      <PropertyToggle
-        className="photo-mirror-control"
-        label={mirror.label}
-        icon={FlipHorizontal2}
-        pressed={mirrored}
-        disabled={disabled}
-        onToggle={() => onAction("toggleHorizontalMirror")}
-      />
     </div>
   );
 }

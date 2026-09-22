@@ -3,8 +3,9 @@ import { FieldValidationAutoTooltip, FieldValidationTooltip, type FieldValidatio
 import "./NumericRangeField.css";
 
 /** Shared layout/validation; live editor gestures and form drafts keep their own lifecycle. */
-export function NumericRangeField({ label, unit, numberInput, slider, validation, ref }: {
+export function NumericRangeField({ label, labelAccessory, unit, numberInput, slider, validation, ref }: {
   label: string;
+  labelAccessory?: ReactNode;
   unit: string;
   numberInput: ReactNode;
   slider: ReactNode;
@@ -13,7 +14,7 @@ export function NumericRangeField({ label, unit, numberInput, slider, validation
 }) {
   return <div className="ui-numeric-range-field" ref={ref}>
     <div className="ui-numeric-range-heading">
-      <span>{label}</span>
+      <div className="ui-numeric-range-label"><span>{label}</span>{labelAccessory}</div>
       <div className="ui-numeric-range-number">
         {numberInput}
         <span aria-hidden="true">{unit}</span>

@@ -1,15 +1,15 @@
 .frame-style-controls {
   display: grid;
   gap: var(--ui-space-3);
-  padding-top: var(--ui-space-2);
+  padding-top: var(--ui-space-3);
 }
 
-.frame-style-border-row {
-  position: relative;
-  display: grid;
-  grid-template-columns: 26px minmax(0, 1fr);
+.frame-style-origin {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
   gap: var(--ui-space-2);
 }
 
-.frame-style-origin { display: grid; justify-items: start; gap: var(--ui-space-1); }
 .frame-style-origin p { margin: 0; color: var(--ui-text-muted); font-size: var(--ui-font-size-micro); }

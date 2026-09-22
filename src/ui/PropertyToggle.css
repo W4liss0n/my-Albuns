@@ -62,3 +62,14 @@
   inset-inline-start: -5px;
   transform: translateY(-50%) rotate(-45deg);
 }
+
+.ui-property-toggle-anchor[data-tooltip-side="left"] .ui-property-toggle-tooltip {
+  left: auto;
+  right: calc(100% + var(--ui-space-2));
+}
+
+.ui-property-toggle-anchor[data-tooltip-side="left"] .ui-property-toggle-tooltip::before {
+  inset-inline-start: auto;
+  inset-inline-end: -5px;
+  transform: translateY(-50%) rotate(135deg);
+}
