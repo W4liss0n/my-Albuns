@@ -353,6 +353,7 @@ enum OwnerPresentation {
 #[serde(rename_all = "camelCase")]
 pub(crate) enum ProjectFailureDialogContext {
     ProjectOpening,
+    FavoriteUpdate,
     ConfigurationValidation,
     DecorativeSelection,
     ProjectCreation,
@@ -362,6 +363,7 @@ impl ProjectFailureDialogContext {
     fn title(self) -> &'static str {
         match self {
             Self::ProjectOpening => "Não foi possível abrir o projeto",
+            Self::FavoriteUpdate => "Não foi possível atualizar os favoritos",
             Self::ConfigurationValidation => "Não foi possível validar as Configurações",
             Self::DecorativeSelection => "Não foi possível escolher a imagem decorativa",
             Self::ProjectCreation => "Não foi possível criar o projeto",
@@ -1265,6 +1267,10 @@ mod tests {
             (
                 ProjectFailureDialogContext::ProjectOpening,
                 "Não foi possível abrir o projeto",
+            ),
+            (
+                ProjectFailureDialogContext::FavoriteUpdate,
+                "Não foi possível atualizar os favoritos",
             ),
             (
                 ProjectFailureDialogContext::ConfigurationValidation,

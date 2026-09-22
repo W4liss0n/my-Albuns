@@ -443,6 +443,18 @@ test("delegates a launch failure to the owned native dialog window", async () =>
     error,
   });
 });
+test("uses the favorite update context for its owned operational dialog", async () => {
+  vi.mocked(invoke).mockResolvedValueOnce(undefined);
+  const error = {
+    code: "recent_project_favorite_unavailable",
+    message: "Não foi possível atualizar os favoritos.",
+    action: "Tente novamente.",
+  };
+  await tauriProjectFailureDialogPort.present({ context: "favoriteUpdate", error });
+  expect(invoke).toHaveBeenCalledWith("show_project_failure_dialog", {
+    context: "favoriteUpdate", error,
+  });
+});
 test("subscribes before snapshotting and delivers each activation terminal once", async () => {
   const listener = vi.fn();
   const unlisten = vi.fn();

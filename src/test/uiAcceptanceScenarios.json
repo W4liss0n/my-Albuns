@@ -35,8 +35,8 @@
       "implementationPath": "/welcome-preview.html?recents=favorites",
       "comparison": { "kind": "implementation-only", "surface": "welcome-window", "reason": "Design 0002: estrela discreta no hover e preenchida no favorito, sem competir com a primeira lâmina." },
       "viewport": { "width": 1000, "height": 760 },
-      "readySelector": ".global-project-card:hover .global-project-favorite[aria-pressed='false']",
-      "actions": [{ "type": "hover", "selector": "ul[aria-label='Projetos recentes'] li:first-child .global-project-launch" }]
+      "readySelector": ".global-project-card:hover .global-project-favorite-tooltip[role='tooltip']",
+      "actions": [{ "type": "hover", "selector": "ul[aria-label='Projetos recentes'] li:first-child .global-project-launch" }, { "type": "hover", "selector": "ul[aria-label='Projetos recentes'] li:first-child .global-project-favorite" }]
     },
     {
       "id": "welcome-favorite-focus",
@@ -44,7 +44,7 @@
       "implementationPath": "/welcome-preview.html?recents=favorites",
       "comparison": { "kind": "implementation-only", "surface": "welcome-window", "reason": "Design 0002: botão nativo com foco e dica acessível sem alterar o cartão." },
       "viewport": { "width": 1000, "height": 760 },
-      "readySelector": ".global-project-favorite[aria-pressed='false']:focus-visible",
+      "readySelector": ".global-project-favorite[aria-pressed='false']:focus-visible ~ .global-project-favorite-tooltip[role='tooltip']",
       "actions": [{ "type": "focus", "selector": "ul[aria-label='Projetos recentes'] li:first-child .global-project-launch" }, { "type": "key", "key": "Tab" }]
     },
     {
@@ -73,6 +73,33 @@
       "viewport": { "width": 640, "height": 800 },
       "readySelector": "main:has(ul[aria-label='Favoritos']):has(ul[aria-label='Projetos recentes']) .global-project-thumbnail[data-preview-state='ready']",
       "actions": []
+    },
+    {
+      "id": "welcome-favorite-add-narrow",
+      "title": "Boas-vindas — marcar favorito na janela estreita",
+      "implementationPath": "/welcome-preview.html?recents=favorites",
+      "comparison": { "kind": "implementation-only", "surface": "welcome-window", "reason": "Design 0002: a estrela move o cartão entre grupos sem corte na largura reduzida." },
+      "viewport": { "width": 640, "height": 800 },
+      "readySelector": "ul[aria-label='Favoritos'] .global-project-card[data-project-id='p2'] .global-project-favorite[aria-pressed='true']:focus",
+      "actions": [{ "type": "hover", "selector": "ul[aria-label='Projetos recentes'] li:first-child .global-project-launch" }, { "type": "click", "selector": "ul[aria-label='Projetos recentes'] li:first-child .global-project-favorite" }]
+    },
+    {
+      "id": "welcome-favorite-remove-narrow",
+      "title": "Boas-vindas — desmarcar último favorito na janela estreita",
+      "implementationPath": "/welcome-preview.html?recents=favorites-only",
+      "comparison": { "kind": "implementation-only", "surface": "welcome-window", "reason": "Design 0002: a remoção do último favorito preserva foco e composição na largura reduzida." },
+      "viewport": { "width": 640, "height": 800 },
+      "readySelector": "main:not(:has(ul[aria-label='Favoritos'])) ul[aria-label='Projetos recentes'] .global-project-card[data-project-id='p3'] .global-project-favorite[aria-pressed='false']:focus",
+      "actions": [{ "type": "click", "selector": "ul[aria-label='Favoritos'] li:first-child .global-project-favorite" }, { "type": "click", "selector": "ul[aria-label='Favoritos'] li:first-child .global-project-favorite" }]
+    },
+    {
+      "id": "welcome-favorite-tooltip-narrow",
+      "title": "Boas-vindas — tooltip da estrela na janela estreita",
+      "implementationPath": "/welcome-preview.html?recents=favorites",
+      "comparison": { "kind": "implementation-only", "surface": "welcome-window", "reason": "Design 0002: o tooltip da estrela fica abaixo do controle e dentro da janela estreita." },
+      "viewport": { "width": 640, "height": 800 },
+      "readySelector": "ul[aria-label='Projetos recentes'] li:first-child .global-project-favorite-tooltip[role='tooltip']",
+      "actions": [{ "type": "hover", "selector": "ul[aria-label='Projetos recentes'] li:first-child .global-project-launch" }, { "type": "hover", "selector": "ul[aria-label='Projetos recentes'] li:first-child .global-project-favorite" }]
     },
     {
       "id": "welcome-favorites-long-name-date",

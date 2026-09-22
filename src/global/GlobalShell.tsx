@@ -112,11 +112,12 @@ function RecentProjectThumbnail({
 }
 
 function RecentProjectCard({
-  project, now, disabled, load, onOpen, onFavorite,
+  project, now, disabled, favoriteDisabled, load, onOpen, onFavorite,
 }: {
   project: RecentProjectSummary;
   now: Date;
   disabled: boolean;
+  favoriteDisabled: boolean;
   load(id: string): Promise<RecentProjectFirstSheet | null>;
   onOpen(id: string): void;
   onFavorite(id: string, favorite: boolean): void;
@@ -235,7 +236,7 @@ function RecentProjectCard({
         aria-label={favoriteLabel}
         aria-pressed={project.favorite}
         className="global-project-favorite"
-        disabled={disabled}
+        disabled={disabled || favoriteDisabled}
         onClick={() => onFavorite(project.id, !project.favorite)}
         ref={favoriteTrigger}
         type="button"
@@ -404,22 +405,28 @@ export function GlobalShell({
     setFavoritePending(id);
     const outcome = await projectPort.setRecentProjectFavorite(id, favorite);
     if (outcome.status === "saved") {
-      restoreFavoriteFocus.current = id;
+      restoreFavoriteFocus.current = outcome.projects.some((project) => project.id === id)
+        ? id
+        : (outcome.projects.find((project) => !project.favorite) ?? outcome.projects[0])?.id ?? "";
       setRecentProjects(outcome.projects);
     } else {
-      await failureDialogPort.present({ context: "projectOpening", error: outcome.error });
+      await failureDialogPort.present({ context: "favoriteUpdate", error: outcome.error });
+      restoreFavoriteFocus.current = id;
     }
     setFavoritePending(null);
   };
 
   useLayoutEffect(() => {
+    if (favoritePending !== null) return;
     const id = restoreFavoriteFocus.current;
-    if (!id) return;
+    if (id === null) return;
     restoreFavoriteFocus.current = null;
     const card = Array.from(document.querySelectorAll<HTMLElement>(".global-project-card"))
       .find((element) => element.dataset.projectId === id);
-    card?.querySelector<HTMLButtonElement>(".global-project-favorite")?.focus({ preventScroll: true });
-  }, [recentProjects]);
+    const target = card?.querySelector<HTMLButtonElement>(".global-project-favorite")
+      ?? newProjectTriggerRef.current;
+    target?.focus({ preventScroll: true });
+  }, [favoritePending, recentProjects]);
 
   const startCreation = useCallback(() => {
     openingAttempt.current += 1;
@@ -531,7 +538,8 @@ export function GlobalShell({
       key={project.id}
       project={project}
       now={recentNow}
-      disabled={isOpening || favoritePending === project.id}
+      disabled={isOpening}
+      favoriteDisabled={favoritePending !== null}
       load={projectPort.firstRecentProjectSheet}
       onOpen={openRecentProject}
       onFavorite={setFavorite}

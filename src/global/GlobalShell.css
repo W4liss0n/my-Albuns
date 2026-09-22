@@ -241,8 +241,12 @@ body,
 }
 
 .global-project-favorite-tooltip {
+  --ui-tooltip-pointer-inline-start: auto;
+  --ui-tooltip-pointer-inline-end: 14px;
+
   top: 38px;
   right: 0;
+  left: auto;
   width: max-content;
   pointer-events: none;
 }

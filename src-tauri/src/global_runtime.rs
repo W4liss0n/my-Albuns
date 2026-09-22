@@ -745,8 +745,8 @@ async fn set_recent_project_favorite(
     let store = state.recent_projects.clone();
     tauri::async_runtime::spawn_blocking(move || store.set_favorite(&project_id, favorite))
         .await
-        .map_err(|_| state_failure())?
-        .map_err(|_| state_failure())
+        .map_err(|_| favorite_update_failure())?
+        .map_err(|_| favorite_update_failure())
 }
 
 #[derive(Serialize)]
@@ -1557,6 +1557,14 @@ fn state_failure() -> ProjectLaunchFailure {
     )
 }
 
+fn favorite_update_failure() -> ProjectLaunchFailure {
+    simple_failure(
+        "recent_project_favorite_unavailable",
+        "Não foi possível atualizar os favoritos.",
+        "Tente novamente.",
+    )
+}
+
 fn graphics_gate_failure() -> ProjectLaunchFailure {
     simple_failure(
         "graphics_requirement_not_met",
@@ -2219,6 +2227,14 @@ pub(crate) fn run(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn favorite_write_failure_describes_the_favorite_operation() {
+        let failure = favorite_update_failure();
+        assert_eq!(failure.code, "recent_project_favorite_unavailable");
+        assert_eq!(failure.message, "Não foi possível atualizar os favoritos.");
+        assert_eq!(failure.action.as_deref(), Some("Tente novamente."));
+    }
 
     #[tokio::test]
     async fn empty_forwarded_activation_waits_for_the_active_launch_owner() {

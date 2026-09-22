@@ -28,6 +28,7 @@ export interface NewProjectOperationalFailure {
 
 export type ProjectFailureDialogContext =
   | "projectOpening"
+  | "favoriteUpdate"
   | NewProjectOperationalFailureContext;
 
 export interface ProjectFailureDialogRequest {

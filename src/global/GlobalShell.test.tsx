@@ -637,8 +637,51 @@ test("keeps the saved favorite when the update fails and reports the operational
     })} />);
   await userEvent.setup().click(await screen.findByRole("button", { name: "Remover dos favoritos" }));
   expect(screen.getByRole("list", { name: "Favoritos" })).toHaveTextContent("Um projeto");
-  expect(present).toHaveBeenCalledOnce();
+  expect(present).toHaveBeenCalledWith({ context: "favoriteUpdate", error: {
+    code: "recent_project_favorite_unavailable", message: "Falha", action: "Tente novamente.",
+  } });
+  expect(screen.getByRole("button", { name: "Remover dos favoritos" })).toHaveFocus();
   expect(openRecentProject).not.toHaveBeenCalled();
+});
+
+test("moves focus to a remaining recent action when retention removes the unfavorited card", async () => {
+  const newer = { id: "newer", name: "Mais recente", lastOpenedAtMs: 200, favorite: false };
+  const older = { id: "older", name: "Favorito antigo", lastOpenedAtMs: 100, favorite: true };
+  render(<GlobalShell graphicsDiagnostic={supportedGraphics} projectPort={createProjectPort({
+    listRecentProjects: async () => [newer, older],
+    setRecentProjectFavorite: async () => ({ status: "saved", projects: [newer] }),
+  })} />);
+  await userEvent.setup().click(await screen.findByRole("button", { name: "Remover dos favoritos" }));
+  expect(screen.queryByRole("button", { name: "Favorito antigo" })).not.toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Mais recente" }).closest("li")
+    ?.querySelector(".global-project-favorite")).toHaveFocus();
+});
+
+test("disables every favorite action while a favorite write is pending", async () => {
+  const pending = deferred<{ status: "saved"; projects: readonly {
+    id: string; name: string; lastOpenedAtMs: number; favorite: boolean;
+  }[] }>();
+  const projects = [
+    { id: "one", name: "Primeiro", lastOpenedAtMs: 200, favorite: false },
+    { id: "two", name: "Segundo", lastOpenedAtMs: 100, favorite: false },
+  ];
+  const setRecentProjectFavorite = vi.fn(() => pending.promise);
+  render(<GlobalShell graphicsDiagnostic={supportedGraphics} projectPort={createProjectPort({
+    listRecentProjects: async () => projects,
+    setRecentProjectFavorite,
+  })} />);
+  await screen.findByRole("button", { name: "Primeiro" });
+  const stars = screen.getAllByRole("button", { name: "Adicionar aos favoritos" });
+  await userEvent.setup().click(stars[0]);
+  expect(stars[0]).toBeDisabled();
+  expect(stars[1]).toBeDisabled();
+  expect(screen.getByRole("button", { name: "Segundo" })).toBeEnabled();
+  expect(setRecentProjectFavorite).toHaveBeenCalledOnce();
+  await act(async () => pending.resolve({ status: "saved", projects: [
+    { ...projects[0], favorite: true }, projects[1],
+  ] }));
+  expect(screen.getByRole("button", { name: "Remover dos favoritos" })).toBeEnabled();
+  expect(screen.getByRole("button", { name: "Adicionar aos favoritos" })).toBeEnabled();
 });
 
 test("shows the startup failure from a direct Windows opening", async () => {
