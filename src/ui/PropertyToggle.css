@@ -1,3 +1,10 @@
+.ui-property-toggle-anchor {
+  position: relative;
+  width: var(--ui-compact-control-height);
+  height: var(--ui-compact-control-height);
+  justify-self: start;
+}
+
 .ui-action-button.ui-property-toggle {
   width: var(--ui-compact-control-height);
   height: var(--ui-compact-control-height);
@@ -42,19 +49,16 @@
 }
 
 .ui-anchored-tooltip.ui-property-toggle-tooltip {
+  top: 50%;
+  left: calc(100% + var(--ui-space-2));
   right: auto;
   width: max-content;
   max-width: calc(100vw - 2 * var(--ui-space-4));
+  transform: translateY(-50%);
 }
 
 .ui-property-toggle-tooltip::before {
   top: 50%;
   inset-inline-start: -5px;
   transform: translateY(-50%) rotate(-45deg);
-}
-
-.ui-property-toggle-tooltip[data-placement="left"]::before {
-  inset-inline-start: auto;
-  inset-inline-end: -5px;
-  transform: translateY(-50%) rotate(135deg);
 }

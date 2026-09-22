@@ -41,12 +41,12 @@ O componente reutiliza o botão compartilhado e os tokens de superfície,
 borda, tipografia e espaçamento do programa. O botão mede 28 × 28 px, com
 ícone centralizado de 16 px e cantos de 4 px. O tooltip reutiliza a superfície,
 a borda e a sombra compartilhadas; aparece ao lado, fora do fluxo do painel,
-e não desloca controles. A abertura, o fechamento e o posicionamento seguem
-o Tooltip do React Aria Components 1.19.0, usando o botão compartilhado como
-gatilho por meio de Focusable, conforme a [documentação oficial](https://react-aria.adobe.com/Tooltip#custom-trigger).
-As coordenadas do gatilho são convertidas para a escala do documento antes
-de posicionar o tooltip; assim, ampliar a interface não aplica a escala duas
-vezes nem afasta a identificação do botão.
+e não desloca controles. A abertura, o fechamento e os atributos de
+acessibilidade usam `useTooltipTrigger`, `useTooltip` e `useTooltipTriggerState`
+(React Aria 3.50.0 e React Stately 3.48.0), conforme a
+[documentação oficial](https://react-aria.adobe.com/Tooltip/useTooltipTrigger).
+O tooltip é ancorado pelo CSS ao próprio controle e acompanha sua escala,
+sem conversão manual de coordenadas ou posicionamento automático em portal.
 O foco por teclado recebe contorno neutro ao redor do botão, separado do estado
 ligado. Enter e Espaço acionam a mesma operação do clique. Nome acessível,
 estado misto e bloqueio durante operações seguem o contrato existente.
