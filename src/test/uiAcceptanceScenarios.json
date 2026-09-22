@@ -12253,6 +12253,100 @@
           "selector": "button[aria-label=\"Lado direito\"]:focus-visible"
         }
       ]
+    },
+    {
+      "id": "workspace-album-mixed-overlay-focus",
+      "title": "Design do álbum — foco visível na sobreposição mista",
+      "implementationPath": "/workspace-preview.html?frame=decorations&decoration-state=inherited&mode=normal",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "shared-design-controls",
+        "reason": "Design 0047: misturas de imagem e ausência mantêm amostra explícita e contorno visível ao navegar por teclado."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "readySelector": "[aria-label=\"Escolher decorativo para sobreposição\"][data-mixed=\"true\"]:focus-visible",
+      "actions": [
+        {
+          "type": "click",
+          "selector": "button[aria-label=\"Informações do álbum\"]"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label=\"Lado esquerdo\"]"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label=\"Sem sobreposição\"]"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label=\"Ambos os lados\"]"
+        },
+        {
+          "type": "focus",
+          "selector": "button[aria-label=\"Sem sobreposição\"]"
+        },
+        {
+          "type": "key",
+          "key": "Tab"
+        }
+      ]
+    },
+    {
+      "id": "workspace-album-mixed-overlay-escape",
+      "title": "Design do álbum — Escape retorna à sobreposição mista",
+      "implementationPath": "/workspace-preview.html?frame=decorations&decoration-state=inherited&mode=normal",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "shared-design-controls",
+        "reason": "Design 0047: misturas de imagem e ausência mantêm amostra explícita e contorno visível ao navegar por teclado."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "readySelector": "[aria-label=\"Escolher decorativo para sobreposição\"][data-mixed=\"true\"]:focus-visible",
+      "actions": [
+        {
+          "type": "click",
+          "selector": "button[aria-label=\"Informações do álbum\"]"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label=\"Lado esquerdo\"]"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label=\"Sem sobreposição\"]"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label=\"Ambos os lados\"]"
+        },
+        {
+          "type": "focus",
+          "selector": "button[aria-label=\"Sem sobreposição\"]"
+        },
+        {
+          "type": "key",
+          "key": "Tab"
+        },
+        {
+          "type": "key",
+          "key": "Enter"
+        },
+        {
+          "type": "assert",
+          "selector": "[role=\"menu\"][aria-label=\"Decorativos para sobreposição\"]"
+        },
+        {
+          "type": "key",
+          "key": "Escape"
+        }
+      ]
     }
   ]
 }

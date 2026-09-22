@@ -36,7 +36,7 @@
   color: var(--ui-text);
 }
 
-.visual-design-picker__option:hover .visual-design-picker__tile {
+.visual-design-picker__option:hover :is(.visual-design-picker__tile, .ui-mixed-swatch) {
   border-color: var(--ui-text-muted);
 }
 
@@ -44,7 +44,7 @@
   outline: 0;
 }
 
-.visual-design-picker__option:focus-visible .visual-design-picker__tile {
+.visual-design-picker__option:focus-visible :is(.visual-design-picker__tile, .ui-mixed-swatch) {
   outline: 1px solid var(--ui-focus-neutral);
   outline-offset: 2px;
 }
