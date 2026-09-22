@@ -12351,7 +12351,7 @@
     {
       "id": "workspace-property-toggle-keyboard",
       "title": "Propriedade do quadro — ativação e foco por teclado",
-      "implementationPath": "/workspace-preview.html?frame=orientation",
+      "implementationPath": "/workspace-preview.html?frame=orientation&orientation=single-rotated",
       "comparison": {
         "kind": "implementation-only",
         "surface": "frame-property-toggle",
