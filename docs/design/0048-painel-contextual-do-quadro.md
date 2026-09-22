@@ -44,6 +44,9 @@ a borda e a sombra compartilhadas; aparece ao lado, fora do fluxo do painel,
 e não desloca controles. A abertura, o fechamento e o posicionamento seguem
 o Tooltip do React Aria Components 1.19.0, usando o botão compartilhado como
 gatilho por meio de Focusable, conforme a [documentação oficial](https://react-aria.adobe.com/Tooltip#custom-trigger).
+As coordenadas do gatilho são convertidas para a escala do documento antes
+de posicionar o tooltip; assim, ampliar a interface não aplica a escala duas
+vezes nem afasta a identificação do botão.
 O foco por teclado recebe contorno neutro ao redor do botão, separado do estado
 ligado. Enter e Espaço acionam a mesma operação do clique. Nome acessível,
 estado misto e bloqueio durante operações seguem o contrato existente.
