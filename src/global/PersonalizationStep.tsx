@@ -26,7 +26,7 @@ import {
 } from "./application/newProjectPersonalization";
 import { personalizationPreviewFromDraft } from "./newProjectPersonalizationPreview";
 import { ActionButton, AppIcon } from "../ui";
-import { PersonalizationScopeSurface } from "../ui/visualPreview";
+import { VisualScopePreview } from "../components/VisualScopePreview";
 import { NewProjectPreviewPanel } from "./NewProjectPreviewPanel";
 
 interface PersonalizationStepProps {
@@ -113,16 +113,19 @@ export function PersonalizationStep({
         surfaceLabel="Prévia do formato da lâmina"
       >
         {(geometry) => (
-          <PersonalizationScopeSurface
-            focus={{
-              kind: "controlled",
-              value: focusedScope,
-              onChange: setFocusedScope,
+          <VisualScopePreview
+            content={{
+              kind: "general",
+              label: "Reprodução da lâmina",
+              geometry,
+              personalization: personalizationPreviewFromDraft(personalization),
+              frameGapUm,
+              technicalGuides: true,
             }}
-            frameGapUm={frameGapUm}
-            geometry={geometry}
-            personalization={personalizationPreviewFromDraft(personalization)}
-            presentation={NEW_PROJECT_SCOPE_PRESENTATION}
+            label="Aplicar personalização em"
+            scope={personalization.fixedScope}
+            bothSidesControl="outside"
+            focus={{ value: focusedScope, onChange: setFocusedScope }}
             onScopeChange={(scope) =>
               onChange(fixPersonalizationScope(personalization, scope))
             }
@@ -261,13 +264,6 @@ const BACKGROUND_SWATCHES = [
 ] as const;
 
 const FRAME_BORDER_SWATCHES = ["#FFFFFF", "#2C2924", "#C5A46D"] as const;
-
-const NEW_PROJECT_SCOPE_PRESENTATION = {
-  accessiblePreviewLabel: "Reprodução da lâmina",
-  externalSelection: true,
-  scopeControlsLabel: "Aplicar personalização em",
-  technicalGuides: true,
-} as const;
 
 function personalizationScopeLabel(
   scope: NewProjectPersonalizationDraft["fixedScope"],

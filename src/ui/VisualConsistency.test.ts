@@ -62,9 +62,9 @@ const applicationMenuSource = readStyles(
 );
 const sharedVisualPreviewSources = [
   "src/ui/visualPreview/PersonalizationPreview.tsx",
-  "src/ui/visualPreview/PersonalizationScopeSurface.tsx",
+  "src/components/VisualScopePreview.tsx",
   "src/ui/visualPreview/ProportionalPreviewViewport.tsx",
-  "src/ui/visualPreview/PersonalizationScopeSurface.css",
+  "src/components/VisualScopePreview.css",
   "src/ui/visualPreview/VisualPreviewSheet.css",
   "src/ui/visualPreview/ProportionalPreviewViewport.css",
 ].map((path) => ({ path, source: readStyles(path) }));
@@ -95,7 +95,7 @@ test("centralizes the shared type scale used by every application surface", () =
   expect(applicationStyles.map(({ path }) => path)).toEqual(
     expect.arrayContaining([
       "src/components/DecorativeMediaPicker.css",
-      "src/ui/visualPreview/PersonalizationScopeSurface.css",
+      "src/components/VisualScopePreview.css",
       "src/ui/visualPreview/VisualPreviewSheet.css",
       "src/ui/visualPreview/ProportionalPreviewViewport.css",
     ]),
@@ -258,7 +258,7 @@ test("keeps the shared visual preview neutral from New Project chrome", () => {
     expect(source, path).not.toMatch(/from\s+["'][^"']*global\//);
   }
   expect(newProjectPersonalizationSource).toContain(
-    'from "../ui/visualPreview"',
+    'from "../components/VisualScopePreview"',
   );
   expect(albumDesignSource).toContain('from "../ui/visualPreview"');
   expect(albumDesignSource).not.toMatch(/from\s+["'][^"']*global\//);

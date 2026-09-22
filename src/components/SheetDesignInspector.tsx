@@ -1,4 +1,4 @@
-import { useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import { RotateCcw, X } from "lucide-react";
 
 import type { VisualScope } from "../application/scopedValues";
@@ -6,8 +6,7 @@ import type {
   ComposedSheet, DecorativeRole, DecorativeScope, MediaCatalogItem, SheetVisualChange, SheetVisuals,
 } from "../domain/project";
 import { ActionButton, AppIcon } from "../ui";
-import { VisualScopeControls } from "../ui/visualPreview/VisualScopeControls";
-import { SheetPreview } from "./SheetPreview";
+import { VisualScopePreview } from "./VisualScopePreview";
 import { VisualDesignControl } from "./VisualDesignControl";
 import "./SheetDesignInspector.css";
 
@@ -40,9 +39,6 @@ export function SheetDesignInspector({
   sheet,
   onScopeChange,
 }: SheetDesignInspectorProps) {
-  const [hoveredScope, setHoveredScope] = useState<SheetDesignScope | null>(
-    null,
-  );
   const [pending, setPending] = useState(false);
   const pendingRef = useRef(false);
   const disabled = !actions || actions.disabled || pending;
@@ -62,12 +58,11 @@ export function SheetDesignInspector({
 
   return (
     <div className="sheet-design-inspector">
-      <SheetScopePreview
-        hoveredScope={hoveredScope}
-        mediaPreviewUrls={mediaPreviewUrls}
+      <VisualScopePreview
+        key={sheet.sheetId}
+        content={{ kind: "sheet", sheet, mediaPreviewUrls }}
+        label={"Aplicar na lâmina " + String(sheet.number).padStart(2, "0")}
         scope={scope}
-        sheet={sheet}
-        onHoveredScopeChange={setHoveredScope}
         onScopeChange={onScopeChange}
       />
       <p aria-live="polite" className="ui-section-eyebrow sheet-design-scope-status">
@@ -102,76 +97,6 @@ export function SheetDesignInspector({
         </ActionButton>
         {saveLayout?.feedback}
       </div>
-    </div>
-  );
-}
-
-function SheetScopePreview({
-  hoveredScope,
-  mediaPreviewUrls,
-  scope,
-  sheet,
-  onHoveredScopeChange,
-  onScopeChange,
-}: {
-  hoveredScope: SheetDesignScope | null;
-  mediaPreviewUrls: Readonly<Record<string, string>>;
-  scope: SheetDesignScope;
-  sheet: ComposedSheet;
-  onHoveredScopeChange(scope: SheetDesignScope | null): void;
-  onScopeChange(scope: SheetDesignScope): void;
-}) {
-  const inactiveSide =
-    sheet.activeSides === "both"
-      ? null
-      : sheet.activeSides === "left"
-        ? "right"
-        : "left";
-  const visualWidthUm =
-    sheet.activeSides === "both" ? sheet.widthUm : sheet.widthUm * 2;
-
-  return (
-    <div
-      aria-label={`Aplicar na lâmina ${String(sheet.number).padStart(2, "0")}`}
-      className="sheet-design-preview"
-      data-active-sides={sheet.activeSides}
-      data-hovered-scope={hoveredScope ?? undefined}
-      data-selected-scope={scope}
-      role="group"
-      style={
-        {
-          "--sheet-design-aspect-ratio": `${visualWidthUm} / ${sheet.heightUm}`,
-        } as CSSProperties
-      }
-      onPointerLeave={() => onHoveredScopeChange(null)}
-    >
-      <SheetPreview
-        mediaPreviewUrls={mediaPreviewUrls}
-        sheet={sheet}
-      />
-      {inactiveSide ? (
-        <span
-          aria-hidden="true"
-          className="sheet-design-preview__inactive"
-          data-side={inactiveSide}
-        />
-      ) : null}
-      <span
-        aria-hidden="true"
-        className="sheet-design-preview__highlight sheet-design-preview__highlight--selected"
-        data-scope={scope}
-      />
-      <VisualScopeControls
-        activeSides={sheet.activeSides}
-        targetLayout="overlaidCenter"
-        labels={{ left: "Página esquerda", both: "Ambos os lados", right: "Página direita" }}
-        scope={scope}
-        hoveredScope={hoveredScope}
-        focusPresentation="target"
-        onScopeChange={onScopeChange}
-        onHoveredScopeChange={onHoveredScopeChange}
-        onFocusedScopeChange={onHoveredScopeChange}
-      />
     </div>
   );
 }

@@ -1,0 +1,87 @@
+.visual-scope-preview {
+  position: relative;
+  width: 100%;
+  aspect-ratio: var(--visual-scope-aspect-ratio);
+  overflow: hidden;
+  border: 1px solid var(--ui-border);
+  background: var(--ui-canvas);
+  box-shadow: var(--ui-shadow-thumbnail);
+  isolation: isolate;
+}
+
+.visual-scope-preview__content,
+.visual-scope-preview__state,
+.visual-scope-preview__focus,
+.visual-scope-controls {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.visual-scope-preview__content > svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  box-shadow: none;
+}
+
+.visual-scope-preview[data-active-sides="left"] .visual-scope-preview__content,
+.visual-scope-preview[data-active-sides="right"] .visual-scope-preview__content {
+  width: 50%;
+}
+
+.visual-scope-preview[data-active-sides="right"] .visual-scope-preview__content {
+  left: 50%;
+}
+
+.visual-scope-preview__inactive,
+.visual-scope-preview__selection {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.visual-scope-preview__inactive { background: var(--ui-canvas); }
+.visual-scope-preview__state { z-index: 1; pointer-events: none; }
+.visual-scope-preview__selection { z-index: 2; box-shadow: inset 0 0 0 2px var(--ui-accent); }
+.visual-scope-controls { z-index: 3; pointer-events: none; }
+.visual-scope-preview__focus { z-index: 4; pointer-events: none; }
+
+.visual-scope-preview__selection[data-scope="left"],
+.visual-scope-preview__inactive[data-side="left"],
+.visual-scope-controls__hover[data-scope="left"] { right: 50%; }
+
+.visual-scope-preview__selection[data-scope="right"],
+.visual-scope-preview__inactive[data-side="right"],
+.visual-scope-controls__hover[data-scope="right"] { left: 50%; }
+
+.visual-scope-controls__target {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 50%;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  pointer-events: auto;
+}
+
+.visual-scope-controls__target:focus-visible { outline: 0; }
+.visual-scope-controls__target[data-scope="left"] { left: 0; }
+.visual-scope-controls__target[data-scope="right"] { right: 0; }
+.visual-scope-controls[data-center] .visual-scope-controls__target { width: 40%; }
+.visual-scope-controls[data-center] .visual-scope-controls__target[data-scope="both"] { left: 40%; width: 20%; }
+
+/* Only the full page changes tone; the target itself has no hover outline. */
+.visual-scope-controls__hover {
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+  background: var(--ui-text-muted);
+  opacity: .12;
+  pointer-events: none;
+}

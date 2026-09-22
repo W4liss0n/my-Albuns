@@ -1,3 +1,4 @@
+import { VisualScopePreview } from "./VisualScopePreview";
 import {
   useEffect,
   useLayoutEffect,
@@ -32,7 +33,6 @@ import type {
   ProjectedVisualDefaults,
 } from "../domain/project";
 import {
-  PersonalizationScopeSurface,
   ProportionalPreviewViewport,
   type DecorativePreview,
   type VisualPersonalizationPreview,
@@ -297,13 +297,16 @@ export function AlbumDesignForm({
             label="Prévia do padrão visual do álbum"
             width={previewGeometry.widthUm}
           >
-            <PersonalizationScopeSurface
-              focus={{ kind: "local" }}
-              includeBothSidesControl
-              frameGapUm={frameGapUm}
-              geometry={previewGeometry}
-              personalization={previewPersonalization}
-              presentation={ALBUM_DESIGN_SCOPE_PRESENTATION}
+            <VisualScopePreview
+              content={{
+                kind: "general",
+                label: "Composição do padrão visual do álbum",
+                geometry: previewGeometry,
+                personalization: previewPersonalization,
+                frameGapUm,
+              }}
+              label="Escopo do padrão visual do álbum"
+              scope={scope}
               onScopeChange={setScope}
             />
           </ProportionalPreviewViewport>
@@ -431,10 +434,3 @@ function scopeLabel(scope: AlbumDesignScope) {
   if (scope === "right") return "Página direita";
   return "Ambos os lados";
 }
-
-const ALBUM_DESIGN_SCOPE_PRESENTATION = {
-  accessiblePreviewLabel: "Composição do padrão visual do álbum",
-  externalSelection: false,
-  scopeControlsLabel: "Escopo do padrão visual do álbum",
-  technicalGuides: false,
-} as const;

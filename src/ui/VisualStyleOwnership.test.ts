@@ -24,8 +24,8 @@ test("keeps feature CSS with its rendering owner", () => {
 });
 
 test("keeps visual preview structure with its direct owner", () => {
-  expect(source("src/ui/visualPreview/PersonalizationScopeSurface.tsx"))
-    .toContain('import "./PersonalizationScopeSurface.css";');
+  expect(source("src/components/VisualScopePreview.tsx"))
+    .toContain('import "./VisualScopePreview.css";');
   for (const owner of [
     "src/ui/visualPreview/PersonalizationPreview.tsx",
     "src/global/DimensionsPreview.tsx",

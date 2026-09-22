@@ -13,10 +13,10 @@ Esta consolidação complementa o design 0040 e preserva o ADR 0005.
 
 ## Interação espacial
 
-`VisualScopeControls`, em `src/ui/visualPreview`, possui os alvos, seus rótulos
-acessíveis, indicação de seleção, disponibilidade dos lados e interpretação de
-ponteiro/foco. `PersonalizationScopeSurface` e `SheetDesignInspector` compõem esse
-mesmo módulo; cada prévia conserva seu conteúdo e seus realces transitórios.
+O [design 0049](0049-previa-compartilhada-de-escopo.md) unificou a superfície
+completa em `VisualScopePreview`, com conteúdo geral ou lâmina real. O componente
+possui seleção, disponibilidade dos lados, ponteiro, foco e apresentação dos
+estados. As duas composições anteriores foram removidas.
 
 ### Destaque ao passar o mouse — refinamento de 22 de setembro
 
@@ -31,15 +31,14 @@ ponteiro passa pela própria Página selecionada. Ele desaparece ao sair; não
 troca o escopo nem altera o documento. A seleção azul continua visível na borda
 externa e o foco de teclado mantém sua indicação própria.
 
-`VisualScopeControls` possui esse realce compartilhado por Novo projeto,
+`VisualScopePreview` possui esse realce compartilhado por Novo projeto,
 Design do álbum e Design da lâmina. As áreas clicáveis permanecem iguais; o
 realce de Ambos os lados cobre toda a lâmina, e não apenas o alvo central.
 
-As três geometrias existentes permanecem explícitas no módulo: duas metades na
-criação; três regiões sem sobreposição com centro de 15% nos Padrões visuais;
-duas metades e alvo central sobreposto de 20% no Design da Lâmina. Preservar a
-última geometria mantém também o contorno de foco com a largura da Página.
-O lado inativo não possui alvo e a Página única não oferece Ambos os lados.
+Nos dois painéis, os alvos usam 40% para cada lado e 20% para Ambos, sem
+sobreposição. O foco e o hover cobrem a página inteira. Na criação permanecem
+duas metades, com Ambos fora da lâmina. Página única só oferece o lado ativo.
+Essa unificação substitui as três geometrias preservadas em 17 de setembro.
 
 Na criação, Ambos continua sendo escolhido fora da Lâmina e o foco do painel
 externo continua controlado pela etapa. Os realces de foco e seleção conservam

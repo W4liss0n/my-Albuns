@@ -39,9 +39,13 @@ test("scope pointer and keyboard interaction only changes the transient selectio
   expect(both).toHaveAttribute("aria-pressed", "true");
   await user.unhover(left);
   expect(preview).not.toHaveAttribute("data-hovered-scope");
+  const matches = left.matches.bind(left);
+  const focusVisible = vi.spyOn(left, "matches").mockImplementation(selector => selector === ":focus-visible" || matches(selector));
   await user.tab();
   expect(left).toHaveFocus();
-  expect(preview).toHaveAttribute("data-hovered-scope", "left");
+  expect(preview).toHaveAttribute("data-focused-scope", "left");
+  expect(preview).not.toHaveAttribute("data-hovered-scope");
+  focusVisible.mockRestore();
   await user.keyboard("{Enter}");
   expect(input.onScopeChange).toHaveBeenCalledExactlyOnceWith("left");
   expect(input.actions!.onChange).not.toHaveBeenCalled();

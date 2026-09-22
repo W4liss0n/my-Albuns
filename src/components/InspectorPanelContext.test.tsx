@@ -240,7 +240,7 @@ test("keeps inactive sides inert for a single-page Sheet", () => {
   ).not.toBeInTheDocument();
   expect(
     document.querySelector(
-      '.sheet-design-preview__inactive[data-side="left"]',
+      '.visual-scope-preview__inactive[data-side="left"]',
     ),
   ).toBeInTheDocument();
   const preview = screen.getByRole("group", {
@@ -248,7 +248,7 @@ test("keeps inactive sides inert for a single-page Sheet", () => {
   });
   expect(preview).toHaveAttribute("data-active-sides", "right");
   expect(preview).toHaveStyle({
-    "--sheet-design-aspect-ratio": "600000 / 300000",
+    "--visual-scope-aspect-ratio": "600000 / 300000",
   });
 });
 

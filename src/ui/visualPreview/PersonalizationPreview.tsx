@@ -1,4 +1,3 @@
-import type { VisualScope } from "../../application/scopedValues";
 import { renderableMediaPreviewUrl } from "../../application/mediaPreviews";
 import type {
   PreviewBackgroundContent,
@@ -16,20 +15,18 @@ import "./VisualPreviewSheet.css";
 
 interface PersonalizationPreviewProps {
   accessibleLabel: string;
-  focusedScope: VisualScope | null;
+  frameOpacities: readonly number[];
   frameGapUm: number;
   geometry: VisualPreviewGeometry;
-  hoveredScope: VisualScope | null;
-  personalization: VisualPersonalizationPreview;
+  personalization: Omit<VisualPersonalizationPreview, "fixedScope">;
   showTechnicalGuides: boolean;
 }
 
 export function PersonalizationPreview({
   accessibleLabel,
-  focusedScope,
+  frameOpacities,
   frameGapUm,
   geometry,
-  hoveredScope,
   personalization,
   showTechnicalGuides,
 }: PersonalizationPreviewProps) {
@@ -51,17 +48,6 @@ export function PersonalizationPreview({
   );
   const frameHeight = heightUm - frameInsetY * 2;
   const frameBorder = personalization.frameBorder;
-  const focusStrokeWidth = Math.max(1, heightUm * 0.0035);
-  const focusOutline = focusedScope
-    ? scopeOutline(
-        focusedScope,
-        heightUm,
-        pageWidth,
-        widthUm,
-        heightUm * 0.012,
-      )
-    : null;
-
   return (
     <svg
       aria-label={accessibleLabel}
@@ -110,14 +96,6 @@ export function PersonalizationPreview({
         </>
       )}
       {pageDescriptors.map(({ pageIndex, side, x: pageX }) => {
-        const isSelected = scopeContainsPage(
-          personalization.fixedScope,
-          pageIndex,
-        );
-        const isFocused = focusedScope
-          ? scopeContainsPage(focusedScope, pageIndex)
-          : false;
-
         return (
           <g key={side}>
             {[0, 1].map((frameIndex) => {
@@ -145,7 +123,7 @@ export function PersonalizationPreview({
                     aria-label={`Quadro de exemplo ${frameNumber}, lado ${side}`}
                     fill="#7A684E"
                     fillOpacity={
-                      isSelected ? "0.24" : isFocused ? "0.15" : "0.08"
+                      frameOpacities[pageIndex]
                     }
                     height={frameHeight}
                     pointerEvents="none"
@@ -204,109 +182,10 @@ export function PersonalizationPreview({
           />
         </>
       )}
-      {pageDescriptors.map(({ pageIndex, side, x: pageX }) => {
-        const isSelected = scopeContainsPage(
-          personalization.fixedScope,
-          pageIndex,
-        );
-        const isCandidate =
-          (hoveredScope
-            ? scopeContainsPage(hoveredScope, pageIndex)
-            : false) ||
-          (focusedScope
-            ? scopeContainsPage(focusedScope, pageIndex)
-            : false);
-
-        return isSelected ? null : (
-          <rect
-            aria-label={`Lado não selecionado: ${side}`}
-            fill="#E3E0DA"
-            fillOpacity={isCandidate ? "0.18" : "0.42"}
-            height={heightUm}
-            key={side}
-            pointerEvents="none"
-            stroke="none"
-            width={pageWidth}
-            x={pageX}
-            y="0"
-          />
-        );
-      })}
-      {focusedScope && focusOutline ? (
-        <rect
-          aria-label={scopeOutlineLabel(focusedScope)}
-          fill="none"
-          pointerEvents="none"
-          stroke="#73A9CE"
-          strokeDasharray={`${focusStrokeWidth * 0.1} ${heightUm * 0.018}`}
-          strokeLinecap="round"
-          strokeWidth={focusStrokeWidth}
-          {...focusOutline}
-        />
-      ) : null}
       {showTechnicalGuides ? <SheetGuideLayer geometry={geometry} /> : null}
     </svg>
   );
 }
-
-function scopeContainsPage(
-  scope: VisualScope,
-  pageIndex: number,
-) {
-  const descriptor = SCOPE_DESCRIPTORS[scope];
-  return (
-    pageIndex >= descriptor.firstPageIndex &&
-    pageIndex < descriptor.firstPageIndex + descriptor.pageCount
-  );
-}
-
-function scopeOutline(
-  scope: VisualScope,
-  heightUm: number,
-  pageWidth: number,
-  widthUm: number,
-  inset: number,
-) {
-  const descriptor = SCOPE_DESCRIPTORS[scope];
-  const scopeWidth = Math.min(
-    widthUm,
-    pageWidth * descriptor.pageCount,
-  );
-  const scopeX = pageWidth * descriptor.firstPageIndex;
-  return {
-    height: Math.max(1, heightUm - inset * 2),
-    width: Math.max(1, scopeWidth - inset * 2),
-    x: scopeX + inset,
-    y: inset,
-  };
-}
-
-function scopeOutlineLabel(
-  scope: VisualScope,
-) {
-  return `Foco de teclado ${SCOPE_DESCRIPTORS[scope].labelSuffix}`;
-}
-
-const SCOPE_DESCRIPTORS = {
-  both: {
-    firstPageIndex: 0,
-    labelSuffix: "de ambos os lados",
-    pageCount: 2,
-  },
-  left: {
-    firstPageIndex: 0,
-    labelSuffix: "do lado esquerdo",
-    pageCount: 1,
-  },
-  right: {
-    firstPageIndex: 1,
-    labelSuffix: "do lado direito",
-    pageCount: 1,
-  },
-} as const satisfies Record<
-  VisualScope,
-  { firstPageIndex: number; labelSuffix: string; pageCount: number }
->;
 
 function OverlayContent({
   content,

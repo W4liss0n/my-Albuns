@@ -64,7 +64,7 @@ Usar os tokens de [tema](../src/ui/theme.css), sem recriar uma paleta paralela:
 | Entradas integradas do painel contextual | `TextInput` com `appearance="integrated"`: fundo transparente, sublinhado discreto, hover neutro e foco em grafite. `UnitInput` de 92 px com unidade fixa dentro do campo. Erro no sublinhado e tooltip. | [0048](../docs/design/0048-painel-contextual-do-quadro.md) |
 | Alternadores compactos de efeito | `PropertyToggle` de 28 × 28 px, ícone de 16 px e cantos de 4 px. Ligado com cinza quente, grafite e leve sombra interna; sem preenchimento azul ou checkbox separado. | [0048](../docs/design/0048-painel-contextual-do-quadro.md) |
 | Giro e espelhamento do quadro | Grupo de 92 px com divisória discreta; espaçamento de 12 px entre ajustes. Sem ação separada de restaurar giro: continuar girando completa a volta. | [0048](../docs/design/0048-painel-contextual-do-quadro.md) |
-| Hover nas prévias de escopo | `VisualScopeControls` muda o tom da página inteira com `--ui-text-muted` a 12%, sem contorno, sombra ou recuo. Seleção e foco permanecem distinguíveis. | [0041](../docs/design/0041-selecao-de-escopo-e-limites-fisicos.md) |
+| Prévia de páginas e hover | `VisualScopePreview` muda o tom da página inteira com `--ui-text-muted` a 12%, sem contorno, sombra ou recuo. Conteúdo geral ou lâmina real no mesmo componente; seleção e foco permanecem distinguíveis. | [0049](../docs/design/0049-previa-compartilhada-de-escopo.md) |
 | Validação de campos | Tooltip compartilhado, fora do fluxo, sem deslocar os controles e com descrição acessível. | [0040](../docs/design/0040-fatos-do-core-e-controles-do-editor.md) |
 
 Os padrões de [controles visuais](../docs/design/0044-controles-visuais-compartilhados.md)

@@ -50,11 +50,3 @@ test("uses a neutral ring around the focused range thumb", () => {
     /\.ui-range:focus-visible::-moz-range-thumb\s*\{[^}]*var\(--ui-focus-neutral\);/s,
   );
 });
-
-test("keeps keyboard focus distinct inside the selected Sheet design scope", () => {
-  const css = stylesheet("./visualPreview/VisualScopeControls.css");
-
-  expect(css).toMatch(
-    /\.visual-scope-controls__target:focus-visible\s*\{[^}]*box-shadow:\s*inset 0 0 0 1px var\(--ui-focus-neutral\);/s,
-  );
-});

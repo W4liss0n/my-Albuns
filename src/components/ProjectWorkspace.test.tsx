@@ -2824,8 +2824,8 @@ test("uses the current reference layout for the Album context", () => {
     within(albumDesignPreview).queryByLabelText("Guias de dobra, corte e segurança da lâmina"),
   ).not.toBeInTheDocument();
   expect(
-    albumDesignPreview.querySelector(".visual-preview-fixed-selection"),
-  ).not.toBeInTheDocument();
+    albumDesignPreview.querySelector(".visual-scope-preview__selection"),
+  ).toHaveAttribute("data-scope", "both");
   expect(
     within(albumDesignPreview).getByRole("group", {
       name: "Escopo do padrão visual do álbum",
@@ -2922,7 +2922,7 @@ test("edits and applies the complete Album design draft as one intent", async ()
     within(scopeControls).getByRole("button", { name: "Ambos os lados" }),
   ).toHaveAttribute("aria-pressed", "true");
 
-  fireEvent.click(albumDesign.getByRole("button", { name: "Lado esquerdo" }));
+  fireEvent.click(albumDesign.getByRole("button", { name: "Página esquerda" }));
   chooseColor("do fundo", "#f7f5f0");
   expect(
     albumDesign.queryByRole("button", { name: "Escolher sobreposição" }),
@@ -4558,7 +4558,7 @@ test("materializes an Album Design draft over the projection produced by a pendi
       .getByRole("button", { name: "Design do álbum" })
       .closest("section") as HTMLElement,
   );
-  fireEvent.click(design.getByRole("button", { name: "Lado esquerdo" }));
+  fireEvent.click(design.getByRole("button", { name: "Página esquerda" }));
   chooseColor("do fundo", "#f7f5f0");
   fireEvent.keyDown(window, { ctrlKey: true, key: "z" });
   await waitFor(() => expect(projectSessionPort.undo).toHaveBeenCalledOnce());

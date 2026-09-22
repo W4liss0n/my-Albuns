@@ -497,8 +497,8 @@ test("previews the pointed side even when it already belongs to the fixed scope"
   );
   await user.click(screen.getByRole("button", { name: "Continuar" }));
 
-  const left = await screen.findByRole("button", { name: "Lado esquerdo" });
-  const right = screen.getByRole("button", { name: "Lado direito" });
+  const left = await screen.findByRole("button", { name: "Página esquerda" });
+  const right = screen.getByRole("button", { name: "Página direita" });
   fireEvent.pointerEnter(left);
   expect(
     screen.getByLabelText("Pré-seleção do lado esquerdo"),
@@ -543,13 +543,13 @@ test("selects both sides from the preview area outside the sheet", async () => {
   });
   expect(within(sideControls).getAllByRole("button")).toHaveLength(2);
   expect(
-    within(sideControls).getByRole("button", { name: "Lado esquerdo" }),
+    within(sideControls).getByRole("button", { name: "Página esquerda" }),
   ).toBeVisible();
   expect(
-    within(sideControls).getByRole("button", { name: "Lado direito" }),
+    within(sideControls).getByRole("button", { name: "Página direita" }),
   ).toBeVisible();
 
-  await user.click(screen.getByRole("button", { name: "Lado esquerdo" }));
+  await user.click(screen.getByRole("button", { name: "Página esquerda" }));
   expect(both).toHaveAttribute("aria-pressed", "false");
   // The real browser focus ring is covered by the UI acceptance scenario.
   const matches = both.matches.bind(both);
@@ -588,7 +588,7 @@ test("selects both sides from the preview legends outside the sheet", async () =
   await user.click(screen.getByRole("button", { name: "Continuar" }));
 
   const both = await screen.findByRole("button", { name: "Ambos os lados" });
-  const left = screen.getByRole("button", { name: "Lado esquerdo" });
+  const left = screen.getByRole("button", { name: "Página esquerda" });
 
   await user.click(left);
   expect(both).toHaveAttribute("aria-pressed", "false");
@@ -622,8 +622,8 @@ test("hover previews the candidate without changing which side receives edits", 
   const both = await screen.findByRole("button", {
     name: "Ambos os lados",
   });
-  const left = screen.getByRole("button", { name: "Lado esquerdo" });
-  const right = screen.getByRole("button", { name: "Lado direito" });
+  const left = screen.getByRole("button", { name: "Página esquerda" });
+  const right = screen.getByRole("button", { name: "Página direita" });
   expect(both).toHaveAttribute("aria-pressed", "true");
   expect(screen.queryAllByLabelText(/Atenuação do lado/)).toHaveLength(0);
 
@@ -633,9 +633,7 @@ test("hover previews the candidate without changing which side receives edits", 
   expect(
     screen.getByLabelText("Pré-seleção do lado esquerdo"),
   ).toHaveAttribute("data-scope", "left");
-  expect(document.querySelector(".visual-preview-fixed-selection")).toHaveClass(
-    "visual-preview-fixed-selection--both",
-  );
+  expect(document.querySelector(".visual-scope-preview__selection")).toHaveAttribute("data-scope", "both");
   expect(screen.getByLabelText("Quadro de exemplo 1, lado esquerdo")).toHaveAttribute(
     "fill-opacity",
     "0.24",
@@ -698,10 +696,10 @@ test("presents divergent side values as mixed when returning to both sides", asy
   await user.click(screen.getByRole("button", { name: "Continuar" }));
 
   await user.click(
-    await screen.findByRole("button", { name: "Lado esquerdo" }),
+    await screen.findByRole("button", { name: "Página esquerda" }),
   );
   chooseColor("do fundo", "#abcdef");
-  await user.click(screen.getByRole("button", { name: "Lado direito" }));
+  await user.click(screen.getByRole("button", { name: "Página direita" }));
   chooseColor("do fundo", "#123456");
   await user.click(screen.getByRole("button", { name: "Ambos os lados" }));
 
@@ -737,8 +735,8 @@ test("page hover keeps the fixed selection and Frame contrast independent", asyn
   );
   await user.click(screen.getByRole("button", { name: "Continuar" }));
 
-  const left = await screen.findByRole("button", { name: "Lado esquerdo" });
-  const right = screen.getByRole("button", { name: "Lado direito" });
+  const left = await screen.findByRole("button", { name: "Página esquerda" });
+  const right = screen.getByRole("button", { name: "Página direita" });
   await user.click(right);
   expect(
     screen.queryByLabelText("Foco de teclado do lado direito"),
@@ -764,12 +762,10 @@ test("page hover keeps the fixed selection and Frame contrast independent", asyn
 
   expect(right).toHaveAttribute("aria-pressed", "true");
   const fixedSelection = document.querySelector(
-    ".visual-preview-fixed-selection",
+    ".visual-scope-preview__selection",
   );
   expect(fixedSelection).toHaveAttribute("aria-hidden", "true");
-  expect(fixedSelection).toHaveClass(
-    "visual-preview-fixed-selection--right",
-  );
+  expect(fixedSelection).toHaveAttribute("data-scope", "right");
   expect(screen.getByLabelText("Quadro de exemplo 1, lado direito")).toHaveAttribute(
     "fill-opacity",
     "0.24",
@@ -800,8 +796,8 @@ test("uses the sheet outline as the keyboard focus indicator", async () => {
   );
   await user.click(screen.getByRole("button", { name: "Continuar" }));
 
-  const left = await screen.findByRole("button", { name: "Lado esquerdo" });
-  const right = await screen.findByRole("button", { name: "Lado direito" });
+  const left = await screen.findByRole("button", { name: "Página esquerda" });
+  const right = await screen.findByRole("button", { name: "Página direita" });
   // jsdom does not model the browser's keyboard focus-visible modality.
   const matches = right.matches.bind(right);
   const focusVisible = vi.spyOn(right, "matches").mockImplementation(selector => selector === ":focus-visible" || matches(selector));
@@ -825,9 +821,7 @@ test("uses the sheet outline as the keyboard focus indicator", async () => {
     "stroke",
     "#73A9CE",
   );
-  expect(document.querySelector(".visual-preview-fixed-selection")).toHaveClass(
-    "visual-preview-fixed-selection--both",
-  );
+  expect(document.querySelector(".visual-scope-preview__selection")).toHaveAttribute("data-scope", "both");
   focusVisible.mockRestore();
 });
 
@@ -980,7 +974,7 @@ test("keeps distinct provisional images by side and sends only their opaque ids"
   await user.click(screen.getByRole("button", { name: "Continuar" }));
 
   await user.click(
-    await screen.findByRole("button", { name: "Lado esquerdo" }),
+    await screen.findByRole("button", { name: "Página esquerda" }),
   );
   await user.click(
     screen.getByRole("button", { name: "Usar imagem… no fundo" }),
@@ -999,7 +993,7 @@ test("keeps distinct provisional images by side and sends only their opaque ids"
     [...(leftBackground.parentElement?.children ?? [])].indexOf(leftBackground),
   );
 
-  await user.click(screen.getByRole("button", { name: "Lado direito" }));
+  await user.click(screen.getByRole("button", { name: "Página direita" }));
   await user.click(
     screen.getByRole("button", { name: "Usar imagem… no fundo" }),
   );

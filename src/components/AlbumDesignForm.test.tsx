@@ -97,7 +97,7 @@ test("mixed sides stay distinguishable and a cancelled palette keeps the album d
   expect(color).toHaveAttribute("data-mixed", "true");
   expect(screen.getByRole("button", { name: "Aplicar" })).toBeDisabled();
   fireEvent.click(color);
-  fireEvent.click(screen.getByRole("button", { name: "Lado esquerdo" }));
+  fireEvent.click(screen.getByRole("button", { name: "Página esquerda" }));
   expect(screen.queryByRole("dialog")).toBeNull();
   expect(screen.getByRole("button", { name: "Cor do fundo" })).toHaveAttribute("title", "#FF0000");
 });

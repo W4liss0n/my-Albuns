@@ -4859,7 +4859,7 @@
       "implementationPath": "/workspace-preview.html?frame=orientation&orientation=single-black-white&selection=none",
       "comparison": { "kind": "implementation-only", "surface": "photo-effects", "reason": "A prévia da Lâmina usa o mesmo plano do Canvas. O filtro SVG aplica luminância em sRGB apenas à Foto que possui o efeito, preservando a outra colocação da mesma mídia." },
       "viewport": { "width": 1440, "height": 800 },
-      "readySelector": ".sheet-design-preview [data-preview-photo-id][filter]",
+      "readySelector": ".visual-scope-preview [data-preview-photo-id][filter]",
       "actions": []
     },
     {
@@ -9773,7 +9773,7 @@
         },
         {
           "type": "click",
-          "selector": ".sheet-design-preview [aria-label=\"Página esquerda\"]"
+          "selector": ".visual-scope-preview [aria-label=\"Página esquerda\"]"
         },
         {
           "type": "click",
@@ -9803,7 +9803,7 @@
         },
         {
           "type": "click",
-          "selector": ".sheet-design-preview [aria-label=\"Página esquerda\"]"
+          "selector": ".visual-scope-preview [aria-label=\"Página esquerda\"]"
         },
         {
           "type": "click",
@@ -11761,7 +11761,7 @@
         },
         {
           "type": "click",
-          "selector": ".sheet-design-preview [aria-label=\"Página esquerda\"]"
+          "selector": ".visual-scope-preview [aria-label=\"Página esquerda\"]"
         },
         {
           "type": "click",
@@ -12040,7 +12040,7 @@
         },
         {
           "type": "click",
-          "selector": "button[aria-label=\"Lado esquerdo\"]"
+          "selector": "button[aria-label=\"Página esquerda\"]"
         },
         {
           "type": "click",
@@ -12057,7 +12057,7 @@
         },
         {
           "type": "click",
-          "selector": "button[aria-label=\"Lado direito\"]"
+          "selector": "button[aria-label=\"Página direita\"]"
         },
         {
           "type": "click",
@@ -12180,7 +12180,7 @@
         },
         {
           "type": "click",
-          "selector": "button[aria-label=\"Lado esquerdo\"]"
+          "selector": "button[aria-label=\"Página esquerda\"]"
         },
         {
           "type": "click",
@@ -12197,7 +12197,7 @@
         },
         {
           "type": "click",
-          "selector": "button[aria-label=\"Lado direito\"]"
+          "selector": "button[aria-label=\"Página direita\"]"
         },
         {
           "type": "click",
@@ -12294,7 +12294,7 @@
         },
         {
           "type": "focus",
-          "selector": "button[aria-label=\"Lado esquerdo\"]"
+          "selector": "button[aria-label=\"Página esquerda\"]"
         },
         {
           "type": "key",
@@ -12302,7 +12302,7 @@
         },
         {
           "type": "assert",
-          "selector": "button[aria-label=\"Lado direito\"]:focus-visible"
+          "selector": "button[aria-label=\"Página direita\"]:focus-visible"
         }
       ]
     },
@@ -12327,7 +12327,7 @@
         },
         {
           "type": "click",
-          "selector": "button[aria-label=\"Lado esquerdo\"]"
+          "selector": "button[aria-label=\"Página esquerda\"]"
         },
         {
           "type": "click",
@@ -12368,7 +12368,7 @@
         },
         {
           "type": "click",
-          "selector": "button[aria-label=\"Lado esquerdo\"]"
+          "selector": "button[aria-label=\"Página esquerda\"]"
         },
         {
           "type": "click",
@@ -12586,7 +12586,7 @@
           "type": "click"
         },
         {
-          "selector": "button[aria-label='Lado esquerdo']",
+          "selector": "button[aria-label='Página esquerda']",
           "type": "hover"
         },
         {
@@ -12632,15 +12632,15 @@
           "type": "click-text"
         },
         {
-          "selector": "button[aria-label=\"Lado direito\"]",
+          "selector": "button[aria-label=\"Página direita\"]",
           "type": "click"
         },
         {
-          "selector": "button[aria-label='Lado esquerdo']",
+          "selector": "button[aria-label='Página esquerda']",
           "type": "hover"
         },
         {
-          "selector": "button[aria-label=\"Lado direito\"][aria-pressed=\"true\"]",
+          "selector": "button[aria-label=\"Página direita\"][aria-pressed=\"true\"]",
           "type": "assert"
         }
       ]
@@ -12665,7 +12665,7 @@
           "type": "click"
         },
         {
-          "selector": "button[aria-label='Lado esquerdo']",
+          "selector": "button[aria-label='Página esquerda']",
           "type": "hover"
         },
         {
@@ -12694,15 +12694,15 @@
           "type": "click"
         },
         {
-          "selector": "button[aria-label=\"Lado esquerdo\"]",
+          "selector": "button[aria-label=\"Página esquerda\"]",
           "type": "click"
         },
         {
-          "selector": "button[aria-label='Lado direito']",
+          "selector": "button[aria-label='Página direita']",
           "type": "hover"
         },
         {
-          "selector": "button[aria-label=\"Lado esquerdo\"][aria-pressed=\"true\"]",
+          "selector": "button[aria-label=\"Página esquerda\"][aria-pressed=\"true\"]",
           "type": "assert"
         }
       ]
@@ -12727,7 +12727,7 @@
           "type": "click"
         },
         {
-          "selector": "button[aria-label=\"Lado esquerdo\"]",
+          "selector": "button[aria-label=\"Página esquerda\"]",
           "type": "click"
         },
         {
@@ -12735,7 +12735,7 @@
           "type": "hover"
         },
         {
-          "selector": "button[aria-label=\"Lado esquerdo\"][aria-pressed=\"true\"]",
+          "selector": "button[aria-label=\"Página esquerda\"][aria-pressed=\"true\"]",
           "type": "assert"
         }
       ]
@@ -12814,7 +12814,7 @@
           "type": "hover"
         },
         {
-          "selector": ".sheet-design-preview[data-active-sides=\"right\"]",
+          "selector": ".visual-scope-preview[data-active-sides=\"right\"]",
           "type": "assert"
         }
       ]
@@ -12839,7 +12839,7 @@
           "type": "click"
         },
         {
-          "selector": "button[aria-label=\"Lado esquerdo\"]",
+          "selector": "button[aria-label=\"Página esquerda\"]",
           "type": "hover"
         },
         {
@@ -12853,6 +12853,92 @@
         {
           "selector": "button[aria-label=\"Ambos os lados\"][aria-pressed=\"true\"]",
           "type": "assert"
+        }
+      ]
+    },
+    {
+      "id": "workspace-album-scope-keyboard-focus",
+      "title": "Design do álbum — foco central e hover independente",
+      "implementationPath": "/workspace-preview.html",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "shared-scope-preview",
+        "reason": "Design 0049: mesmo componente, seleção, hover e foco independentes nas duas variantes; foco espacial cobre a lâmina inteira ao selecionar o alvo central."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "readySelector": "[aria-label=\"Foco de teclado de ambos os lados\"]",
+      "actions": [
+        {
+          "type": "click",
+          "selector": "button[aria-label=\"Informações do álbum\"]"
+        },
+        {
+          "type": "focus",
+          "selector": "button[aria-label=\"Página esquerda\"]"
+        },
+        {
+          "type": "key",
+          "key": "Tab"
+        },
+        {
+          "type": "assert",
+          "selector": "button[aria-label=\"Ambos os lados\"]:focus-visible"
+        },
+        {
+          "type": "hover",
+          "selector": "button[aria-label=\"Página esquerda\"]"
+        },
+        {
+          "type": "assert",
+          "selector": ".visual-scope-controls__hover[data-scope=\"left\"]"
+        },
+        {
+          "type": "assert",
+          "selector": "button[aria-label=\"Ambos os lados\"][aria-pressed=\"true\"]"
+        }
+      ]
+    },
+    {
+      "id": "workspace-sheet-scope-keyboard-focus",
+      "title": "Design da lâmina — foco central e hover independente",
+      "implementationPath": "/workspace-preview.html?frame=decorations&decoration-state=whole&context=sheet",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "shared-scope-preview",
+        "reason": "Design 0049: mesmo componente, seleção, hover e foco independentes nas duas variantes; foco espacial cobre a lâmina inteira ao selecionar o alvo central."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "readySelector": "[aria-label=\"Foco de teclado de ambos os lados\"]",
+      "actions": [
+        {
+          "type": "focus",
+          "selector": "button[aria-label=\"Página esquerda\"]"
+        },
+        {
+          "type": "key",
+          "key": "Tab"
+        },
+        {
+          "type": "assert",
+          "selector": "button[aria-label=\"Ambos os lados\"]:focus-visible"
+        },
+        {
+          "type": "hover",
+          "selector": "button[aria-label=\"Página esquerda\"]"
+        },
+        {
+          "type": "assert",
+          "selector": ".visual-scope-controls__hover[data-scope=\"left\"]"
+        },
+        {
+          "type": "assert",
+          "selector": "button[aria-label=\"Ambos os lados\"][aria-pressed=\"true\"]"
         }
       ]
     }
