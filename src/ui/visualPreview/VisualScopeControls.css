@@ -18,6 +18,24 @@
   pointer-events: auto;
 }
 
+/* A quiet, whole-page tint keeps the target readable at thumbnail size. */
+.visual-scope-controls__hover {
+  position: absolute;
+  z-index: 2;
+  inset: 0;
+  background: var(--ui-text-muted);
+  opacity: .12;
+  pointer-events: none;
+}
+
+.visual-scope-controls__hover[data-scope="left"] {
+  right: 50%;
+}
+
+.visual-scope-controls__hover[data-scope="right"] {
+  left: 50%;
+}
+
 .visual-scope-controls__target[data-scope="left"] { left: 0; }
 .visual-scope-controls__target[data-scope="right"] { right: 0; }
 

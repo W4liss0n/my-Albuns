@@ -76,6 +76,7 @@ export function PersonalizationScopeSurface({
         targetLayout={includeBothSidesControl ? "partitionedCenter" : "halves"}
         labels={{ left: "Lado esquerdo", both: "Ambos os lados", right: "Lado direito" }}
         scope={personalization.fixedScope}
+        hoveredScope={hoveredScope}
         focusPresentation="preview"
         onScopeChange={onScopeChange}
         onHoveredScopeChange={setHoveredScope}

@@ -485,7 +485,7 @@ test.each([
   }));
 });
 
-test("does not hover a side that already belongs to the fixed scope", async () => {
+test("previews the pointed side even when it already belongs to the fixed scope", async () => {
   const user = userEvent.setup();
 
   render(
@@ -501,20 +501,22 @@ test("does not hover a side that already belongs to the fixed scope", async () =
   const right = screen.getByRole("button", { name: "Lado direito" });
   fireEvent.pointerEnter(left);
   expect(
-    screen.queryByLabelText("Pré-seleção do lado esquerdo"),
-  ).not.toBeInTheDocument();
+    screen.getByLabelText("Pré-seleção do lado esquerdo"),
+  ).toHaveAttribute("data-scope", "left");
+  expect(screen.getByRole("button", { name: "Ambos os lados" })).toHaveAttribute("aria-pressed", "true");
 
   await user.click(left);
   fireEvent.pointerEnter(left);
   expect(
-    screen.queryByLabelText("Pré-seleção do lado esquerdo"),
-  ).not.toBeInTheDocument();
+    screen.getByLabelText("Pré-seleção do lado esquerdo"),
+  ).toHaveAttribute("data-scope", "left");
 
   fireEvent.pointerEnter(right);
   expect(screen.getByLabelText("Pré-seleção do lado direito")).toHaveAttribute(
-    "fill",
-    "var(--ui-text-muted)",
+    "data-scope",
+    "right",
   );
+  expect(left).toHaveAttribute("aria-pressed", "true");
 });
 
 test("selects both sides from the preview area outside the sheet", async () => {
@@ -604,7 +606,7 @@ test("selects both sides from the preview legends outside the sheet", async () =
   expect(both).toHaveAttribute("aria-pressed", "false");
 });
 
-test("hover fills only an unselected candidate without changing the fixed scope", async () => {
+test("hover previews the candidate without changing which side receives edits", async () => {
   const user = userEvent.setup();
   const onCreate = vi.fn(async () => ({ status: "cancelled" as const }));
 
@@ -629,8 +631,8 @@ test("hover fills only an unselected candidate without changing the fixed scope"
   expect(left).not.toHaveAttribute("data-highlighted");
   expect(both).toHaveAttribute("aria-pressed", "true");
   expect(
-    screen.queryByLabelText("Pré-seleção do lado esquerdo"),
-  ).not.toBeInTheDocument();
+    screen.getByLabelText("Pré-seleção do lado esquerdo"),
+  ).toHaveAttribute("data-scope", "left");
   expect(document.querySelector(".visual-preview-fixed-selection")).toHaveClass(
     "visual-preview-fixed-selection--both",
   );
@@ -655,17 +657,9 @@ test("hover fills only an unselected candidate without changing the fixed scope"
   await user.click(left);
   expect(left).toHaveAttribute("aria-pressed", "true");
   fireEvent.pointerEnter(right);
-  const hoverFill = screen
-    .getByLabelText("Pré-seleção do lado direito")
-    .getAttribute("fill");
-  expect(hoverFill).toBe("var(--ui-text-muted)");
   expect(screen.getByLabelText("Pré-seleção do lado direito")).toHaveAttribute(
-    "fill-opacity",
-    "0.08",
-  );
-  expect(screen.getByLabelText("Pré-seleção do lado direito")).toHaveAttribute(
-    "stroke",
-    "none",
+    "data-scope",
+    "right",
   );
   chooseColor("do fundo", "#abcdef");
   expect(screen.getByLabelText("Fundo do lado esquerdo")).toHaveAttribute(
@@ -731,7 +725,7 @@ test("presents divergent side values as mixed when returning to both sides", asy
   );
 });
 
-test("hover tint keeps the fixed selection and Frame contrast independent", async () => {
+test("page hover keeps the fixed selection and Frame contrast independent", async () => {
   const user = userEvent.setup();
 
   render(
@@ -785,12 +779,8 @@ test("hover tint keeps the fixed selection and Frame contrast independent", asyn
     "0.08",
   );
   expect(screen.getByLabelText("Pré-seleção do lado esquerdo")).toHaveAttribute(
-    "fill-opacity",
-    "0.08",
-  );
-  expect(screen.getByLabelText("Pré-seleção do lado esquerdo")).toHaveAttribute(
-    "stroke",
-    "none",
+    "data-scope",
+    "left",
   );
   expect(screen.getByLabelText("Lado não selecionado: esquerdo")).toHaveAttribute(
     "fill-opacity",
@@ -826,8 +816,8 @@ test("uses the sheet outline as the keyboard focus indicator", async () => {
   fireEvent.pointerEnter(left);
   expect(left).not.toHaveAttribute("data-highlighted");
   expect(
-    screen.queryByLabelText("Pré-seleção do lado esquerdo"),
-  ).not.toBeInTheDocument();
+    screen.getByLabelText("Pré-seleção do lado esquerdo"),
+  ).toHaveAttribute("data-scope", "left");
   expect(
     screen.getByLabelText("Foco de teclado do lado direito"),
   ).toHaveAttribute("fill", "none");

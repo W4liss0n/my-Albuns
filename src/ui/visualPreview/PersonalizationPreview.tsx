@@ -61,9 +61,6 @@ export function PersonalizationPreview({
         heightUm * 0.012,
       )
     : null;
-  const hoverArea = hoveredScope
-    ? scopeOutline(hoveredScope, heightUm, pageWidth, widthUm, 0)
-    : null;
 
   return (
     <svg
@@ -235,19 +232,9 @@ export function PersonalizationPreview({
           />
         );
       })}
-      {hoveredScope && hoverArea ? (
-        <rect
-          aria-label={scopeOutlineLabel("Pré-seleção", hoveredScope)}
-          fill="var(--ui-text-muted)"
-          fillOpacity="0.08"
-          pointerEvents="none"
-          stroke="none"
-          {...hoverArea}
-        />
-      ) : null}
       {focusedScope && focusOutline ? (
         <rect
-          aria-label={scopeOutlineLabel("Foco de teclado", focusedScope)}
+          aria-label={scopeOutlineLabel(focusedScope)}
           fill="none"
           pointerEvents="none"
           stroke="#73A9CE"
@@ -295,10 +282,9 @@ function scopeOutline(
 }
 
 function scopeOutlineLabel(
-  prefix: "Foco de teclado" | "Pré-seleção",
   scope: VisualScope,
 ) {
-  return `${prefix} ${SCOPE_DESCRIPTORS[scope].labelSuffix}`;
+  return `Foco de teclado ${SCOPE_DESCRIPTORS[scope].labelSuffix}`;
 }
 
 const SCOPE_DESCRIPTORS = {

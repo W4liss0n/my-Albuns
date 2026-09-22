@@ -18,6 +18,23 @@ acessíveis, indicação de seleção, disponibilidade dos lados e interpretaç�
 ponteiro/foco. `PersonalizationScopeSurface` e `SheetDesignInspector` compõem esse
 mesmo módulo; cada prévia conserva seu conteúdo e seus realces transitórios.
 
+### Destaque ao passar o mouse — refinamento de 22 de setembro
+
+O ponteiro muda suavemente o tom da Página inteira, ou de ambas as Páginas
+quando está na região central. O realce usa o tom neutro quente da interface
+com opacidade de 12%, sem contorno, sombra ou recuo. A indicação alcança a
+superfície completa e não depende apenas do contraste dos quadros de exemplo,
+conservando a leitura na prévia pequena do painel contextual.
+
+O realce aparece também quando Ambos os lados já está selecionado e quando o
+ponteiro passa pela própria Página selecionada. Ele desaparece ao sair; não
+troca o escopo nem altera o documento. A seleção azul continua visível na borda
+externa e o foco de teclado mantém sua indicação própria.
+
+`VisualScopeControls` possui esse realce compartilhado por Novo projeto,
+Design do álbum e Design da lâmina. As áreas clicáveis permanecem iguais; o
+realce de Ambos os lados cobre toda a lâmina, e não apenas o alvo central.
+
 As três geometrias existentes permanecem explícitas no módulo: duas metades na
 criação; três regiões sem sobreposição com centro de 15% nos Padrões visuais;
 duas metades e alvo central sobreposto de 20% no Design da Lâmina. Preservar a

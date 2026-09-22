@@ -12561,6 +12561,300 @@
         { "type": "key", "key": "Tab" },
         { "type": "focus", "selector": "[aria-label='Ângulo em graus']" }
       ]
+    },
+    {
+      "id": "new-project-scope-hover-both",
+      "title": "Novo projeto — página apontada com ambos selecionados",
+      "implementationPath": "/welcome-preview.html",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "shared-scope-hover",
+        "reason": "Design 0041, refinamento de 22/09: mudança suave de tom na página inteira, com neutro quente a 12%, sem contorno ou sombra e sem trocar a seleção."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "readySelector": ".visual-scope-controls__hover[data-scope='left']",
+      "actions": [
+        {
+          "selector": "[aria-label=\"Novo projeto\"]",
+          "type": "click"
+        },
+        {
+          "selector": "[aria-label=\"Continuar\"]",
+          "type": "click"
+        },
+        {
+          "selector": "button[aria-label='Lado esquerdo']",
+          "type": "hover"
+        },
+        {
+          "selector": "button[aria-label=\"Ambos os lados\"][aria-pressed=\"true\"]",
+          "type": "assert"
+        }
+      ]
+    },
+    {
+      "id": "new-project-scope-hover-opposite",
+      "title": "Novo projeto — hover oposto à seleção sobre fundo escuro",
+      "implementationPath": "/welcome-preview.html",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "shared-scope-hover",
+        "reason": "Design 0041, refinamento de 22/09: mudança suave de tom na página inteira, com neutro quente a 12%, sem contorno ou sombra e sem trocar a seleção."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "readySelector": ".visual-scope-controls__hover[data-scope='left']",
+      "actions": [
+        {
+          "selector": "[aria-label=\"Novo projeto\"]",
+          "type": "click"
+        },
+        {
+          "selector": "[aria-label=\"Continuar\"]",
+          "type": "click"
+        },
+        {
+          "selector": "button[aria-label=\"Cor do fundo\"]",
+          "type": "click"
+        },
+        {
+          "type": "input",
+          "value": "#263744",
+          "selector": "input[aria-label=\"Código da cor do fundo\"]"
+        },
+        {
+          "text": "Aplicar cor",
+          "type": "click-text"
+        },
+        {
+          "selector": "button[aria-label=\"Lado direito\"]",
+          "type": "click"
+        },
+        {
+          "selector": "button[aria-label='Lado esquerdo']",
+          "type": "hover"
+        },
+        {
+          "selector": "button[aria-label=\"Lado direito\"][aria-pressed=\"true\"]",
+          "type": "assert"
+        }
+      ]
+    },
+    {
+      "id": "workspace-album-scope-hover-left",
+      "title": "Design do álbum — hover esquerdo na miniatura",
+      "implementationPath": "/workspace-preview.html",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "shared-scope-hover",
+        "reason": "Design 0041, refinamento de 22/09: mudança suave de tom na página inteira, com neutro quente a 12%, sem contorno ou sombra e sem trocar a seleção."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "readySelector": ".visual-scope-controls__hover[data-scope='left']",
+      "actions": [
+        {
+          "selector": "button[aria-label=\"Informações do álbum\"]",
+          "type": "click"
+        },
+        {
+          "selector": "button[aria-label='Lado esquerdo']",
+          "type": "hover"
+        },
+        {
+          "selector": "button[aria-label=\"Ambos os lados\"][aria-pressed=\"true\"]",
+          "type": "assert"
+        }
+      ]
+    },
+    {
+      "id": "workspace-album-scope-hover-right",
+      "title": "Design do álbum — hover direito sem trocar seleção",
+      "implementationPath": "/workspace-preview.html",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "shared-scope-hover",
+        "reason": "Design 0041, refinamento de 22/09: mudança suave de tom na página inteira, com neutro quente a 12%, sem contorno ou sombra e sem trocar a seleção."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "readySelector": ".visual-scope-controls__hover[data-scope='right']",
+      "actions": [
+        {
+          "selector": "button[aria-label=\"Informações do álbum\"]",
+          "type": "click"
+        },
+        {
+          "selector": "button[aria-label=\"Lado esquerdo\"]",
+          "type": "click"
+        },
+        {
+          "selector": "button[aria-label='Lado direito']",
+          "type": "hover"
+        },
+        {
+          "selector": "button[aria-label=\"Lado esquerdo\"][aria-pressed=\"true\"]",
+          "type": "assert"
+        }
+      ]
+    },
+    {
+      "id": "workspace-album-scope-hover-center-150",
+      "title": "Design do álbum — centro destaca a lâmina inteira a 150%",
+      "implementationPath": "/workspace-preview.html?scale=1.5",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "shared-scope-hover",
+        "reason": "Design 0041, refinamento de 22/09: mudança suave de tom na página inteira, com neutro quente a 12%, sem contorno ou sombra e sem trocar a seleção."
+      },
+      "viewport": {
+        "width": 2160,
+        "height": 1350
+      },
+      "readySelector": ".visual-scope-controls__hover[data-scope='both']",
+      "actions": [
+        {
+          "selector": "button[aria-label=\"Informações do álbum\"]",
+          "type": "click"
+        },
+        {
+          "selector": "button[aria-label=\"Lado esquerdo\"]",
+          "type": "click"
+        },
+        {
+          "selector": "button[aria-label='Ambos os lados']",
+          "type": "hover"
+        },
+        {
+          "selector": "button[aria-label=\"Lado esquerdo\"][aria-pressed=\"true\"]",
+          "type": "assert"
+        }
+      ]
+    },
+    {
+      "id": "workspace-sheet-scope-hover-image",
+      "title": "Design da lâmina — página apontada sobre decorativo",
+      "implementationPath": "/workspace-preview.html?frame=decorations&decoration-state=local&context=sheet",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "shared-scope-hover",
+        "reason": "Design 0041, refinamento de 22/09: mudança suave de tom na página inteira, com neutro quente a 12%, sem contorno ou sombra e sem trocar a seleção."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "readySelector": ".visual-scope-controls__hover[data-scope='left']",
+      "actions": [
+        {
+          "selector": "button[aria-label='Página esquerda']",
+          "type": "hover"
+        },
+        {
+          "selector": "button[aria-label=\"Ambos os lados\"][aria-pressed=\"true\"]",
+          "type": "assert"
+        }
+      ]
+    },
+    {
+      "id": "workspace-sheet-scope-hover-center-125",
+      "title": "Design da lâmina — centro destaca toda a composição a 125%",
+      "implementationPath": "/workspace-preview.html?frame=decorations&decoration-state=local&context=sheet&scale=1.25",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "shared-scope-hover",
+        "reason": "Design 0041, refinamento de 22/09: mudança suave de tom na página inteira, com neutro quente a 12%, sem contorno ou sombra e sem trocar a seleção."
+      },
+      "viewport": {
+        "width": 1800,
+        "height": 1125
+      },
+      "readySelector": ".visual-scope-controls__hover[data-scope='both']",
+      "actions": [
+        {
+          "selector": "button[aria-label=\"Página esquerda\"]",
+          "type": "click"
+        },
+        {
+          "selector": "button[aria-label='Ambos os lados']",
+          "type": "hover"
+        },
+        {
+          "selector": "button[aria-label=\"Página esquerda\"][aria-pressed=\"true\"]",
+          "type": "assert"
+        }
+      ]
+    },
+    {
+      "id": "workspace-sheet-scope-hover-single",
+      "title": "Design da lâmina — hover somente na página ativa",
+      "implementationPath": "/workspace-preview.html?frame=decorations&decoration-state=single&context=sheet",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "shared-scope-hover",
+        "reason": "Design 0041, refinamento de 22/09: mudança suave de tom na página inteira, com neutro quente a 12%, sem contorno ou sombra e sem trocar a seleção."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "readySelector": ".visual-scope-controls__hover[data-scope='right']",
+      "actions": [
+        {
+          "selector": "button[aria-label='Página direita']",
+          "type": "hover"
+        },
+        {
+          "selector": ".sheet-design-preview[data-active-sides=\"right\"]",
+          "type": "assert"
+        }
+      ]
+    },
+    {
+      "id": "workspace-album-scope-hover-leave",
+      "title": "Design do álbum — realce desaparece ao sair",
+      "implementationPath": "/workspace-preview.html",
+      "comparison": {
+        "reason": "Design 0041, refinamento de 22/09: mudança suave de tom na página inteira, com neutro quente a 12%, sem contorno ou sombra e sem trocar a seleção.",
+        "kind": "implementation-only",
+        "surface": "shared-scope-hover"
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "readySelector": ".album-design-form:not(:has(.visual-scope-controls__hover))",
+      "actions": [
+        {
+          "selector": "button[aria-label=\"Informações do álbum\"]",
+          "type": "click"
+        },
+        {
+          "selector": "button[aria-label=\"Lado esquerdo\"]",
+          "type": "hover"
+        },
+        {
+          "selector": ".visual-scope-controls__hover[data-scope=\"left\"]",
+          "type": "assert"
+        },
+        {
+          "selector": ".album-design-scope-label",
+          "type": "hover"
+        },
+        {
+          "selector": "button[aria-label=\"Ambos os lados\"][aria-pressed=\"true\"]",
+          "type": "assert"
+        }
+      ]
     }
   ]
 }

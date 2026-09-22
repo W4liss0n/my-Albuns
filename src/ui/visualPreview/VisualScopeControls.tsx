@@ -7,6 +7,7 @@ interface VisualScopeControlsProps {
   groupLabel?: string;
   labels: Readonly<Record<VisualScope, string>>;
   scope: VisualScope;
+  hoveredScope: VisualScope | null;
   focusPresentation: "preview" | "target";
   onScopeChange(scope: VisualScope): void;
   onHoveredScopeChange(scope: VisualScope | null): void;
@@ -14,13 +15,14 @@ interface VisualScopeControlsProps {
 }
 
 // Owns target geometry, available sides and pointer/keyboard interpretation.
-// Consumers keep the preview rendering and its transient highlight state.
+// Owns the full-page hover tint; consumers keep selection and keyboard focus.
 export function VisualScopeControls({
   activeSides = "both",
   targetLayout,
   groupLabel,
   labels,
   scope,
+  hoveredScope,
   focusPresentation,
   onScopeChange,
   onHoveredScopeChange,
@@ -40,6 +42,14 @@ export function VisualScopeControls({
       role={groupLabel ? "group" : undefined}
       onPointerLeave={() => onHoveredScopeChange(null)}
     >
+      {hoveredScope ? (
+        <span
+          aria-hidden="true"
+          aria-label={`Pré-seleção ${hoveredScope === "both" ? "de ambos os lados" : hoveredScope === "left" ? "do lado esquerdo" : "do lado direito"}`}
+          className="visual-scope-controls__hover"
+          data-scope={hoveredScope}
+        />
+      ) : null}
       {scopes.map((candidate) => (
         <button
           aria-label={labels[candidate]}

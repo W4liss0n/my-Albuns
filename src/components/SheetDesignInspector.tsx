@@ -161,18 +161,12 @@ function SheetScopePreview({
         className="sheet-design-preview__highlight sheet-design-preview__highlight--selected"
         data-scope={scope}
       />
-      {hoveredScope && hoveredScope !== scope ? (
-        <span
-          aria-hidden="true"
-          className="sheet-design-preview__highlight sheet-design-preview__highlight--hovered"
-          data-scope={hoveredScope}
-        />
-      ) : null}
       <VisualScopeControls
         activeSides={sheet.activeSides}
         targetLayout="overlaidCenter"
         labels={{ left: "Página esquerda", both: "Ambos os lados", right: "Página direita" }}
         scope={scope}
+        hoveredScope={hoveredScope}
         focusPresentation="target"
         onScopeChange={onScopeChange}
         onHoveredScopeChange={onHoveredScopeChange}
