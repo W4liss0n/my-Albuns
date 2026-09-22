@@ -1,3 +1,4 @@
+import { Contrast } from "lucide-react";
 import type { FrameSnapshot } from "../domain/project";
 import { projectCommandDescriptor } from "../application/projectCommandCatalog";
 import { PropertyToggle } from "../ui";
@@ -22,6 +23,7 @@ export function PhotoEffectsControls({ frames, disabled, onToggleBlackAndWhite }
       )}
       <PropertyToggle className="photo-effect-control"
         label={projectCommandDescriptor("toggle-photo-black-and-white").label}
+        icon={Contrast}
         pressed={enabled} disabled={disabled} onToggle={onToggleBlackAndWhite} />
     </div>
   );

@@ -1,10 +1,12 @@
-import { Check, Minus } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { ActionButton } from "./ActionButton";
+import { AppIcon } from "./AppIcon";
 import "./PropertyToggle.css";
 
-/** A compact property row with a persistent on/off/mixed indicator. */
-export function PropertyToggle({ label, pressed, disabled, onToggle, className }: {
+/** A compact tool whose whole surface reflects the property's state. */
+export function PropertyToggle({ label, icon, pressed, disabled, onToggle, className }: {
   label: string;
+  icon: LucideIcon;
   pressed: boolean | "mixed";
   disabled: boolean;
   onToggle(): void;
@@ -19,10 +21,8 @@ export function PropertyToggle({ label, pressed, disabled, onToggle, className }
       disabled={disabled}
       onClick={onToggle}
     >
+      <AppIcon icon={icon} />
       <span>{label}</span>
-      <span className="ui-property-toggle__indicator" aria-hidden="true">
-        {pressed === "mixed" ? <Minus size={12} /> : pressed ? <Check size={12} /> : null}
-      </span>
     </ActionButton>
   );
 }

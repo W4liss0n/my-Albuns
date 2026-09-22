@@ -19,15 +19,19 @@ continuam na validação por tooltip. A origem da borda e a ação para usar o
 padrão do álbum continuam disponíveis porque informam a herança do design.
 
 Espelhar horizontalmente e Preto e branco usam `PropertyToggle`, componente
-neutro de UI com o nome à esquerda e um indicador quadrado à direita. O
-indicador vazio representa desligado, a marca representa ligado e o traço
-representa valores diferentes na seleção. O azul se restringe ao indicador
-ligado; o texto mantém a cor dos demais rótulos do painel.
+neutro de UI com ícone e texto em um botão compacto, alinhado à esquerda e com
+largura do conteúdo. O usuário rejeitou a primeira apresentação como uma linha
+com checkbox separado; o estado passa a fazer parte do próprio botão.
+
+O estado desligado usa superfície neutra e borda discreta. O estado ligado
+usa fundo azul suave, borda e texto na cor de seleção. Valores diferentes na
+seleção usam borda tracejada, sem simular que a propriedade está ligada em
+todas as fotos. Os ícones seguem o traço compartilhado do programa.
 
 O componente reutiliza o botão compartilhado e os tokens de superfície,
-borda, tipografia e espaçamento do programa. A linha tem altura mínima de
-28 px, tipografia de controle e indicador de 16 px; toda a linha é clicável.
-O foco por teclado recebe contorno neutro no indicador, separado do estado
+borda, tipografia e espaçamento do programa. O botão tem altura mínima de
+28 px, ícone de 14 px, espaçamento interno de 8 px e cantos de 4 px.
+O foco por teclado recebe contorno neutro ao redor do botão, separado do estado
 ligado. Enter e Espaço acionam a mesma operação do clique. Nome acessível,
 estado misto e bloqueio durante operações seguem o contrato existente.
 

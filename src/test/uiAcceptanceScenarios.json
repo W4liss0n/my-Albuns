@@ -12355,7 +12355,7 @@
       "comparison": {
         "kind": "implementation-only",
         "surface": "frame-property-toggle",
-        "reason": "Design 0048: linha discreta compartilhada, marca de ativação e foco neutro independente do estado."
+        "reason": "Design 0048 refinado: botão compacto de ícone e texto, estado ativo integrado à superfície e foco neutro independente da seleção."
       },
       "viewport": {
         "width": 1440,
@@ -12392,7 +12392,7 @@
       "comparison": {
         "kind": "implementation-only",
         "surface": "frame-property-toggle",
-        "reason": "Design 0048: o traço indica seleção mista sem escolher um valor; foco por teclado deve continuar visível."
+        "reason": "Design 0048 refinado: borda tracejada indica valores diferentes sem escolher um valor; foco por teclado continua visível ao redor do botão."
       },
       "viewport": {
         "width": 1440,

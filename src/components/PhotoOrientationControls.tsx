@@ -1,4 +1,4 @@
-import { RotateCcw } from "lucide-react";
+import { FlipHorizontal2, RotateCcw } from "lucide-react";
 import type { FrameSnapshot, PhotoOrientationAction } from "../domain/project";
 import { projectCommandDescriptor } from "../application/projectCommandCatalog";
 import { ActionButton, PropertyToggle } from "../ui";
@@ -60,6 +60,7 @@ export function PhotoOrientationControls({ frames, disabled, onAction, angle }: 
       <PropertyToggle
         className="photo-mirror-control"
         label={mirror.label}
+        icon={FlipHorizontal2}
         pressed={mirrored}
         disabled={disabled}
         onToggle={() => onAction("toggleHorizontalMirror")}
