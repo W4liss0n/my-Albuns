@@ -12743,7 +12743,7 @@
     {
       "id": "workspace-sheet-scope-hover-image",
       "title": "Design da lâmina — página apontada sobre decorativo",
-      "implementationPath": "/workspace-preview.html?frame=decorations&decoration-state=local&context=sheet",
+      "implementationPath": "/workspace-preview.html?frame=decorations&decoration-state=whole&context=sheet",
       "comparison": {
         "kind": "implementation-only",
         "surface": "shared-scope-hover",
@@ -12768,7 +12768,7 @@
     {
       "id": "workspace-sheet-scope-hover-center-125",
       "title": "Design da lâmina — centro destaca toda a composição a 125%",
-      "implementationPath": "/workspace-preview.html?frame=decorations&decoration-state=local&context=sheet&scale=1.25",
+      "implementationPath": "/workspace-preview.html?frame=decorations&decoration-state=whole&context=sheet&scale=1.25",
       "comparison": {
         "kind": "implementation-only",
         "surface": "shared-scope-hover",
