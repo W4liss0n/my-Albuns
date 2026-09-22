@@ -266,7 +266,7 @@ test("keeps the shared visual preview neutral from New Project chrome", () => {
 
 test("keeps compact visual-default focus independent from selection", () => {
   expect(visualDefaultPickerStyles).toMatch(
-    /\.visual-design-picker__option:focus-visible \.visual-design-picker__tile\s*\{[^}]*outline:\s*1px solid var\(--ui-focus-neutral\);[^}]*outline-offset:\s*2px;/s,
+    /\.visual-design-picker__option:focus-visible :is\(\.visual-design-picker__tile, \.ui-mixed-swatch\)\s*\{[^}]*outline:\s*1px solid var\(--ui-focus-neutral\);[^}]*outline-offset:\s*2px;/s,
   );
   expect(visualDefaultPickerStyles).toMatch(
     /\.visual-design-picker__option\[data-selected="true"\][\s\S]*border-color:\s*var\(--ui-accent\);/,
