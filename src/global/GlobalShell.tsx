@@ -601,7 +601,7 @@ export function GlobalShell({
           <button type="button" disabled={isOpening || !onOpenSettings} onClick={() => {
             setSettingsError(null);
             void onOpenSettings?.().catch(() => setSettingsError("Não foi possível abrir Configurações. Tente novamente."));
-          }}>Configurações…</button>
+          }}><span>Configurações…</span></button>
           {settingsError && <p role="alert">{settingsError}</p>}
           <button
             aria-label="Exportação em lote"

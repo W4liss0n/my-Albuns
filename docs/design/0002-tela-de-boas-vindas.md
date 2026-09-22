@@ -38,6 +38,11 @@ Depois de um divisor, `Exportação em lote` aparece como ação visualmente
 secundária. Essa hierarquia reproduz a referência aceita sem alterar o conceito
 canônico da operação.
 
+Quando conectadas, `Configurações…` e `Exportação em lote` usam o mesmo feedback
+discreto: texto e ícone escurecem para grafite no hover ou foco visível, e só o
+rótulo recebe um sublinhado fino. O botão mantém fundo transparente, posição e
+área de clique; quando desabilitado, não recebe esse feedback.
+
 ```text
 ┌──────────────────────────────────────────────────────────────────┐
 │                            MyAlbuns                               │

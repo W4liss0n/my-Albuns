@@ -115,6 +115,17 @@ body,
   text-align: left;
 }
 
+.global-secondary-actions button:not(:disabled):is(:hover, :focus-visible) {
+  color: var(--ui-text);
+}
+
+.global-secondary-actions button:not(:disabled):is(:hover, :focus-visible) > span {
+  text-decoration: underline;
+  text-decoration-color: var(--ui-text-secondary);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+}
+
 .global-secondary-actions button:disabled {
   color: var(--ui-text-disabled);
   opacity: 1;
