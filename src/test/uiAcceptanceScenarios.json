@@ -12482,6 +12482,37 @@
         { "type": "assert", "selector": "[aria-label='Ângulo em graus']:focus" },
         { "type": "pointer-click", "selector": ".ui-unit-input:has([aria-label='Espessura da borda em mm']) .ui-unit-input__unit" }
       ]
+    },
+    {
+      "id": "workspace-numeric-unit-hover",
+      "title": "Ajustes do quadro — indicação discreta de edição ao passar o mouse",
+      "implementationPath": "/workspace-preview.html?frame=orientation&orientation=single-both",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "frame-numeric-controls",
+        "reason": "Design 0048: campos sem contorno fechado, com sublinhado discreto e realce neutro ao passar o mouse, mantendo a unidade integrada."
+      },
+      "viewport": { "width": 1440, "height": 800 },
+      "readySelector": "[aria-label='Ângulo em graus']:hover:not(:focus)",
+      "actions": [
+        { "type": "hover", "selector": "[aria-label='Ângulo em graus']" }
+      ]
+    },
+    {
+      "id": "workspace-numeric-unit-keyboard",
+      "title": "Ajustes do quadro — foco da entrada sem contorno a 150%",
+      "implementationPath": "/workspace-preview.html?frame=orientation&orientation=single-both&scale=1.5",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "frame-numeric-controls",
+        "reason": "Design 0048: foco por teclado usa sublinhado mais forte em grafite e fundo suave, sem recuperar o visual de célula ou deslocar o painel."
+      },
+      "viewport": { "width": 1920, "height": 1200 },
+      "readySelector": "[aria-label='Ângulo em graus']:focus-visible",
+      "actions": [
+        { "type": "key", "key": "Tab" },
+        { "type": "focus", "selector": "[aria-label='Ângulo em graus']" }
+      ]
     }
   ]
 }

@@ -63,7 +63,13 @@ seleção mista, teclado e escalas de 125% e 150%.
 ## Alinhamento e agrupamento dos ajustes
 
 Os campos numéricos do quadro usam `UnitInput`, entrada reutilizável de 92 px
-com a unidade dentro da mesma borda. O número permanece editável e a unidade
+com a unidade integrada à área de edição. Após o usuário rejeitar a aparência
+de célula, o campo passa a ter fundo transparente e apenas um sublinhado
+discreto, sem contorno fechado. O sublinhado indica que o número é editável;
+ao passar o mouse, ganha contraste e um fundo neutro suave. Durante a edição,
+o sublinhado fica mais forte, em grafite, sem alterar as dimensões do campo.
+Erros usam sublinhado vermelho e o tooltip compartilhado. Campos bloqueados
+não mostram a indicação de edição. O número permanece editável e a unidade
 é fixa, sem fazer parte do valor digitado. Clicar sobre a unidade também dá
 foco ao campo. Zoom, ângulo, opacidade e borda compartilham esse componente;
 porcentagens, graus e medidas físicas mantêm a mesma coluna. Os estados de
