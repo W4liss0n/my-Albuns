@@ -235,9 +235,13 @@ body,
 
 .global-project-favorite:disabled { cursor: wait; }
 
+.global-project-favorite svg {
+  fill: var(--ui-surface);
+  filter: drop-shadow(0 0 1px var(--ui-surface));
+}
+
 .global-project-favorite[aria-pressed="true"] svg {
   fill: currentColor;
-  filter: drop-shadow(0 0 2px var(--ui-surface));
 }
 
 .global-project-favorite-tooltip {

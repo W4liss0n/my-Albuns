@@ -48,6 +48,42 @@
       "actions": [{ "type": "hover", "selector": "ul[aria-label='Favoritos'] li:first-child .global-project-favorite" }]
     },
     {
+      "id": "welcome-favorite-overlap-idle",
+      "title": "Boas-vindas — estrelas sobre lâmina escura",
+      "implementationPath": "/welcome-preview.html?recents=star-overlap",
+      "comparison": { "kind": "implementation-only", "surface": "welcome-window", "reason": "Design 0002: a estrela vazada e a preenchida se distinguem da lâmina que cruza o ícone." },
+      "viewport": { "width": 1000, "height": 760 },
+      "readySelector": "main:has(.global-project-card[data-project-id='p1'] .global-project-thumbnail[data-preview-state='ready']):has(.global-project-card[data-project-id='p2'] .global-project-thumbnail[data-preview-state='ready'])",
+      "actions": []
+    },
+    {
+      "id": "welcome-favorite-overlap-hover",
+      "title": "Boas-vindas — hover na estrela vazada sobre lâmina escura",
+      "implementationPath": "/welcome-preview.html?recents=star-overlap",
+      "comparison": { "kind": "implementation-only", "surface": "welcome-window", "reason": "Design 0002: interior claro e halo fino separam a estrela vazada da lâmina, sem fundo no botão." },
+      "viewport": { "width": 1000, "height": 760 },
+      "readySelector": "ul[aria-label='Projetos recentes'] .global-project-card[data-project-id='p2'] .global-project-favorite-tooltip[role='tooltip']",
+      "actions": [{ "type": "hover", "selector": "ul[aria-label='Projetos recentes'] .global-project-card[data-project-id='p2'] .global-project-launch" }, { "type": "hover", "selector": "ul[aria-label='Projetos recentes'] .global-project-card[data-project-id='p2'] .global-project-favorite" }]
+    },
+    {
+      "id": "welcome-favorite-overlap-marked-hover",
+      "title": "Boas-vindas — hover na estrela preenchida sobre lâmina escura",
+      "implementationPath": "/welcome-preview.html?recents=star-overlap",
+      "comparison": { "kind": "implementation-only", "surface": "welcome-window", "reason": "Design 0002: a estrela preenchida conserva o contorno claro discreto no hover." },
+      "viewport": { "width": 1000, "height": 760 },
+      "readySelector": "ul[aria-label='Favoritos'] .global-project-card[data-project-id='p1'] .global-project-favorite-tooltip[role='tooltip']",
+      "actions": [{ "type": "hover", "selector": "ul[aria-label='Favoritos'] .global-project-card[data-project-id='p1'] .global-project-favorite" }]
+    },
+    {
+      "id": "welcome-favorite-overlap-focus",
+      "title": "Boas-vindas — foco na estrela vazada sobre lâmina escura",
+      "implementationPath": "/welcome-preview.html?recents=star-overlap",
+      "comparison": { "kind": "implementation-only", "surface": "welcome-window", "reason": "Design 0002: foco de teclado e silhueta continuam distintos da miniatura." },
+      "viewport": { "width": 1000, "height": 760 },
+      "readySelector": "ul[aria-label='Projetos recentes'] .global-project-card[data-project-id='p2'] .global-project-favorite[aria-pressed='false']:focus-visible ~ .global-project-favorite-tooltip[role='tooltip']",
+      "actions": [{ "type": "focus", "selector": "ul[aria-label='Projetos recentes'] .global-project-card[data-project-id='p2'] .global-project-launch" }, { "type": "key", "key": "Tab" }]
+    },
+    {
       "id": "welcome-favorite-focus",
       "title": "Boas-vindas — estrela pelo teclado e tooltip",
       "implementationPath": "/welcome-preview.html?recents=favorites",

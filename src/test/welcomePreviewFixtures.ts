@@ -21,6 +21,9 @@ export function welcomePreviewRecentProjects(
 ): readonly RecentProjectSummary[] {
   const variant = parameters.get("recents");
   if (variant === "empty") return [];
+  if (variant === "star-overlap") {
+    return welcomePreviewRecentProjects(new URLSearchParams("recents=favorites"));
+  }
   if (variant === "favorites-long-names") {
     return welcomePreviewRecentProjects(new URLSearchParams("recents=long-names"))
       .map((project, index) => ({ ...project, favorite: index === 0 }));
@@ -78,6 +81,13 @@ export function welcomePreviewFirstSheet(
   if (variant === "missing" || (variant === "mixed" && id === "p4")) return null;
   const source = representativeProjection.composition.sheets[0];
   const sheet = structuredClone(source);
+  if (variant === "star-overlap") {
+    const rgb = "#74343a";
+    sheet.base.rgb = rgb;
+    sheet.backgrounds = [{ kind: "color", rgb, drawRect: { ...sheet.base.drawRect } }];
+    sheet.frames = [];
+    sheet.overlays = [];
+  }
   if (variant === "mixed" && (id === "p2" || id === "p3")) {
     const rgb = id === "p2" ? "#FFFFFF" : "#eae7df";
     sheet.base.rgb = rgb;

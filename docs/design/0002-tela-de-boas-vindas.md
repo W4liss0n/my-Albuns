@@ -145,7 +145,9 @@ aparece no hover do cartão ou no foco visível de teclado. A estrela usa o cinz
 quente secundário em repouso e escurece para grafite no hover do próprio botão ou
 no foco visível, sem fundo no botão. O botão possui nome acessível, estado
 pressionado e tooltip, sem acionar a abertura. O foco permanece na ação após a
-troca de grupo.
+troca de grupo. Quando a estrela cruza o limite da miniatura, a vazada cobre a
+imagem somente dentro da própria silhueta com o tom claro da superfície; ambas
+recebem uma separação clara bem fina ao redor do ícone.
 
 O estado local de Projetos recentes guarda a marcação por identidade de Projeto,
 separado do arquivo criativo e do Cache. A consulta não grava. Registros legados
