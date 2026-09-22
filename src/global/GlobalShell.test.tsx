@@ -377,7 +377,7 @@ test("shows a real first Sheet and keeps an unavailable card usable", async () =
           sheetId: "first", number: 1, activeSides: "both" as const,
           widthUm: 600_000, heightUm: 300_000,
           base: { rgb: "#FFFFFF", drawRect: { x: 0, y: 0, width: 600_000, height: 300_000 } },
-          backgrounds: [{ kind: "color" as const, rgb: "#123456", drawRect: { x: 0, y: 0, width: 600_000, height: 300_000 } }],
+          backgrounds: [{ kind: "color" as const, rgb: "#FFFFFF", drawRect: { x: 0, y: 0, width: 600_000, height: 300_000 } }],
           frames: [], overlays: [],
         },
         mediaPreviewUrls: {},
@@ -400,11 +400,31 @@ test("shows a real first Sheet and keeps an unavailable card usable", async () =
   );
   expect(await screen.findByRole("img", { name: "Prévia da lâmina 01", hidden: true })).toBeInTheDocument();
   expect(container.querySelector('.global-project-thumbnail[data-preview-state="ready"] .sheet-preview')).toBeInTheDocument();
-  await waitFor(() => expect(container.querySelector('.global-project-thumbnail[data-preview-state="unavailable"]')).toBeInTheDocument());
+  expect(container.querySelector('.global-project-thumbnail[data-preview-state="ready"] [data-preview-background-color="#FFFFFF"]')).toBeInTheDocument();
+  expect(container.querySelector('.global-project-thumbnail[data-preview-state="ready"] .global-project-album')).not.toBeInTheDocument();
+  await waitFor(() => expect(container.querySelector('.global-project-thumbnail[data-preview-state="unavailable"] .global-project-album')).toBeInTheDocument());
+  expect(container.querySelector('.global-project-thumbnail[data-preview-state="unavailable"] .sheet-preview')).not.toBeInTheDocument();
   await userEvent.setup().click(screen.getByRole("button", { name: "Álbum da Bia" }));
   expect(openRecentProject).toHaveBeenCalledWith("recent-bia");
   expect(firstRecentProjectSheet).toHaveBeenCalledWith("recent-ana");
   expect(firstRecentProjectSheet).toHaveBeenCalledWith("recent-bia");
+});
+
+test("keeps a pending first Sheet represented without blocking its card", async () => {
+  const firstRecentProjectSheet = vi.fn(() => new Promise<never>(() => undefined));
+  const { container } = render(
+    <GlobalShell
+      graphicsDiagnostic={supportedGraphics}
+      projectPort={createProjectPort({
+        listRecentProjects: async () => [{ id: "recent-ana", name: "Álbum da Ana" }],
+        firstRecentProjectSheet,
+      })}
+    />,
+  );
+  expect(await screen.findByRole("button", { name: "Álbum da Ana" })).toBeEnabled();
+  await waitFor(() => expect(firstRecentProjectSheet).toHaveBeenCalledWith("recent-ana"));
+  expect(container.querySelector('.global-project-thumbnail[data-preview-state="loading"] .global-project-album')).toBeInTheDocument();
+  expect(container.querySelector('.global-project-thumbnail[data-preview-state="loading"] .sheet-preview')).not.toBeInTheDocument();
 });
 
 test("reopens a recent Project using only its opaque id", async () => {

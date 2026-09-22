@@ -25,7 +25,12 @@ const projectPort: GlobalProjectPort = {
   },
   listRecentProjects: async () =>
     welcomePreviewRecentProjects(previewParameters),
-  firstRecentProjectSheet: async (id) => welcomePreviewFirstSheet(previewParameters, id),
+  firstRecentProjectSheet: async (id) => {
+    if (previewParameters.get("recents") === "loading") {
+      return new Promise<never>(() => undefined);
+    }
+    return welcomePreviewFirstSheet(previewParameters, id);
+  },
   openRecentProject: async () => ({ status: "cancelled" }),
   startupOpenFailure: async () => null,
 };

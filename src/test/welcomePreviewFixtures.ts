@@ -16,19 +16,36 @@ const populatedRecentProjects = [
 export function welcomePreviewRecentProjects(
   parameters: URLSearchParams,
 ): readonly RecentProjectSummary[] {
-  return parameters.get("recents") === "empty" ? [] :
-    ["single", "missing"].includes(parameters.get("recents") ?? "")
-      ? populatedRecentProjects.slice(0, 1) : populatedRecentProjects;
+  const variant = parameters.get("recents");
+  if (variant === "empty") return [];
+  if (["single", "missing", "loading"].includes(variant ?? "")) {
+    return populatedRecentProjects.slice(0, 1);
+  }
+  return variant === "mixed"
+    ? populatedRecentProjects.slice(0, 4)
+    : populatedRecentProjects;
 }
 
 export function welcomePreviewFirstSheet(
   parameters: URLSearchParams,
   id: string,
 ): RecentProjectFirstSheet | null {
-  if (parameters.get("recents") === "missing") return null;
+  const variant = parameters.get("recents");
+  if (variant === "missing" || (variant === "mixed" && id === "p4")) return null;
   const source = representativeProjection.composition.sheets[0];
   const sheet = structuredClone(source);
-  if (parameters.get("recents") === "single") {
+  if (variant === "mixed" && (id === "p2" || id === "p3")) {
+    const rgb = id === "p2" ? "#FFFFFF" : "#eae7df";
+    sheet.base.rgb = rgb;
+    sheet.backgrounds = [{
+      kind: "color",
+      rgb,
+      drawRect: { ...sheet.base.drawRect },
+    }];
+    sheet.frames = [];
+    sheet.overlays = [];
+  }
+  if (variant === "single") {
     sheet.activeSides = "left";
     sheet.widthUm = source.widthUm / 2;
     sheet.base.drawRect.width = sheet.widthUm;
@@ -39,8 +56,8 @@ export function welcomePreviewFirstSheet(
   }
   return {
     sheet,
-    mediaPreviewUrls: {
+    mediaPreviewUrls: sheet.frames.length > 0 ? {
       "media-001": `/src/test/dev-media/${id === "p2" ? "retrato" : "serra-amanhecer"}.svg`,
-    },
+    } : {},
   };
 }

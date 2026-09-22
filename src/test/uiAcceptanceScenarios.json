@@ -34,7 +34,7 @@
       "comparison": {
         "kind": "implementation-only",
         "surface": "welcome-window",
-        "reason": "Design 0002: prévia indisponível preserva a área neutra e a ação de abrir, sem mensagem transitória ou alteração na altura dos cartões."
+        "reason": "Design 0002: prévia indisponível mostra um álbum fechado neutro e preserva a ação de abrir, sem mensagem transitória ou alteração na altura dos cartões."
       },
       "viewport": {
         "width": 1280,
@@ -70,6 +70,59 @@
         {
           "type": "key",
           "key": "Tab"
+        }
+      ]
+    },
+    {
+      "id": "welcome-first-sheet-mixed",
+      "title": "Boas-vindas — fotos, lâminas claras e prévia indisponível",
+      "implementationPath": "/welcome-preview.html?recents=mixed",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "welcome-window",
+        "reason": "Design 0002: superfície clara, limite fino do papel e álbum fechado neutro distinguem a composição real da prévia indisponível sem alterar a grade."
+      },
+      "viewport": {
+        "width": 1000,
+        "height": 800
+      },
+      "readySelector": ".global-recent-list:has(.global-project-thumbnail[data-preview-state=\"ready\"]):has(.global-project-thumbnail[data-preview-state=\"unavailable\"]):not(:has(.global-project-thumbnail[data-preview-state=\"loading\"]))",
+      "actions": []
+    },
+    {
+      "id": "welcome-first-sheet-loading",
+      "title": "Boas-vindas — apresentação estável durante a consulta",
+      "implementationPath": "/welcome-preview.html?recents=loading",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "welcome-window",
+        "reason": "Design 0002: durante a consulta o mesmo álbum fechado preenche a área reservada, sem animação, novo texto ou mudança de altura."
+      },
+      "viewport": {
+        "width": 1000,
+        "height": 720
+      },
+      "readySelector": ".global-recent-list button:not(:disabled) .global-project-thumbnail[data-preview-state=\"loading\"]",
+      "actions": []
+    },
+    {
+      "id": "welcome-first-sheet-mixed-hover",
+      "title": "Boas-vindas — cartão sem prévia ao passar o mouse",
+      "implementationPath": "/welcome-preview.html?recents=mixed",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "welcome-window",
+        "reason": "Design 0002: o realce pertence ao cartão inteiro; a representação de álbum permanece discreta e não desloca o conteúdo."
+      },
+      "viewport": {
+        "width": 1000,
+        "height": 800
+      },
+      "readySelector": ".global-recent-list:has(.global-project-thumbnail[data-preview-state=\"ready\"]):has(.global-project-thumbnail[data-preview-state=\"unavailable\"]):not(:has(.global-project-thumbnail[data-preview-state=\"loading\"])):has(button:hover .global-project-thumbnail[data-preview-state=\"unavailable\"])",
+      "actions": [
+        {
+          "type": "hover",
+          "selector": ".global-recent-list button:has(.global-project-thumbnail[data-preview-state=\"unavailable\"])"
         }
       ]
     },

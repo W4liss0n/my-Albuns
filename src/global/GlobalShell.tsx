@@ -88,7 +88,7 @@ function RecentProjectThumbnail({
   return (
     <span aria-hidden="true" className="global-project-thumbnail"
       data-preview-state={resolved ? (preview ? "ready" : "unavailable") : "loading"} ref={element}>
-      {sheet && (
+      {sheet ? (
         <span
           className="global-project-first-sheet"
           style={{
@@ -98,6 +98,8 @@ function RecentProjectThumbnail({
         >
           <SheetPreviewShell sheet={sheet} mediaPreviewUrls={preview.mediaPreviewUrls} />
         </span>
+      ) : (
+        <span className="global-project-album" />
       )}
     </span>
   );

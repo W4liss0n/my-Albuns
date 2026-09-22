@@ -80,12 +80,23 @@ Cache, por referências autorizadas. Essa consulta não inicia processamento dos
 originais nem grava uma imagem de capa. O baseline do ADR 0005 continua válido:
 não há preview persistido de lâmina nem novo formato de armazenamento de capa.
 
-Durante a consulta ou se o Projeto estiver indisponível, a área reservada mantém
-uma apresentação neutra, sem texto de carregamento ou erro que desloque os
-cartões. Uma mídia sem prévia segue a apresentação degradada do desenho
-compartilhado. O Nome e a ação de abrir permanecem disponíveis; a ausência da
-miniatura não impede a tentativa normal de abertura. Alterações ainda não
-salvas em uma Janela de Projeto não aparecem na miniatura dos recentes.
+A miniatura repousa sobre uma superfície clara e quente (--ui-surface-muted),
+levemente distinta do fundo da lista. Uma linha fina de baixo contraste e a
+sombra curta das miniaturas definem o limite da lâmina, inclusive quando ela é
+branca ou tem uma cor próxima do fundo. Esse acabamento envolve o papel inteiro,
+sem aumentar sua área, recortar a composição ou criar uma moldura espessa.
+
+Durante a consulta ou se o Projeto estiver indisponível, aparece uma pequena
+representação neutra de **álbum fechado**, com capa, lombada discreta e borda de
+páginas. Ela ocupa o centro da mesma área reservada, sem texto de carregamento,
+aviso ou animação. O álbum fechado distingue a ausência de prévia de uma lâmina
+realmente branca e evita deixar o cartão visualmente vazio.
+
+A altura dos cartões, o alinhamento dos nomes e a ação de abrir permanecem.
+O hover e o foco pertencem ao cartão inteiro. Uma mídia sem prévia em uma
+composição disponível segue a apresentação degradada do desenho compartilhado.
+A ausência da miniatura não impede a tentativa normal de abertura. Alterações
+ainda não salvas em uma Janela de Projeto não aparecem na miniatura dos recentes.
 
 A lista usa a abertura mais recente como ordenação decrescente. A entrada passa
 para o topo somente depois que o Host independente confirma `Ready`; cancelamento
