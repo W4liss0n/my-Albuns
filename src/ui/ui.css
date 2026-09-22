@@ -366,28 +366,6 @@ kbd {
   background: var(--ui-surface-muted);
 }
 
-/* `ui-range-control` é o layout empilhado (rótulo, valor e trilho); `ui-range`
-   é só o trilho, para sliders que já vivem numa linha própria. */
-.ui-range-control {
-  display: grid;
-  gap: 4px;
-}
-
-.ui-range-control__heading {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  color: var(--ui-text-secondary);
-  font-size: var(--ui-font-size-label);
-  gap: 12px;
-}
-
-.ui-range-control__heading output {
-  color: var(--ui-text-muted);
-  font-family: var(--ui-font-mono);
-  font-size: var(--ui-font-size-micro);
-}
-
 .ui-range {
   width: 100%;
   height: 16px;
@@ -782,4 +760,14 @@ kbd {
   .ui-progress-dialog__indicator--indeterminate {
     animation-duration: 3s;
   }
+}
+
+.ui-mixed-swatch {
+  display: inline-block;
+  width: 26px;
+  height: 26px;
+  flex: none;
+  border: 1px dashed var(--ui-border-strong);
+  border-radius: 5px;
+  background: linear-gradient(to right, var(--ui-surface-raised) 50%, var(--ui-text-muted) 50%);
 }

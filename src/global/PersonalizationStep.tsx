@@ -1,3 +1,5 @@
+import { ColorPropertyControl } from "../ui/ColorPropertyControl";
+import { summarizeVisualSelection } from "../ui/visualSelection";
 import { FrameDefaultRangeControl } from "../components/FrameDefaultRangeControl";
 import { useState } from "react";
 import { Image as ImageIcon, X } from "lucide-react";
@@ -49,8 +51,10 @@ export function PersonalizationStep({
   const backgroundRead = readBackgroundForFixedScope(personalization);
   const selectedBackground =
     backgroundRead.kind === "uniform" ? backgroundRead.value : null;
-  const backgroundColor =
-    selectedBackground?.kind === "color" ? selectedBackground.rgb : "#FFFFFF";
+  const backgroundSelection = summarizeVisualSelection(
+    (backgroundRead.kind === "uniform" ? [backgroundRead.value] : [backgroundRead.left, backgroundRead.right])
+      .map(value => value.kind === "color" ? value : { kind: "media", mediaId: value.selection.selectionId }),
+  );
   const overlayRead = readOverlayForFixedScope(personalization);
   const selectedOverlay =
     overlayRead.kind === "uniform" ? overlayRead.value : undefined;
@@ -151,19 +155,9 @@ export function PersonalizationStep({
                 type="button"
               />
             ))}
-            <label className="new-project-color-picker">
-              <span className="ui-visually-hidden">Cor do fundo</span>
-              <input
-                aria-label="Cor do fundo"
-                onChange={(event) =>
-                  onChange(
-                    setBackgroundColor(personalization, event.target.value),
-                  )
-                }
-                type="color"
-                value={backgroundColor}
-              />
-            </label>
+            <ColorPropertyControl key={personalization.fixedScope} label="do fundo" defaultRgb="#FFFFFF"
+              rgb={backgroundSelection.rgb} mixed={backgroundSelection.mixed} previewColors={backgroundSelection.previewColors}
+              onCommit={(rgb) => onChange(setBackgroundColor(personalization, rgb))} />
           </div>
           <ActionButton
             aria-label="Usar imagem… no fundo"
@@ -173,9 +167,7 @@ export function PersonalizationStep({
             <AppIcon icon={ImageIcon} size={14} />
             Usar imagem…
           </ActionButton>
-          {backgroundRead.kind === "mixed" ? (
-            <p className="new-project-native-note">Valores diferentes</p>
-          ) : selectedBackground?.kind === "image" ? (
+          {selectedBackground?.kind === "image" ? (
             <p className="new-project-selection-name">
               {selectedBackground.selection.displayName}
             </p>
@@ -185,14 +177,15 @@ export function PersonalizationStep({
           <h2>Sobreposição</h2>
           <ActionButton
             aria-label="Escolher imagem… de sobreposição"
+            title={overlayRead.kind === "mixed" ? "Valores diferentes" : undefined}
             className="new-project-image-action new-project-image-action--dashed"
             onClick={() => void chooseOverlay()}
           >
-            <AppIcon icon={ImageIcon} size={14} />
+            {overlayRead.kind === "mixed" ? <span aria-hidden="true" className="ui-mixed-swatch" /> : <AppIcon icon={ImageIcon} size={14} />}
             Escolher imagem…
           </ActionButton>
           {overlayRead.kind === "mixed" ? (
-            <p className="new-project-native-note">Valores diferentes</p>
+            <span className="ui-visually-hidden">Valores diferentes</span>
           ) : selectedOverlay ? (
             <>
               <p className="new-project-selection-name">
@@ -241,6 +234,7 @@ export function PersonalizationStep({
                 type="button"
               />
             ))}
+            <ColorPropertyControl label="da borda" rgb={frameBorderColor} onCommit={changeFrameBorderColor} />
           </div>
           <FrameDefaultRangeControl
             kind="gap"

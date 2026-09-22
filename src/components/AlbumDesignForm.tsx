@@ -10,6 +10,7 @@ import {
   changeFrameBorderWidth,
   createFrameBorderEditorState,
 } from "../application/frameBorderEditor";
+import { ColorPropertyControl } from "../ui/ColorPropertyControl";
 import { FrameDefaultRangeControl } from "./FrameDefaultRangeControl";
 import { renderableMediaPreviewUrls } from "../application/mediaPreviews";
 import {
@@ -128,8 +129,8 @@ export function AlbumDesignForm({
   const [applying, setApplying] = useState(false);
   const dirty = projectDraft.changed;
   const ready = dirty && !applying;
-  const background = backgroundAtScope(draft, scope);
-  const overlay = overlayAtScope(draft, scope);
+  const background = readScopedValue(draft.background, scope, sameBackground);
+  const overlay = readScopedValue(draft.overlay, scope, sameOverlay);
   const borderEnabled = draft.frameBorder.kind === "solid";
   const previewPersonalization = albumDesignPreviewDraft(
     draft,
@@ -282,6 +283,7 @@ export function AlbumDesignForm({
     <form
       id={formId}
       className="inspector-subsections album-design-form"
+      noValidate
       onSubmit={(event) => {
         event.preventDefault();
         void submit();
@@ -314,41 +316,18 @@ export function AlbumDesignForm({
           label="Fundo"
           mediaPreviewUrls={mediaPreviewUrls}
           open={openPicker === "Fundo"}
-          selectedMediaId={
-            background?.kind === "media" ? background.mediaId : null
-          }
+          key={`background:${scope}`}
+          values={background.kind === "uniform" ? [background.value] : [background.left, background.right]}
+          color={{ label: "do fundo", onCommit: (rgb) => chooseBackground({ kind: "color", rgb }) }}
           onOpenChange={(open) => setOpenPicker(open ? "Fundo" : null)}
           onSelect={(mediaId) => chooseBackground({ kind: "media", mediaId })}
-        >
-          <label
-            className="visual-design-picker__option visual-design-picker__color"
-            data-selected={background?.kind === "color" || undefined}
-          >
-            <span
-              aria-hidden="true"
-              className="visual-design-picker__tile"
-              style={{ background: backgroundColor(background) }}
-            />
-            <input
-              aria-label="Cor do fundo"
-              type="color"
-              value={backgroundColor(background)}
-              onChange={(event) =>
-                chooseBackground({
-                  kind: "color",
-                  rgb: event.currentTarget.value.toUpperCase(),
-                })
-              }
-            />
-          </label>
-        </VisualDesignControl>
+        />
         <VisualDesignControl
           decorativeMedia={decorativeMedia}
           label="Sobreposição"
           mediaPreviewUrls={mediaPreviewUrls}
-          noneSelected={overlay === null}
           open={openPicker === "Sobreposição"}
-          selectedMediaId={overlay?.mediaId ?? null}
+          values={(overlay.kind === "uniform" ? [overlay.value] : [overlay.left, overlay.right]).map(value => value ?? { kind: "none" })}
           onOpenChange={(open) => setOpenPicker(open ? "Sobreposição" : null)}
           onSelect={(mediaId) => chooseOverlay({ kind: "media", mediaId })}
           onClear={() => chooseOverlay(null)}
@@ -357,22 +336,10 @@ export function AlbumDesignForm({
       <section className="inspector-subsection">
         <h3>Padrão dos quadros</h3>
         <div className="album-frame-border-row">
-          <label className="album-frame-border-color-picker">
-            <span className="ui-visually-hidden">Cor da borda</span>
-            <input
-              aria-label="Cor da borda"
-              type="color"
-              value={borderEditor.rgb}
-              onChange={(event) =>
-                updateBorder(
-                  changeFrameBorderColor(
-                    createFrameBorderEditorState(draft.frameBorder, borderEditor),
-                    event.currentTarget.value,
-                  ),
-                )
-              }
-            />
-          </label>
+          <ColorPropertyControl label="da borda" rgb={borderEditor.rgb}
+            onCommit={(rgb) => updateBorder(changeFrameBorderColor(
+              createFrameBorderEditorState(draft.frameBorder, borderEditor), rgb,
+            ))} />
           <FrameDefaultRangeControl
             kind="border"
             displayUnit={presentationUnit}
@@ -441,22 +408,6 @@ function decorativePreview(
   };
 }
 
-function backgroundAtScope(
-  defaults: ProjectedVisualDefaults,
-  scope: AlbumDesignScope,
-) {
-  const read = readScopedValue(defaults.background, scope, sameBackground);
-  return read.kind === "uniform" ? read.value : null;
-}
-
-function overlayAtScope(
-  defaults: ProjectedVisualDefaults,
-  scope: AlbumDesignScope,
-) {
-  const read = readScopedValue(defaults.overlay, scope, sameOverlay);
-  return read.kind === "uniform" ? read.value : undefined;
-}
-
 function sameBackground(
   left: ProjectedBackgroundContent,
   right: ProjectedBackgroundContent,
@@ -473,10 +424,6 @@ function sameOverlay(
 ) {
   if (left === null || right === null) return left === right;
   return left.mediaId === right.mediaId;
-}
-
-function backgroundColor(content: ProjectedBackgroundContent | null) {
-  return content?.kind === "color" ? content.rgb : "#FFFFFF";
 }
 
 function scopeLabel(scope: AlbumDesignScope) {

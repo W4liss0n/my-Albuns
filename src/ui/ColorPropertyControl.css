@@ -9,20 +9,43 @@
   cursor: pointer;
 }
 
-.ui-color-property-trigger[data-mixed="true"] { border-style: dashed; box-shadow: none; }
+.ui-color-property-trigger[data-mixed="true"] {
+  border-style: dashed;
+  box-shadow: none;
+  background: linear-gradient(to right, var(--ui-surface-raised) 50%, var(--ui-text-muted) 50%);
+}
+.ui-color-property-trigger[data-empty="true"] {
+  background: linear-gradient(135deg, var(--ui-surface-raised) 47%, var(--ui-border-strong) 47% 53%, var(--ui-surface-raised) 53%);
+}
 .ui-color-property-trigger:disabled { cursor: default; opacity: 0.5; }
 .ui-color-property-trigger:focus-visible { outline: 2px solid var(--ui-focus-neutral); outline-offset: 2px; }
 
 .ui-color-property-popover {
-  position: absolute;
-  z-index: 20;
-  top: calc(100% + var(--ui-space-1));
-  left: 0;
-  right: 0;
-  display: grid;
-  gap: var(--ui-space-2);
+  z-index: 50;
+  width: 244px;
+  max-width: calc(100vw - 24px);
+  overflow: auto;
   padding: var(--ui-space-3);
 }
+
+.ui-color-property-dialog {
+  display: grid;
+  gap: var(--ui-space-3);
+  outline: none;
+}
+.ui-color-property-surface { outline: none; }
+
+.ui-color-property-area { width: 100%; height: 148px; border-radius: var(--ui-radius-small); }
+.ui-color-property-track { height: 16px; border-radius: var(--ui-radius-small); }
+.ui-color-property-thumb {
+  width: 14px;
+  height: 14px;
+  border: 2px solid white;
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px #0008;
+}
+.ui-color-property-thumb[data-focus-visible] { outline: 2px solid var(--ui-focus-neutral); outline-offset: 2px; }
+.ui-color-property-track .ui-color-property-thumb { top: 50%; }
 
 .ui-color-property-inputs { position: relative; display: flex; gap: var(--ui-space-2); align-items: center; }
 .ui-color-property-inputs > .ui-field-validation-auto-tooltip {
@@ -35,6 +58,6 @@
   bottom: -5px;
   transform: rotate(225deg);
 }
-.ui-color-property-inputs input[type="color"] { width: 32px; height: 28px; padding: 1px; }
+.ui-color-property-sample { width: 28px; height: 28px; flex: none; border: 1px solid var(--ui-border-strong); border-radius: var(--ui-radius-small); }
 .ui-color-property-inputs input[type="text"] { width: 100%; min-width: 0; font-family: var(--ui-font-mono); }
 .ui-color-property-actions { display: flex; justify-content: flex-end; gap: var(--ui-space-2); }

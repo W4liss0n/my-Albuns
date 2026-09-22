@@ -447,7 +447,7 @@
 }
 
 .new-project-color-swatches > button,
-.new-project-color-picker {
+.new-project-color-swatches .ui-color-property-trigger {
   display: grid;
   width: 26px;
   height: 26px;
@@ -464,17 +464,11 @@
 }
 
 .new-project-color-swatches > button:focus-visible,
-.new-project-color-picker:focus-within {
+.new-project-color-swatches .ui-color-property-trigger:focus-visible {
   filter: brightness(0.88);
 }
 
-.new-project-color-picker input {
-  width: 34px;
-  height: 34px;
-  padding: 0;
-  border: 0;
-  transform: scale(1.35);
-}
+.new-project-color-swatches .ui-color-property-trigger { margin: 0; box-shadow: none; }
 
 .new-project-image-action.ui-action-button {
   width: 100%;

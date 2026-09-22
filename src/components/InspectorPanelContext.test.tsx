@@ -188,6 +188,7 @@ test("shows Design da Lâmina and preserves its scope while Frame temporarily ow
     />,
   );
   expect(screen.getByText("Quadro selecionado")).toBeInTheDocument();
+  expect(screen.queryByText(sheetState.frames[0].id, { exact: false })).not.toBeInTheDocument();
 
   view.rerender(<InspectorPanel {...inspectorProps(sheetContext())} />);
   expect(

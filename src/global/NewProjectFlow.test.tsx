@@ -1,3 +1,4 @@
+import { chooseColor } from "../test/colorPicker";
 import { rasterLimitsAt300Dpi } from "../test/projectConfigurationFixtures";
 import {
   act,
@@ -378,26 +379,26 @@ test("creates from the neutral visual defaults without copying the demonstrative
     expect(frame).toHaveAttribute("fill-opacity", "0.24");
     expect(frame).toHaveAttribute("stroke", "none");
   }
-  expect(screen.getByLabelText("Cor do fundo")).toHaveValue("#ffffff");
+  expect(screen.getByLabelText("Cor do fundo")).toHaveAttribute("title", "#FFFFFF");
   expect(
     screen.queryByRole("checkbox", { name: "Borda dos quadros" }),
   ).not.toBeInTheDocument();
   expect(
     screen.getByRole("slider", { name: "Espessura da borda padrão" }),
   ).toHaveValue("0");
-  expect(screen.getByText("sem borda")).toBeVisible();
+  expect(screen.getByRole("slider", { name: "Espessura da borda padrão" })).toHaveAttribute("aria-valuetext", "sem borda");
   const borderColors = within(
     screen.getByRole("group", { name: "Cores da borda" }),
   ).getAllByRole("button");
   expect(
     screen.getByRole("group", { name: "Cores da borda" }),
   ).toHaveClass("new-project-color-swatches");
-  expect(borderColors).toHaveLength(3);
+  expect(borderColors).toHaveLength(4);
   expect(borderColors[0]).toHaveAttribute("aria-pressed", "true");
   expect(
     screen.getByRole("slider", { name: "Espaço entre quadros" }),
   ).toHaveValue("5000");
-  expect(screen.getByText("5 mm")).toBeVisible();
+  expect(screen.getByRole("spinbutton", { name: "Espaço entre quadros em mm" })).toHaveValue("5");
   expect(
     screen
       .getByRole("slider", { name: "Espaço entre quadros" })
@@ -412,7 +413,7 @@ test("creates from the neutral visual defaults without copying the demonstrative
   expect(
     screen.getByRole("slider", { name: "Espaço entre quadros" }),
   ).toHaveValue("18000");
-  expect(screen.getByText("18 mm")).toBeVisible();
+  expect(screen.getByRole("spinbutton", { name: "Espaço entre quadros em mm" })).toHaveValue("18");
   expect(Number(secondFrame.getAttribute("x"))).toBeGreaterThan(
     initialSecondFrameX,
   );
@@ -454,7 +455,34 @@ test("formats the Project Frame spacing in the configured Unit", async () => {
   expect(
     screen.getByRole("slider", { name: "Espaço entre quadros" }),
   ).toHaveValue("5000");
-  expect(screen.getByText("0.5 cm")).toBeVisible();
+  expect(screen.getByRole("spinbutton", { name: "Espaço entre quadros em cm" })).toHaveValue("0.5");
+});
+
+test.each([
+  ["mm", "1,27", "5,08"],
+  ["cm", "0,127", "0,508"],
+  ["pol", "0,05", "0,2"],
+])("keeps a custom border color and exact typed measures through Back/Create in %s", async (unit, borderText, gapText) => {
+  const user = userEvent.setup();
+  const onCreate = vi.fn(async () => ({ status: "cancelled" as const }));
+  render(<NewProjectFlow onCancel={vi.fn()} onCreate={onCreate} onValidate={validConfiguration} />);
+  await user.click(screen.getByRole("button", { name: unit }));
+  await user.click(screen.getByRole("button", { name: "Continuar" }));
+  chooseColor("da borda", "#4B7286");
+  const width = screen.getByRole("spinbutton", { name: `Espessura da borda padrão em ${unit}` });
+  fireEvent.change(width, { target: { value: borderText } });
+  fireEvent.keyDown(width, { key: "Enter" });
+  const gap = screen.getByRole("spinbutton", { name: `Espaço entre quadros em ${unit}` });
+  fireEvent.change(gap, { target: { value: gapText } });
+  fireEvent.keyDown(gap, { key: "Enter" });
+  await user.click(screen.getByRole("button", { name: "Voltar" }));
+  await user.click(screen.getByRole("button", { name: "Continuar" }));
+  expect(screen.getByRole("button", { name: "Cor da borda" })).toHaveAttribute("title", "#4B7286");
+  await user.click(screen.getByRole("button", { name: "Criar projeto" }));
+  expect(onCreate).toHaveBeenCalledWith(expect.objectContaining({
+    frameGapUm: 5_080,
+    visualDefaults: expect.objectContaining({ frameBorder: { kind: "solid", rgb: "#4B7286", widthUm: 1_270 } }),
+  }));
 });
 
 test("does not hover a side that already belongs to the fixed scope", async () => {
@@ -521,6 +549,9 @@ test("selects both sides from the preview area outside the sheet", async () => {
 
   await user.click(screen.getByRole("button", { name: "Lado esquerdo" }));
   expect(both).toHaveAttribute("aria-pressed", "false");
+  // The real browser focus ring is covered by the UI acceptance scenario.
+  const matches = both.matches.bind(both);
+  const focusVisible = vi.spyOn(both, "matches").mockImplementation(selector => selector === ":focus-visible" || matches(selector));
   both.focus();
   await waitFor(() =>
     expect(
@@ -539,6 +570,7 @@ test("selects both sides from the preview area outside the sheet", async () => {
   );
   await user.click(both);
   expect(both).toHaveAttribute("aria-pressed", "true");
+  focusVisible.mockRestore();
 });
 
 test("selects both sides from the preview legends outside the sheet", async () => {
@@ -610,9 +642,7 @@ test("hover fills only an unselected candidate without changing the fixed scope"
     "fill-opacity",
     "0.24",
   );
-  fireEvent.change(screen.getByLabelText("Cor do fundo"), {
-    target: { value: "#123456" },
-  });
+  chooseColor("do fundo", "#123456");
   expect(screen.getByLabelText("Fundo de ambos os lados")).toHaveAttribute(
     "fill",
     "#123456",
@@ -637,9 +667,7 @@ test("hover fills only an unselected candidate without changing the fixed scope"
     "stroke",
     "none",
   );
-  fireEvent.change(screen.getByLabelText("Cor do fundo"), {
-    target: { value: "#abcdef" },
-  });
+  chooseColor("do fundo", "#abcdef");
   expect(screen.getByLabelText("Fundo do lado esquerdo")).toHaveAttribute(
     "fill",
     "#ABCDEF",
@@ -678,28 +706,22 @@ test("presents divergent side values as mixed when returning to both sides", asy
   await user.click(
     await screen.findByRole("button", { name: "Lado esquerdo" }),
   );
-  fireEvent.change(screen.getByLabelText("Cor do fundo"), {
-    target: { value: "#abcdef" },
-  });
+  chooseColor("do fundo", "#abcdef");
   await user.click(screen.getByRole("button", { name: "Lado direito" }));
-  fireEvent.change(screen.getByLabelText("Cor do fundo"), {
-    target: { value: "#123456" },
-  });
+  chooseColor("do fundo", "#123456");
   await user.click(screen.getByRole("button", { name: "Ambos os lados" }));
 
   const backgroundSection = screen
     .getByRole("heading", { name: "Fundo" })
     .closest("section") as HTMLElement;
-  expect(within(backgroundSection).getByText("Valores diferentes")).toBeVisible();
+  expect(within(backgroundSection).getByRole("button", { name: "Cor do fundo" })).toHaveAttribute("title", "Valores diferentes");
   expect(
     within(backgroundSection)
       .getAllByRole("button", { name: /Usar fundo/ })
       .some((button) => button.getAttribute("aria-pressed") === "true"),
   ).toBe(false);
 
-  fireEvent.change(within(backgroundSection).getByLabelText("Cor do fundo"), {
-    target: { value: "#eeeeee" },
-  });
+  chooseColor("do fundo", "#eeeeee");
   expect(
     within(backgroundSection).queryByText("Valores diferentes"),
   ).not.toBeInTheDocument();
@@ -790,6 +812,9 @@ test("uses the sheet outline as the keyboard focus indicator", async () => {
 
   const left = await screen.findByRole("button", { name: "Lado esquerdo" });
   const right = await screen.findByRole("button", { name: "Lado direito" });
+  // jsdom does not model the browser's keyboard focus-visible modality.
+  const matches = right.matches.bind(right);
+  const focusVisible = vi.spyOn(right, "matches").mockImplementation(selector => selector === ":focus-visible" || matches(selector));
   left.focus();
   await user.tab();
   expect(right).toHaveFocus();
@@ -813,6 +838,7 @@ test("uses the sheet outline as the keyboard focus indicator", async () => {
   expect(document.querySelector(".visual-preview-fixed-selection")).toHaveClass(
     "visual-preview-fixed-selection--both",
   );
+  focusVisible.mockRestore();
 });
 
 test("shows a solid Frame border immediately and sends its canonical values", async () => {
@@ -838,7 +864,7 @@ test("shows a solid Frame border immediately and sends its canonical values", as
     screen.getByRole("button", { name: "Usar cor da borda #C5A46D" }),
   );
 
-  expect(screen.getByText("2.5 mm")).toBeVisible();
+  expect(screen.getByRole("spinbutton", { name: "Espessura da borda padrão em mm" })).toHaveValue("2.5");
   expect(
     screen.getByRole("button", { name: "Usar cor da borda #C5A46D" }),
   ).toHaveAttribute("aria-pressed", "true");
@@ -901,7 +927,7 @@ test("restores the chosen Frame border color after passing through zero", async 
   );
 
   fireEvent.change(width, { target: { value: "0" } });
-  expect(screen.getByText("sem borda")).toBeVisible();
+  expect(screen.getByRole("slider", { name: "Espessura da borda padrão" })).toHaveAttribute("aria-valuetext", "sem borda");
   fireEvent.change(width, { target: { value: "1250" } });
 
   expect(
@@ -1260,7 +1286,7 @@ test("shows a typed native picker failure without changing personalization", asy
   );
   expect(onOperationalFailure).toHaveBeenCalledOnce();
   expect(screen.queryByRole("alert")).not.toBeInTheDocument();
-  expect(screen.getByText("Cor do fundo")).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Cor do fundo" })).toBeInTheDocument();
 });
 
 test("releases a provisional image as soon as it is no longer referenced", async () => {

@@ -1,3 +1,4 @@
+import { chooseColor } from "../test/colorPicker";
 import { rasterLimitsAt300Dpi } from "../test/projectConfigurationFixtures";
 import { emptyLayoutCatalogPort } from "../test/layoutCatalogPorts";
 import {
@@ -2680,11 +2681,11 @@ test("projects the pending Unidade across the Project Window without changing Al
 
   expect(await screen.findByText("11.811×11.811 pol · 1 lâmina")).toBeVisible();
   expect(
-    design.getByText("Borda padrão").closest("label"),
-  ).toHaveTextContent("0.1 pol");
+    design.getByRole("spinbutton", { name: "Espessura da borda em pol" }),
+  ).toHaveValue("0.1");
   expect(
-    design.getByText("Espaço entre quadros").closest("label"),
-  ).toHaveTextContent("0.197 pol");
+    design.getByRole("spinbutton", { name: "Espaço entre quadros em pol" }),
+  ).toHaveValue("0.197");
   expect(designApply).toBeDisabled();
   expect(screen.getByText("salvo")).toBeVisible();
   expect(apply).not.toHaveBeenCalled();
@@ -2694,8 +2695,8 @@ test("projects the pending Unidade across the Project Window without changing Al
   );
   expect(await screen.findByText("300×300 mm · 1 lâmina")).toBeVisible();
   expect(
-    design.getByText("Espaço entre quadros").closest("label"),
-  ).toHaveTextContent("5 mm");
+    design.getByRole("spinbutton", { name: "Espaço entre quadros em mm" }),
+  ).toHaveValue("5");
   expect(designApply).toBeDisabled();
 
   fireEvent.click(
@@ -2758,9 +2759,7 @@ test("clears pending Apply actions when their inspector forms are collapsed", as
   fireEvent.change(information.getByLabelText("DPI"), {
     target: { value: "600" },
   });
-  fireEvent.change(design.getByLabelText("Cor do fundo"), {
-    target: { value: "#f7f5f0" },
-  });
+  chooseColor("do fundo", "#f7f5f0");
 
   await waitFor(() => expect(informationApply).toBeEnabled());
   await waitFor(() => expect(designApply).toBeEnabled());
@@ -2924,9 +2923,7 @@ test("edits and applies the complete Album design draft as one intent", async ()
   ).toHaveAttribute("aria-pressed", "true");
 
   fireEvent.click(albumDesign.getByRole("button", { name: "Lado esquerdo" }));
-  fireEvent.change(albumDesign.getByLabelText("Cor do fundo"), {
-    target: { value: "#f7f5f0" },
-  });
+  chooseColor("do fundo", "#f7f5f0");
   expect(
     albumDesign.queryByRole("button", { name: "Escolher sobreposição" }),
   ).not.toBeInTheDocument();
@@ -2956,9 +2953,7 @@ test("edits and applies the complete Album design draft as one intent", async ()
   expect(
     frame.compareDocumentPosition(overlay) & Node.DOCUMENT_POSITION_FOLLOWING,
   ).toBeTruthy();
-  fireEvent.change(albumDesign.getByLabelText("Cor da borda"), {
-    target: { value: "#2c2924" },
-  });
+  chooseColor("da borda", "#2c2924");
   const borderWidth = albumDesign.getByRole("slider", {
     name: "Espessura da borda",
   });
@@ -3010,9 +3005,7 @@ test("prevents re-entering Album Design Apply while its mutation is pending", as
       .getByRole("button", { name: "Design do álbum" })
       .closest("section") as HTMLElement,
   );
-  fireEvent.change(albumDesign.getByLabelText("Cor do fundo"), {
-    target: { value: "#f7f5f0" },
-  });
+  chooseColor("do fundo", "#f7f5f0");
   const applyDesign = albumDesign.getByRole("button", { name: "Aplicar" });
   expect(applyDesign).toBeEnabled();
 
@@ -3073,9 +3066,7 @@ test("saves the revision committed by a pending Album Design Apply", async () =>
       .getByRole("button", { name: "Design do álbum" })
       .closest("section") as HTMLElement,
   );
-  fireEvent.change(albumDesign.getByLabelText("Cor do fundo"), {
-    target: { value: "#f7f5f0" },
-  });
+  chooseColor("do fundo", "#f7f5f0");
   fireEvent.click(albumDesign.getByRole("button", { name: "Aplicar" }));
   fireEvent.click(getApplicationCommand("Arquivo", "Salvar"));
 
@@ -3140,9 +3131,7 @@ test("cancels a queued Save when Album Design Apply fails and allows a clean ret
       .getByRole("button", { name: "Design do álbum" })
       .closest("section") as HTMLElement,
   );
-  fireEvent.change(albumDesign.getByLabelText("Cor do fundo"), {
-    target: { value: "#f7f5f0" },
-  });
+  chooseColor("do fundo", "#f7f5f0");
   fireEvent.click(albumDesign.getByRole("button", { name: "Aplicar" }));
   fireEvent.click(getApplicationCommand("Arquivo", "Salvar"));
 
@@ -3230,9 +3219,7 @@ test("clears pending Save state after a queued Album Design save fails", async (
       .getByRole("button", { name: "Design do álbum" })
       .closest("section") as HTMLElement,
   );
-  fireEvent.change(albumDesign.getByLabelText("Cor do fundo"), {
-    target: { value: "#f7f5f0" },
-  });
+  chooseColor("do fundo", "#f7f5f0");
   fireEvent.click(albumDesign.getByRole("button", { name: "Aplicar" }));
   fireEvent.click(getApplicationCommand("Arquivo", "Salvar"));
 
@@ -3301,9 +3288,7 @@ test("revalidates queued Redo after Album Design Apply changes History eligibili
       .getByRole("button", { name: "Design do álbum" })
       .closest("section") as HTMLElement,
   );
-  fireEvent.change(albumDesign.getByLabelText("Cor do fundo"), {
-    target: { value: "#f7f5f0" },
-  });
+  chooseColor("do fundo", "#f7f5f0");
   fireEvent.click(albumDesign.getByRole("button", { name: "Aplicar" }));
   fireEvent.keyDown(window, { ctrlKey: true, key: "y" });
 
@@ -3342,9 +3327,7 @@ test("cancels queued Undo when Album Design Apply fails", async () => {
       .getByRole("button", { name: "Design do álbum" })
       .closest("section") as HTMLElement,
   );
-  fireEvent.change(albumDesign.getByLabelText("Cor do fundo"), {
-    target: { value: "#f7f5f0" },
-  });
+  chooseColor("do fundo", "#f7f5f0");
   fireEvent.click(albumDesign.getByRole("button", { name: "Aplicar" }));
   fireEvent.keyDown(window, { ctrlKey: true, key: "z" });
 
@@ -3392,9 +3375,7 @@ test("waits for a pending Album Design Apply before requesting Project close", a
       .getByRole("button", { name: "Design do álbum" })
       .closest("section") as HTMLElement,
   );
-  fireEvent.change(albumDesign.getByLabelText("Cor do fundo"), {
-    target: { value: "#f7f5f0" },
-  });
+  chooseColor("do fundo", "#f7f5f0");
   fireEvent.click(albumDesign.getByRole("button", { name: "Aplicar" }));
   fireEvent.click(getApplicationCommand("Arquivo", "Fechar projeto"));
 
@@ -3432,9 +3413,7 @@ test("cancels a queued Project close after Album Design Apply fails and allows r
       .getByRole("button", { name: "Design do álbum" })
       .closest("section") as HTMLElement,
   );
-  fireEvent.change(albumDesign.getByLabelText("Cor do fundo"), {
-    target: { value: "#f7f5f0" },
-  });
+  chooseColor("do fundo", "#f7f5f0");
   fireEvent.click(albumDesign.getByRole("button", { name: "Aplicar" }));
   fireEvent.click(getApplicationCommand("Arquivo", "Fechar projeto"));
 
@@ -3500,9 +3479,7 @@ test("releases a native close request when pending Album Design Apply fails", as
       .getByRole("button", { name: "Design do álbum" })
       .closest("section") as HTMLElement,
   );
-  fireEvent.change(albumDesign.getByLabelText("Cor do fundo"), {
-    target: { value: "#f7f5f0" },
-  });
+  chooseColor("do fundo", "#f7f5f0");
   fireEvent.click(albumDesign.getByRole("button", { name: "Aplicar" }));
   close.emitCloseRequested();
 
@@ -3596,7 +3573,7 @@ test("maps Borda zero to none and a positive value back to solid", async () => {
   const applyDesign = design.getByRole("button", { name: "Aplicar" });
 
   fireEvent.change(borderWidth, { target: { value: "0" } });
-  expect(design.getByText("sem borda")).toBeVisible();
+  expect(borderWidth).toHaveAttribute("aria-valuetext", "sem borda");
   fireEvent.click(applyDesign);
   await waitFor(() =>
     expect(apply).toHaveBeenLastCalledWith({
@@ -3620,7 +3597,7 @@ test("maps Borda zero to none and a positive value back to solid", async () => {
     design.getByRole("slider", { name: "Espessura da borda" }),
     { target: { value: "1250" } },
   );
-  expect(design.getByText("1.25 mm")).toBeVisible();
+  expect(design.getByRole("spinbutton", { name: "Espessura da borda em mm" })).toHaveValue("1.25");
   fireEvent.click(applyDesign);
   await waitFor(() =>
     expect(apply).toHaveBeenLastCalledWith({
@@ -3660,7 +3637,7 @@ test("previews the pending gap and confirms it with Album Design Apply", async (
   expect(gap).toHaveValue("5000");
   fireEvent.change(gap, { target: { value: "18000" } });
 
-  expect(design.getByText("18 mm")).toBeVisible();
+  expect(design.getByRole("spinbutton", { name: "Espaço entre quadros em mm" })).toHaveValue("18");
   expect(Number(secondFrame.getAttribute("x"))).toBeGreaterThan(
     initialSecondFrameX,
   );
@@ -4117,9 +4094,7 @@ test("preserves both unapplied Album drafts when Save returns an equivalent proj
   fireEvent.change(information.getByLabelText("DPI"), {
     target: { value: "600" },
   });
-  fireEvent.change(design.getByLabelText("Cor do fundo"), {
-    target: { value: "#f7f5f0" },
-  });
+  chooseColor("do fundo", "#f7f5f0");
   await waitFor(() =>
     expect(information.getByRole("button", { name: "Aplicar" })).toBeEnabled(),
   );
@@ -4138,7 +4113,7 @@ test("preserves both unapplied Album drafts when Save returns an equivalent proj
 
   expect(information.getByLabelText("DPI")).toHaveValue("600");
   expect(information.getByRole("button", { name: "Aplicar" })).toBeEnabled();
-  expect(design.getByLabelText("Cor do fundo")).toHaveValue("#f7f5f0");
+  expect(design.getByLabelText("Cor do fundo")).toHaveAttribute("title", "#F7F5F0");
   expect(design.getByRole("button", { name: "Aplicar" })).toBeEnabled();
 });
 
@@ -4186,9 +4161,7 @@ test("preserves the Album Information draft when Album Design is applied", async
   fireEvent.change(information.getByLabelText("DPI"), {
     target: { value: "600" },
   });
-  fireEvent.change(design.getByLabelText("Cor do fundo"), {
-    target: { value: "#f7f5f0" },
-  });
+  chooseColor("do fundo", "#f7f5f0");
   await waitFor(() =>
     expect(information.getByRole("button", { name: "Aplicar" })).toBeEnabled(),
   );
@@ -4255,9 +4228,7 @@ test("preserves the Album Design draft when Album Information is applied", async
       .getByRole("button", { name: "Design do álbum" })
       .closest("section") as HTMLElement,
   );
-  fireEvent.change(design.getByLabelText("Cor do fundo"), {
-    target: { value: "#f7f5f0" },
-  });
+  chooseColor("do fundo", "#f7f5f0");
   fireEvent.change(information.getByLabelText("DPI"), {
     target: { value: "600" },
   });
@@ -4284,7 +4255,7 @@ test("preserves the Album Design draft when Album Information is applied", async
     />,
   );
 
-  expect(design.getByLabelText("Cor do fundo")).toHaveValue("#f7f5f0");
+  expect(design.getByLabelText("Cor do fundo")).toHaveAttribute("title", "#F7F5F0");
   expect(design.getByRole("button", { name: "Aplicar" })).toBeEnabled();
 });
 
@@ -4342,9 +4313,7 @@ test("preserves both unapplied Album drafts across equivalent Undo and Redo proj
   fireEvent.change(information.getByLabelText("DPI"), {
     target: { value: "600" },
   });
-  fireEvent.change(design.getByLabelText("Cor do fundo"), {
-    target: { value: "#f7f5f0" },
-  });
+  chooseColor("do fundo", "#f7f5f0");
   await waitFor(() =>
     expect(information.getByRole("button", { name: "Aplicar" })).toBeEnabled(),
   );
@@ -4360,7 +4329,7 @@ test("preserves both unapplied Album drafts across equivalent Undo and Redo proj
     />,
   );
   expect(information.getByLabelText("DPI")).toHaveValue("600");
-  expect(design.getByLabelText("Cor do fundo")).toHaveValue("#f7f5f0");
+  expect(design.getByLabelText("Cor do fundo")).toHaveAttribute("title", "#F7F5F0");
 
   fireEvent.keyDown(window, { ctrlKey: true, key: "y" });
   await waitFor(() => expect(onProjectionChange).toHaveBeenCalledWith(afterRedo));
@@ -4373,7 +4342,7 @@ test("preserves both unapplied Album drafts across equivalent Undo and Redo proj
     />,
   );
   expect(information.getByLabelText("DPI")).toHaveValue("600");
-  expect(design.getByLabelText("Cor do fundo")).toHaveValue("#f7f5f0");
+  expect(design.getByLabelText("Cor do fundo")).toHaveAttribute("title", "#F7F5F0");
 });
 
 test("keeps a mutation failure behind Album Information and releases both owners in order", async () => {
@@ -4398,9 +4367,7 @@ test("keeps a mutation failure behind Album Information and releases both owners
       .getByRole("button", { name: "Design do álbum" })
       .closest("section") as HTMLElement,
   );
-  fireEvent.change(design.getByLabelText("Cor do fundo"), {
-    target: { value: "#f7f5f0" },
-  });
+  chooseColor("do fundo", "#f7f5f0");
   fireEvent.click(design.getByRole("button", { name: "Aplicar" }));
 
   const information = within(
@@ -4592,9 +4559,7 @@ test("materializes an Album Design draft over the projection produced by a pendi
       .closest("section") as HTMLElement,
   );
   fireEvent.click(design.getByRole("button", { name: "Lado esquerdo" }));
-  fireEvent.change(design.getByLabelText("Cor do fundo"), {
-    target: { value: "#f7f5f0" },
-  });
+  chooseColor("do fundo", "#f7f5f0");
   fireEvent.keyDown(window, { ctrlKey: true, key: "z" });
   await waitFor(() => expect(projectSessionPort.undo).toHaveBeenCalledOnce());
   fireEvent.click(design.getByRole("button", { name: "Aplicar" }));
@@ -4640,9 +4605,7 @@ test("applies an Album Design draft over its captured baseline when pending Undo
       .getByRole("button", { name: "Design do álbum" })
       .closest("section") as HTMLElement,
   );
-  fireEvent.change(design.getByLabelText("Cor do fundo"), {
-    target: { value: "#f7f5f0" },
-  });
+  chooseColor("do fundo", "#f7f5f0");
   fireEvent.keyDown(window, { ctrlKey: true, key: "z" });
   await waitFor(() => expect(projectSessionPort.undo).toHaveBeenCalledOnce());
   fireEvent.click(design.getByRole("button", { name: "Aplicar" }));

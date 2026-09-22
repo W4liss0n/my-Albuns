@@ -1,3 +1,4 @@
+import { chooseColor } from "./test/colorPicker";
 import {
   fireEvent,
   render,
@@ -80,9 +81,7 @@ test("recomposes the development Grade after applying Album changes", async () =
       .getByRole("button", { name: "Design do álbum" })
       .closest("section") as HTMLElement,
   );
-  fireEvent.change(design.getByLabelText("Cor do fundo"), {
-    target: { value: "#f7f5f0" },
-  });
+  chooseColor("do fundo", "#f7f5f0");
   fireEvent.click(design.getByRole("button", { name: "Aplicar" }));
 
   await waitFor(() =>

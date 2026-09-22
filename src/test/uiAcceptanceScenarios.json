@@ -9598,7 +9598,7 @@
       "comparison": {
         "kind": "implementation-only",
         "surface": "sheet-design",
-        "implementationCaptureSelector": ".app-shell",
+        "implementationCaptureSelector": "body",
         "reason": "A SPEC, seção 16, e o design 0001 definem cor local, remoção, restauração e origem por lado. As composições e transições deste cenário são geradas pelo ProjectCore."
       },
       "viewport": {
@@ -11556,7 +11556,7 @@
       },
       "id": "workspace-photo-zoom-invalid",
       "title": "Zoom — valor inválido não altera o Projeto",
-      "readySelector": "body[data-photo-orientation='single-zoom'][data-photo-orientation-history='0,0'] .numeric-property-control:has([aria-label='Zoom da foto em porcentagem'][aria-invalid='true']) [role='tooltip']",
+      "readySelector": "body[data-photo-orientation='single-zoom'][data-photo-orientation-history='0,0'] .ui-numeric-range-field:has([aria-label='Zoom da foto em porcentagem'][aria-invalid='true']) [role='tooltip']",
       "actions": [
         {
           "type": "input",
@@ -11580,7 +11580,7 @@
       "implementationPath": "/workspace-preview.html?frame=orientation&orientation=single-zoom",
       "comparison": { "kind": "implementation-only", "surface": "photo-zoom", "reason": "O design 0040 mantém a validação no controle numérico existente e preserva o Projeto enquanto a entrada é inválida." },
       "viewport": { "width": 1440, "height": 800 },
-      "readySelector": "body[data-photo-orientation-history='0,0'] .numeric-property-control:has([aria-label='Zoom da foto em porcentagem'][aria-invalid='true']) [role='tooltip']",
+      "readySelector": "body[data-photo-orientation-history='0,0'] .ui-numeric-range-field:has([aria-label='Zoom da foto em porcentagem'][aria-invalid='true']) [role='tooltip']",
       "actions": [{ "type": "input", "selector": "[aria-label='Zoom da foto em porcentagem']", "value": "9999" }]
     },
     {
@@ -11822,7 +11822,7 @@
       "comparison": {
         "kind": "implementation-only",
         "surface": "sheet-design",
-        "implementationCaptureSelector": ".app-shell",
+        "implementationCaptureSelector": "body",
         "reason": "Design 0044: controles compactos compartilhados com o álbum, preservando o escopo e as operações existentes."
       },
       "viewport": {
@@ -11902,6 +11902,355 @@
         {
           "type": "context-click",
           "selector": ".canvas-host canvas"
+        }
+      ]
+    },
+    {
+      "id": "new-project-background-palette",
+      "title": "Novo projeto — paleta de fundo completa",
+      "implementationPath": "/welcome-preview.html",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "shared-design-controls",
+        "reason": "Design 0047: paleta completa no primeiro clique, medidas digitáveis e estados mistos explícitos, com o visual compacto vigente."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "readySelector": ".ui-color-property-area",
+      "actions": [
+        {
+          "type": "click",
+          "selector": "[aria-label=\"Novo projeto\"]"
+        },
+        {
+          "type": "click",
+          "selector": "[aria-label=\"Continuar\"]"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label=\"Cor do fundo\"]"
+        }
+      ]
+    },
+    {
+      "id": "new-project-border-palette-small",
+      "title": "Novo projeto — paleta da borda em janela menor",
+      "implementationPath": "/welcome-preview.html",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "shared-design-controls",
+        "reason": "Design 0047: paleta completa no primeiro clique, medidas digitáveis e estados mistos explícitos, com o visual compacto vigente."
+      },
+      "viewport": {
+        "width": 1000,
+        "height": 650
+      },
+      "readySelector": ".ui-color-property-area",
+      "actions": [
+        {
+          "type": "click",
+          "selector": "[aria-label=\"Novo projeto\"]"
+        },
+        {
+          "type": "click",
+          "selector": "[aria-label=\"Continuar\"]"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label=\"Cor da borda\"]"
+        }
+      ]
+    },
+    {
+      "id": "new-project-mixed-colors",
+      "title": "Novo projeto — cores diferentes por lado",
+      "implementationPath": "/welcome-preview.html",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "shared-design-controls",
+        "reason": "Design 0047: paleta completa no primeiro clique, medidas digitáveis e estados mistos explícitos, com o visual compacto vigente."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "readySelector": "[aria-label=\"Cor do fundo\"][data-mixed=\"true\"]",
+      "actions": [
+        {
+          "type": "click",
+          "selector": "[aria-label=\"Novo projeto\"]"
+        },
+        {
+          "type": "click",
+          "selector": "[aria-label=\"Continuar\"]"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label=\"Lado esquerdo\"]"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label=\"Cor do fundo\"]"
+        },
+        {
+          "type": "input",
+          "selector": "input[aria-label=\"Código da cor do fundo\"]",
+          "value": "#E3A184"
+        },
+        {
+          "type": "click-text",
+          "text": "Aplicar cor"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label=\"Lado direito\"]"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label=\"Cor do fundo\"]"
+        },
+        {
+          "type": "input",
+          "selector": "input[aria-label=\"Código da cor do fundo\"]",
+          "value": "#507A8C"
+        },
+        {
+          "type": "click-text",
+          "text": "Aplicar cor"
+        },
+        {
+          "type": "pointer-click",
+          "selector": "button[aria-label=\"Ambos os lados\"]",
+          "offsetY": -300
+        }
+      ]
+    },
+    {
+      "id": "new-project-number-invalid",
+      "title": "Novo projeto — erro da medida em tooltip",
+      "implementationPath": "/welcome-preview.html",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "shared-design-controls",
+        "reason": "Design 0047: paleta completa no primeiro clique, medidas digitáveis e estados mistos explícitos, com o visual compacto vigente."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "readySelector": "[role=\"tooltip\"]",
+      "actions": [
+        {
+          "type": "click",
+          "selector": "[aria-label=\"Novo projeto\"]"
+        },
+        {
+          "type": "click",
+          "selector": "[aria-label=\"Continuar\"]"
+        },
+        {
+          "type": "input",
+          "selector": "input[aria-label=\"Espessura da borda padrão em mm\"]",
+          "value": "999"
+        }
+      ]
+    },
+    {
+      "id": "workspace-album-background-palette",
+      "title": "Design do álbum — paleta de fundo completa",
+      "implementationPath": "/workspace-preview.html",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "shared-design-controls",
+        "reason": "Design 0047: paleta completa no primeiro clique, medidas digitáveis e estados mistos explícitos, com o visual compacto vigente."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "readySelector": ".ui-color-property-area",
+      "actions": [
+        {
+          "type": "click",
+          "selector": "button[aria-label=\"Informações do álbum\"]"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label=\"Cor do fundo\"]"
+        }
+      ]
+    },
+    {
+      "id": "workspace-album-border-palette",
+      "title": "Design do álbum — paleta de borda completa",
+      "implementationPath": "/workspace-preview.html",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "shared-design-controls",
+        "reason": "Design 0047: paleta completa no primeiro clique, medidas digitáveis e estados mistos explícitos, com o visual compacto vigente."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "readySelector": ".ui-color-property-area",
+      "actions": [
+        {
+          "type": "click",
+          "selector": "button[aria-label=\"Informações do álbum\"]"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label=\"Cor da borda\"]"
+        }
+      ]
+    },
+    {
+      "id": "workspace-album-mixed-colors",
+      "title": "Design do álbum — cores diferentes por lado",
+      "implementationPath": "/workspace-preview.html",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "shared-design-controls",
+        "reason": "Design 0047: paleta completa no primeiro clique, medidas digitáveis e estados mistos explícitos, com o visual compacto vigente."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "readySelector": "[aria-label=\"Cor do fundo\"][data-mixed=\"true\"]",
+      "actions": [
+        {
+          "type": "click",
+          "selector": "button[aria-label=\"Informações do álbum\"]"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label=\"Lado esquerdo\"]"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label=\"Cor do fundo\"]"
+        },
+        {
+          "type": "input",
+          "selector": "input[aria-label=\"Código da cor do fundo\"]",
+          "value": "#E3A184"
+        },
+        {
+          "type": "click-text",
+          "text": "Aplicar cor"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label=\"Lado direito\"]"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label=\"Cor do fundo\"]"
+        },
+        {
+          "type": "input",
+          "selector": "input[aria-label=\"Código da cor do fundo\"]",
+          "value": "#507A8C"
+        },
+        {
+          "type": "click-text",
+          "text": "Aplicar cor"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label=\"Ambos os lados\"]"
+        }
+      ]
+    },
+    {
+      "id": "workspace-frame-color-palette",
+      "title": "Quadro — paleta completa no primeiro clique",
+      "implementationPath": "/workspace-preview.html?frame=style",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "shared-design-controls",
+        "reason": "Design 0047: paleta completa no primeiro clique, medidas digitáveis e estados mistos explícitos, com o visual compacto vigente."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 800
+      },
+      "readySelector": ".ui-color-property-area",
+      "actions": [
+        {
+          "type": "assert",
+          "selector": ".canvas-host:has(canvas):not(:has(.canvas-loading))"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label=\"Cor da borda\"]"
+        }
+      ]
+    },
+    {
+      "id": "workspace-album-number-invalid",
+      "title": "Design do álbum — medida inválida em tooltip",
+      "implementationPath": "/workspace-preview.html",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "shared-design-controls",
+        "reason": "Design 0047: paleta completa no primeiro clique, medidas digitáveis e estados mistos explícitos, com o visual compacto vigente."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "readySelector": "[role=\"tooltip\"]",
+      "actions": [
+        {
+          "type": "click",
+          "selector": "button[aria-label=\"Informações do álbum\"]"
+        },
+        {
+          "type": "input",
+          "selector": "input[aria-label=\"Espaço entre quadros em mm\"]",
+          "value": "999"
+        }
+      ]
+    },
+    {
+      "id": "new-project-scope-keyboard-focus",
+      "title": "Novo projeto — foco de teclado no lado direito",
+      "implementationPath": "/welcome-preview.html",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "shared-design-controls",
+        "reason": "Design 0047: paleta completa no primeiro clique, medidas digitáveis e estados mistos explícitos, com o visual compacto vigente."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "readySelector": "[aria-label=\"Foco de teclado do lado direito\"]",
+      "actions": [
+        {
+          "type": "click",
+          "selector": "[aria-label=\"Novo projeto\"]"
+        },
+        {
+          "type": "click",
+          "selector": "[aria-label=\"Continuar\"]"
+        },
+        {
+          "type": "focus",
+          "selector": "button[aria-label=\"Lado esquerdo\"]"
+        },
+        {
+          "type": "key",
+          "key": "Tab"
+        },
+        {
+          "type": "assert",
+          "selector": "button[aria-label=\"Lado direito\"]:focus-visible"
         }
       ]
     }

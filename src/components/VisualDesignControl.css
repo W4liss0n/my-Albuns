@@ -97,27 +97,6 @@
   );
 }
 
-.visual-design-picker__color:has(input:focus-visible)
-  .visual-design-picker__tile {
-  outline: 1px solid var(--ui-focus-neutral);
-  outline-offset: 2px;
-}
-
-.visual-design-picker__color {
-  cursor: default;
-}
-
-.visual-design-picker__color input {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 26px;
-  height: 26px;
-  padding: 0;
-  border: 0;
-  opacity: 0;
-}
-
 .visual-design-picker__option:disabled { opacity: 0.5; }
 
 .visual-design-actions {
@@ -146,8 +125,4 @@
   margin: 0;
   border-radius: 5px;
   box-shadow: none;
-}
-
-.visual-design-color-property .ui-color-property-trigger[data-mixed="true"] {
-  background: var(--visual-design-color-preview, linear-gradient(to right, var(--ui-surface-raised) 50%, var(--ui-surface-muted) 50%));
 }

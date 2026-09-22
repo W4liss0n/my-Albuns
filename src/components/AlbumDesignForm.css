@@ -14,20 +14,6 @@
   text-align: center;
 }
 
-.album-frame-border-color-picker input {
-  position: absolute;
-  inset: -8px;
-  width: calc(100% + 16px);
-  height: calc(100% + 16px);
-  padding: 0;
-  border: 0;
-}
-
-.album-frame-border-color-picker:has(input:focus-visible) {
-  border-color: var(--ui-focus-neutral);
-  box-shadow: 0 0 0 1px var(--ui-border-strong);
-}
-
 /* Cor e espessura dividem a mesma linha: o seletor sozinho não justifica uma
    faixa inteira do painel. */
 .album-frame-border-row {
@@ -37,21 +23,7 @@
   gap: var(--ui-space-3);
 }
 
-.album-frame-border-row > .ui-range-control {
+.album-frame-border-row > .ui-numeric-range-field {
   min-width: 0;
   flex: 1;
-}
-
-.album-frame-border-color-picker {
-  position: relative;
-  width: 24px;
-  height: 24px;
-  overflow: hidden;
-  padding: 0;
-  border: 1px solid var(--ui-border-strong);
-  border-radius: var(--ui-radius-small);
-}
-
-.album-frame-border-color-picker:hover {
-  border-color: var(--ui-text-muted);
 }

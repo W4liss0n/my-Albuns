@@ -6,7 +6,6 @@ import type {
   ComposedSheet, DecorativeRole, DecorativeScope, MediaCatalogItem, SheetVisualChange, SheetVisuals,
 } from "../domain/project";
 import { ActionButton, AppIcon } from "../ui";
-import { ColorPropertyControl } from "../ui/ColorPropertyControl";
 import { VisualScopeControls } from "../ui/visualPreview/VisualScopeControls";
 import { SheetPreview } from "./SheetPreview";
 import { VisualDesignControl } from "./VisualDesignControl";
@@ -207,9 +206,6 @@ function SheetVisualControls({
       const background = role === "Fundo";
       const decorativeRole = background ? "background" : "overlay";
       const values = background ? backgroundValues : overlayValues;
-      const first = values[0];
-      const selectedMediaId = first?.kind === "media" && values.every(value => value.kind === "media" && value.mediaId === first.mediaId)
-        ? first.mediaId : null;
       const description = values.map(value =>
         `${value.side ? value.side + ": " : ""}${value.label}. ${value.custom ? "Personalizado nesta lâmina" : "Usando o padrão do álbum"}.`,
       ).join(" ");
@@ -220,9 +216,9 @@ function SheetVisualControls({
           label={role}
           mediaPreviewUrls={mediaPreviewUrls}
           description={description}
-          noneSelected={values.every(value => value.kind === "none")}
           open={openPicker === role}
-          selectedMediaId={selectedMediaId}
+          values={values}
+          color={background ? { label: "do fundo da lâmina", onCommit: (rgb) => onChange({ kind: "backgroundColor", rgb }) } : undefined}
           onClear={background ? undefined : () => onChange({ kind: "remove", role: "overlay" })}
           onOpenChange={(open) => setOpenPicker(open ? role : null)}
           onSelect={(mediaId) => onSelectMedia(decorativeRole, mediaId)}
@@ -237,22 +233,10 @@ function SheetVisualControls({
               <AppIcon icon={RotateCcw} size={14} />
             </ActionButton>}
           </>}
-        >
-          {background && <div className="visual-design-color-property" title={description}
-            style={backgroundSwatchStyle(values)}>
-            <ColorPropertyControl label="do fundo da lâmina" defaultRgb="#FFFFFF"
-              disabled={disabled} rgb={sharedBackgroundColor(values)}
-              onCommit={(rgb) => onChange({ kind: "backgroundColor", rgb })} />
-          </div>}
-        </VisualDesignControl>
+        />
       </section>;
     })}
   </div>;
-}
-
-function backgroundSwatchStyle(values: readonly VisualValue[]): CSSProperties | undefined {
-  if (values.length !== 2 || values[0].kind !== "color" || values[1].kind !== "color") return undefined;
-  return { "--visual-design-color-preview": `linear-gradient(to right, ${values[0].rgb} 50%, ${values[1].rgb} 50%)` } as CSSProperties;
 }
 
 function visualValues(
@@ -320,12 +304,6 @@ function sameVisualValue(left: VisualValue, right: VisualValue) {
     return left.mediaId === right.mediaId;
   }
   return left.kind === "none" && right.kind === "none";
-}
-
-function sharedBackgroundColor(values: readonly VisualValue[]) {
-  const first = values[0];
-  return first?.kind === "color" && values.every((value) => value.kind === "color" && value.rgb === first.rgb)
-    ? first.rgb : null;
 }
 
 function scopeLabel(scope: SheetDesignScope) {

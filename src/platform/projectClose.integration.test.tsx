@@ -1,3 +1,4 @@
+import { chooseColor } from "../test/colorPicker";
 import { rasterLimitsAt300Dpi } from "../test/projectConfigurationFixtures";
 import { emptyLayoutCatalogPort } from "../test/layoutCatalogPorts";
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
@@ -133,9 +134,7 @@ test.each(["pending", "completed"] as const)(
     const albumDesign = within(
       screen.getByRole("button", { name: "Design do álbum" }).closest("section") as HTMLElement,
     );
-    fireEvent.change(albumDesign.getByLabelText("Cor do fundo"), {
-      target: { value: "#f7f5f0" },
-    });
+    chooseColor("do fundo", "#f7f5f0");
     fireEvent.click(albumDesign.getByRole("button", { name: "Aplicar" }));
     fireEvent.keyDown(window, { ctrlKey: true, key: "s" });
     await waitFor(() => expect(corePort.save).toHaveBeenCalledWith(appliedProjection.state.revision));

@@ -1,3 +1,4 @@
+import { chooseColor } from "../test/colorPicker";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { useState, type ComponentProps } from "react";
 import { expect, test, vi } from "vitest";
@@ -54,6 +55,53 @@ function Harness({
   );
 }
 
+test("typed border and gap preserve precision, reject invalid drafts and cancel with Escape", async () => {
+  const onApply = vi.fn<ComponentProps<typeof AlbumDesignForm>["onApply"]>(async () => true);
+  render(<Harness onApply={onApply} value={representativeProjection.state.album.visualDefaults} />);
+  const border = screen.getByRole("spinbutton", { name: "Espessura da borda em mm" });
+  const gap = screen.getByRole("spinbutton", { name: "Espaço entre quadros em mm" });
+  fireEvent.change(border, { target: { value: "1,123" } });
+  fireEvent.keyDown(border, { key: "Enter" });
+  expect(border).toHaveValue("1.123");
+  fireEvent.change(gap, { target: { value: "9.125" } });
+  fireEvent.keyDown(gap, { key: "Escape" });
+  expect(gap).toHaveValue("5");
+  fireEvent.change(gap, { target: { value: "999" } });
+  expect(gap).toHaveAttribute("aria-invalid", "true");
+  expect(screen.getByRole("tooltip")).toHaveTextContent("Use uma medida entre 0 e 24 mm.");
+  fireEvent.blur(gap);
+  expect(gap).toHaveValue("5");
+  fireEvent.change(gap, { target: { value: "7,875" } });
+  fireEvent.click(screen.getByRole("button", { name: "Aplicar" }));
+  await waitFor(() => expect(onApply).toHaveBeenCalledOnce());
+  expect(onApply.mock.calls[0][0].materialize(representativeProjection)).toMatchObject({
+    frameGapUm: 7_875, visualDefaults: { frameBorder: { kind: "solid", widthUm: 1_123 } },
+  });
+});
+
+test("mixed sides stay distinguishable and a cancelled palette keeps the album draft unchanged", () => {
+  const value: ProjectedVisualDefaults = { ...representativeProjection.state.album.visualDefaults,
+    background: { scope: "perSide", left: { kind: "color", rgb: "#FF0000" }, right: { kind: "color", rgb: "#0000FF" } },
+    overlay: { scope: "perSide", left: { kind: "media", mediaId: "decorative-1" }, right: null },
+  };
+  const onApply = vi.fn();
+  render(<Harness onApply={onApply} value={value} />);
+  const color = screen.getByRole("button", { name: "Cor do fundo" });
+  expect(color).toHaveAttribute("data-mixed", "true");
+  expect(color.style.backgroundImage).toContain("rgb(255, 0, 0)");
+  expect(color.style.backgroundImage).toContain("rgb(0, 0, 255)");
+  expect(screen.getByRole("button", { name: "Sem sobreposição" })).toHaveAttribute("aria-pressed", "false");
+  fireEvent.click(color);
+  fireEvent.change(screen.getByRole("textbox", { name: "Código da cor do fundo" }), { target: { value: "#EEEEEE" } });
+  fireEvent.click(screen.getByRole("button", { name: "Cancelar" }));
+  expect(color).toHaveAttribute("data-mixed", "true");
+  expect(screen.getByRole("button", { name: "Aplicar" })).toBeDisabled();
+  fireEvent.click(color);
+  fireEvent.click(screen.getByRole("button", { name: "Lado esquerdo" }));
+  expect(screen.queryByRole("dialog")).toBeNull();
+  expect(screen.getByRole("button", { name: "Cor do fundo" })).toHaveAttribute("title", "#FF0000");
+});
+
 test("retains existing border and gap values above the standard creation range", async () => {
   const value: ProjectedVisualDefaults = {
     ...representativeProjection.state.album.visualDefaults,
@@ -68,7 +116,7 @@ test("retains existing border and gap values above the standard creation range",
   expect(gap).toHaveValue("30000");
   expect(gap).toHaveAttribute("max", "30000");
   fireEvent.change(border, { target: { value: "0" } });
-  expect(screen.getByText("sem borda")).toBeVisible();
+  expect(border).toHaveAttribute("aria-valuetext", "sem borda");
   expect(border).toHaveAttribute("max", "8000");
   fireEvent.change(border, { target: { value: "7750" } });
   fireEvent.change(gap, { target: { value: "29000" } });
@@ -84,9 +132,7 @@ test("preserves an unapplied draft across a semantically equivalent projection",
   const onApply = vi.fn<ComponentProps<typeof AlbumDesignForm>["onApply"]>();
   const baseline = representativeProjection.state.album.visualDefaults;
   const view = render(<Harness onApply={onApply} value={baseline} />);
-  fireEvent.change(screen.getByLabelText("Cor do fundo"), {
-    target: { value: "#f7f5f0" },
-  });
+  chooseColor("do fundo", "#f7f5f0");
   await waitFor(() =>
     expect(screen.getByRole("button", { name: "Aplicar" })).toBeEnabled(),
   );
@@ -95,7 +141,7 @@ test("preserves an unapplied draft across a semantically equivalent projection",
     <Harness onApply={onApply} value={cloneVisualDefaults(baseline)} />,
   );
 
-  expect(screen.getByLabelText("Cor do fundo")).toHaveValue("#f7f5f0");
+  expect(screen.getByLabelText("Cor do fundo")).toHaveAttribute("title", "#F7F5F0");
   expect(screen.getByRole("button", { name: "Aplicar" })).toBeEnabled();
 });
 
@@ -129,9 +175,7 @@ test("rebases an unapplied draft over an authoritative Album design change", asy
     },
   };
   const view = render(<Harness onApply={onApply} value={baseline} />);
-  fireEvent.change(screen.getByLabelText("Cor do fundo"), {
-    target: { value: "#f7f5f0" },
-  });
+  chooseColor("do fundo", "#f7f5f0");
   await waitFor(() =>
     expect(screen.getByRole("button", { name: "Aplicar" })).toBeEnabled(),
   );
@@ -139,7 +183,7 @@ test("rebases an unapplied draft over an authoritative Album design change", asy
   view.rerender(<Harness onApply={onApply} value={changed} />);
 
   await waitFor(() =>
-    expect(screen.getByLabelText("Cor do fundo")).toHaveValue("#f7f5f0"),
+    expect(screen.getByLabelText("Cor do fundo")).toHaveAttribute("title", "#F7F5F0"),
   );
   expect(screen.getByRole("button", { name: "Aplicar" })).toBeEnabled();
 });
@@ -162,22 +206,18 @@ test("preserves edits made after submit while the applied projection arrives", a
   };
   const view = render(<Harness onApply={onApply} value={baseline} />);
 
-  fireEvent.change(screen.getByLabelText("Cor do fundo"), {
-    target: { value: "#f7f5f0" },
-  });
+  chooseColor("do fundo", "#f7f5f0");
   await waitFor(() =>
     expect(screen.getByRole("button", { name: "Aplicar" })).toBeEnabled(),
   );
   fireEvent.click(screen.getByRole("button", { name: "Aplicar" }));
   expect(screen.getByRole("button", { name: "Aplicar" })).toBeDisabled();
 
-  fireEvent.change(screen.getByLabelText("Cor do fundo"), {
-    target: { value: "#ffffff" },
-  });
+  chooseColor("do fundo", "#ffffff");
   view.rerender(<Harness onApply={onApply} value={applied} />);
 
   await waitFor(() =>
-    expect(screen.getByLabelText("Cor do fundo")).toHaveValue("#ffffff"),
+    expect(screen.getByLabelText("Cor do fundo")).toHaveAttribute("title", "#FFFFFF"),
   );
   await act(async () => {
     finishApply(true);
@@ -208,9 +248,7 @@ test("keeps the post-submit Design delta through temporarily matching predecesso
   };
   const view = render(<Harness onApply={onApply} value={baseline} />);
 
-  fireEvent.change(screen.getByLabelText("Cor do fundo"), {
-    target: { value: "#f7f5f0" },
-  });
+  chooseColor("do fundo", "#f7f5f0");
   await waitFor(() =>
     expect(screen.getByRole("button", { name: "Aplicar" })).toBeEnabled(),
   );
@@ -235,9 +273,7 @@ test("keeps the post-submit Design delta through temporarily matching predecesso
       value={matchingPostEdit}
     />,
   );
-  fireEvent.change(screen.getByLabelText("Cor do fundo"), {
-    target: { value: "#aabbcc" },
-  });
+  chooseColor("do fundo", "#aabbcc");
 
   view.rerender(
     <Harness
@@ -252,9 +288,7 @@ test("keeps the post-submit Design delta through temporarily matching predecesso
   });
 
   await waitFor(() =>
-    expect(screen.getByLabelText("Cor do fundo")).toHaveValue(
-      "#aabbcc",
-    ),
+    expect(screen.getByLabelText("Cor do fundo")).toHaveAttribute("title", "#AABBCC"),
   );
   expect(screen.getByLabelText("Espessura da borda")).toHaveValue("1000");
 });
@@ -277,9 +311,7 @@ test("restores the complete Design intent when Apply fails after a predecessor",
   };
   const view = render(<Harness onApply={onApply} value={baseline} />);
 
-  fireEvent.change(screen.getByLabelText("Cor do fundo"), {
-    target: { value: "#f7f5f0" },
-  });
+  chooseColor("do fundo", "#f7f5f0");
   await waitFor(() =>
     expect(screen.getByRole("button", { name: "Aplicar" })).toBeEnabled(),
   );
@@ -298,7 +330,7 @@ test("restores the complete Design intent when Apply fails after a predecessor",
     await pendingApply;
   });
 
-  expect(screen.getByLabelText("Cor do fundo")).toHaveValue("#f7f5f0");
+  expect(screen.getByLabelText("Cor do fundo")).toHaveAttribute("title", "#F7F5F0");
   await waitFor(() =>
     expect(screen.getByRole("button", { name: "Aplicar" })).toBeEnabled(),
   );
@@ -322,9 +354,7 @@ test("records a post-submit reset against the concurrent value shown to the user
   };
   const view = render(<Harness onApply={onApply} value={baseline} />);
 
-  fireEvent.change(screen.getByLabelText("Cor do fundo"), {
-    target: { value: "#f7f5f0" },
-  });
+  chooseColor("do fundo", "#f7f5f0");
   await waitFor(() =>
     expect(screen.getByRole("button", { name: "Aplicar" })).toBeEnabled(),
   );

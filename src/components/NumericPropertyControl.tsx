@@ -1,7 +1,7 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { TextInput } from "../ui/TextInput";
-import { FieldValidationAutoTooltip, FieldValidationTooltip, fieldValidationTooltipAttributes, useFieldValidationTooltip } from "../ui/FieldValidationTooltip";
-import "./NumericPropertyControl.css";
+import { fieldValidationTooltipAttributes, useFieldValidationTooltip } from "../ui/FieldValidationTooltip";
+import { NumericRangeField } from "../ui/NumericRangeField";
 import type { PointerDragThreshold } from "../application/projectPorts";
 
 export interface NumericPropertyControlActions {
@@ -138,11 +138,9 @@ export function NumericPropertyControl(props: NumericPropertyControlProps) {
   }, []);
 
   return (
-    <div className="numeric-property-control" ref={rootRef}>
-      <div className="numeric-property-heading">
-        <span>{props.label}</span>
-        <div className="numeric-property-number">
-          <TextInput
+    <NumericRangeField ref={rootRef} label={props.label} unit={props.unit}
+      validation={validationTooltip} help={{ id: helpId, text: props.help }}
+      numberInput={<TextInput
             ref={numberRef}
             className="ui-field-control"
             type="text"
@@ -190,13 +188,9 @@ export function NumericPropertyControl(props: NumericPropertyControlProps) {
                 preview(next);
               }
             }}
-          />
-          <span aria-hidden="true">{props.unit}</span>
-        </div>
-        <FieldValidationAutoTooltip field="value" tooltip={validationTooltip} />
-      </div>
-      <input
-        className="ui-range numeric-property-slider"
+          />}
+      slider={<input
+        className="ui-range ui-numeric-range-slider"
         type="range"
         aria-label={props.sliderLabel}
         aria-valuetext={shownValue === null ? "Múltiplos valores" : props.valueText(shownValue)}
@@ -247,11 +241,7 @@ export function NumericPropertyControl(props: NumericPropertyControlProps) {
         }}
         onKeyUp={(event) => { if (SLIDER_KEYS.has(event.key)) finish(); }}
         onBlur={finish}
-      />
-      <p id={helpId} className="numeric-property-help">
-        {props.help}
-      </p>
-      <FieldValidationTooltip tooltip={validationTooltip} />
-    </div>
+      />}
+    />
   );
 }

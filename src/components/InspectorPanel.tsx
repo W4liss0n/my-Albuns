@@ -379,10 +379,6 @@ export function InspectorPanel({
               sectionState={sectionState}
               defaultOpen
             >
-              <PropertyRow
-                label="Quadro"
-                value={context.frame.id.replace("frame-", "").toUpperCase()}
-              />
               {context.frame.photo && <PropertyRow
                 label="Posição horizontal"
                 value={`${Math.round(displayedPhotoPanX * 100)}%`}

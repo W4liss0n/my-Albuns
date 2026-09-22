@@ -17,6 +17,7 @@ import "./VisualDesignControl.css";
 const IMPORT_PLACEHOLDER_TITLE = "Ainda não disponível nesta versão";
 
 interface DecorativeMediaPickerProps {
+  mixed?: boolean;
   disabled?: boolean;
   decorativeMedia: readonly MediaCatalogItem[];
   label: "Fundo" | "Sobreposição";
@@ -28,6 +29,7 @@ interface DecorativeMediaPickerProps {
 }
 
 export function DecorativeMediaPicker({
+  mixed = false,
   disabled = false,
   decorativeMedia,
   label,
@@ -104,7 +106,8 @@ export function DecorativeMediaPicker({
         disabled={disabled}
         data-selected={applied ? true : undefined}
         ref={triggerRef}
-        title={applied ? applied.name : "Escolher decorativo"}
+        title={mixed ? "Valores diferentes. Escolher decorativo" : applied ? applied.name : "Escolher decorativo"}
+        data-mixed={mixed}
         type="button"
         onClick={() => onOpenChange(!open)}
       >
@@ -117,9 +120,9 @@ export function DecorativeMediaPicker({
         ) : (
           <span
             aria-hidden="true"
-            className="visual-design-picker__tile visual-design-picker__tile--add"
+            className={mixed ? "ui-mixed-swatch" : "visual-design-picker__tile visual-design-picker__tile--add"}
           >
-            <AppIcon icon={Plus} size={12} />
+            {!mixed && <AppIcon icon={Plus} size={12} />}
           </span>
         )}
       </button>
