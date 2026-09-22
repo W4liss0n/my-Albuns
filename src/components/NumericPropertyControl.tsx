@@ -30,7 +30,6 @@ interface NumericPropertyControlProps extends NumericPropertyControlActions {
   formatValue(value: number): string;
   parseValue(text: string): number | null;
   valueText(value: number): string;
-  help: string;
   invalidHelp: string;
 }
 
@@ -44,7 +43,7 @@ export function NumericPropertyControl(props: NumericPropertyControlProps) {
     return parsed !== null && Number.isSafeInteger(parsed) && parsed >= minimum && parsed <= maximum ? parsed : null;
   };
   const displayNumber = (value: number) => Number(formatValue(value).replace(",", "."));
-  const helpId = useId();
+  const validationId = useId();
   const rootRef = useRef<HTMLDivElement>(null);
   const numberRef = useRef<HTMLInputElement>(null);
   const actionsRef = useRef(props);
@@ -57,7 +56,7 @@ export function NumericPropertyControl(props: NumericPropertyControlProps) {
   const shownValue = liveValue ?? value;
   const invalid = textDraft !== null && parseValue(textDraft) === null;
   const error = invalid ? props.invalidHelp : undefined;
-  const validationTooltip = useFieldValidationTooltip(`${helpId}-error`, [
+  const validationTooltip = useFieldValidationTooltip(validationId, [
     { field: "value", messages: error ? [error] : undefined },
   ]);
 
@@ -139,7 +138,7 @@ export function NumericPropertyControl(props: NumericPropertyControlProps) {
 
   return (
     <NumericRangeField ref={rootRef} label={props.label} unit={props.unit}
-      validation={validationTooltip} help={{ id: helpId, text: props.help }}
+      validation={validationTooltip}
       numberInput={<TextInput
             ref={numberRef}
             className="ui-field-control"
@@ -153,7 +152,7 @@ export function NumericPropertyControl(props: NumericPropertyControlProps) {
             aria-valuetext={shownValue === null ? "Múltiplos valores" : undefined}
             {...fieldValidationTooltipAttributes("value", error, validationTooltip)}
             aria-invalid={invalid}
-            aria-describedby={invalid ? validationTooltip.id : helpId}
+            aria-describedby={invalid ? validationTooltip.id : undefined}
             onMouseEnter={() => { if (invalid) validationTooltip.show("value"); }}
             disabled={disabled}
             value={textDraft ?? (shownValue === null ? "" : formatValue(shownValue))}
@@ -194,7 +193,6 @@ export function NumericPropertyControl(props: NumericPropertyControlProps) {
         type="range"
         aria-label={props.sliderLabel}
         aria-valuetext={shownValue === null ? "Múltiplos valores" : props.valueText(shownValue)}
-        aria-describedby={helpId}
         data-mixed={shownValue === null}
         min={minimum / sliderScale}
         max={Math.min(maximum, Math.max(props.sliderMaximum ?? maximum, shownValue ?? minimum)) / sliderScale}

@@ -342,7 +342,6 @@ export function ProjectWorkspace({
     selectedFrame,
     selectedComposedPhoto,
     displayedPhotoZoom,
-    displayedPhotoPanX,
   } = controller;
   const canvasMode = controller.canvasProps.mode;
   const editingSheet =
@@ -800,7 +799,7 @@ export function ProjectWorkspace({
             onToggleBlackAndWhite: () => { void controller.togglePhotoBlackAndWhite(); } }}
           context={inspectorContext}
           displayedPhotoZoom={displayedPhotoZoom}
-          displayedPhotoPanX={displayedPhotoPanX}          document={projection.state.document}
+          document={projection.state.document}
           presentationUnit={presentationUnit}
           mediaItems={projection.state.album.media}
           sheetStates={projection.state.album.sheets}

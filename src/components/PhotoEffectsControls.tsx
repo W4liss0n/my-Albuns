@@ -1,7 +1,6 @@
-import { Contrast } from "lucide-react";
 import type { FrameSnapshot } from "../domain/project";
 import { projectCommandDescriptor } from "../application/projectCommandCatalog";
-import { ActionButton } from "../ui";
+import { PropertyToggle } from "../ui";
 
 export interface PhotoEffectsControlActions {
   disabled: boolean;
@@ -21,12 +20,9 @@ export function PhotoEffectsControls({ frames, disabled, onToggleBlackAndWhite }
           Aplicado a {photos.length} {photos.length === 1 ? "foto" : "fotos"} de {frames.length} quadros
         </p>
       )}
-      <ActionButton className="photo-effect-control" density="compact" aria-pressed={enabled}
-        disabled={disabled} onClick={onToggleBlackAndWhite}>
-        <Contrast size={14} aria-hidden="true" />
-        {projectCommandDescriptor("toggle-photo-black-and-white").label}
-        {enabled === "mixed" && <span aria-hidden="true">—</span>}
-      </ActionButton>
+      <PropertyToggle className="photo-effect-control"
+        label={projectCommandDescriptor("toggle-photo-black-and-white").label}
+        pressed={enabled} disabled={disabled} onToggle={onToggleBlackAndWhite} />
     </div>
   );
 }

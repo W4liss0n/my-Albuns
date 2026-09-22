@@ -18,7 +18,6 @@ function inspectorProps(
 ): ComponentProps<typeof InspectorPanel> {
   return {
     context,
-    displayedPhotoPanX: 0,
     displayedPhotoZoom: 1,
     document: representativeProjection.state.document,
     focusedSheetId: composedSheet.sheetId,

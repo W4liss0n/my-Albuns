@@ -473,7 +473,6 @@ export function useProjectEditorController({
     selectedComposedPhoto,
     selectedFrames,
     displayedPhotoZoom: properties.singleZoom.value ?? photoGestures.displayedPhotoZoom,
-    displayedPhotoPanX: photoGestures.displayedPhotoPanX,
     sheetCount: projection.state.album.sheets.length,
     structuralCommandsDisabled,
     structuralMutationPending,

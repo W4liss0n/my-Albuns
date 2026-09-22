@@ -535,7 +535,6 @@ function rect(left: number, top: number, right: number, bottom: number): DOMRect
 function props(): ComponentProps<typeof InspectorPanel> {
   return {
     context: { kind: "album" },
-    displayedPhotoPanX: 0,
     displayedPhotoZoom: 1,
     document: projection.state.document,
     focusedSheetId: projection.state.album.sheets[0].id,

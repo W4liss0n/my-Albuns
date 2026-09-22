@@ -14,6 +14,6 @@ export function PhotoZoomControl(props: PhotoZoomControlProps) {
     step={1} resetValue={props.minimum}
     formatValue={String} parseValue={(text) => /^\d+$/.test(text.trim()) ? Number(text) : null}
     valueText={(value) => `${value}%`}
-    help="Dois cliques para restaurar" invalidHelp={`Use ${props.minimum}% a ${props.maximum}%.`}
+    invalidHelp={`Use ${props.minimum}% a ${props.maximum}%.`}
   />;
 }

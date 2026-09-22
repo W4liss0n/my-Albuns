@@ -6317,9 +6317,7 @@ test("updates the contextual Zoom slider during a Canvas gesture", () => {
   });
 
   expect(slider).toHaveValue("125");
-  expect(screen.getByText("Posição horizontal").parentElement).toHaveTextContent(
-    "35%",
-  );
+  expect(screen.queryByText("Posição horizontal")).not.toBeInTheDocument();
   expect(apply).not.toHaveBeenCalled();
 
   act(() => {
@@ -6327,9 +6325,6 @@ test("updates the contextual Zoom slider during a Canvas gesture", () => {
   });
 
   expect(slider).toHaveValue("100");
-  expect(screen.getByText("Posição horizontal").parentElement).toHaveTextContent(
-    "0%",
-  );
 });
 
 test("discards a live Canvas value when its commit fails", async () => {

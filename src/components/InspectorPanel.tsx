@@ -85,7 +85,6 @@ export interface InspectorPanelProps {
   photoZoom?: PhotoZoomControlActions;
   context: InspectorContext;
   displayedPhotoZoom: number;
-  displayedPhotoPanX: number;
   document: DocumentSnapshot;
   presentationUnit: DisplayUnit;
   mediaItems: readonly MediaCatalogItem[];
@@ -132,7 +131,6 @@ export function InspectorPanel({
   photoEffects,
   context,
   displayedPhotoZoom,
-  displayedPhotoPanX,
   document,
   presentationUnit,
   mediaItems,
@@ -379,10 +377,6 @@ export function InspectorPanel({
               sectionState={sectionState}
               defaultOpen
             >
-              {context.frame.photo && <PropertyRow
-                label="Posição horizontal"
-                value={`${Math.round(displayedPhotoPanX * 100)}%`}
-              />}
               {context.frame.photo && context.composedPhoto && photoZoom && (
                 <PhotoZoomControl key={photoZoom.scopeKey} {...photoZoom}
                   value={Math.round(displayedPhotoZoom * 100)}
@@ -802,15 +796,6 @@ function InspectorSection({
     </section>
   );
 }
-function PropertyRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="property-row">
-      <span>{label}</span>
-      <strong>{value}</strong>
-    </div>
-  );
-}
-
 function defaultSheetScope(sheet: ComposedSheet): SheetDesignScope {
   return sheet.activeSides === "both" ? "both" : sheet.activeSides;
 }

@@ -12347,6 +12347,68 @@
           "key": "Escape"
         }
       ]
+    },
+    {
+      "id": "workspace-property-toggle-keyboard",
+      "title": "Propriedade do quadro — ativação e foco por teclado",
+      "implementationPath": "/workspace-preview.html?frame=orientation",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "frame-property-toggle",
+        "reason": "Design 0048: linha discreta compartilhada, marca de ativação e foco neutro independente do estado."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 800
+      },
+      "readySelector": ".photo-effect-control[aria-pressed=\"true\"]:focus-visible",
+      "actions": [
+        {
+          "type": "focus",
+          "selector": ".photo-mirror-control"
+        },
+        {
+          "type": "key",
+          "key": "Enter"
+        },
+        {
+          "type": "assert",
+          "selector": ".photo-mirror-control[aria-pressed=\"true\"]"
+        },
+        {
+          "type": "focus",
+          "selector": ".photo-effect-control"
+        },
+        {
+          "type": "key",
+          "key": "Space"
+        }
+      ]
+    },
+    {
+      "id": "workspace-property-toggle-mixed-focus",
+      "title": "Propriedade do quadro — valores mistos e foco",
+      "implementationPath": "/workspace-preview.html?frame=orientation&orientation=single-both-black-white&selection=group",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "frame-property-toggle",
+        "reason": "Design 0048: o traço indica seleção mista sem escolher um valor; foco por teclado deve continuar visível."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 800
+      },
+      "readySelector": ".photo-mirror-control[aria-pressed=\"mixed\"]:focus-visible",
+      "actions": [
+        {
+          "type": "focus",
+          "selector": ".photo-mirror-control"
+        },
+        {
+          "type": "key",
+          "key": "ArrowRight"
+        }
+      ]
     }
   ]
 }

@@ -29,12 +29,6 @@
   font-family: var(--ui-font-mono);
 }
 
-.ui-numeric-range-help {
-  margin: 0;
-  color: var(--ui-text-muted);
-  font-size: var(--ui-font-size-micro);
-}
-
 .ui-numeric-range-slider[data-mixed="true"]::-webkit-slider-thumb {
   opacity: 0;
 }

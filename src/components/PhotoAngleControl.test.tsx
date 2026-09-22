@@ -69,20 +69,18 @@ test("accepts comma or dot, validates precision and range, and cancels invalid e
   expect(h.onCommit).toHaveBeenLastCalledWith(450);
 });
 
-test("invalid input uses the shared tooltip while preserving normal help, and Escape clears it", () => {
+test("invalid input uses the shared tooltip without permanent help, and Escape clears it", () => {
   const h = harness();
-  const help = screen.getByText("−45° a 45° · dois cliques para zerar");
-  const originalDescription = h.number.getAttribute("aria-describedby");
+  expect(screen.queryByText(/dois cliques/i)).not.toBeInTheDocument();
   fireEvent.change(h.number, { target: { value: "90" } });
   expect(screen.getByRole("tooltip")).toHaveTextContent("Use −45° a 45°, com uma casa decimal.");
   expect(h.number).toHaveAccessibleDescription("Use −45° a 45°, com uma casa decimal.");
-  expect(help).toHaveTextContent("−45° a 45° · dois cliques para zerar");
-  expect(h.slider).toHaveAttribute("aria-describedby", originalDescription);
+  expect(h.slider).not.toHaveAttribute("aria-describedby");
   expect(h.onPreview).not.toHaveBeenCalled();
   fireEvent.keyDown(h.number, { key: "Escape" });
   expect(screen.queryByRole("tooltip")).toBeNull();
   expect(screen.queryByRole("alert")).toBeNull();
-  expect(h.number).toHaveAttribute("aria-describedby", originalDescription);
+  expect(h.number).not.toHaveAttribute("aria-describedby");
   expect(h.number).toHaveValue("12");
   expect(h.onCommit).not.toHaveBeenCalled();
 });

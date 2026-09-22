@@ -40,7 +40,7 @@ export function FrameStyleControls({ frames, unit, ...actions }: FrameStyleContr
       value={opacity} label="Opacidade" numberLabel="Opacidade em porcentagem" sliderLabel="Opacidade do quadro"
       unit="%" minimum={0} maximum={100} step={1} resetValue={100}
       formatValue={String} parseValue={(text) => /^\d+$/.test(text.trim()) ? Number(text) : null}
-      valueText={(value) => `${value}%`} help="Dois cliques para restaurar 100%" invalidHelp="Use um número inteiro entre 0 e 100."
+      valueText={(value) => `${value}%`} invalidHelp="Use um número inteiro entre 0 e 100."
     />
     <div className="frame-style-border-row">
       <ColorPropertyControl rgb={rgb} label="da borda" disabled={actions.disabled}
@@ -53,7 +53,6 @@ export function FrameStyleControls({ frames, unit, ...actions }: FrameStyleContr
         sliderMaximum={Math.max(5_000, ...frames.map((frame) => frame.style.borderWidthUm))}
         formatValue={(value) => formatMicrometers(value, unit)} parseValue={parseWidth}
         valueText={(value) => value === 0 ? "sem borda" : formatPhysicalMeasurement(value, unit)}
-        help={width === 0 ? "sem borda · dois cliques para remover" : "Dois cliques para remover a borda"}
         invalidHelp={`Use uma medida positiva ou zero em ${displayUnitLabel(unit)}.`}
       />
     </div>

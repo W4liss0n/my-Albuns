@@ -1,7 +1,7 @@
-import { FlipHorizontal2, RotateCcw } from "lucide-react";
+import { RotateCcw } from "lucide-react";
 import type { FrameSnapshot, PhotoOrientationAction } from "../domain/project";
 import { projectCommandDescriptor } from "../application/projectCommandCatalog";
-import { ActionButton } from "../ui";
+import { ActionButton, PropertyToggle } from "../ui";
 import { PhotoAngleControl, type PhotoAngleControlActions } from "./PhotoAngleControl";
 
 export interface PhotoOrientationControlActions {
@@ -57,16 +57,13 @@ export function PhotoOrientationControls({ frames, disabled, onAction, angle }: 
         </ActionButton>
       </div>
       {angle && <PhotoAngleControl key={angle.scopeKey} value={angleTenths} {...angle} />}
-      <ActionButton
+      <PropertyToggle
         className="photo-mirror-control"
-        density="compact"
-        aria-pressed={mirrored}
+        label={mirror.label}
+        pressed={mirrored}
         disabled={disabled}
-        onClick={() => onAction("toggleHorizontalMirror")}
-      >
-        <FlipHorizontal2 size={14} aria-hidden="true" /> {mirror.label}
-        {mirrored === "mixed" && <span aria-hidden="true">—</span>}
-      </ActionButton>
+        onToggle={() => onAction("toggleHorizontalMirror")}
+      />
     </div>
   );
 }

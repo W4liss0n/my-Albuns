@@ -59,14 +59,9 @@ export function usePhotoGestures({
       ? canvasPhotoPreview.preview
       : null;
   const displayedPhotoZoom = selectedCanvasPhotoPreview?.zoom ?? selectedPhotoZoom;
-  const displayedPhotoPanX =
-    selectedCanvasPhotoPreview?.panX ??
-    selectedFrame?.photo?.transform.panX ??
-    0;
 
   return {
     displayedPhotoZoom,
-    displayedPhotoPanX,
     onTransformPreview: (preview: PhotoTransformPreview | null) =>
       setCanvasPhotoPreview(
         preview

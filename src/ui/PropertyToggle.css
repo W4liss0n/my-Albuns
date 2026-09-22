@@ -1,0 +1,45 @@
+.ui-action-button.ui-property-toggle {
+  width: 100%;
+  justify-content: space-between;
+  padding: var(--ui-space-1) 0;
+  border: 0;
+  font-size: var(--ui-font-size-control);
+  font-weight: 400;
+  text-align: left;
+}
+
+.ui-property-toggle__indicator {
+  display: inline-flex;
+  width: var(--ui-space-4);
+  height: var(--ui-space-4);
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--ui-border-strong);
+  border-radius: var(--ui-radius-small);
+  background: var(--ui-surface-raised);
+}
+
+.ui-property-toggle[aria-pressed="true"] .ui-property-toggle__indicator {
+  color: var(--ui-on-accent);
+  border-color: var(--ui-accent-fill);
+  background: var(--ui-accent-fill);
+}
+
+.ui-property-toggle[aria-pressed="mixed"] .ui-property-toggle__indicator {
+  color: var(--ui-text-secondary);
+  background: var(--ui-surface-muted);
+}
+
+.ui-property-toggle:hover:not(:disabled) .ui-property-toggle__indicator {
+  border-color: var(--ui-text-secondary);
+}
+
+.ui-action-button.ui-property-toggle:focus-visible {
+  outline: 0;
+}
+
+.ui-property-toggle:focus-visible .ui-property-toggle__indicator {
+  outline: 1px solid var(--ui-focus-neutral);
+  outline-offset: 2px;
+}

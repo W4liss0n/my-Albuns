@@ -1,4 +1,5 @@
 export { ActionButton } from "./ActionButton";
+export { PropertyToggle } from "./PropertyToggle";
 export { AppIcon } from "./AppIcon";
 export { ApplicationHeader } from "./ApplicationHeader";
 export { BrandWordmark } from "./BrandWordmark";
