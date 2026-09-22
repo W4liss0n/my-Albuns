@@ -5,6 +5,8 @@ import {
   type KeyboardEvent as ReactKeyboardEvent,
 } from "react";
 import { useDismissableSurface } from "../ui/useDismissableSurface";
+import { focusMenuItem } from "../ui/menuNavigation";
+import { MenuItem, MenuSeparator } from "../ui/MenuItem";
 
 import "./ApplicationMenuBar.css";
 
@@ -114,8 +116,7 @@ export function ApplicationMenuBar({
     queueMicrotask(() => {
       const popup = document.getElementById(popupId);
       if (!popup) return;
-      const firstItem = enabledDirectMenuItems(popup)[0];
-      (firstItem ?? popup).focus();
+      focusMenuItem(popup, "first");
     });
   }
 
@@ -199,19 +200,19 @@ export function ApplicationMenuBar({
     switch (event.key) {
       case "ArrowDown":
         event.preventDefault();
-        focusRelativeMenuItem(event.currentTarget, currentItem, 1);
+        focusMenuItem(event.currentTarget, "next", { current: currentItem });
         break;
       case "ArrowUp":
         event.preventDefault();
-        focusRelativeMenuItem(event.currentTarget, currentItem, -1);
+        focusMenuItem(event.currentTarget, "previous", { current: currentItem });
         break;
       case "Home":
         event.preventDefault();
-        focusEdgeMenuItem(event.currentTarget, "first");
+        focusMenuItem(event.currentTarget, "first");
         break;
       case "End":
         event.preventDefault();
-        focusEdgeMenuItem(event.currentTarget, "last");
+        focusMenuItem(event.currentTarget, "last");
         break;
       case "ArrowRight":
         event.preventDefault();
@@ -241,19 +242,19 @@ export function ApplicationMenuBar({
     switch (event.key) {
       case "ArrowDown":
         event.preventDefault();
-        focusRelativeMenuItem(event.currentTarget, currentItem, 1);
+        focusMenuItem(event.currentTarget, "next", { current: currentItem });
         break;
       case "ArrowUp":
         event.preventDefault();
-        focusRelativeMenuItem(event.currentTarget, currentItem, -1);
+        focusMenuItem(event.currentTarget, "previous", { current: currentItem });
         break;
       case "Home":
         event.preventDefault();
-        focusEdgeMenuItem(event.currentTarget, "first");
+        focusMenuItem(event.currentTarget, "first");
         break;
       case "End":
         event.preventDefault();
-        focusEdgeMenuItem(event.currentTarget, "last");
+        focusMenuItem(event.currentTarget, "last");
         break;
       case "ArrowLeft":
       case "Escape":
@@ -268,23 +269,14 @@ export function ApplicationMenuBar({
   function renderCommand(item: ApplicationMenuCommand, nested = false) {
     const placeholder = item.availability === "placeholder";
     return (
-      <button
-        aria-label={item.label}
+      <MenuItem
+        label={item.label}
+        shortcut={item.shortcut}
+        checked={!placeholder ? item.checked : undefined}
         data-placeholder-feature={placeholder ? item.feature : undefined}
         disabled={placeholder || item.disabled}
         key={item.id}
-        aria-checked={
-          !placeholder && item.checked !== undefined
-            ? item.checked
-            : undefined
-        }
-        role={
-          !placeholder && item.checked !== undefined
-            ? "menuitemcheckbox"
-            : "menuitem"
-        }
-        title={item.availability === "placeholder" ? PLACEHOLDER_TITLE : item.title}
-        type="button"
+        title={placeholder ? PLACEHOLDER_TITLE : item.title}
         onClick={() => {
           if (placeholder) return;
           closeMenus();
@@ -293,19 +285,7 @@ export function ApplicationMenuBar({
         onPointerEnter={() => {
           if (!nested && openSubmenuIdRef.current !== null) closeSubmenu();
         }}
-      >
-        <span>
-          {!placeholder && item.checked !== undefined && (
-            <span aria-hidden="true" className="app-menu-checkmark">
-              {item.checked ? "✓" : ""}
-            </span>
-          )}
-          {item.label}
-        </span>
-        {item.shortcut && (
-          <span className="app-menu-shortcut">{item.shortcut}</span>
-        )}
-      </button>
+      />
     );
   }
 
@@ -352,11 +332,7 @@ export function ApplicationMenuBar({
                 {group.items.map((item) => {
                   if (item.type === "separator") {
                     return (
-                      <span
-                        className="app-menu-separator"
-                        key={item.id}
-                        role="separator"
-                      />
+                      <MenuSeparator key={item.id} />
                     );
                   }
                   if (item.type === "command") return renderCommand(item);
@@ -369,7 +345,7 @@ export function ApplicationMenuBar({
                       key={item.id}
                       role="none"
                     >
-                      <button
+                      <MenuItem
                         ref={(node) => {
                           if (node) {
                             submenuButtonRefs.current.set(item.id, node);
@@ -381,18 +357,13 @@ export function ApplicationMenuBar({
                         aria-expanded={submenuOpen}
                         aria-haspopup="menu"
                         data-submenu-trigger={item.id}
-                        role="menuitem"
-                        type="button"
+                        label={item.label}
+                        trailing={<span aria-hidden="true" className="app-menu-cascade">›</span>}
                         onClick={() =>
                           setOpenSubmenuId(item.id)
                         }
                         onPointerEnter={() => setOpenSubmenuId(item.id)}
-                      >
-                        <span>{item.label}</span>
-                        <span aria-hidden="true" className="app-menu-cascade">
-                          ›
-                        </span>
-                      </button>
+                      />
                       {submenuOpen && (
                         <div
                           aria-label={item.label}
@@ -417,43 +388,4 @@ export function ApplicationMenuBar({
       })}
     </nav>
   );
-}
-
-function enabledDirectMenuItems(container: HTMLElement) {
-  return Array.from(container.children).flatMap((child) => {
-    if (child instanceof HTMLButtonElement && !child.disabled) return [child];
-    if (child instanceof HTMLDivElement) {
-      const trigger = child.firstElementChild;
-      if (trigger instanceof HTMLButtonElement && !trigger.disabled) {
-        return [trigger];
-      }
-    }
-    return [];
-  });
-}
-
-function focusRelativeMenuItem(
-  container: HTMLElement,
-  currentItem: HTMLButtonElement | null,
-  direction: -1 | 1,
-) {
-  const items = enabledDirectMenuItems(container);
-  if (items.length === 0) {
-    container.focus();
-    return;
-  }
-  const currentIndex = currentItem ? items.indexOf(currentItem) : -1;
-  const nextIndex =
-    currentIndex < 0
-      ? direction === 1
-        ? 0
-        : items.length - 1
-      : (currentIndex + direction + items.length) % items.length;
-  items[nextIndex]?.focus();
-}
-
-function focusEdgeMenuItem(container: HTMLElement, edge: "first" | "last") {
-  const items = enabledDirectMenuItems(container);
-  const item = edge === "first" ? items[0] : items[items.length - 1];
-  (item ?? container).focus();
 }

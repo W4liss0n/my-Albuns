@@ -1,3 +1,4 @@
+import { FrameDefaultRangeControl } from "../components/FrameDefaultRangeControl";
 import { useState } from "react";
 import { Image as ImageIcon, X } from "lucide-react";
 
@@ -5,10 +6,6 @@ import {
   changeFrameBorderColor as transitionFrameBorderColor,
   changeFrameBorderWidth as transitionFrameBorderWidth,
 } from "../application/frameBorderEditor";
-import {
-  displayUnitLabel,
-  formatMicrometers,
-} from "../application/physicalMeasurements";
 import type {
   ProvisionalDecorativeSelectionOutcome,
 } from "./application/globalProjectPort";
@@ -63,12 +60,6 @@ export function PersonalizationStep({
       : null;
   const frameBorderColor = personalization.frameBorderPreference.rgb;
   const frameBorderWidthUm = activeFrameBorder?.widthUm ?? 0;
-  const frameBorderValue = activeFrameBorder
-    ? `${formatMicrometers(
-        activeFrameBorder.widthUm,
-        draft.displayUnit,
-      )} ${displayUnitLabel(draft.displayUnit)}`
-    : "sem borda";
   const scopeLabel = personalizationScopeLabel(personalization.fixedScope);
   const frameBorderEditor = {
     border: personalization.frameBorder,
@@ -226,15 +217,12 @@ export function PersonalizationStep({
             Todas as lâminas
           </p>
           <h2>Quadros</h2>
-          <FrameRangeControl
+          <FrameDefaultRangeControl
+            kind="border"
             label="Espessura da borda padrão"
-            max={5_000}
-            min={0}
+            displayUnit={draft.displayUnit}
             onChange={changeFrameBorderWidth}
-            step={250}
-            value={frameBorderWidthUm}
-            valueText={frameBorderValue}
-            visibleLabel="Borda padrão"
+            valueUm={frameBorderWidthUm}
           />
           <div
             aria-label="Cores da borda"
@@ -254,18 +242,11 @@ export function PersonalizationStep({
               />
             ))}
           </div>
-          <FrameRangeControl
-            label="Espaço entre quadros"
-            max={24_000}
-            min={0}
+          <FrameDefaultRangeControl
+            kind="gap"
+            displayUnit={draft.displayUnit}
             onChange={(frameGapUm) => onChange({ ...personalization, frameGapUm })}
-            step={1_000}
-            value={frameGapUm}
-            valueText={`${formatMicrometers(
-              frameGapUm,
-              draft.displayUnit,
-            )} ${displayUnitLabel(draft.displayUnit)}`}
-            visibleLabel="Espaço entre quadros"
+            valueUm={frameGapUm}
           />
         </section>
         <p className="new-project-native-note">
@@ -293,50 +274,6 @@ const NEW_PROJECT_SCOPE_PRESENTATION = {
   scopeControlsLabel: "Aplicar personalização em",
   technicalGuides: true,
 } as const;
-
-function FrameRangeControl({
-  dataPlaceholderFeature,
-  label,
-  max,
-  min,
-  onChange,
-  step,
-  value,
-  valueText,
-  visibleLabel,
-}: {
-  dataPlaceholderFeature?: string;
-  label: string;
-  max: number;
-  min: number;
-  onChange(value: number): void;
-  step: number;
-  value: number;
-  valueText: string;
-  visibleLabel: string;
-}) {
-  return (
-    <div
-      className="ui-range-control"
-      data-placeholder-feature={dataPlaceholderFeature}
-    >
-      <div className="ui-range-control__heading">
-        <span>{visibleLabel}</span>
-        <output>{valueText}</output>
-      </div>
-      <input
-        aria-label={label}
-        max={max}
-        min={min}
-        onChange={(event) => onChange(Number(event.target.value))}
-        className="ui-range"
-        step={step}
-        type="range"
-        value={value}
-      />
-    </div>
-  );
-}
 
 function personalizationScopeLabel(
   scope: NewProjectPersonalizationDraft["fixedScope"],

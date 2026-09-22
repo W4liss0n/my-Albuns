@@ -51,6 +51,7 @@ import { useAlbumInformationApplyController } from "./useAlbumInformationApplyCo
 import { SheetContextMenu } from "./SheetContextMenu";
 import { FrameContextMenu } from "./FrameContextMenu";
 import { ContextMenuSurface } from "../ui/ContextMenuSurface";
+import { MenuItem } from "../ui/MenuItem";
 import { projectCommandDescriptor } from "../application/projectCommandCatalog";
 import {
   createSheetReorderSession,
@@ -922,10 +923,10 @@ export function ProjectWorkspace({
       {frameContextMenu?.kind === "empty" ? (
         <ContextMenuSurface label="Área vazia da área de edição" position={frameContextMenu.position}
           onDismiss={() => setFrameContextMenu(null)}>
-          <button type="button" role="menuitem" onClick={() => {
+          <MenuItem label={projectCommandDescriptor("add-frame").label} onClick={() => {
             void controller.addFrame();
             setFrameContextMenu(null);
-          }}>{projectCommandDescriptor("add-frame").label}</button>
+          }} />
         </ContextMenuSurface>
       ) : null}
       {sheetContextMenu ? (

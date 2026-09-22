@@ -13,13 +13,13 @@
 }
 
 .inspector-readout-grid
-  > .album-information-field
+  > :is(.album-information-field, .ui-text-field)
   > .ui-field-validation-auto-tooltip {
   width: calc(200% + var(--ui-space-3));
 }
 
 .inspector-readout-grid
-  > .album-information-field:last-child
+  > :is(.album-information-field, .ui-text-field):last-child
   > .ui-field-validation-auto-tooltip {
   --ui-tooltip-pointer-inline-start: auto;
   --ui-tooltip-pointer-inline-end: 14px;
@@ -60,46 +60,4 @@
 
 .album-entry-control .ui-field-control {
   padding-right: 30px;
-}
-
-.album-entry-reset {
-  position: absolute;
-  top: 50%;
-  right: var(--ui-space-1);
-  display: grid;
-  width: 20px;
-  height: 20px;
-  padding: 0;
-  border: 0;
-  border-radius: var(--ui-radius-small);
-  color: var(--ui-text-muted);
-  background: transparent;
-  transform: translateY(-50%);
-  place-items: center;
-}
-
-.album-entry-reset:hover,
-.album-entry-reset:focus-visible {
-  color: var(--ui-text);
-  background: var(--ui-surface-muted);
-}
-
-.album-measurement-control .ui-field-control {
-  padding-right: 54px;
-  font-family: var(--ui-font-mono);
-}
-
-.album-measurement-control .album-entry-reset {
-  right: 28px;
-}
-
-.album-measurement-control > span {
-  position: absolute;
-  top: 50%;
-  right: var(--ui-space-2);
-  color: var(--ui-text-muted);
-  font-family: var(--ui-font-mono);
-  font-size: var(--ui-font-size-micro);
-  pointer-events: none;
-  transform: translateY(-50%);
 }

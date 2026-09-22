@@ -9,6 +9,7 @@ import { Plus } from "lucide-react";
 import type { MediaCatalogItem } from "../domain/project";
 import { AppIcon } from "../ui";
 import { useDismissableSurface } from "../ui/useDismissableSurface";
+import { focusMenuItem } from "../ui/menuNavigation";
 import { MediaPreviewCard } from "./MediaPreviewCard";
 import "./DecorativeMediaPicker.css";
 import "./VisualDesignControl.css";
@@ -45,13 +46,7 @@ export function DecorativeMediaPicker({
   useEffect(() => {
     if (!open) return;
     const menu = menuRef.current;
-    const selected = menu?.querySelector<HTMLElement>(
-      '[role="menuitem"][data-selected="true"]',
-    );
-    const first = menu?.querySelector<HTMLElement>(
-      '[role="menuitem"]:not(:disabled)',
-    );
-    (selected ?? first ?? menu)?.focus({ preventScroll: true });
+    if (menu) focusMenuItem(menu, "selected", { preventScroll: true });
   }, [open]);
 
   useDismissableSurface({
@@ -80,32 +75,18 @@ export function DecorativeMediaPicker({
   }
 
   function navigateMenu(event: ReactKeyboardEvent<HTMLDivElement>) {
-    const menuItems = Array.from(
-      event.currentTarget.querySelectorAll<HTMLElement>(
-        '[role="menuitem"]:not(:disabled)',
-      ),
-    );
-    if (menuItems.length === 0) return;
-    const currentIndex = menuItems.indexOf(
-      document.activeElement as HTMLElement,
-    );
-    let nextIndex: number | null = null;
-    if (event.key === "Home") nextIndex = 0;
-    if (event.key === "End") nextIndex = menuItems.length - 1;
-    if (["ArrowDown", "ArrowRight"].includes(event.key)) {
-      nextIndex = (currentIndex + 1) % menuItems.length;
-    }
-    if (["ArrowUp", "ArrowLeft"].includes(event.key)) {
-      nextIndex =
-        (currentIndex <= 0 ? menuItems.length : currentIndex) - 1;
-    }
     if (event.key === "Tab") {
       onOpenChange(false);
       return;
     }
-    if (nextIndex === null) return;
+    const target = event.key === "Home" ? "first"
+      : event.key === "End" ? "last"
+      : ["ArrowDown", "ArrowRight"].includes(event.key) ? "next"
+      : ["ArrowUp", "ArrowLeft"].includes(event.key) ? "previous"
+      : null;
+    if (target === null) return;
     event.preventDefault();
-    menuItems[nextIndex]?.focus({ preventScroll: true });
+    focusMenuItem(event.currentTarget, target, { preventScroll: true, fallbackToContainer: false });
   }
 
   return (

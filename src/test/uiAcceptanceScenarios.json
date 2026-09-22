@@ -11882,6 +11882,28 @@
           "selector": "[role=\"menu\"][aria-label=\"Decorativos para fundo\"]"
         }
       ]
+    },
+    {
+      "id": "workspace-manual-frame-context-menu",
+      "title": "Adicionar quadro — menu da área vazia",
+      "implementationPath": "/workspace-preview.html?frame=manual&surface=right",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "manual-frame-creation",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "Design 0045: o menu da área vazia usa a mesma apresentação dos outros menus contextuais, mantendo a criação no fluxo existente."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "readySelector": "[role=\"menu\"][aria-label=\"Área vazia da área de edição\"]",
+      "actions": [
+        {
+          "type": "context-click",
+          "selector": ".canvas-host canvas"
+        }
+      ]
     }
   ]
 }

@@ -63,6 +63,35 @@ function menuFixture(onSave = vi.fn()): readonly ApplicationMenuGroup[] {
   ];
 }
 
+test("keeps parent navigation out of the open submenu and includes checkable commands", async () => {
+  const user = userEvent.setup();
+  const groups: readonly ApplicationMenuGroup[] = [{
+    id: "view", label: "Exibir", items: [
+      { id: "guides", label: "Guias", type: "command", availability: "implemented", checked: true, onSelect: vi.fn() },
+      { id: "disabled", label: "Indisponível", type: "command", availability: "placeholder", feature: "unavailable" },
+      { id: "nested", label: "Mais", type: "submenu", items: [
+        { id: "child", label: "Detalhes", type: "command", availability: "implemented", onSelect: vi.fn() },
+      ] },
+      { id: "last", label: "Último", type: "command", availability: "implemented", onSelect: vi.fn() },
+    ],
+  }];
+  render(<ApplicationMenuBar groups={groups} />);
+  await user.click(screen.getByRole("menuitem", { name: "Exibir" }));
+  const checked = screen.getByRole("menuitemcheckbox", { name: "Guias" });
+  expect(checked).toHaveFocus();
+  expect(checked).toHaveAttribute("aria-checked", "true");
+  await user.keyboard("{ArrowUp}");
+  expect(screen.getByRole("menuitem", { name: "Último" })).toHaveFocus();
+  await user.keyboard("{Home}{ArrowDown}{ArrowRight}");
+  await waitFor(() => expect(screen.getByRole("menuitem", { name: "Detalhes" })).toHaveFocus());
+  const trigger = screen.getByRole("menuitem", { name: "Mais" });
+  trigger.focus();
+  await user.keyboard("{ArrowDown}");
+  expect(screen.getByRole("menuitem", { name: "Último" })).toHaveFocus();
+  await user.keyboard("{ArrowDown}");
+  expect(checked).toHaveFocus();
+});
+
 test("distinguishes implemented commands from explicit placeholders", async () => {
   const user = userEvent.setup();
   const onSave = vi.fn();

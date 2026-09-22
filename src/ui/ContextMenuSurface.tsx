@@ -8,6 +8,7 @@ import {
 } from "react";
 
 import { useDismissableSurface } from "./useDismissableSurface";
+import { focusMenuItem } from "./menuNavigation";
 import "./ContextMenuSurface.css";
 
 const VIEWPORT_MARGIN_PX = 8;
@@ -63,33 +64,17 @@ export function ContextMenuSurface({ label, position, children, onDismiss }: Con
 
   useEffect(() => {
     queueMicrotask(() => {
-      rootRef.current
-        ?.querySelector<HTMLButtonElement>("button:not(:disabled)")
-        ?.focus();
+      if (rootRef.current) focusMenuItem(rootRef.current, "first", { fallbackToContainer: false });
     });
   }, []);
 
   function handleKeyDown(event: ReactKeyboardEvent<HTMLDivElement>) {
     if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
     event.preventDefault();
-    const items = Array.from(
-      event.currentTarget.querySelectorAll<HTMLButtonElement>(
-        "button:not(:disabled)",
-      ),
-    );
-    if (items.length === 0) return;
-    const current =
-      event.target instanceof HTMLButtonElement
-        ? items.indexOf(event.target)
-        : -1;
-    const delta = event.key === "ArrowDown" ? 1 : -1;
-    const next =
-      current < 0
-        ? delta > 0
-          ? 0
-          : items.length - 1
-        : (current + delta + items.length) % items.length;
-    items[next]?.focus();
+    focusMenuItem(event.currentTarget, event.key === "ArrowDown" ? "next" : "previous", {
+      current: event.target,
+      fallbackToContainer: false,
+    });
   }
 
   return (

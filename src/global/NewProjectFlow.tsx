@@ -1,5 +1,5 @@
+import { ValidatedTextField } from "../ui/ValidatedTextField";
 import {
-  forwardRef,
   useCallback,
   useId,
   useLayoutEffect,
@@ -48,11 +48,8 @@ import {
 import {
   ActionButton,
   AppIcon,
-  FieldValidationAutoTooltip,
   FieldValidationTooltip,
   TextInput,
-  fieldValidationTooltipAttributes,
-  type FieldValidationTooltipModel,
   useFieldValidationTooltip,
 } from "../ui";
 import { DimensionsPreview } from "./DimensionsPreview";
@@ -528,9 +525,8 @@ function ConfigurationStep({
 
         <ControlSection title="Tamanho da lâmina fechada">
           <div className="new-project-size-fields">
-            <NumericField
-              attempted={attempted}
-              error={errors.sheetWidth}
+            <ValidatedTextField
+              error={attempted ? errors.sheetWidth?.[0] : undefined}
               field="sheetWidth"
               hideLabel
               inputMode="decimal"
@@ -544,9 +540,8 @@ function ConfigurationStep({
             <span aria-hidden="true" className="new-project-size-separator">
               ×
             </span>
-            <NumericField
-              attempted={attempted}
-              error={errors.sheetHeight}
+            <ValidatedTextField
+              error={attempted ? errors.sheetHeight?.[0] : undefined}
               field="sheetHeight"
               hideLabel
               inputMode="decimal"
@@ -562,9 +557,8 @@ function ConfigurationStep({
 
         <ControlSection title="Sangria e Área de segurança">
           <div className="new-project-paired-fields">
-            <NumericField
-              attempted={attempted}
-              error={errors.bleed}
+            <ValidatedTextField
+              error={attempted ? errors.bleed?.[0] : undefined}
               field="bleed"
               inputMode="decimal"
               label="Sangria"
@@ -574,9 +568,8 @@ function ConfigurationStep({
               validationTooltip={validationTooltip}
               value={draft.bleed.text}
             />
-            <NumericField
-              attempted={attempted}
-              error={errors.safety}
+            <ValidatedTextField
+              error={attempted ? errors.safety?.[0] : undefined}
               field="safety"
               inputMode="decimal"
               label="Área de segurança"
@@ -590,8 +583,7 @@ function ConfigurationStep({
         </ControlSection>
 
         <ControlSection className="new-project-sheet-count" title="Lâminas">
-          <NumericField
-            attempted={attempted}
+          <ValidatedTextField
             controls={
               <span className="new-project-stepper-actions">
                 <button
@@ -610,7 +602,7 @@ function ConfigurationStep({
                 </button>
               </span>
             }
-            error={errors.sheetCount}
+            error={attempted ? errors.sheetCount?.[0] : undefined}
             field="sheetCount"
             hideLabel
             inputMode="numeric"
@@ -625,9 +617,8 @@ function ConfigurationStep({
         </ControlSection>
 
         <ControlSection title="Resolução do projeto">
-          <NumericField
-            attempted={attempted}
-            error={errors.dpi}
+          <ValidatedTextField
+            error={attempted ? errors.dpi?.[0] : undefined}
             field="dpi"
             hideLabel
             inputMode="numeric"
@@ -839,80 +830,6 @@ function UnitSelector({
     </div>
   );
 }
-
-interface NumericFieldProps {
-  attempted: boolean;
-  controls?: React.ReactNode;
-  error?: readonly string[];
-  field: DimensionsFieldName;
-  hideLabel?: boolean;
-  inputMode: "decimal" | "numeric";
-  label: string;
-  onChange(value: string): void;
-  suffix?: string;
-  validationTooltip: FieldValidationTooltipModel;
-  value: string;
-}
-
-const NumericField = forwardRef<HTMLInputElement, NumericFieldProps>(
-  function NumericField(
-    {
-      attempted,
-      controls,
-      error,
-      field,
-      hideLabel,
-      inputMode,
-      label,
-      onChange,
-      suffix,
-      validationTooltip,
-      value,
-    },
-    ref,
-  ) {
-    const inputId = useId();
-    const visibleErrors = attempted ? error : undefined;
-    const hasControls = Boolean(controls);
-    return (
-      <div className="new-project-field">
-        <label
-          className={hideLabel ? "ui-visually-hidden" : undefined}
-          htmlFor={inputId}
-        >
-          {label}
-        </label>
-        <span
-          className={`new-project-input-shell${suffix ? " new-project-input-shell--suffix" : ""}${hasControls ? " new-project-input-shell--controlled" : ""}`}
-        >
-          <TextInput
-            inputMode={inputMode}
-            id={inputId}
-            onChange={(event) => onChange(event.target.value)}
-            ref={ref}
-            type="text"
-            value={value}
-            {...fieldValidationTooltipAttributes(
-              field,
-              visibleErrors?.[0],
-              validationTooltip,
-            )}
-          />
-          {suffix ? (
-            <span aria-hidden="true" className="new-project-input-suffix">
-              {suffix}
-            </span>
-          ) : null}
-          {controls}
-        </span>
-        <FieldValidationAutoTooltip
-          field={field}
-          tooltip={validationTooltip}
-        />
-      </div>
-    );
-  },
-);
 
 function SelectField({
   label,

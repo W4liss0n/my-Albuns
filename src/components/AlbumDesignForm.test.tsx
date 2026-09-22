@@ -54,6 +54,32 @@ function Harness({
   );
 }
 
+test("retains existing border and gap values above the standard creation range", async () => {
+  const value: ProjectedVisualDefaults = {
+    ...representativeProjection.state.album.visualDefaults,
+    frameBorder: { kind: "solid", rgb: "#123456", widthUm: 8_000 },
+  };
+  const onApply = vi.fn<ComponentProps<typeof AlbumDesignForm>["onApply"]>(async () => true);
+  render(<Harness onApply={onApply} value={value} frameGapUm={30_000} />);
+  const border = screen.getByRole("slider", { name: "Espessura da borda" });
+  const gap = screen.getByRole("slider", { name: "Espaço entre quadros" });
+  expect(border).toHaveValue("8000");
+  expect(border).toHaveAttribute("max", "8000");
+  expect(gap).toHaveValue("30000");
+  expect(gap).toHaveAttribute("max", "30000");
+  fireEvent.change(border, { target: { value: "0" } });
+  expect(screen.getByText("sem borda")).toBeVisible();
+  expect(border).toHaveAttribute("max", "8000");
+  fireEvent.change(border, { target: { value: "7750" } });
+  fireEvent.change(gap, { target: { value: "29000" } });
+  fireEvent.click(screen.getByRole("button", { name: "Aplicar" }));
+  await waitFor(() => expect(onApply).toHaveBeenCalledOnce());
+  expect(onApply.mock.calls[0][0].materialize(representativeProjection)).toMatchObject({
+    visualDefaults: { frameBorder: { kind: "solid", rgb: "#123456", widthUm: 7_750 } },
+    frameGapUm: 29_000,
+  });
+});
+
 test("preserves an unapplied draft across a semantically equivalent projection", async () => {
   const onApply = vi.fn<ComponentProps<typeof AlbumDesignForm>["onApply"]>();
   const baseline = representativeProjection.state.album.visualDefaults;

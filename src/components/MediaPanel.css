@@ -282,22 +282,6 @@
   padding: 4px;
 }
 
-.media-import-popup button {
-  height: var(--ui-compact-control-height);
-  padding: 0 8px;
-  border: 0;
-  border-radius: var(--ui-radius-small);
-  color: var(--ui-text-secondary);
-  background: transparent;
-  font-size: var(--ui-font-size-support);
-  text-align: left;
-}
-
-.media-import-popup button:disabled {
-  color: var(--ui-text-disabled);
-  opacity: 1;
-}
-
 .media-options-popup {
   top: calc(100% + 2px);
   right: 10px;

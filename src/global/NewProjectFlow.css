@@ -219,7 +219,6 @@
 }
 
 .new-project-save-preset > input,
-.new-project-field input,
 .new-project-field select {
   width: 100%;
   min-width: 0;
@@ -259,7 +258,6 @@
 }
 
 .new-project-save-preset > input:focus-visible,
-.new-project-field input:focus-visible,
 .new-project-field select:focus-visible {
   outline: 0;
   background: var(--ui-surface-muted);
@@ -365,19 +363,15 @@
   gap: 5px;
 }
 
-.new-project-field input[aria-invalid="true"] {
-  border-color: var(--ui-danger);
-}
-
 .new-project-size-fields .ui-field-validation-auto-tooltip {
   width: 222px;
 }
 
 .new-project-size-fields
-  > .new-project-field:last-child
+  > .ui-text-field:last-child
   > .ui-field-validation-auto-tooltip,
 .new-project-paired-fields
-  > .new-project-field:last-child
+  > .ui-text-field:last-child
   > .ui-field-validation-auto-tooltip {
   --ui-tooltip-pointer-inline-start: auto;
   --ui-tooltip-pointer-inline-end: 14px;
@@ -388,29 +382,6 @@
 
 .new-project-paired-fields .ui-field-validation-auto-tooltip {
   width: calc(200% + 10px);
-}
-
-.new-project-input-shell {
-  position: relative;
-  display: block;
-}
-
-.new-project-input-suffix {
-  position: absolute;
-  top: 50%;
-  right: 9px;
-  color: var(--ui-text-muted);
-  font-family: var(--ui-font-mono);
-  font-size: var(--ui-font-size-caption);
-  transform: translateY(-50%);
-}
-
-.new-project-input-shell--suffix input {
-  padding-right: 38px;
-}
-
-.new-project-input-shell--controlled input {
-  padding-right: 57px;
 }
 
 .new-project-stepper-actions {

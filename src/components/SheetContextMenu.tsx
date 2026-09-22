@@ -1,3 +1,4 @@
+import { MenuItem, MenuSeparator } from "../ui/MenuItem";
 import { projectCommandDescriptor } from "../application/projectCommandCatalog";
 import type { SheetStructureAvailability } from "../application/sheetStructure";
 import { ContextMenuSurface } from "../ui/ContextMenuSurface";
@@ -44,52 +45,27 @@ export function SheetContextMenu({
   return (
     <ContextMenuSurface label={`Ações da lâmina ${String(sheetNumber).padStart(2, "0")}`}
       position={position} onDismiss={onDismiss}>
-        <button
+        <MenuItem label={sheetCommandLabels.addBefore}
           disabled={!availability.canAddBefore}
-          role="menuitem"
-          type="button"
-          onClick={() => invoke(onAddBefore)}
-        >
-          {sheetCommandLabels.addBefore}
-        </button>
-        <button
+          onClick={() => invoke(onAddBefore)} />
+        <MenuItem label={sheetCommandLabels.addAfter}
           disabled={!availability.canAddAfter}
-          role="menuitem"
-          type="button"
-          onClick={() => invoke(onAddAfter)}
-        >
-          {sheetCommandLabels.addAfter}
-        </button>
-        <button
+          onClick={() => invoke(onAddAfter)} />
+        <MenuItem label={sheetCommandLabels.duplicateSheet}
           disabled={!availability.canDuplicate}
-          role="menuitem"
-          type="button"
-          onClick={() => invoke(onDuplicate)}
-        >
-          {sheetCommandLabels.duplicateSheet}
-        </button>
-        <button
+          onClick={() => invoke(onDuplicate)} />
+        <MenuItem label={sheetCommandLabels.deleteSheet}
           disabled={!availability.canDelete}
-          role="menuitem"
-          type="button"
-          onClick={() => invoke(onDelete)}
-        >
-          {sheetCommandLabels.deleteSheet}
-        </button>
-        <span className="ui-context-menu__separator" role="separator" />
-        <button
+          onClick={() => invoke(onDelete)} />
+        <MenuSeparator />
+        <MenuItem label={sheetCommandLabels.convertEdge}
           disabled={!availability.canConvertEdge}
-          role="menuitem"
           title={
             availability.canConvertEdge
               ? undefined
               : "Disponível somente para uma extremidade"
           }
-          type="button"
-          onClick={() => invoke(onConvertEdge)}
-        >
-          {sheetCommandLabels.convertEdge}
-        </button>
+          onClick={() => invoke(onConvertEdge)} />
     </ContextMenuSurface>
   );
 }

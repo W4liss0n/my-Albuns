@@ -1,3 +1,4 @@
+import { MenuItem, MenuSeparator } from "../ui/MenuItem";
 import { FRAME_STACK_COMMANDS, projectCommandDescriptor, projectCommandShortcutLabel } from "../application/projectCommandCatalog";
 import type { FrameStackAction } from "../domain/project";
 import { ContextMenuSurface } from "../ui/ContextMenuSurface";
@@ -19,33 +20,26 @@ export function FrameContextMenu({ editing = true, hasPhoto = false, canOpenInPh
   return (
     <ContextMenuSurface label={editing ? "Organizar quadros" : "Ações da foto"} position={position} onDismiss={onDismiss}>
       {hasPhoto && <>
-        <button type="button" role="menuitem" aria-label={projectCommandDescriptor("open-in-photoshop").label} disabled={!canOpenInPhotoshop} onClick={() => { onOpenInPhotoshop?.(); onDismiss(); }}>
-          <span>{projectCommandDescriptor("open-in-photoshop").label}</span>
-          <kbd aria-hidden="true">{projectCommandShortcutLabel("open-in-photoshop")}</kbd>
-        </button>
-        {editing && <div className="ui-context-menu__separator" role="separator" />}
+        <MenuItem label={projectCommandDescriptor("open-in-photoshop").label} shortcut={projectCommandShortcutLabel("open-in-photoshop")}
+          disabled={!canOpenInPhotoshop}
+          onClick={() => { onOpenInPhotoshop?.(); onDismiss(); }} />
+        {editing && <MenuSeparator />}
       </>}
       {editing && <>
       {FRAME_STACK_COMMANDS.map(({ id, action }) => {
         const shortcut = projectCommandShortcutLabel(id);
         return (
-          <button key={id} type="button" role="menuitem"
-            onClick={() => { onArrange(action); onDismiss(); }}>
-            <span>{projectCommandDescriptor(id).label}</span>
-            {shortcut ? <kbd aria-hidden="true">{shortcut}</kbd> : null}
-          </button>
+          <MenuItem label={projectCommandDescriptor(id).label} shortcut={shortcut}
+          key={id}
+          onClick={() => { onArrange(action); onDismiss(); }} />
         );
       })}
-      <div className="ui-context-menu__separator" role="separator" />
-      <button type="button" role="menuitem" disabled={!canSwapContents}
-        onClick={() => { onSwapContents(); onDismiss(); }}>
-        {projectCommandDescriptor("swap-frame-contents").label}
-      </button>
-      <button type="button" role="menuitem" aria-label={projectCommandDescriptor("delete-frames").label}
-        onClick={() => { onDelete(); onDismiss(); }}>
-        <span>{projectCommandDescriptor("delete-frames").label}</span>
-        <kbd aria-hidden="true">{projectCommandShortcutLabel("delete-frames")}</kbd>
-      </button>
+      <MenuSeparator />
+      <MenuItem label={projectCommandDescriptor("swap-frame-contents").label}
+          disabled={!canSwapContents}
+          onClick={() => { onSwapContents(); onDismiss(); }} />
+      <MenuItem label={projectCommandDescriptor("delete-frames").label} shortcut={projectCommandShortcutLabel("delete-frames")}
+          onClick={() => { onDelete(); onDismiss(); }} />
       </>}
     </ContextMenuSurface>
   );

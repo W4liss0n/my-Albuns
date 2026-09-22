@@ -116,7 +116,7 @@ test("allows composed dimension drafts for Core validation", () => {
   for (const label of ["Largura", "Altura"]) {
     const input = within(dimensions).getByRole("textbox", { name: label });
     expect(input).toBeEnabled();
-    expect(input.closest(".album-information-field")).not.toHaveAttribute("data-placeholder-feature");
+    expect(input.closest(".ui-text-field")).not.toHaveAttribute("data-placeholder-feature");
   }
 });
 

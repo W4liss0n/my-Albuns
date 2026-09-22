@@ -1,0 +1,87 @@
+.ui-text-field {
+  position: relative;
+  display: grid;
+  min-width: 0;
+  color: var(--ui-text-secondary);
+  font-size: var(--ui-font-size-support);
+  gap: 5px;
+}
+
+.ui-text-field input[aria-invalid="true"] { border-color: var(--ui-danger); }
+
+.ui-text-field--regular input {
+  width: 100%;
+  min-width: 0;
+  height: var(--ui-control-height);
+  padding: 0 9px;
+  border: 1px solid var(--ui-border-strong);
+  border-radius: var(--ui-radius-small);
+  color: var(--ui-text);
+  background: #fff;
+  font-size: var(--ui-font-size-control);
+}
+
+.ui-text-field--regular input:focus-visible {
+  outline: 0;
+  background: var(--ui-surface-muted);
+}
+
+.ui-text-field__entry {
+  position: relative;
+  display: block;
+  min-width: 0;
+}
+
+.ui-text-field__suffix {
+  position: absolute;
+  top: 50%;
+  right: 9px;
+  color: var(--ui-text-muted);
+  font-family: var(--ui-font-mono);
+  font-size: var(--ui-font-size-caption);
+  pointer-events: none;
+  transform: translateY(-50%);
+}
+
+.ui-text-field__entry--suffix input { padding-right: 38px; }
+.ui-text-field__entry--controlled input { padding-right: 57px; }
+
+.ui-text-field--compact {
+  color: var(--ui-text-muted);
+  font-size: var(--ui-font-size-caption);
+  gap: var(--ui-space-1);
+}
+
+.ui-text-field--compact input { padding-right: 30px; }
+.ui-text-field--compact .ui-text-field__entry--suffix input {
+  padding-right: 54px;
+  font-family: var(--ui-font-mono);
+}
+.ui-text-field--compact .ui-text-field__suffix {
+  right: var(--ui-space-2);
+  font-size: var(--ui-font-size-micro);
+}
+
+.ui-field-reset {
+  position: absolute;
+  top: 50%;
+  right: var(--ui-space-1);
+  display: grid;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--ui-radius-small);
+  color: var(--ui-text-muted);
+  background: transparent;
+  transform: translateY(-50%);
+  place-items: center;
+}
+
+.ui-field-reset:hover,
+.ui-field-reset:focus-visible {
+  color: var(--ui-text);
+  background: var(--ui-surface-muted);
+}
+
+.ui-text-field__entry--suffix .ui-field-reset { right: 28px; }

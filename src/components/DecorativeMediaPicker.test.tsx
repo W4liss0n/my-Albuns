@@ -56,6 +56,33 @@ test("closes on an outside pointer and preserves focus on the chosen control", a
   await waitFor(() => expect(screen.getByRole("button", { name: "Fora do seletor" })).toHaveFocus());
 });
 
+test("starts at the selected decorative and wraps past the disabled import item", async () => {
+  const user = userEvent.setup();
+  const select = vi.fn();
+  render(<DecorativeMediaPicker decorativeMedia={decorativeMedia} label="Fundo"
+    mediaPreviewUrls={{}} open selectedMediaId="decorative-portrait"
+    onOpenChange={vi.fn()} onSelect={select} />);
+  const portrait = screen.getByRole("menuitem", { name: "Usar fundo Textura vertical. Selecionado" });
+  const landscape = screen.getByRole("menuitem", { name: "Usar fundo Textura horizontal" });
+  expect(portrait).toHaveFocus();
+  await user.keyboard("{ArrowRight}");
+  expect(landscape).toHaveFocus();
+  await user.keyboard("{ArrowLeft}{Home}{End}");
+  expect(portrait).toHaveFocus();
+  await user.keyboard("{Enter}");
+  expect(select).toHaveBeenCalledWith("decorative-portrait");
+});
+
+test("focuses the empty decorative menu without focusing its disabled import", () => {
+  render(<DecorativeMediaPicker decorativeMedia={[]} label="Fundo"
+    mediaPreviewUrls={{}} open selectedMediaId={null}
+    onOpenChange={vi.fn()} onSelect={vi.fn()} />);
+  const menu = screen.getByRole("menu", { name: "Decorativos para fundo" });
+  expect(menu).toHaveFocus();
+  fireEvent.keyDown(menu, { key: "ArrowRight" });
+  expect(menu).toHaveFocus();
+});
+
 test("restores focus when an outside pointer leaves no focused control", async () => {
   const user = userEvent.setup();
   renderPicker();

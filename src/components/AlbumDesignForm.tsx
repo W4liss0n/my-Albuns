@@ -10,7 +10,7 @@ import {
   changeFrameBorderWidth,
   createFrameBorderEditorState,
 } from "../application/frameBorderEditor";
-import { formatPhysicalMeasurement } from "../application/physicalMeasurements";
+import { FrameDefaultRangeControl } from "./FrameDefaultRangeControl";
 import { renderableMediaPreviewUrls } from "../application/mediaPreviews";
 import {
   mapScopedValue,
@@ -373,53 +373,23 @@ export function AlbumDesignForm({
               }
             />
           </label>
-          <label className="ui-range-control">
-            <span className="ui-range-control__heading">
-              <span>Borda padrão</span>
-              <output>
-                {borderEnabled
-                  ? formatPhysicalMeasurement(
-                      borderEditor.widthUm,
-                      presentationUnit,
-                    )
-                  : "sem borda"}
-              </output>
-            </span>
-            <input
-              aria-label="Espessura da borda"
-              className="ui-range"
-              max={Math.max(5_000, borderEditor.widthUm)}
-              min="0"
-              step="250"
-              type="range"
-              value={borderEnabled ? borderEditor.widthUm : 0}
-              onChange={(event) =>
-                changeBorderWidth(Number(event.currentTarget.value))
-              }
-            />
-          </label>
-        </div>
-        <label className="ui-range-control">
-          <span className="ui-range-control__heading">
-            <span>Espaço entre quadros</span>
-            <output>
-              {formatPhysicalMeasurement(frameGapUm, presentationUnit)}
-            </output>
-          </span>
-          <input
-            aria-label="Espaço entre quadros"
-            className="ui-range"
-            max={Math.max(24_000, frameGapUm)}
-            min="0"
-            step="1000"
-            type="range"
-            value={frameGapUm}
-            onChange={(event) => {
-              const frameGapUm = Number(event.currentTarget.value);
-              transitionProjectDraft((current) => ({ ...current, frameGapUm }));
-            }}
+          <FrameDefaultRangeControl
+            kind="border"
+            displayUnit={presentationUnit}
+            includeValueUm={borderEditor.widthUm}
+            valueUm={borderEnabled ? borderEditor.widthUm : 0}
+            onChange={changeBorderWidth}
           />
-        </label>
+        </div>
+        <FrameDefaultRangeControl
+          kind="gap"
+          displayUnit={presentationUnit}
+          includeValueUm={frameGapUm}
+          valueUm={frameGapUm}
+          onChange={(frameGapUm) =>
+            transitionProjectDraft((current) => ({ ...current, frameGapUm }))
+          }
+        />
       </section>
     </form>
   );

@@ -1,3 +1,4 @@
+import { MenuItem } from "../ui/MenuItem";
 import { useEffect, useRef, useState } from "react";
 import {
   ChevronDown,
@@ -148,25 +149,15 @@ export function MediaPanelToolbar({
             className="ui-floating-surface media-popup media-import-popup"
             role="menu"
           >
-            <button
-              disabled={importDisabled}
-              role="menuitem"
-              type="button"
-              onClick={() => {
+            <MenuItem compact label={projectCommandDescriptor("import-media-files").label}
+          disabled={importDisabled}
+          onClick={() => {
                 setOpenPopup(null);
                 onImportMedia("files");
-              }}
-            >
-              {projectCommandDescriptor("import-media-files").label}
-            </button>
-            <button
-              disabled={importDisabled}
-              role="menuitem"
-              type="button"
-              onClick={() => { setOpenPopup(null); onImportMedia("folder"); }}
-            >
-              {projectCommandDescriptor("import-media-folder").label}
-            </button>
+              }} />
+            <MenuItem compact label={projectCommandDescriptor("import-media-folder").label}
+          disabled={importDisabled}
+          onClick={() => { setOpenPopup(null); onImportMedia("folder"); }} />
           </div>
         )}
       </div>

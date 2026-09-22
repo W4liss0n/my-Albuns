@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useState } from "react";
-import { X } from "lucide-react";
+import { FieldResetButton, ValidatedTextField } from "../ui/ValidatedTextField";
 
 import type {
   AlbumInformation,
@@ -29,10 +29,8 @@ import {
   type AlbumInformationProjectDraft,
 } from "../application/projectSettingsDraft";
 import {
-  AppIcon,
   FieldValidationAutoTooltip,
   FieldValidationTooltip,
-  TextInput,
   fieldValidationTooltipAttributes,
   type FieldValidationTooltipModel,
   useFieldValidationTooltip,
@@ -442,7 +440,7 @@ export function AlbumInformationForm({
               changeUnit(value as DocumentSnapshot["displayUnit"])
             }
           />
-          <TextField
+          <ValidatedTextField density="compact"
             error={firstError(errors.dpi)}
             field="dpi"
             inputMode="numeric"
@@ -460,22 +458,22 @@ export function AlbumInformationForm({
         <fieldset className="album-information-dimension">
           <legend>Dimensão da lâmina</legend>
           <div className="inspector-readout-grid">
-            <MeasurementField
+            <ValidatedTextField density="compact" inputMode="decimal"
               error={firstError(errors.sheetWidth)}
               field="sheetWidth"
               label="Largura"
               onReset={measurementResetAction("sheetWidth")}
-              unit={draft.displayUnit}
+              suffix={displayUnitLabel(draft.displayUnit)}
               validationTooltip={validationTooltip}
               value={draft.sheetWidth.text}
               onChange={(value) => setMeasurement("sheetWidth", value)}
             />
-            <MeasurementField
+            <ValidatedTextField density="compact" inputMode="decimal"
               error={firstError(errors.sheetHeight)}
               field="sheetHeight"
               label="Altura"
               onReset={measurementResetAction("sheetHeight")}
-              unit={draft.displayUnit}
+              suffix={displayUnitLabel(draft.displayUnit)}
               validationTooltip={validationTooltip}
               value={draft.sheetHeight.text}
               onChange={(value) => setMeasurement("sheetHeight", value)}
@@ -511,22 +509,22 @@ export function AlbumInformationForm({
       <section className="inspector-subsection">
         <h3>Áreas técnicas</h3>
         <div className="inspector-readout-grid">
-          <MeasurementField
+          <ValidatedTextField density="compact" inputMode="decimal"
             error={firstError(errors.bleed)}
             field="bleed"
             label="Sangria"
             onReset={measurementResetAction("bleed")}
-            unit={draft.displayUnit}
+            suffix={displayUnitLabel(draft.displayUnit)}
             validationTooltip={validationTooltip}
             value={draft.bleed.text}
             onChange={(value) => setMeasurement("bleed", value)}
           />
-          <MeasurementField
+          <ValidatedTextField density="compact" inputMode="decimal"
             error={firstError(errors.safety)}
             field="safety"
             label="Área de segurança"
             onReset={measurementResetAction("safety")}
-            unit={draft.displayUnit}
+            suffix={displayUnitLabel(draft.displayUnit)}
             validationTooltip={validationTooltip}
             value={draft.safety.text}
             onChange={(value) => setMeasurement("safety", value)}
@@ -888,136 +886,6 @@ function SelectField({
       </span>
       <FieldValidationAutoTooltip field={field} tooltip={validationTooltip} />
     </div>
-  );
-}
-
-function TextField({
-  error,
-  field,
-  inputMode,
-  label,
-  onReset,
-  validationTooltip,
-  value,
-  onChange,
-}: {
-  error?: string;
-  field: string;
-  inputMode: "decimal" | "numeric";
-  label: string;
-  onReset?: () => void;
-  validationTooltip: FieldValidationTooltipModel;
-  value: string;
-  onChange(value: string): void;
-}) {
-  const inputId = `album-information-${field}`;
-  return (
-    <div className="album-information-field">
-      <label htmlFor={inputId}>{label}</label>
-      <span className="album-entry-control">
-        <TextInput
-          aria-label={label}
-          className="ui-field-control"
-          id={inputId}
-          inputMode={inputMode}
-          type="text"
-          value={value}
-          {...fieldValidationTooltipAttributes(
-            field,
-            error,
-            validationTooltip,
-          )}
-          onChange={(event) => onChange(event.currentTarget.value)}
-        />
-        {onReset ? <FieldResetButton label={label} onReset={onReset} /> : null}
-      </span>
-      <FieldValidationAutoTooltip
-        field={field}
-        tooltip={validationTooltip}
-      />
-    </div>
-  );
-}
-
-function MeasurementField({
-  disabled = false,
-  error,
-  field,
-  label,
-  onReset,
-  placeholderFeature,
-  unit,
-  validationTooltip,
-  value,
-  onChange,
-}: {
-  disabled?: boolean;
-  error?: string;
-  field: string;
-  label: string;
-  onReset?: () => void;
-  placeholderFeature?: string;
-  unit: DocumentSnapshot["displayUnit"];
-  validationTooltip: FieldValidationTooltipModel;
-  value: string;
-  onChange(value: string): void;
-}) {
-  const inputId = `album-information-${field}`;
-  return (
-    <div
-      className="album-information-field"
-      data-placeholder-feature={disabled ? placeholderFeature : undefined}
-      title={
-        disabled
-          ? "Disponível após a mudança dimensional segura"
-          : undefined
-      }
-    >
-      <label htmlFor={inputId}>{label}</label>
-      <span className="album-entry-control album-measurement-control">
-        <TextInput
-          aria-label={label}
-          className="ui-field-control"
-          disabled={disabled}
-          id={inputId}
-          inputMode="decimal"
-          type="text"
-          value={value}
-          {...fieldValidationTooltipAttributes(
-            field,
-            error,
-            validationTooltip,
-          )}
-          onChange={(event) => onChange(event.currentTarget.value)}
-        />
-        {onReset ? <FieldResetButton label={label} onReset={onReset} /> : null}
-        <span aria-hidden="true">{displayUnitLabel(unit)}</span>
-      </span>
-      <FieldValidationAutoTooltip
-        field={field}
-        tooltip={validationTooltip}
-      />
-    </div>
-  );
-}
-
-function FieldResetButton({
-  label,
-  onReset,
-}: {
-  label: string;
-  onReset(): void;
-}) {
-  return (
-    <button
-      aria-label={`Restaurar ${label}`}
-      className="album-entry-reset"
-      type="button"
-      onClick={onReset}
-      onPointerDown={(event) => event.preventDefault()}
-    >
-      <AppIcon icon={X} size={12} />
-    </button>
   );
 }
 

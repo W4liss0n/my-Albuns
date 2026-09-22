@@ -1331,8 +1331,8 @@ test("converts periodic display values without changing physical values and keep
   expect(
     screen.getByRole("textbox", { name: "Área de segurança" }),
   ).toHaveValue("0.118");
-  expect(width.closest(".new-project-input-shell")).toHaveTextContent("pol");
-  expect(width.closest(".new-project-input-shell")).not.toHaveTextContent(
+  expect(width.closest(".ui-text-field__entry")).toHaveTextContent("pol");
+  expect(width.closest(".ui-text-field__entry")).not.toHaveTextContent(
     "in",
   );
   fireEvent.change(width, { target: { value: "11.81" } });
