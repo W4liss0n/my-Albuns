@@ -4948,7 +4948,47 @@
       "comparison": { "kind": "implementation-only", "surface": "photo-orientation", "reason": "Giro e demais ajustes são independentes. Restaurar Giro conserva o Espelhamento e o enquadramento, conforme o contrato da entrega e o design 0001." },
       "viewport": { "width": 1440, "height": 800 },
       "readySelector": "body[data-photo-orientation=\"single-mirrored\"] [aria-label=\"Restaurar giro\"]:disabled",
-      "actions": [{ "type": "click", "selector": "[aria-label=\"Restaurar giro\"]" }]
+      "actions": [
+        { "type": "click", "selector": "[aria-label=\"Restaurar giro\"]" },
+        { "type": "assert", "selector": "body[data-photo-orientation=\"single-both\"]" },
+        { "type": "double-click", "selector": "[aria-label=\"Giro das fotos\"]" }
+      ]
+    },
+    {
+      "id": "workspace-photo-orientation-reset-focus",
+      "title": "Giro — foco no valor integrado ao rótulo",
+      "implementationPath": "/workspace-preview.html?frame=orientation&orientation=single-both",
+      "comparison": { "kind": "implementation-only", "surface": "photo-orientation", "reason": "Design 0048 refinado: restauração no próprio valor, sem botão desenhado ou ícone extra; foco neutro permanece visível para quem usa teclado." },
+      "viewport": { "width": 1440, "height": 800 },
+      "readySelector": ".photo-rotation-readout:focus-visible:not(:disabled)",
+      "actions": [
+        { "type": "key", "key": "Tab" },
+        { "type": "focus", "selector": ".photo-rotation-readout" }
+      ]
+    },
+    {
+      "id": "workspace-photo-orientation-reset-enter",
+      "title": "Giro — restaurar pelo valor com Enter",
+      "implementationPath": "/workspace-preview.html?frame=orientation&orientation=single-both",
+      "comparison": { "kind": "implementation-only", "surface": "photo-orientation", "reason": "Design 0048: Enter no valor restaura apenas o giro e mantém o espelhamento, com um único comando de histórico." },
+      "viewport": { "width": 1440, "height": 800 },
+      "readySelector": "body[data-photo-orientation=\"single-mirrored\"][data-photo-orientation-history=\"1,0\"] .photo-rotation-readout:disabled",
+      "actions": [
+        { "type": "focus", "selector": ".photo-rotation-readout" },
+        { "type": "key", "key": "Enter" }
+      ]
+    },
+    {
+      "id": "workspace-photo-orientation-reset-space",
+      "title": "Giro — restaurar pelo valor com Espaço",
+      "implementationPath": "/workspace-preview.html?frame=orientation&orientation=single-both",
+      "comparison": { "kind": "implementation-only", "surface": "photo-orientation", "reason": "Design 0048: Espaço no valor restaura apenas o giro e mantém o espelhamento, com um único comando de histórico." },
+      "viewport": { "width": 1440, "height": 800 },
+      "readySelector": "body[data-photo-orientation=\"single-mirrored\"][data-photo-orientation-history=\"1,0\"] .photo-rotation-readout:disabled",
+      "actions": [
+        { "type": "focus", "selector": ".photo-rotation-readout" },
+        { "type": "key", "key": "Space" }
+      ]
     },
     {
       "id": "workspace-photo-orientation-keyboard-history",

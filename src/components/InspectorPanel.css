@@ -115,6 +115,7 @@
 }
 
 .photo-orientation-row,
+.photo-orientation-label,
 .photo-orientation-actions {
   display: flex;
   align-items: center;
@@ -126,45 +127,30 @@
   margin-left: auto;
 }
 
-.photo-rotation-control {
-  display: flex;
-  height: var(--ui-compact-control-height);
-  box-sizing: border-box;
-  border: 1px solid var(--ui-border);
-  border-radius: var(--ui-radius-small);
-  background: var(--ui-surface-raised);
-}
-
-.photo-rotation-control > .ui-action-button {
-  height: 100%;
-  padding-inline: var(--ui-space-2);
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-}
-
-.photo-rotation-control > .ui-action-button:first-child {
-  border-right: 1px solid var(--ui-border);
-  border-radius: var(--ui-radius-small) 0 0 var(--ui-radius-small);
-}
-
-.photo-rotation-control > .photo-rotation-reset {
-  border-radius: 0 var(--ui-radius-small) var(--ui-radius-small) 0;
-}
-
-.photo-rotation-reset output {
+.ui-action-button.photo-rotation-readout,
+.ui-action-button.photo-rotation-readout:hover:not(:disabled),
+.ui-action-button.photo-rotation-readout:focus-visible:not(:disabled) {
   min-width: 4ch;
+  padding: 0;
+  border: 0;
+  background: transparent;
   font-family: var(--ui-font-mono);
+  font-weight: 400;
   color: var(--ui-text-secondary);
-  text-align: right;
 }
 
-.photo-rotation-control > .photo-rotation-reset:disabled {
+.ui-action-button.photo-rotation-readout:disabled {
   opacity: 1;
 }
 
-.photo-rotation-reset:disabled .ui-app-icon {
-  color: var(--ui-text-disabled);
+.photo-rotation-readout:hover:not(:disabled) {
+  text-decoration: underline dotted;
+  text-underline-offset: var(--ui-space-1);
+}
+
+.photo-rotation-readout:focus-visible {
+  outline: 1px solid var(--ui-focus-neutral);
+  outline-offset: 2px;
 }
 
 .photo-orientation-scope,

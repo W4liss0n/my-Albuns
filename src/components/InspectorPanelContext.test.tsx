@@ -1,5 +1,6 @@
 import { rasterLimitsAt300Dpi } from "../test/projectConfigurationFixtures";
 import { fireEvent, render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import type { ComponentProps } from "react";
 import { beforeEach, expect, test, vi } from "vitest";
 
@@ -139,14 +140,30 @@ test("Photo orientation controls show mixed values and target compatible Photos"
   expect(mirror).toHaveAttribute("aria-pressed", "mixed");
   fireEvent.click(screen.getByRole("button", { name: "Girar 90° à esquerda" }));
   fireEvent.click(mirror);
-  fireEvent.click(screen.getByRole("button", { name: "Restaurar giro" }));
+  const rotationValue = screen.getByRole("button", { name: "Restaurar giro" });
+  fireEvent.click(rotationValue, { detail: 1 });
+  expect(onAction).toHaveBeenCalledTimes(2);
+  fireEvent.doubleClick(rotationValue);
   expect(onAction.mock.calls).toEqual([["rotateCounterClockwise"], ["toggleHorizontalMirror"], ["resetRotation"]]);
   view.rerender(<InspectorPanel {...props} photoOrientation={{ disabled: true, onAction }} />);
   expect(screen.getByRole("button", { name: "Girar 90° à esquerda" })).toBeDisabled();
   expect(mirror).toBeDisabled();
+  expect(rotationValue).toBeDisabled();
   view.rerender(<InspectorPanel {...inspectorProps({ kind: "frame", frame: frames[2], composedPhoto: null })}
     photoOrientation={{ disabled: false, onAction }} />);
   expect(screen.queryByRole("button", { name: "Espelhar horizontalmente" })).not.toBeInTheDocument();
+});
+
+test.each(["{Enter}", " "])("restores Photo rotation from its readout with keyboard %s", async (key) => {
+  const user = userEvent.setup();
+  const frame = structuredClone(sheetState.frames[0]);
+  frame.photo!.transform.quarterTurns = 3;
+  const onAction = vi.fn();
+  const props = inspectorProps({ kind: "frame", frame, composedPhoto: composedSheet.frames[0].photo });
+  render(<InspectorPanel {...props} photoOrientation={{ disabled: false, onAction }} />);
+  screen.getByRole("button", { name: "Restaurar giro" }).focus();
+  await user.keyboard(key);
+  expect(onAction).toHaveBeenCalledExactlyOnceWith("resetRotation");
 });
 
 test("shows Design da Lâmina and preserves its scope while Frame temporarily owns the Inspector", () => {
