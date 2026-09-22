@@ -10,7 +10,6 @@ import {
   Download,
   FolderOpen,
   Plus,
-  Star,
 } from "lucide-react";
 
 import type { GraphicsDiagnostic } from "../application/graphics";
@@ -26,8 +25,10 @@ import type {
   OpenProjectOutcome,
   ProjectFailureDialogPort,
   RecentProjectSummary,
+  RecentProjectFirstSheet,
 } from "./application/globalProjectPort";
 import { NewProjectFlow } from "./NewProjectFlow";
+import { SheetPreviewShell } from "../components/SheetPreview";
 import {
   ActionButton,
   AppIcon,
@@ -47,8 +48,60 @@ interface GlobalShellProps {
   projectPort: GlobalProjectPort;
 }
 
-const recentCoverVariants = [1, 2, 1, 3, 4, 1, 2] as const;
-const portraitCoverIndexes = new Set([1, 4, 6]);
+function RecentProjectThumbnail({
+  id, load,
+}: {
+  id: string;
+  load(id: string): Promise<RecentProjectFirstSheet | null>;
+}) {
+  const element = useRef<HTMLSpanElement>(null);
+  const [visible, setVisible] = useState(false);
+  const [preview, setPreview] = useState<RecentProjectFirstSheet | null>(null);
+  const [resolved, setResolved] = useState(false);
+
+  useEffect(() => {
+    if (!element.current) return;
+    if (!window.IntersectionObserver) {
+      setVisible(true);
+      return;
+    }
+    const observer = new IntersectionObserver(([entry]) => {
+      if (entry?.isIntersecting) {
+        setVisible(true);
+        observer.disconnect();
+      }
+    });
+    observer.observe(element.current);
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
+    if (!visible) return;
+    let active = true;
+    void load(id).then((result) => {
+      if (active) { setPreview(result); setResolved(true); }
+    });
+    return () => { active = false; };
+  }, [id, load, visible]);
+
+  const sheet = preview?.sheet;
+  return (
+    <span aria-hidden="true" className="global-project-thumbnail"
+      data-preview-state={resolved ? (preview ? "ready" : "unavailable") : "loading"} ref={element}>
+      {sheet && (
+        <span
+          className="global-project-first-sheet"
+          style={{
+            aspectRatio: `${sheet.widthUm * (sheet.activeSides === "both" ? 1 : 2)} / ${sheet.heightUm}`,
+            width: `${Math.round(102 * sheet.widthUm * (sheet.activeSides === "both" ? 1 : 2) / sheet.heightUm)}px`,
+          }}
+        >
+          <SheetPreviewShell sheet={sheet} mediaPreviewUrls={preview.mediaPreviewUrls} />
+        </span>
+      )}
+    </span>
+  );
+}
 
 export function GlobalShell({
   initialSurface = "welcome",
@@ -292,11 +345,10 @@ export function GlobalShell({
           <ul
             aria-label="Projetos recentes"
             className="global-recent-list"
-            data-placeholder-feature="recent-project-visual-metadata"
+            data-placeholder-feature="recent-project-secondary-metadata"
           >
-            {/* PLACEHOLDER UI: capas, fixação e metadados secundários vêm da
-                referência visual, mas ainda não existem no contrato de recentes. */}
-            {recentProjects.map((project, index) => (
+            {/* PLACEHOLDER UI: fixação e metadados secundários ainda não existem no contrato de recentes. */}
+            {recentProjects.map((project) => (
               <li key={project.id}>
                 <button
                   aria-label={project.name}
@@ -304,21 +356,7 @@ export function GlobalShell({
                   onClick={() => openRecentProject(project.id)}
                   type="button"
                 >
-                  <span
-                    aria-hidden="true"
-                    className="global-project-thumbnail"
-                    data-shape={
-                      portraitCoverIndexes.has(index % 7)
-                        ? "portrait"
-                        : "square"
-                    }
-                    data-variant={recentCoverVariants[index % 7]}
-                  >
-                    <i />
-                    <span className="global-project-pin">
-                      <AppIcon icon={Star} size={12} />
-                    </span>
-                  </span>
+                  <RecentProjectThumbnail id={project.id} load={projectPort.firstRecentProjectSheet} />
                   <span className="global-project-summary">
                     <strong>{project.name}</strong>
                     <small>Projeto MyAlbuns</small>

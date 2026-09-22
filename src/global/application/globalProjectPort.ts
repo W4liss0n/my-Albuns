@@ -132,6 +132,11 @@ export interface RecentProjectSummary {
   name: string;
 }
 
+export interface RecentProjectFirstSheet {
+  sheet: import("../../domain/project").ComposedSheet;
+  mediaPreviewUrls: Readonly<Record<string, string>>;
+}
+
 export interface GlobalProjectPort {
   onActivationTerminal(
     listener: (outcome: ProjectLaunchOutcome) => void,
@@ -141,6 +146,7 @@ export interface GlobalProjectPort {
   ): Promise<ProjectLaunchOutcome | null>;
   openProject(): Promise<OpenProjectOutcome>;
   listRecentProjects(): Promise<readonly RecentProjectSummary[]>;
+  firstRecentProjectSheet(id: string): Promise<RecentProjectFirstSheet | null>;
   openRecentProject(id: string): Promise<OpenProjectOutcome>;
   startupOpenFailure(): Promise<OpenProjectFailure | null>;
 }

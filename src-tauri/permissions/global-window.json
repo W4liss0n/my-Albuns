@@ -16,6 +16,7 @@
           "release_provisional_decorative",
             "open_project",
             "recent_projects",
+            "first_recent_project_sheet",
             "open_recent_project",
             "show_project_failure_dialog",
             "startup_open_failure",

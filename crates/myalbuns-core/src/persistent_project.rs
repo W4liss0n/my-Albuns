@@ -121,6 +121,14 @@ impl LoadedProjectRevision {
         }
     }
 
+    /// Composes only the first saved Sheet using oriented reduced-image dimensions.
+    pub fn first_sheet_preview(
+        &self,
+        dimensions: &HashMap<MediaId, (u32, u32)>,
+    ) -> Option<crate::ComposedSheet> {
+        persistent_projection::first_sheet_preview(&self.revision.project, dimensions)
+    }
+
     pub fn project_id(&self) -> Uuid {
         self.revision.project_id
     }

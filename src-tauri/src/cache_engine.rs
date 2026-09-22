@@ -2086,6 +2086,55 @@ fn sweep_unreferenced_generations(
         })
 }
 
+/// Reuse existing reduced images for one read-only recent-Project card.
+/// This never schedules processing, changes the index, or touches Originals.
+pub(crate) fn persisted_previews(
+    app_paths: &AppPaths,
+    project_id: &str,
+    sources: &[(String, PathBuf)],
+    registry: &CachePreviewRegistry,
+) -> HashMap<String, (String, u32, u32)> {
+    let mut previews = HashMap::new();
+    let Some(cache_paths) = app_paths
+        .project_cache(&project_data_namespace(project_id))
+        .ok()
+    else {
+        return previews;
+    };
+    let namespace = AuthorizedCacheNamespace {
+        project_id: project_id.to_owned(),
+        cache_paths,
+    };
+    let Some(storage) = app_paths.prepare_cache_storage(namespace.paths()).ok() else {
+        return previews;
+    };
+    let Some(index) = CacheIndex::read(&storage, namespace.paths(), project_id) else {
+        return previews;
+    };
+    for (media_id, source_path) in sources {
+        let Some(entry) = index
+            .entry(media_id)
+            .filter(|entry| entry.matches_source_path(source_path))
+        else {
+            continue;
+        };
+        let artifact = entry.artifact();
+        if verify_cached_artifact(&storage, namespace.paths(), &artifact).is_err() {
+            continue;
+        }
+        if let Ok(preview) =
+            registry.publish_for_recent(app_paths, &namespace, &artifact, source_path)
+            && let Some(url) = preview.url
+        {
+            previews.insert(
+                media_id.clone(),
+                (url, artifact.width_px, artifact.height_px),
+            );
+        }
+    }
+    previews
+}
+
 fn load_metadata(
     storage: &PreparedCacheStorage,
     cache_paths: &CachePathPlan,
@@ -2485,6 +2534,39 @@ mod tests {
             );
             assert_eq!(previews.len(), 3);
             assert_eq!(super::INDEX_IO.get(), (3, 1));
+        });
+    }
+
+    #[test]
+    fn recent_card_reads_verified_reduced_bytes_once_and_returns_oriented_dimensions() {
+        tauri::async_runtime::block_on(async {
+            let fixture = fixture();
+            let engine = CacheEngine::default();
+            let artifact = verified_preview_artifact(&fixture, &engine).await;
+            let registry = CachePreviewRegistry::new("global");
+            let media_id = fixture.work.source.media_id().to_owned();
+            let source = fixture.work.source.source_path().to_path_buf();
+            super::INDEX_IO.set((0, 0));
+            let previews = super::persisted_previews(
+                &fixture.app_paths,
+                fixture.work.namespace.project_id(),
+                &[(media_id.clone(), source.clone())],
+                &registry,
+            );
+            let (url, width, height) = previews.get(&media_id).unwrap();
+            assert!(url.starts_with("http://myalbuns-cache.localhost/"));
+            assert_eq!((*width, *height), (artifact.width_px, artifact.height_px));
+            assert_eq!(super::INDEX_IO.get().0, 1, "one index read per card");
+            assert!(
+                super::persisted_previews(
+                    &fixture.app_paths,
+                    fixture.work.namespace.project_id(),
+                    &[(media_id, source.with_file_name("different.jpg"))],
+                    &registry,
+                )
+                .is_empty(),
+                "a changed source binding cannot reuse old bytes"
+            );
         });
     }
 

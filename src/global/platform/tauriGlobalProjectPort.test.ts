@@ -351,6 +351,15 @@ test("keeps the welcome surface operational when recent Projects are unavailable
   ).resolves.toEqual([]);
 });
 
+test("requests a first Sheet by opaque id without exposing a native path", async () => {
+  vi.mocked(invoke).mockResolvedValueOnce(null);
+  await expect(tauriGlobalProjectPort.firstRecentProjectSheet("recent-ana"))
+    .resolves.toBeNull();
+  expect(invoke).toHaveBeenCalledWith("first_recent_project_sheet", {
+    projectId: "recent-ana",
+  });
+});
+
 test("reopens a recent Project by opaque id only", async () => {
   vi.mocked(invoke).mockResolvedValueOnce({ status: "opened" });
 

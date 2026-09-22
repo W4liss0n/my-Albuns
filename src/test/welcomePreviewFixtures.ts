@@ -1,4 +1,5 @@
-import type { RecentProjectSummary } from "../global/application/globalProjectPort";
+import type { RecentProjectSummary, RecentProjectFirstSheet } from "../global/application/globalProjectPort";
+import { representativeProjection } from "./projectFixtures";
 
 // Preview-only data. It must never be read from or written to the user's real
 // recent-Projects storage.
@@ -15,5 +16,31 @@ const populatedRecentProjects = [
 export function welcomePreviewRecentProjects(
   parameters: URLSearchParams,
 ): readonly RecentProjectSummary[] {
-  return parameters.get("recents") === "empty" ? [] : populatedRecentProjects;
+  return parameters.get("recents") === "empty" ? [] :
+    ["single", "missing"].includes(parameters.get("recents") ?? "")
+      ? populatedRecentProjects.slice(0, 1) : populatedRecentProjects;
+}
+
+export function welcomePreviewFirstSheet(
+  parameters: URLSearchParams,
+  id: string,
+): RecentProjectFirstSheet | null {
+  if (parameters.get("recents") === "missing") return null;
+  const source = representativeProjection.composition.sheets[0];
+  const sheet = structuredClone(source);
+  if (parameters.get("recents") === "single") {
+    sheet.activeSides = "left";
+    sheet.widthUm = source.widthUm / 2;
+    sheet.base.drawRect.width = sheet.widthUm;
+    sheet.frames = sheet.frames.map((frame) => ({
+      ...frame,
+      clipRect: { ...frame.clipRect, width: Math.min(frame.clipRect.width, 260_000) },
+    }));
+  }
+  return {
+    sheet,
+    mediaPreviewUrls: {
+      "media-001": `/src/test/dev-media/${id === "p2" ? "retrato" : "serra-amanhecer"}.svg`,
+    },
+  };
 }

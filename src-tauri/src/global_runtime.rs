@@ -7,15 +7,19 @@ use std::{
     time::Duration,
 };
 
+use myalbuns_core::{LoadProjectRequest, ProjectCore, ProjectLocation};
 use myalbuns_logging::ProcessRole;
+use myalbuns_paths::OperationPathContext;
 #[cfg(windows)]
 use myalbuns_paths::ProcessInstanceHandle;
 use myalbuns_paths::{AppPaths, AppPathsError, NativePathDto, ProcessInstanceId, RootBindingPlan};
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use tauri::{AppHandle, Emitter, Manager, WebviewWindow, WebviewWindowBuilder};
 use tauri_plugin_dialog::{DialogExt, FilePath};
 
 use crate::{
+    cache_previews::CachePreviewRegistry,
     cache_service::{CacheScheduledCleanupOutcome, CacheService},
     desktop_webview_policy,
     global_activation::{
@@ -162,6 +166,8 @@ struct GlobalRuntimeState {
     progress_webview_data_directory: PathBuf,
     graphics_gate: GraphicsLaunchGate,
     recent_projects: RecentProjectsStore,
+    recent_preview_paths: AppPaths,
+    recent_previews: CachePreviewRegistry,
     startup_failure: Arc<Mutex<Option<ProjectLaunchFailure>>>,
     activation_terminals: GlobalActivationTerminalStore,
     new_project_requests: Arc<AtomicU64>,
@@ -189,6 +195,8 @@ impl GlobalRuntimeState {
                 .map_err(|error| std::io::Error::other(error.to_string()))?,
             graphics_gate: GraphicsLaunchGate::new(activation_projects),
             recent_projects: RecentProjectsStore::new(app_paths),
+            recent_preview_paths: app_paths.clone(),
+            recent_previews: CachePreviewRegistry::new(GLOBAL_WINDOW_LABEL),
             startup_failure: Arc::new(Mutex::new(None)),
             activation_terminals: GlobalActivationTerminalStore::default(),
             scheduled_cleanup: ScheduledCleanupGate::default(),
@@ -726,6 +734,92 @@ async fn recent_projects(
         .await
         .map_err(|_| state_failure())?
         .map_err(|_| state_failure())
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct RecentProjectFirstSheet {
+    sheet: myalbuns_core::ComposedSheet,
+    media_preview_urls: HashMap<String, String>,
+}
+
+// A card asks only while visible. A broken or offline Project leaves its card
+// usable; no editable session, schema publication or media import is started.
+#[tauri::command]
+async fn first_recent_project_sheet(
+    project_id: String,
+    state: tauri::State<'_, GlobalRuntimeState>,
+) -> Result<Option<RecentProjectFirstSheet>, ()> {
+    let state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let path = state
+            .recent_projects
+            .path_for(&project_id)
+            .ok()??
+            .into_path_buf();
+        let mut paths = OperationPathContext::new();
+        paths.capture(&path).ok()?;
+        let core = ProjectCore::new().with_identity_storage_roots(
+            state.recent_preview_paths.project_identity_leases_dir(),
+            state.recent_preview_paths.project_identities_dir(),
+        );
+        let loaded = core
+            .load_persisted_revision(LoadProjectRequest::new(ProjectLocation::new(
+                path,
+                paths.freeze(),
+            )))
+            .ok()?;
+        if loaded.project_id().hyphenated().to_string() != project_id {
+            return None;
+        }
+        let first = loaded.first_sheet_preview(&HashMap::new())?;
+        let referenced = first
+            .referenced_media_ids()
+            .map(|id| id.to_string())
+            .collect::<std::collections::HashSet<_>>();
+        let sources = loaded
+            .project()
+            .media()
+            .iter()
+            .filter(|source| referenced.contains(&source.id().hyphenated().to_string()))
+            .map(|source| {
+                (
+                    source.id().hyphenated().to_string(),
+                    source.path().to_path_buf(),
+                )
+            })
+            .collect::<Vec<_>>();
+        let cached = crate::cache_engine::persisted_previews(
+            &state.recent_preview_paths,
+            &project_id,
+            &sources,
+            &state.recent_previews,
+        );
+        let dimensions = cached
+            .iter()
+            .filter_map(|(id, (_, width, height))| {
+                id.parse::<myalbuns_core::MediaId>()
+                    .ok()
+                    .map(|media_id| (media_id, (*width, *height)))
+            })
+            .collect();
+        let sheet = loaded.first_sheet_preview(&dimensions)?;
+        let referenced = sheet
+            .referenced_media_ids()
+            .map(|id| id.to_string())
+            .collect::<std::collections::HashSet<_>>();
+        let media_preview_urls = cached
+            .into_iter()
+            .filter(|(id, _)| referenced.contains(id))
+            .map(|(id, (url, _, _))| (id, url))
+            .collect();
+        Some(RecentProjectFirstSheet {
+            sheet,
+            media_preview_urls,
+        })
+    })
+    .await
+    .map_err(|_| ())
 }
 
 #[tauri::command]
@@ -1981,12 +2075,24 @@ pub(crate) fn run(
     let provisional_decoratives =
         crate::provisional_decoratives::ProvisionalDecorativeRegistry::default();
     let preview_registry = provisional_decoratives.clone();
+    let recent_preview_registry = state.recent_previews.clone();
     tauri::Builder::default()
         .register_asynchronous_uri_scheme_protocol(
             crate::provisional_decoratives::PREVIEW_PROTOCOL_SCHEME,
             move |context, request, responder| {
                 crate::provisional_decoratives::respond_to_preview_request(
                     preview_registry.clone(),
+                    context,
+                    request,
+                    responder,
+                );
+            },
+        )
+        .register_asynchronous_uri_scheme_protocol(
+            crate::cache_previews::CACHE_MEDIA_PROTOCOL_SCHEME,
+            move |context, request, responder| {
+                crate::cache_previews::respond_to_cache_media_request(
+                    recent_preview_registry.clone(),
                     context,
                     request,
                     responder,
@@ -2077,6 +2183,7 @@ pub(crate) fn run(
             create_project,
             open_project,
             recent_projects,
+            first_recent_project_sheet,
             open_recent_project,
             show_project_failure_dialog,
             startup_open_failure,

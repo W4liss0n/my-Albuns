@@ -7,7 +7,7 @@ import type {
 } from "./global/application/globalProjectPort";
 import { GlobalShell } from "./global/GlobalShell";
 import { createNewProjectPortStub } from "./global/testing/newProjectPortStub";
-import { welcomePreviewRecentProjects } from "./test/welcomePreviewFixtures";
+import { welcomePreviewRecentProjects, welcomePreviewFirstSheet } from "./test/welcomePreviewFixtures";
 import "./ui/theme.css";
 import "./ui/ui.css";
 import "./global/GlobalShell.css";
@@ -25,6 +25,7 @@ const projectPort: GlobalProjectPort = {
   },
   listRecentProjects: async () =>
     welcomePreviewRecentProjects(previewParameters),
+  firstRecentProjectSheet: async (id) => welcomePreviewFirstSheet(previewParameters, id),
   openRecentProject: async () => ({ status: "cancelled" }),
   startupOpenFailure: async () => null,
 };

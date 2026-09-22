@@ -65,6 +65,7 @@ function createProjectPort(
     completeGraphicsGate: async () => null,
     openProject: async () => ({ status: "cancelled" }),
     listRecentProjects: async () => [],
+    firstRecentProjectSheet: async () => null,
     openRecentProject: async () => ({ status: "cancelled" }),
     startupOpenFailure: async () => null,
     ...overrides,
@@ -363,10 +364,47 @@ test("loads and renders recent Projects by name", async () => {
   ).toBeEnabled();
   expect(screen.getByRole("list", { name: "Projetos recentes" })).toHaveAttribute(
     "data-placeholder-feature",
-    "recent-project-visual-metadata",
+    "recent-project-secondary-metadata",
   );
   expect(screen.getAllByText("Aberto recentemente")).toHaveLength(2);
   expect(listRecentProjects).toHaveBeenCalledOnce();
+});
+
+test("shows a real first Sheet and keeps an unavailable card usable", async () => {
+  const firstRecentProjectSheet = vi.fn(async (id: string) => id === "recent-ana"
+    ? {
+        sheet: {
+          sheetId: "first", number: 1, activeSides: "both" as const,
+          widthUm: 600_000, heightUm: 300_000,
+          base: { rgb: "#FFFFFF", drawRect: { x: 0, y: 0, width: 600_000, height: 300_000 } },
+          backgrounds: [{ kind: "color" as const, rgb: "#123456", drawRect: { x: 0, y: 0, width: 600_000, height: 300_000 } }],
+          frames: [], overlays: [],
+        },
+        mediaPreviewUrls: {},
+      }
+    : null);
+  const openRecentProject = vi.fn(async () => ({ status: "cancelled" as const }));
+  const { container } = render(
+    <GlobalShell
+      graphicsDiagnostic={supportedGraphics}
+      newProjectPort={createNewProjectPortStub()}
+      projectPort={createProjectPort({
+        listRecentProjects: async () => [
+          { id: "recent-ana", name: "Álbum da Ana" },
+          { id: "recent-bia", name: "Álbum da Bia" },
+        ],
+        firstRecentProjectSheet,
+        openRecentProject,
+      })}
+    />,
+  );
+  expect(await screen.findByRole("img", { name: "Prévia da lâmina 01", hidden: true })).toBeInTheDocument();
+  expect(container.querySelector('.global-project-thumbnail[data-preview-state="ready"] .sheet-preview')).toBeInTheDocument();
+  await waitFor(() => expect(container.querySelector('.global-project-thumbnail[data-preview-state="unavailable"]')).toBeInTheDocument());
+  await userEvent.setup().click(screen.getByRole("button", { name: "Álbum da Bia" }));
+  expect(openRecentProject).toHaveBeenCalledWith("recent-bia");
+  expect(firstRecentProjectSheet).toHaveBeenCalledWith("recent-ana");
+  expect(firstRecentProjectSheet).toHaveBeenCalledWith("recent-bia");
 });
 
 test("reopens a recent Project using only its opaque id", async () => {

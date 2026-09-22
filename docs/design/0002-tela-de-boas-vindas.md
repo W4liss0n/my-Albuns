@@ -1,6 +1,7 @@
 ---
 status: accepted
 document: design
+updated: 2026-09-22
 ---
 
 # Tela de Boas-vindas
@@ -9,7 +10,7 @@ document: design
 
 ## Objetivo
 
-A Tela de Boas-vindas é a superfície principal visível do processo `MyAlbuns.exe`. Ela funciona como ponto de entrada e coordenação do aplicativo, sem incorporar Canvas, composição ou qualquer estado criativo de um Projeto.
+A Tela de Boas-vindas é a superfície principal visível do processo `MyAlbuns.exe`. Ela funciona como ponto de entrada e coordenação do aplicativo, sem incorporar Canvas nem uma sessão criativa mutável de Projeto. Os cartões podem apresentar uma composição imutável da primeira lâmina salva.
 
 ## Entradas da primeira versão
 
@@ -57,19 +58,34 @@ Os Projetos recentes aparecem em uma grade de cartões. Cada cartão reserva uma
 capa visual, o Nome do Projeto, metadados secundários e a indicação de abertura.
 Clicar em qualquer ponto do cartão abre o Projeto correspondente.
 
-O contrato real ainda expõe ao frontend somente o Nome do Projeto e uma
-Identidade opaca usada para solicitar sua reabertura. O pathname nativo permanece
-no armazenamento do backend e nunca é transportado como string Unicode para a
-interface. Enquanto capa, fixação e metadados não existirem nesse contrato, esses
-trechos do cartão são placeholders de reprodução e permanecem marcados no código
-com `PLACEHOLDER UI` e `data-placeholder-feature`.
+O cartão mostra a **primeira lâmina salva do Projeto**, no lugar da representação
+genérica da referência original. Essa decisão do autor, de 22 de setembro de
+2026, refina somente o conteúdo da miniatura; a grade, as ações e a hierarquia
+da tela permanecem. A lâmina mantém sua proporção e cabe inteira na área
+reservada, sem cortar a composição para preencher o cartão.
 
-Uma capa real não possui contrato nesta versão. Conforme o ADR 0005, previews
-persistidos de Lâmina só podem ser introduzidos se medições demonstrarem que o
-baseline não atende. Até que essa evidência exista e a decisão arquitetural seja
-reavaliada, este desenho não define geração, persistência, transporte, esquema
-nem momento de atualização para uma capa; o cartão conserva exclusivamente o
-placeholder descrito acima.
+O frontend recebe o Nome do Projeto e uma Identidade opaca para solicitar sua
+reabertura e sua prévia. O pathname nativo permanece no backend e nunca é
+transportado como string Unicode para a interface. Fixação e metadados ainda
+sem contrato continuam marcados como placeholders de reprodução.
+
+A prévia é consultada sob demanda para os cartões visíveis. O Core lê a revisão
+persistida e fornece a composição da primeira lâmina, sem criar uma sessão
+editável, salvar o documento ou alterar a ordem dos recentes. A interface
+reutiliza o desenho de lâmina compartilhado, incluindo páginas ativas, fundos,
+sobreposições, fotos e suas transformações; não recompõe as regras do álbum.
+
+As fotos e os decorativos usam as representações reduzidas já disponíveis no
+Cache, por referências autorizadas. Essa consulta não inicia processamento dos
+originais nem grava uma imagem de capa. O baseline do ADR 0005 continua válido:
+não há preview persistido de lâmina nem novo formato de armazenamento de capa.
+
+Durante a consulta ou se o Projeto estiver indisponível, a área reservada mantém
+uma apresentação neutra, sem texto de carregamento ou erro que desloque os
+cartões. Uma mídia sem prévia segue a apresentação degradada do desenho
+compartilhado. O Nome e a ação de abrir permanecem disponíveis; a ausência da
+miniatura não impede a tentativa normal de abertura. Alterações ainda não
+salvas em uma Janela de Projeto não aparecem na miniatura dos recentes.
 
 A lista usa a abertura mais recente como ordenação decrescente. A entrada passa
 para o topo somente depois que o Host independente confirma `Ready`; cancelamento

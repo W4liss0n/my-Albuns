@@ -71,9 +71,34 @@ pub(crate) fn editor_state(
     }
 }
 
+pub(crate) fn first_sheet_preview(
+    project: &crate::ProjectDocument,
+    dimensions: &HashMap<MediaId, (u32, u32)>,
+) -> Option<crate::ComposedSheet> {
+    let mut album = album_snapshot_limited(project, &HashMap::new(), Some(1));
+    for media in &mut album.media {
+        if let Some((width, height)) = dimensions.get(&media.id) {
+            media.source_width_px = Some(*width);
+            media.source_height_px = Some(*height);
+        }
+    }
+    crate::composition::compose_album(&album)
+        .sheets
+        .into_iter()
+        .next()
+}
+
 pub(crate) fn album_snapshot(
     project: &crate::ProjectDocument,
     photo_sources: &HashMap<MediaId, HashMap<PathBuf, PhotoSourceMetadata>>,
+) -> AlbumSnapshot {
+    album_snapshot_limited(project, photo_sources, None)
+}
+
+fn album_snapshot_limited(
+    project: &crate::ProjectDocument,
+    photo_sources: &HashMap<MediaId, HashMap<PathBuf, PhotoSourceMetadata>>,
+    sheet_limit: Option<usize>,
 ) -> AlbumSnapshot {
     let settings = project.document();
     let last_sheet = project.sheets().len().saturating_sub(1);
@@ -84,6 +109,7 @@ pub(crate) fn album_snapshot(
         sheets: project
             .sheets()
             .iter()
+            .take(sheet_limit.unwrap_or(usize::MAX))
             .enumerate()
             .map(|(index, sheet)| {
                 let active_sides = projected_active_sides(sheet.active_sides());

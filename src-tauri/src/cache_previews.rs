@@ -89,7 +89,14 @@ impl CachePreviewRegistry {
         artifact: &CacheArtifact,
         source_path: &Path,
     ) -> Result<MediaPreview, CachePreviewError> {
-        self.publish_with_digest(app_paths, namespace, artifact, source_path, None)
+        self.publish_with_digest(
+            app_paths,
+            namespace,
+            artifact,
+            source_path,
+            None,
+            &artifact.media_id,
+        )
     }
 
     pub(crate) fn publish_verified(
@@ -106,7 +113,19 @@ impl CachePreviewRegistry {
             artifact,
             source_path,
             Some(preview_sha256),
+            &artifact.media_id,
         )
+    }
+
+    pub(crate) fn publish_for_recent(
+        &self,
+        app_paths: &AppPaths,
+        namespace: &AuthorizedCacheNamespace,
+        artifact: &CacheArtifact,
+        source_path: &Path,
+    ) -> Result<MediaPreview, CachePreviewError> {
+        let key = format!("{}:{}", namespace.project_id(), artifact.media_id);
+        self.publish_with_digest(app_paths, namespace, artifact, source_path, None, &key)
     }
 
     fn publish_with_digest(
@@ -116,6 +135,7 @@ impl CachePreviewRegistry {
         artifact: &CacheArtifact,
         source_path: &Path,
         expected_digest: Option<&[u8; 32]>,
+        publication_key: &str,
     ) -> Result<MediaPreview, CachePreviewError> {
         let storage = app_paths
             .prepare_cache_storage(namespace.paths())
@@ -154,7 +174,7 @@ impl CachePreviewRegistry {
         let source_binding = CacheSourceBinding::for_path(source_path);
         publication.access_sequence += 1;
         let last_used = publication.access_sequence;
-        if let Some(published) = publication.tokens_by_media.get_mut(&artifact.media_id)
+        if let Some(published) = publication.tokens_by_media.get_mut(publication_key)
             && published.generation_id == artifact.generation_id
             && published.source_binding == source_binding
         {
@@ -170,7 +190,7 @@ impl CachePreviewRegistry {
                 )),
             });
         }
-        if let Some(previous) = publication.tokens_by_media.remove(&artifact.media_id) {
+        if let Some(previous) = publication.tokens_by_media.remove(publication_key) {
             publication.previews_by_token.remove(&previous.token);
         }
         let token = format!(
@@ -179,7 +199,7 @@ impl CachePreviewRegistry {
             expected_format.extension()
         );
         publication.tokens_by_media.insert(
-            artifact.media_id.clone(),
+            publication_key.to_owned(),
             PublishedCachePreview {
                 generation_id: artifact.generation_id.clone(),
                 source_binding,
@@ -705,6 +725,54 @@ mod tests {
                 .is_none(),
             "resident bytes cannot cross a relink, Undo, or discarded binding"
         );
+
+        // Recent cards may reuse a media UUID across independent Projects. The
+        // second publication must not revoke the first card's opaque URL.
+        let second_project_path = root.path().join("Segundo.myalbuns");
+        let mut second_context = OperationPathContext::new();
+        second_context.capture(&second_project_path).unwrap();
+        let second_project = ProjectCore::new()
+            .with_identity_storage_roots(root.path().join("leases"), root.path().join("identities"))
+            .create_editable(CreateProjectRequest::new(
+                ProjectLocation::new(second_project_path, second_context.freeze()),
+                InitialProject::neutral(),
+                CreateAuthorization::CreateOnly,
+            ))
+            .unwrap();
+        let second_namespace =
+            AuthorizedCacheNamespace::mount(&app_paths, second_project.identity_authority())
+                .unwrap();
+        let second_derived = second_namespace
+            .paths()
+            .preview_file(&artifact.media_id, &artifact.generation_id, artifact.format)
+            .unwrap();
+        app_paths
+            .prepare_cache_storage(second_namespace.paths())
+            .unwrap();
+        std::fs::write(second_derived, &derived_bytes).unwrap();
+        let first_recent = registry
+            .publish_for_recent(&app_paths, &namespace, &artifact, &original_path)
+            .unwrap()
+            .url
+            .unwrap();
+        let second_recent = registry
+            .publish_for_recent(&app_paths, &second_namespace, &artifact, &original_path)
+            .unwrap()
+            .url
+            .unwrap();
+        assert_ne!(first_recent, second_recent);
+        for url in [first_recent, second_recent] {
+            let token = url.rsplit('/').next().unwrap();
+            let response = registry.serve(
+                "main",
+                Request::builder()
+                    .uri(format!("/{token}"))
+                    .body(Vec::new())
+                    .unwrap(),
+            );
+            assert_eq!(response.status(), StatusCode::OK);
+            assert_eq!(response.body(), &derived_bytes);
+        }
 
         registry.mark_sources_changed(["media-photo"]);
         assert!(

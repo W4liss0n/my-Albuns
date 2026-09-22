@@ -8,8 +8,70 @@
       "referencePath": "/docs/references/ui-programa-diagramacao/Boas-vindas.dc.html",
       "comparison": { "kind": "paired", "surface": "welcome-window" },
       "viewport": { "width": 1280, "height": 720 },
-      "readySelector": "[aria-label=\"Ações principais\"]",
+      "readySelector": ".global-recent-list li:first-child .global-project-thumbnail[data-preview-state=\"ready\"] .sheet-preview",
       "actions": []
+    },
+    {
+      "id": "welcome-first-sheet-single",
+      "title": "Boas-vindas — primeira lâmina com página única",
+      "implementationPath": "/welcome-preview.html?recents=single",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "welcome-window",
+        "reason": "Design 0002, decisão de 22/09/2026: o cartão mostra a primeira lâmina salva com seu lado ativo, mantendo a área reservada e a composição inteira."
+      },
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "readySelector": ".global-project-thumbnail[data-preview-state=\"ready\"] .sheet-preview-shell:not([data-active-sides=\"both\"])",
+      "actions": []
+    },
+    {
+      "id": "welcome-first-sheet-unavailable",
+      "title": "Boas-vindas — projeto sem prévia disponível",
+      "implementationPath": "/welcome-preview.html?recents=missing",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "welcome-window",
+        "reason": "Design 0002: prévia indisponível preserva a área neutra e a ação de abrir, sem mensagem transitória ou alteração na altura dos cartões."
+      },
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "readySelector": ".global-project-thumbnail[data-preview-state=\"unavailable\"]",
+      "actions": [
+        {
+          "type": "assert",
+          "selector": ".global-recent-list button:not(:disabled):has(.global-project-thumbnail[data-preview-state=\"unavailable\"])"
+        }
+      ]
+    },
+    {
+      "id": "welcome-first-sheet-focus",
+      "title": "Boas-vindas — foco de teclado nos projetos com prévia real",
+      "implementationPath": "/welcome-preview.html",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "welcome-window",
+        "reason": "Design 0002: a lâmina é conteúdo passivo do cartão; navegação por teclado continua no botão de abrir o projeto."
+      },
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "readySelector": ".global-recent-list li:nth-child(2) button:focus-visible .global-project-thumbnail[data-preview-state=\"ready\"] .sheet-preview",
+      "actions": [
+        {
+          "type": "focus",
+          "selector": ".global-recent-list li:first-child button"
+        },
+        {
+          "type": "key",
+          "key": "Tab"
+        }
+      ]
     },
     {
       "id": "album-dimensional-confirmation",
@@ -274,7 +336,7 @@
         "width": 640,
         "height": 720
       },
-      "readySelector": "[aria-label=\"Ações principais\"]",
+      "readySelector": ".global-recent-list li:first-child .global-project-thumbnail[data-preview-state=\"ready\"] .sheet-preview",
       "actions": []
     },
     {

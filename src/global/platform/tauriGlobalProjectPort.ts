@@ -6,6 +6,7 @@ import type {
   ProjectLaunchFailure,
   ProjectLaunchOutcome,
   RecentProjectSummary,
+  RecentProjectFirstSheet,
 } from "../application/globalProjectPort";
 import { hasOnlyIpcKeys, isIpcRecord } from "../../platform/ipcGuards";
 import {
@@ -113,6 +114,16 @@ export const tauriGlobalProjectPort: GlobalProjectPort = {
       );
     } catch {
       return [];
+    }
+  },
+  firstRecentProjectSheet: async (id) => {
+    try {
+      const result = await invoke<RecentProjectFirstSheet | null>(
+        "first_recent_project_sheet", { projectId: id },
+      );
+      return result;
+    } catch {
+      return null;
     }
   },
   openRecentProject: (id) =>
