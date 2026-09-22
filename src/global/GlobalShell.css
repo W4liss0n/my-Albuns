@@ -218,7 +218,7 @@ body,
 }
 
 .global-project-card:hover .global-project-favorite,
-.global-project-card:focus-within .global-project-favorite,
+.global-project-card:has(:focus-visible) .global-project-favorite,
 .global-project-favorite[aria-pressed="true"] {
   opacity: 1;
 }

@@ -62,7 +62,7 @@
       "implementationPath": "/welcome-preview.html?recents=favorites-only",
       "comparison": { "kind": "implementation-only", "surface": "welcome-window", "reason": "Design 0002: o grupo some quando o último favorito é removido e o foco acompanha a estrela." },
       "viewport": { "width": 1000, "height": 720 },
-      "readySelector": "main:not(:has(ul[aria-label='Favoritos'])) ul[aria-label='Projetos recentes'] .global-project-card[data-project-id='p3'] .global-project-favorite[aria-pressed='false']:focus",
+      "readySelector": "main:not(:has(ul[aria-label='Favoritos'])) ul[aria-label='Projetos recentes'] .global-project-card[data-project-id='p3']:has(.global-project-favorite[aria-pressed='false']:focus) .global-project-launch",
       "actions": [{ "type": "click", "selector": "ul[aria-label='Favoritos'] li:first-child .global-project-favorite" }, { "type": "click", "selector": "ul[aria-label='Favoritos'] li:first-child .global-project-favorite" }]
     },
     {
@@ -89,7 +89,7 @@
       "implementationPath": "/welcome-preview.html?recents=favorites-only",
       "comparison": { "kind": "implementation-only", "surface": "welcome-window", "reason": "Design 0002: a remoção do último favorito preserva foco e composição na largura reduzida." },
       "viewport": { "width": 640, "height": 800 },
-      "readySelector": "main:not(:has(ul[aria-label='Favoritos'])) ul[aria-label='Projetos recentes'] .global-project-card[data-project-id='p3'] .global-project-favorite[aria-pressed='false']:focus",
+      "readySelector": "main:not(:has(ul[aria-label='Favoritos'])) ul[aria-label='Projetos recentes'] .global-project-card[data-project-id='p3']:has(.global-project-favorite[aria-pressed='false']:focus) .global-project-launch",
       "actions": [{ "type": "click", "selector": "ul[aria-label='Favoritos'] li:first-child .global-project-favorite" }, { "type": "click", "selector": "ul[aria-label='Favoritos'] li:first-child .global-project-favorite" }]
     },
     {
