@@ -58,7 +58,6 @@ export function VisualScopePreview({
     : content.geometry.widthUm;
   const includes = (target: VisualScope | null, side: VisualScope) => target === "both" || target === side;
   const focusInset = height * 0.012;
-  const focusStroke = Math.max(1, height * 0.0035);
 
   return (
     <div
@@ -124,8 +123,8 @@ export function VisualScopePreview({
         <svg className="visual-scope-preview__focus" viewBox={`0 0 ${width} ${height}`} aria-hidden="true">
           <rect
             aria-label={`Foco de teclado ${SCOPE_SUFFIX[focused]}`}
-            fill="none" stroke="#73A9CE" strokeWidth={focusStroke}
-            strokeDasharray={`${focusStroke * 0.1} ${height * 0.018}`} strokeLinecap="round"
+            fill="none" stroke="#73A9CE" strokeWidth="1" vectorEffect="non-scaling-stroke"
+            strokeDasharray="1 4" strokeLinecap="round"
             x={(focused === "right" ? width / 2 : 0) + focusInset}
             y={focusInset}
             width={Math.max(1, (focused === "both" ? width : width / 2) - focusInset * 2)}

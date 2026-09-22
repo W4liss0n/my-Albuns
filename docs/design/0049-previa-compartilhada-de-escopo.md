@@ -36,7 +36,8 @@ Essa configuração representa o fluxo de criação, sem criar outro seletor.
 O hover conserva o tom neutro quente com opacidade de 12%, sem contorno ou
 sombra. Seleção usa a indicação azul interna já existente no programa; o lado
 não selecionado é suavizado. Foco de teclado usa a indicação pontilhada espacial
-da prévia de criação nas duas variantes, separado do hover e da seleção. O foco
+da prévia de criação nas duas variantes, com espessura de 1 px independente do
+tamanho da miniatura, separado do hover e da seleção. O foco
 externo de Ambos os lados na criação também usa a mesma apresentação.
 
 A superfície usa borda discreta e sombra de miniatura compartilhadas. A largura
@@ -68,3 +69,6 @@ A documentação oficial de [composição por propriedades](https://react.dev/le
 [eventos de foco](https://react.dev/reference/react-dom/components/common#onfocus)
 fundamenta a composição. A mudança conserva as APIs já usadas nesta versão,
 sem dependências novas.
+
+O atributo SVG [vector-effect](https://developer.mozilla.org/en-US/docs/Web/SVG/Reference/Attribute/vector-effect)
+conserva a espessura do foco ao reduzir a prévia.
