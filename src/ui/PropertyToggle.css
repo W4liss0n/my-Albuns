@@ -57,7 +57,7 @@
   transform: translateY(-50%);
 }
 
-.ui-property-toggle-tooltip::before {
+.ui-anchored-tooltip.ui-property-toggle-tooltip::before {
   top: 50%;
   inset-inline-start: -5px;
   transform: translateY(-50%) rotate(-45deg);

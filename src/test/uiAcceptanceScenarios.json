@@ -12421,7 +12421,10 @@
       },
       "viewport": { "width": 1600, "height": 1000 },
       "readySelector": "body:has(.photo-mirror-control[aria-describedby]) .ui-property-toggle-tooltip[role=\"tooltip\"]",
-      "actions": [{ "type": "hover", "selector": ".photo-mirror-control" }]
+      "actions": [
+        { "type": "hover", "selector": "[aria-label=\"Ângulo da foto\"]" },
+        { "type": "hover", "selector": ".photo-mirror-control" }
+      ]
     },
     {
       "id": "workspace-property-toggle-tooltip-keyboard",
