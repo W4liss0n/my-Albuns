@@ -1,15 +1,11 @@
 .ui-action-button.ui-property-toggle {
-  width: fit-content;
-  max-width: 100%;
+  width: var(--ui-compact-control-height);
+  height: var(--ui-compact-control-height);
   justify-self: start;
-  justify-content: flex-start;
-  gap: var(--ui-space-2);
-  padding: 0 var(--ui-space-2);
+  padding: 0;
   border-color: var(--ui-border);
   color: var(--ui-text-secondary);
   background: var(--ui-surface-muted);
-  font-size: var(--ui-font-size-action);
-  font-weight: 500;
 }
 
 .ui-action-button.ui-property-toggle:hover:not(:disabled),
@@ -43,4 +39,22 @@
 .ui-action-button.ui-property-toggle:focus-visible {
   outline: 1px solid var(--ui-focus-neutral);
   outline-offset: 2px;
+}
+
+.ui-anchored-tooltip.ui-property-toggle-tooltip {
+  right: auto;
+  width: max-content;
+  max-width: calc(100vw - 2 * var(--ui-space-4));
+}
+
+.ui-property-toggle-tooltip::before {
+  top: 50%;
+  inset-inline-start: -5px;
+  transform: translateY(-50%) rotate(-45deg);
+}
+
+.ui-property-toggle-tooltip[data-placement="left"]::before {
+  inset-inline-start: auto;
+  inset-inline-end: -5px;
+  transform: translateY(-50%) rotate(135deg);
 }

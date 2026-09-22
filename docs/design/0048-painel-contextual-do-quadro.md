@@ -19,13 +19,15 @@ continuam na validação por tooltip. A origem da borda e a ação para usar o
 padrão do álbum continuam disponíveis porque informam a herança do design.
 
 Espelhar horizontalmente e Preto e branco usam `PropertyToggle`, componente
-neutro de UI com ícone e texto em um botão compacto, alinhado à esquerda e com
-largura do conteúdo. O usuário rejeitou a primeira apresentação como uma linha
-com checkbox separado; o estado passa a fazer parte do próprio botão.
+neutro de UI com ícone em um botão compacto, alinhado à esquerda. Após a
+aprovação do estado pressionado neutro, o usuário pediu a retirada do texto
+visível. O nome da ação aparece no tooltip ao passar o mouse ou navegar pelo
+teclado, além de identificar o botão para leitores de tela. O estado faz parte
+do próprio botão, sem checkbox separado.
 
 O estado desligado usa superfície neutra e borda discreta. Após o usuário
 rejeitar o preenchimento azul, o estado ligado passa a parecer pressionado:
-fundo cinza quente, borda neutra, sombra interna suave e texto em grafite.
+fundo cinza quente, borda neutra, sombra interna suave e ícone em grafite.
 O ícone ganha um pouco de peso, de 1,4 px para 1,8 px, sem mudar suas dimensões.
 A indicação permanece ao passar o mouse e ao receber foco por teclado.
 Hover e foco no botão desligado mantêm a superfície clara, para não simular
@@ -36,8 +38,12 @@ simular que a propriedade está ligada em todas as fotos. Os ícones vêm do
 componente compartilhado do programa.
 
 O componente reutiliza o botão compartilhado e os tokens de superfície,
-borda, tipografia e espaçamento do programa. O botão tem altura mínima de
-28 px, ícone de 14 px, espaçamento interno de 8 px e cantos de 4 px.
+borda, tipografia e espaçamento do programa. O botão mede 28 × 28 px, com
+ícone centralizado de 16 px e cantos de 4 px. O tooltip reutiliza a superfície,
+a borda e a sombra compartilhadas; aparece ao lado, fora do fluxo do painel,
+e não desloca controles. A abertura, o fechamento e o posicionamento seguem
+o Tooltip do React Aria Components 1.19.0, usando o botão compartilhado como
+gatilho por meio de Focusable, conforme a [documentação oficial](https://react-aria.adobe.com/Tooltip#custom-trigger).
 O foco por teclado recebe contorno neutro ao redor do botão, separado do estado
 ligado. Enter e Espaço acionam a mesma operação do clique. Nome acessível,
 estado misto e bloqueio durante operações seguem o contrato existente.

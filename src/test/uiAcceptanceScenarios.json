@@ -12355,7 +12355,7 @@
       "comparison": {
         "kind": "implementation-only",
         "surface": "frame-property-toggle",
-        "reason": "Design 0048 refinado: botão compacto de ícone e texto, estado ativo neutro com aparência pressionada e foco independente da seleção, sem realce azul."
+        "reason": "Design 0048 refinado: botão compacto apenas com ícone, estado ativo neutro com aparência pressionada e foco independente da seleção, sem realce azul."
       },
       "viewport": {
         "width": 1440,
@@ -12408,6 +12408,53 @@
           "type": "key",
           "key": "ArrowRight"
         }
+      ]
+    },
+    {
+      "id": "workspace-property-toggle-tooltip-pointer",
+      "title": "Propriedade do quadro — identificação do ícone pelo mouse",
+      "implementationPath": "/workspace-preview.html?frame=orientation&orientation=single-both&scale=1.25",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "frame-property-toggle",
+        "reason": "Design 0048: tooltip de Espelhar horizontalmente a 125%, com botão apenas de ícone e nome fora do fluxo do painel."
+      },
+      "viewport": { "width": 1600, "height": 1000 },
+      "readySelector": "body:has(.photo-mirror-control[aria-describedby]) .ui-property-toggle-tooltip[role=\"tooltip\"]",
+      "actions": [{ "type": "hover", "selector": ".photo-mirror-control" }]
+    },
+    {
+      "id": "workspace-property-toggle-tooltip-keyboard",
+      "title": "Propriedade do quadro — identificação do ícone pelo teclado",
+      "implementationPath": "/workspace-preview.html?frame=orientation&orientation=single-both-black-white&scale=1.5",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "frame-property-toggle",
+        "reason": "Design 0048: tooltip de Preto e branco ao receber foco por teclado a 150%, com nome acessível e estado pressionado neutro preservados."
+      },
+      "viewport": { "width": 1920, "height": 1200 },
+      "readySelector": "body:has(.photo-effect-control[aria-describedby]:focus-visible) .ui-property-toggle-tooltip[role=\"tooltip\"]",
+      "actions": [
+        { "type": "key", "key": "Tab" },
+        { "type": "focus", "selector": ".photo-effect-control" }
+      ]
+    },
+    {
+      "id": "workspace-property-toggle-tooltip-dismiss",
+      "title": "Propriedade do quadro — fechar identificação com Escape",
+      "implementationPath": "/workspace-preview.html?frame=orientation&orientation=single-both-black-white",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "frame-property-toggle",
+        "reason": "Design 0048: Escape fecha o tooltip sem alterar o efeito ou retirar a seleção da foto."
+      },
+      "viewport": { "width": 1440, "height": 800 },
+      "readySelector": "body:not(:has(.ui-property-toggle-tooltip)) .photo-effect-control[aria-pressed=\"true\"]:focus-visible",
+      "actions": [
+        { "type": "key", "key": "Tab" },
+        { "type": "focus", "selector": ".photo-effect-control" },
+        { "type": "assert", "selector": ".ui-property-toggle-tooltip[role=\"tooltip\"]" },
+        { "type": "key", "key": "Escape" }
       ]
     }
   ]
