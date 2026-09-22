@@ -13509,6 +13509,84 @@
           "selector": "button[aria-label=\"Ambos os lados\"][aria-pressed=\"true\"]"
         }
       ]
+    },
+    {
+      "id": "image-viewer-window",
+      "title": "Visualizador em janela própria — imagem inteira",
+      "implementationPath": "/image-viewer.html?preview=normal",
+      "comparison": {
+        "implementationCaptureSelector": ".image-viewer-window",
+        "reason": "Design 0050: janela separada, sem barra de ferramentas",
+        "kind": "implementation-only",
+        "surface": "image-viewer"
+      },
+      "viewport": {
+        "height": 720,
+        "width": 1050
+      },
+      "readySelector": ".image-viewer__image[style*=\"opacity: 1\"]",
+      "actions": []
+    },
+    {
+      "id": "image-viewer-zoom",
+      "title": "Visualizador — ampliação e navegação",
+      "implementationPath": "/image-viewer.html?preview=normal",
+      "comparison": {
+        "implementationCaptureSelector": ".image-viewer-window",
+        "reason": "Design 0050: setas laterais e ajuste discreto",
+        "kind": "implementation-only",
+        "surface": "image-viewer"
+      },
+      "viewport": {
+        "height": 720,
+        "width": 1050
+      },
+      "readySelector": ".image-viewer__image[style*=\"opacity: 1\"]",
+      "actions": [
+        {
+          "type": "wheel",
+          "selector": ".image-viewer__stage",
+          "deltaY": -480
+        },
+        {
+          "type": "assert",
+          "selector": "button[aria-label=\"Ajustar à janela\"]"
+        }
+      ]
+    },
+    {
+      "id": "image-viewer-missing",
+      "title": "Visualizador — imagem ausente",
+      "implementationPath": "/image-viewer.html?preview=missing",
+      "comparison": {
+        "implementationCaptureSelector": ".image-viewer-window",
+        "reason": "Design 0050: ausência na geometria estável",
+        "kind": "implementation-only",
+        "surface": "image-viewer"
+      },
+      "viewport": {
+        "height": 720,
+        "width": 1050
+      },
+      "readySelector": ".image-viewer__message",
+      "actions": []
+    },
+    {
+      "id": "image-viewer-long-name",
+      "title": "Visualizador — nome longo em janela estreita",
+      "implementationPath": "/image-viewer.html?preview=long",
+      "comparison": {
+        "implementationCaptureSelector": ".image-viewer-window",
+        "reason": "Design 0050: título truncado e controles preservados",
+        "kind": "implementation-only",
+        "surface": "image-viewer"
+      },
+      "viewport": {
+        "height": 480,
+        "width": 600
+      },
+      "readySelector": ".image-viewer__image[style*=\"opacity: 1\"]",
+      "actions": []
     }
   ]
 }

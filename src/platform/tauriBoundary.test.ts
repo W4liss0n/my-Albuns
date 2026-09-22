@@ -9,6 +9,8 @@ import messageDialogWindowPermission from "../../src-tauri/permissions/message-d
 import ownedDialogWindowPermission from "../../src-tauri/permissions/owned-dialog-window.json?raw";
 import projectWindowPermission from "../../src-tauri/permissions/project-window.json?raw";
 import projectDialogWindowPermission from "../../src-tauri/permissions/project-dialog-window.json?raw";
+import imageViewerWindowCapability from "../../src-tauri/capabilities/image-viewer.json?raw";
+import imageViewerWindowPermission from "../../src-tauri/permissions/image-viewer.json?raw";
 import settingsWindowCapability from "../../src-tauri/capabilities/settings.json?raw";
 import settingsWindowPermission from "../../src-tauri/permissions/settings-window.json?raw";
 import batchWindowCapability from "../../src-tauri/capabilities/batch-window.json?raw";
@@ -42,7 +44,9 @@ const tauriCommandSources = {
     "./tauriProjectDialogPort.ts",
     "./tauriProjectPorts.ts",
     "./tauriProjectWindowPort.ts",
+    "./tauriImageViewerWindow.ts",
   ],
+  imageViewer: ["../image-viewer/platform/tauriImageViewerClient.ts"],
   projectDialog: [
     "../project-dialog/platform/tauriProjectDialogClient.ts",
   ],
@@ -60,11 +64,13 @@ const compositionRoots = new Set([
   "../global/main.tsx",
   "../main.tsx",
   "../project-dialog/main.tsx",
+  "../image-viewer/main.tsx",
 ]);
 const platformDirectories = [
   "../platform/",
   "../global/platform/",
   "../project-dialog/platform/",
+  "../image-viewer/platform/",
 ];
 const issue16GlobalCacheCommands = new Set([
   "cache_service_status",
@@ -167,6 +173,7 @@ test("assigns every Tauri command adapter to an explicit surface", () => {
     ...tauriCommandSources.openingDialog,
     ...tauriCommandSources.project,
     ...tauriCommandSources.projectDialog,
+    ...tauriCommandSources.imageViewer,
     ...tauriCommandSources.global,
   ];
 
@@ -204,6 +211,15 @@ test("keeps the project-window capability aligned with the invoked commands", ()
     "core:window:allow-internal-toggle-maximize",
   ]);
   expect([...allowedCommands].sort()).toEqual([...invokedCommands].sort());
+});
+
+test("keeps the owned image viewer capability read-only and scoped to its window", () => {
+  const invokedCommands = extractInvokedCommands(tauriCommandSources.imageViewer);
+  const { capability, allowedCommands } = parseSurfaceContract(imageViewerWindowCapability, imageViewerWindowPermission);
+  expect(capability.windows).toEqual(["image-viewer"]);
+  expect([...allowedCommands].sort()).toEqual([...invokedCommands].sort());
+  expect(allowedCommands.has("prepare_media_previews")).toBe(false);
+  expect(allowedCommands.has("apply_project_intent")).toBe(false);
 });
 
 test("keeps the global-window capability isolated from project commands", () => {

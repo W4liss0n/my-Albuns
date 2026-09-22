@@ -73,6 +73,13 @@ type ProjectCommandSourceDefinition<Id extends string> =
 
 const DEFINITIONS = [
   command({
+    id: "view-image",
+    label: "Visualizar imagem",
+    description: "Abre a foto inteira em uma janela de visualização.",
+    kind: "interface", contexts: ["media-photo", "frame-photo"], availability: "implemented",
+    shortcuts: [shortcut(" ", "Espaço")],
+  }),
+  command({
     id: "toggle-photo-black-and-white",
     label: "Preto e branco",
     description: "Alterna o efeito Preto e branco das fotos selecionadas.",

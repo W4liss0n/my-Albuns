@@ -49,6 +49,7 @@ import "./MediaPanel.css";
 import { MEDIA_PANEL_PRELOAD_MARGIN, mediaPanelViewportDemand } from "./mediaPanelViewport";
 
 export interface MediaPanelHandle {
+  viewerSelection(focusedMediaId?: string | null): { mediaId: string; mediaIds: readonly string[] } | null;
   planCatalog(mediaItems: readonly MediaCatalogItem[], mediaUsage: readonly MediaUsage[], folders?: readonly MediaFolder[]): {
     demand: MediaPreviewDemand;
     commit(): void;
@@ -97,6 +98,7 @@ interface MediaPanelProps {
   onEditMediaFolder?(edit: MediaFolderEdit): Promise<boolean>;
   photoshopAvailable?: boolean;
   onOpenInPhotoshop?(mediaId: string): void;
+  onViewPhoto?(mediaId: string, mediaIds: readonly string[], trigger: HTMLElement | null): void;
   ref?: Ref<MediaPanelHandle>;
   hidden?: boolean;
   mediaItems: readonly MediaCatalogItem[];
@@ -133,6 +135,7 @@ export function MediaPanel({
   onEditMediaFolder,
   photoshopAvailable = false,
   onOpenInPhotoshop,
+  onViewPhoto,
   ref,
   hidden = false,
   mediaItems,
@@ -301,6 +304,15 @@ export function MediaPanel({
   });
 
   useImperativeHandle(ref, () => ({
+    viewerSelection(focusedMediaId = null) {
+      if (activeMediaKind !== "photo" || hidden) return null;
+      const mediaId = focusedMediaId && visibleMediaIdSet.has(focusedMediaId)
+        ? focusedMediaId
+        : selectionAnchorId && visibleMediaIdSet.has(selectionAnchorId) && selectedMediaIds.has(selectionAnchorId)
+          ? selectionAnchorId
+          : visibleMediaIds.find((id) => selectedMediaIds.has(id));
+      return mediaId ? { mediaId, mediaIds: visibleMediaIds } : null;
+    },
     planCatalog(nextItems, nextUsage, folders = mediaFolders) {
       const folder = folders.find((item) => item.id === activeFolder?.id);
       const members = folder ? new Set(folder.mediaIds) : null;
@@ -738,6 +750,13 @@ export function MediaPanel({
       </div>
       {contextMenu && <ContextMenuSurface label="Ações das imagens" position={contextMenu}
         onDismiss={() => { setContextMenu(null); panelHostRef.current?.focus({ preventScroll: true }); }}>
+        {activeMediaKind === "photo" && onViewPhoto && <MenuItem label={projectCommandDescriptor("view-image").label} shortcut={projectCommandShortcutLabel("view-image")}
+          onClick={() => {
+            const id = contextMenu.mediaId;
+            const trigger = panelHostRef.current?.querySelector<HTMLElement>(`[data-media-id="${CSS.escape(id)}"]`) ?? panelHostRef.current;
+            setContextMenu(null);
+            onViewPhoto(id, visibleMediaIds, trigger ?? null);
+          }} />}
         {fileInformation[contextMenu.mediaId]?.state === "absent" && (
           <MenuItem label={projectCommandDescriptor("relink-media").label}
           disabled={relinkDisabled || importPending}

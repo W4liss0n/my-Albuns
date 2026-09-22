@@ -30,6 +30,23 @@ const mediaPanelInteractions = {
   onRetryUnavailableMedia: async () => undefined,
 };
 
+test("viewer context menu opens the clicked photo in the current sorted list without changing a multiselection", () => {
+  const onViewPhoto = vi.fn();
+  const ref = createRef<MediaPanelHandle>();
+  render(<MediaPanel {...mediaPanelInteractions} ref={ref} mediaItems={mediaItems} mediaUsage={mediaUsage}
+    onFillPhoto={vi.fn()} previewSource={{ kind: "static" }} preferences={{ kind: "local" }} onViewPhoto={onViewPhoto} />);
+  const first = screen.getByRole("button", { name: /^album 2/ });
+  const second = screen.getByRole("button", { name: /^Álbum 10/ });
+  fireEvent.click(first);
+  fireEvent.click(second, { ctrlKey: true });
+  fireEvent.contextMenu(second);
+  fireEvent.click(screen.getByRole("menuitem", { name: "Visualizar imagem" }));
+  expect(onViewPhoto).toHaveBeenCalledWith("photo-album-10", ["photo-album-2", "photo-album-10", "photo-retrato"], second);
+  expect(first).toHaveAttribute("aria-pressed", "true");
+  expect(second).toHaveAttribute("aria-pressed", "true");
+  expect(ref.current?.viewerSelection()).toEqual({ mediaId: "photo-album-2", mediaIds: ["photo-album-2", "photo-album-10", "photo-retrato"] });
+});
+
 test("applies only the double-clicked Decorative and distinguishes each usage role", () => {
   const onApplyDecorative = vi.fn();
   render(<MediaPanel {...mediaPanelInteractions} onApplyDecorative={onApplyDecorative}

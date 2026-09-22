@@ -25,6 +25,7 @@ import type {
   ProjectWindowPort,
 } from "./application/projectPorts";
 import type { ProjectDialogPort } from "./application/projectDialogPort";
+import type { ImageViewerWindowPort } from "./application/imageViewerWindow";
 import type { WorkspacePreferencesPort } from "./application/workspacePreferences";
 import type { EditorProjection } from "./domain/project";
 import { projectSaveAsStartupFailure } from "./application/projectSaveAsStartup";
@@ -58,6 +59,7 @@ type AppProps = {
   projectCorePort: ProjectCorePort;
   projectDialogPort: ProjectDialogPort;
   projectWindowPort: ProjectWindowPort;
+  imageViewerWindowPort?: ImageViewerWindowPort;
   graphicsProbe: GraphicsProbe;
   canvasGraphicsDiagnosticProbe: CanvasGraphicsDiagnosticProbe;
   logger: Logger;
@@ -96,6 +98,7 @@ function App({
   projectCorePort,
   projectDialogPort,
   projectWindowPort,
+  imageViewerWindowPort,
   graphicsProbe,
   canvasGraphicsDiagnosticProbe,
   logger,
@@ -775,6 +778,7 @@ function App({
         probe={canvasGraphicsDiagnosticProbe}
       >
         <ProjectWorkspace
+          imageViewerWindowPort={imageViewerWindowPort}
           photoshopPort={photoshopPort}
           projectLauncher={projectLauncher}
           generationLauncher={generationLauncher}

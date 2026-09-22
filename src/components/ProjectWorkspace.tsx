@@ -21,6 +21,7 @@ import {
 } from "../application/physicalMeasurements";
 import { sheetStructureAvailability } from "../application/sheetStructure";
 import type { ProjectDialogPort } from "../application/projectDialogPort";
+import type { ImageViewerWindowPort, ViewerPresentation } from "../application/imageViewerWindow";
 import type { GraphicsDiagnostic } from "../application/graphics";
 import { mergeMediaPreviewDemands, renderableMediaPreviewUrls } from "../application/mediaPreviews";
 import type { DisplayUnit, EditorProjection } from "../domain/project";
@@ -38,6 +39,8 @@ import {
   type InspectorContext,
 } from "./InspectorPanel";
 import { MediaPanel, type MediaPanelHandle } from "./MediaPanel";
+import { adjacentViewerDemand, sheetViewerMediaIds } from "./imageViewerModel";
+import { ownsEditingKeys } from "./keyboardEventOwnership";
 import { createProjectApplicationMenus } from "./projectApplicationMenus";
 import { useProjectLauncher } from "./useProjectLauncher";
 import { useProjectCommandShortcuts } from "./useProjectCommandShortcuts";
@@ -82,6 +85,7 @@ interface ProjectWorkspaceProps {
   projectDialogPort: ProjectDialogPort;
   exportPipelinePort: ExportPipelinePort;
   projectWindowPort: ProjectWindowPort;
+  imageViewerWindowPort?: ImageViewerWindowPort;
   runProjectMutation: ProjectMutationRunner;
   projectCorePort: ProjectCorePort;
   mediaPreviews: Readonly<Record<string, MediaPreview>>;
@@ -110,6 +114,7 @@ export function ProjectWorkspace({
   projectDialogPort,
   exportPipelinePort,
   projectWindowPort,
+  imageViewerWindowPort,
   runProjectMutation,
   projectCorePort,
   mediaPreviews,
@@ -140,9 +145,22 @@ export function ProjectWorkspace({
     workspacePreferencesPort,
   );
   const projectId = projection.state.projectId;
+  const [viewer, setViewer] = useState<{
+    sessionId: string;
+    projectId: string;
+    source: "panel" | "sheet";
+    mediaId: string;
+    mediaIds: readonly string[];
+    restoreFocus: HTMLElement | null;
+  } | null>(null);
+  const openedViewerSession = useRef<string | null>(null);
+  const viewerRevision = useRef(0);
+  const spaceCandidate = useRef<{ source: "panel" | "sheet"; mediaId: string; mediaIds: readonly string[]; focus: HTMLElement | null; cancelled: boolean } | null>(null);
   useEffect(() => {
     setMediaSelectionRequest(null);
     setMediaDrag(null);
+    setViewer(null);
+    spaceCandidate.current = null;
   }, [projectId]);
   useEffect(() => {
     if (workspacePreferences.ready) onPreferencesReady(projectId);
@@ -161,6 +179,8 @@ export function ProjectWorkspace({
   const [frameContextMenu, setFrameContextMenu] = useState<{
     kind: "frames" | "empty" | "photo";
     position: { x: number; y: number };
+    mediaId?: string;
+    sheetId?: string;
   } | null>(null);
   const photoshop = usePhotoshop(photoshopPort);
   const [presentationUnitOverride, setPresentationUnitOverride] = useState<{
@@ -200,12 +220,15 @@ export function ProjectWorkspace({
     onMediaDemandChange(mergeMediaPreviewDemands(
       canvasMediaDemand, panelMediaDemand,
       { visibleMediaIds: [], preloadMediaIds: albumDesignPreloadMediaIds },
+      viewer?.projectId === projectId ? adjacentViewerDemand(viewer.mediaIds, viewer.mediaId) : { visibleMediaIds: [], preloadMediaIds: [] },
     ));
   }, [
     albumDesignPreloadMediaIds,
     canvasMediaDemand,
     onMediaDemandChange,
     panelMediaDemand,
+    viewer,
+    projectId,
   ]);
   const reportCloseError = useCallback((value: string) => {
     setCloseMessage(value);
@@ -382,6 +405,118 @@ export function ProjectWorkspace({
     graphicsFailure !== null;
   const selectedPhotoFrame = controller.selectedFrames.length === 1 && controller.selectedFrames[0].photo
     ? controller.selectedFrames[0] : null;
+  const viewerActive = viewer?.projectId === projectId ? viewer : null;
+  const openViewer = (source: "panel" | "sheet", mediaId: string, mediaIds: readonly string[], focus: HTMLElement | null) => {
+    if (!imageViewerWindowPort || commandsBlocked || mediaDrag || !mediaIds.includes(mediaId)) return;
+    setFrameContextMenu(null);
+    setSheetContextMenu(null);
+    setViewer({ sessionId: crypto.randomUUID(), projectId, source, mediaId, mediaIds: [...mediaIds], restoreFocus: focus });
+  };
+  const viewerPresentation = useMemo<ViewerPresentation | null>(() => {
+    if (!viewerActive) return null;
+    const position = viewerActive.mediaIds.indexOf(viewerActive.mediaId);
+    const media = projection.state.album.media.find((item) => item.id === viewerActive.mediaId);
+    const preview = mediaPreviews[viewerActive.mediaId];
+    return {
+      sessionId: viewerActive.sessionId, revision: ++viewerRevision.current,
+      mediaId: viewerActive.mediaId, name: media?.name ?? "Imagem",
+      url: mediaPreviewUrls[viewerActive.mediaId] ?? null,
+      state: mediaFiles?.[viewerActive.mediaId]?.state ?? preview?.state ?? "loading",
+      canPrevious: position > 0, canNext: position >= 0 && position < viewerActive.mediaIds.length - 1,
+    };
+  }, [viewerActive, projection.state.album.media, mediaPreviews, mediaPreviewUrls, mediaFiles]);
+  useEffect(() => {
+    if (!imageViewerWindowPort) return;
+    if (!viewerPresentation) {
+      const session = openedViewerSession.current;
+      openedViewerSession.current = null;
+      if (session) void imageViewerWindowPort.close(session).catch(() => undefined);
+      return;
+    }
+    if (openedViewerSession.current !== viewerPresentation.sessionId) {
+      const previousSession = openedViewerSession.current;
+      openedViewerSession.current = viewerPresentation.sessionId;
+      void (async () => {
+        if (previousSession) await imageViewerWindowPort.close(previousSession);
+        await imageViewerWindowPort.open(viewerPresentation);
+      })().catch(() => setViewer((current) => current?.sessionId === viewerPresentation.sessionId ? null : current));
+    } else {
+      void imageViewerWindowPort.update(viewerPresentation).catch(() => undefined);
+    }
+  }, [imageViewerWindowPort, viewerPresentation]);
+  useEffect(() => {
+    if (!imageViewerWindowPort) return;
+    let active = true;
+    let stopNavigate: (() => void) | undefined;
+    let stopClosed: (() => void) | undefined;
+    void imageViewerWindowPort.onNavigate(({ sessionId, offset }) => {
+      if (!active) return;
+      setViewer((current) => {
+        if (!current || current.sessionId !== sessionId) return current;
+        const index = current.mediaIds.indexOf(current.mediaId);
+        const mediaId = current.mediaIds[index + offset];
+        return mediaId ? { ...current, mediaId } : current;
+      });
+    }).then((stop) => { if (active) stopNavigate = stop; else stop(); });
+    void imageViewerWindowPort.onClosed((sessionId) => {
+      if (!active) return;
+      setViewer((current) => {
+        if (current?.sessionId !== sessionId) return current;
+        requestAnimationFrame(() => (current.restoreFocus?.isConnected ? current.restoreFocus : document.querySelector<HTMLElement>(current.source === "panel" ? "#media-panel" : ".canvas-host canvas"))?.focus({ preventScroll: true }));
+        return null;
+      });
+    }).then((stop) => { if (active) stopClosed = stop; else stop(); });
+    return () => { active = false; stopNavigate?.(); stopClosed?.(); };
+  }, [imageViewerWindowPort]);
+  useEffect(() => {
+    const keyDown = (event: globalThis.KeyboardEvent) => {
+      if (viewerActive) return;
+      if (event.code !== "Space") {
+        if (spaceCandidate.current) spaceCandidate.current.cancelled = true;
+        return;
+      }
+      if (event.repeat || event.ctrlKey || event.altKey || event.metaKey || ownsEditingKeys(event.target) || commandsBlocked || mediaDrag || frameContextMenu || sheetContextMenu) return;
+      if (spaceCandidate.current) return;
+      const target = event.target instanceof Element ? event.target : null;
+      const panel = target?.closest("#media-panel");
+      if (panel) {
+        const card = target?.closest<HTMLElement>("[data-media-id]");
+        if (target?.closest("button, [role=menu], [role=menubar]") && !card) return;
+        const selection = mediaPanelRef.current?.viewerSelection(card?.dataset.mediaId);
+        if (!selection) return;
+        spaceCandidate.current = { source: "panel", ...selection, focus: target instanceof HTMLElement ? target : null, cancelled: false };
+      } else if (target?.closest(".canvas-host") && !target.closest("button, [role=menu], [role=menubar]")) {
+        const frame = selectedPhotoFrame;
+        if (!frame?.photo) return;
+        const sheet = projection.composition.sheets.find((item) => item.frames.some((candidate) => candidate.frameId === frame.id)) ?? null;
+        const mediaIds = sheetViewerMediaIds(sheet);
+        if (!mediaIds.includes(frame.photo.mediaId)) return;
+        spaceCandidate.current = { source: "sheet", mediaId: frame.photo.mediaId, mediaIds, focus: target instanceof HTMLElement ? target : null, cancelled: false };
+      } else return;
+      event.preventDefault();
+    };
+    const keyUp = (event: globalThis.KeyboardEvent) => {
+      if (viewerActive) return;
+      if (event.code !== "Space") return;
+      const candidate = spaceCandidate.current;
+      spaceCandidate.current = null;
+      if (!candidate) return;
+      event.preventDefault();
+      if (!candidate.cancelled) openViewer(candidate.source, candidate.mediaId, candidate.mediaIds, candidate.focus);
+    };
+    const pointerDown = () => { if (spaceCandidate.current) spaceCandidate.current.cancelled = true; };
+    const blur = () => { spaceCandidate.current = null; };
+    window.addEventListener("keydown", keyDown, true);
+    window.addEventListener("keyup", keyUp, true);
+    window.addEventListener("pointerdown", pointerDown, true);
+    window.addEventListener("blur", blur);
+    return () => {
+      window.removeEventListener("keydown", keyDown, true);
+      window.removeEventListener("keyup", keyUp, true);
+      window.removeEventListener("pointerdown", pointerDown, true);
+      window.removeEventListener("blur", blur);
+    };
+  });
   const canOpenFrameInPhotoshop = selectedPhotoFrame !== null && photoshop.available && !photoshop.opening && !commandsBlocked;
   const openFrameInPhotoshop = () => {
     if (canOpenFrameInPhotoshop && selectedPhotoFrame) void photoshop.open({ kind: "frames", frameIds: [selectedPhotoFrame.id] });
@@ -561,15 +696,19 @@ export function ProjectWorkspace({
       const frame = projection.state.album.sheets.flatMap((sheet) => sheet.frames).find((frame) => frame.id === frameId);
       if (!frame?.photo) return;
       controller.canvasProps.onSelectFrame(frameId);
-      setFrameContextMenu({ kind: "photo", position });
+      const sheetId = projection.state.album.sheets.find((sheet) => sheet.frames.some((item) => item.id === frameId))?.id;
+      setFrameContextMenu({ kind: "photo", position, mediaId: frame.photo.mediaId, sheetId });
       return;
     }
     if (!projection.state.album.sheets.find((sheet) => sheet.id === canvasMode.sheetId)?.frames.some((frame) => frame.id === frameId)) return;
     if (!controller.canvasProps.selectedFrameIds.includes(frameId)) controller.canvasProps.onSelectFrame(frameId);
     if (!controller.canAddFrame || !controller.canArrangeFrames) {
       const frame = projection.state.album.sheets.flatMap((sheet) => sheet.frames).find((frame) => frame.id === frameId);
-      if (frame?.photo) setFrameContextMenu({ kind: "photo", position });
-    } else setFrameContextMenu({ kind: "frames", position });
+      if (frame?.photo) setFrameContextMenu({ kind: "photo", position, mediaId: frame.photo.mediaId, sheetId: canvasMode.sheetId });
+    } else {
+      const frame = projection.state.album.sheets.flatMap((sheet) => sheet.frames).find((frame) => frame.id === frameId);
+      setFrameContextMenu({ kind: "frames", position, mediaId: frame?.photo?.mediaId, sheetId: canvasMode.sheetId });
+    }
   };
   const openEmptyCanvasContextMenu = (sheetId: string, position: { x: number; y: number }) => {
     if (!controller.canAddFrame || commandsBlocked || canvasMode.kind !== "sheet-editing" || canvasMode.sheetId !== sheetId) return;
@@ -839,6 +978,7 @@ export function ProjectWorkspace({
         />}
 
         <MediaPanel
+          onViewPhoto={imageViewerWindowPort ? (mediaId, mediaIds, trigger) => openViewer("panel", mediaId, mediaIds, trigger) : undefined}
           photoshopAvailable={photoshop.available && !photoshop.opening && !commandsBlocked}
           onOpenInPhotoshop={(mediaId) => { if (!commandsBlocked) void photoshop.open({ kind: "panel", mediaIds: [mediaId] }); }}
           dropPort={mediaDropPort}
@@ -912,6 +1052,10 @@ export function ProjectWorkspace({
       {frameContextMenu?.kind === "frames" || frameContextMenu?.kind === "photo" ? <FrameContextMenu position={frameContextMenu.position}
         editing={frameContextMenu.kind === "frames"}
         hasPhoto={controller.selectedFrames.some((frame) => frame.photo !== null)}
+        onViewPhoto={imageViewerWindowPort && frameContextMenu.mediaId && frameContextMenu.sheetId ? () => {
+          const ids = sheetViewerMediaIds(projection.composition.sheets.find((sheet) => sheet.sheetId === frameContextMenu.sheetId) ?? null);
+          openViewer("sheet", frameContextMenu.mediaId!, ids, document.querySelector<HTMLElement>(".canvas-host canvas"));
+        } : undefined}
         canOpenInPhotoshop={canOpenFrameInPhotoshop}
         onOpenInPhotoshop={openFrameInPhotoshop}
         onSwapContents={() => { void controller.swapFrameContents(); }}
@@ -958,6 +1102,7 @@ export function ProjectWorkspace({
           onDismiss={() => setSheetContextMenu(null)}
         />
       ) : null}
+
 
     </div>
   );

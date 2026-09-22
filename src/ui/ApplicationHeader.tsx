@@ -6,7 +6,7 @@ import { useWindowControls } from "./WindowControlsContext";
 
 interface ApplicationHeaderProps {
   showBrand?: boolean;
-  controls?: "all" | "close" | "none";
+  controls?: "all" | "maximize-close" | "close" | "none";
   context?: string;
   metadata?: string;
   status?: string;
@@ -49,7 +49,7 @@ export function ApplicationHeader({
                 ·
               </span>
             ) : null}
-            <strong>{context}</strong>
+            <strong title={context}>{context}</strong>
           </>
         ) : null}
         {metadata ? <small>{metadata}</small> : null}
@@ -66,9 +66,9 @@ export function ApplicationHeader({
           className="ui-window-controls"
           role="group"
         >
-          {controls === "all" ? (
+          {controls === "all" || controls === "maximize-close" ? (
             <>
-              <button
+              {controls === "all" ? <button
                 aria-label="Minimizar janela"
                 className="ui-window-control ui-window-control--minimize"
                 onClick={() => runWindowAction(windowControls.minimize)}
@@ -76,7 +76,7 @@ export function ApplicationHeader({
                 type="button"
               >
                 <AppIcon icon={Minus} size={12} />
-              </button>
+              </button> : null}
               <button
                 aria-label="Maximizar ou restaurar janela"
                 className="ui-window-control ui-window-control--maximize"

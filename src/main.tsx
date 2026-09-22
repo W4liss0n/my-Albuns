@@ -22,6 +22,7 @@ import { tauriMediaDropPort } from "./platform/tauriMediaDropPort";
 import { tauriProjectDialogPort } from "./platform/tauriProjectDialogPort";
 import { tauriPhotoshopPort } from "./platform/tauriPhotoshopPort";
 import { tauriWindowControls } from "./platform/tauriWindowControls";
+import { tauriImageViewerWindow } from "./platform/tauriImageViewerWindow";
 import { WindowControlsProvider } from "./ui";
 
 installDesktopWebViewPolicy(document);
@@ -41,6 +42,7 @@ ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
         projectCorePort={tauriProjectCorePort}
         projectDialogPort={tauriProjectDialogPort}
         projectWindowPort={tauriProjectWindowPort}
+        imageViewerWindowPort={tauriImageViewerWindow}
         graphicsProbe={probeGraphics}
         canvasGraphicsDiagnosticProbe={probeCanvasGraphics}
         logger={tauriLogger}

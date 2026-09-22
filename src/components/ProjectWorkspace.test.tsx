@@ -143,7 +143,7 @@ function emitPanelIntersections(
 vi.mock("./AlbumCanvas", () => ({
   AlbumCanvas: (props: typeof canvasHarness.props) => {
     canvasHarness.props = props;
-    return <div data-testid="album-canvas" />;
+    return <div className="canvas-host" data-testid="album-canvas" tabIndex={0} />;
   },
 }));
 
@@ -673,6 +673,64 @@ beforeEach(() => {
     editingSheetId: null,
     viewport: { offsetX: 42 },
   });
+});
+
+test("viewer opens from a selected canvas photo on Space release, isolates editor shortcuts, then restores focus", async () => {
+  let closed!: (sessionId: string) => void;
+  const viewerPort = { open: vi.fn(async (_presentation: import("../application/imageViewerWindow").ViewerPresentation) => undefined), update: vi.fn(async () => undefined), close: vi.fn(async () => undefined),
+    onNavigate: vi.fn(async () => () => undefined), onClosed: vi.fn(async (callback: (sessionId: string) => void) => { closed = callback; return () => undefined; }) };
+  useEditorView.setState({ editingSheetId: "sheet-001", selectedFrameIds: ["frame-001"] });
+  const port = projectCorePortWithApply(async () => projection);
+  port.undo = vi.fn(async () => projection);
+  const demand = vi.fn();
+  render(<ProjectWorkspace projection={projection} projectCorePort={port} onProjectionChange={vi.fn()}
+    imageViewerWindowPort={viewerPort}
+    onMediaDemandChange={demand} mediaPreviews={{ "media-001": { mediaId: "media-001", state: "ready", url: "data:image/png;base64,AAAA" } }} />);
+  const canvas = screen.getByTestId("album-canvas");
+  canvas.focus();
+  fireEvent.keyDown(canvas, { code: "Space", key: " " });
+  expect(viewerPort.open).not.toHaveBeenCalled();
+  fireEvent.keyUp(canvas, { code: "Space", key: " " });
+  await waitFor(() => expect(viewerPort.open).toHaveBeenCalledWith(expect.objectContaining({ mediaId: "media-001" })));
+  expect(demand).toHaveBeenLastCalledWith(expect.objectContaining({ visibleMediaIds: expect.arrayContaining(["media-001"]) }));
+  expect(port.undo).not.toHaveBeenCalled();
+  expect(projection.state.revision).toBe(25);
+  act(() => closed(viewerPort.open.mock.calls[0][0].sessionId));
+  await waitFor(() => expect(document.activeElement).toBe(canvas));
+});
+
+test("Space with a canvas pointer gesture never opens the viewer, while its photo menu opens the clicked image", () => {
+  const viewerPort = { open: vi.fn(async () => undefined), update: vi.fn(async () => undefined), close: vi.fn(async () => undefined),
+    onNavigate: vi.fn(async () => () => undefined), onClosed: vi.fn(async () => () => undefined) };
+  useEditorView.setState({ editingSheetId: "sheet-001", selectedFrameIds: ["frame-001"] });
+  render(<ProjectWorkspace projection={projection} onProjectionChange={vi.fn()} imageViewerWindowPort={viewerPort} />);
+  const canvas = screen.getByTestId("album-canvas");
+  canvas.focus();
+  fireEvent.keyDown(canvas, { code: "Space", key: " " });
+  fireEvent.pointerDown(canvas, { button: 0, pointerId: 1 });
+  fireEvent.pointerUp(canvas, { button: 0, pointerId: 1 });
+  fireEvent.keyUp(canvas, { code: "Space", key: " " });
+  expect(viewerPort.open).not.toHaveBeenCalled();
+  act(() => canvasHarness.props?.onOpenFrameContextMenu?.("frame-001", { x: 100, y: 100 }));
+  fireEvent.click(screen.getByRole("menuitem", { name: "Visualizar imagem" }));
+  expect(viewerPort.open).toHaveBeenCalledWith(expect.objectContaining({ mediaId: "media-001" }));
+});
+
+test("Photos panel Space uses the focused photo and leaves text entry to its control", () => {
+  const viewerPort = { open: vi.fn(async () => undefined), update: vi.fn(async () => undefined), close: vi.fn(async () => undefined),
+    onNavigate: vi.fn(async () => () => undefined), onClosed: vi.fn(async () => () => undefined) };
+  render(<ProjectWorkspace projection={projection} onProjectionChange={vi.fn()} imageViewerWindowPort={viewerPort} />);
+  const search = screen.getByRole("searchbox");
+  search.focus();
+  fireEvent.keyDown(search, { code: "Space", key: " " });
+  fireEvent.keyUp(search, { code: "Space", key: " " });
+  expect(viewerPort.open).not.toHaveBeenCalled();
+  const photo = screen.getByRole("button", { name: /Campo.jpg/ });
+  fireEvent.click(photo);
+  photo.focus();
+  fireEvent.keyDown(photo, { code: "Space", key: " " });
+  fireEvent.keyUp(photo, { code: "Space", key: " " });
+  expect(viewerPort.open).toHaveBeenCalledWith(expect.objectContaining({ name: "Campo.jpg" }));
 });
 
 test("creates one placeholder from Edit and selects only the new Frame", async () => {

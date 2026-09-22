@@ -178,6 +178,7 @@ pub(crate) fn run(
         .manage(ExportAttempts::default())
         .manage(crate::project_ui_operations::ProjectUiOperations::default())
         .manage(crate::project_dialog_window::ProjectDialogPresentationStore::default())
+        .manage(crate::image_viewer_window::ViewerStore::default())
         .manage(crate::settings_preferences::SettingsStore::new(&app_paths))
         .manage(crate::photoshop::PhotoshopStateStore::new(&app_paths))
         .manage(layout_catalog)
@@ -305,6 +306,11 @@ pub(crate) fn run(
             crate::project_dialog_window::dismiss_project_dialog,
             crate::project_dialog_window::current_project_dialog_presentation,
             crate::project_dialog_window::submit_project_dialog_action,
+            crate::image_viewer_window::open_image_viewer,
+            crate::image_viewer_window::update_image_viewer,
+            crate::image_viewer_window::current_image_viewer,
+            crate::image_viewer_window::navigate_image_viewer,
+            crate::image_viewer_window::close_image_viewer,
             crate::media_preview_commands::prepare_media_previews,
             crate::media_preview_commands::read_media_files,
             crate::export_commands::normal::export_project,

@@ -708,6 +708,23 @@ pub(crate) async fn build_hidden_owned_window(
     owner: &WebviewWindow,
     config: HiddenOwnedWindowConfig<'_>,
 ) -> io::Result<WebviewWindow> {
+    build_hidden_owned_window_with_profile(app, owner, config, false).await
+}
+
+pub(crate) async fn build_hidden_owned_viewer_window(
+    app: &AppHandle,
+    owner: &WebviewWindow,
+    config: HiddenOwnedWindowConfig<'_>,
+) -> io::Result<WebviewWindow> {
+    build_hidden_owned_window_with_profile(app, owner, config, true).await
+}
+
+async fn build_hidden_owned_window_with_profile(
+    app: &AppHandle,
+    owner: &WebviewWindow,
+    config: HiddenOwnedWindowConfig<'_>,
+    resizable: bool,
+) -> io::Result<WebviewWindow> {
     let HiddenOwnedWindowConfig {
         label,
         url,
@@ -745,8 +762,8 @@ pub(crate) async fn build_hidden_owned_window(
     let mut builder = WebviewWindowBuilder::new(app, label, WebviewUrl::App(ready_url.into()))
         .title("MyAlbuns")
         .inner_size(width, height)
-        .resizable(false)
-        .maximizable(false)
+        .resizable(resizable)
+        .maximizable(resizable)
         .minimizable(false)
         .closable(false)
         .decorations(false)
@@ -758,6 +775,9 @@ pub(crate) async fn build_hidden_owned_window(
         .visible(false)
         .center()
         .prevent_overflow();
+    if resizable {
+        builder = builder.min_inner_size(480.0, 360.0);
+    }
     if let Some(arguments) = browser_arguments {
         builder = builder.additional_browser_args(arguments);
     }

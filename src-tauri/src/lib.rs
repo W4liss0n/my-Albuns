@@ -27,6 +27,7 @@ mod global_activation;
 mod global_runtime;
 mod graphics_launch_gate;
 mod image_processing;
+mod image_viewer_window;
 mod image_work_admission;
 mod imaging_processor;
 #[cfg(test)]

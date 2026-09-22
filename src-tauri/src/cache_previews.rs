@@ -31,6 +31,7 @@ const RECENT_PREVIEW_COUNT: usize = 512;
 pub(crate) struct CachePreviewRegistry {
     allowed_webview_label: Arc<str>,
     publication: Arc<Mutex<CachePreviewPublication>>,
+    viewer_access: Arc<Mutex<bool>>,
 }
 
 #[derive(Default)]
@@ -79,7 +80,24 @@ impl CachePreviewRegistry {
         Self {
             allowed_webview_label: allowed_webview_label.into(),
             publication: Arc::new(Mutex::new(CachePreviewPublication::default())),
+            viewer_access: Arc::new(Mutex::new(false)),
         }
+    }
+
+    pub(crate) fn set_viewer_access(&self, enabled: bool) {
+        *self
+            .viewer_access
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) = enabled;
+    }
+
+    pub(crate) fn is_published_url(&self, url: &str) -> bool {
+        self.publication
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .previews_by_token
+            .keys()
+            .any(|token| opaque_image_url(CACHE_MEDIA_PROTOCOL_SCHEME, token) == url)
     }
 
     pub(crate) fn publish(
@@ -389,8 +407,17 @@ impl CachePreviewRegistry {
         webview_label: &str,
         request: tauri::http::Request<Vec<u8>>,
     ) -> tauri::http::Response<Vec<u8>> {
+        let viewer_allowed = *self
+            .viewer_access
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let allowed_label = if viewer_allowed && webview_label == "image-viewer" {
+            "image-viewer"
+        } else {
+            self.allowed_webview_label.as_ref()
+        };
         serve_opaque_image(
-            self.allowed_webview_label.as_ref(),
+            allowed_label,
             webview_label,
             request,
             |token, include_body| {
@@ -523,6 +550,39 @@ mod tests {
         publication.access_sequence = count as u64;
         drop(publication);
         registry
+    }
+
+    #[test]
+    fn viewer_protocol_access_exists_only_during_the_owned_session() {
+        let registry = resident_registry(1, 4, 4);
+        let url = super::opaque_image_url(super::CACHE_MEDIA_PROTOCOL_SCHEME, "photo-000.jpg");
+        assert!(registry.is_published_url(&url));
+        assert!(!registry.is_published_url("myalbuns-cache://other.jpg"));
+        let request = || {
+            Request::builder()
+                .method(Method::GET)
+                .uri(&url)
+                .body(Vec::new())
+                .unwrap()
+        };
+        assert_eq!(
+            registry.serve("image-viewer", request()).status(),
+            StatusCode::NOT_FOUND
+        );
+        registry.set_viewer_access(true);
+        assert_eq!(
+            registry.serve("image-viewer", request()).status(),
+            StatusCode::OK
+        );
+        registry.set_viewer_access(false);
+        assert_eq!(
+            registry.serve("image-viewer", request()).status(),
+            StatusCode::NOT_FOUND
+        );
+        assert_eq!(
+            registry.serve("project", request()).status(),
+            StatusCode::OK
+        );
     }
 
     #[test]

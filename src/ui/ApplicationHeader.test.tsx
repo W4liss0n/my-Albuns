@@ -91,3 +91,13 @@ test("uses the same titlebar with only the controls supported by a dialog", () =
     document.querySelector("[data-tauri-drag-region]"),
   ).not.toBeNull();
 });
+
+test("viewer titlebar keeps maximize and close without an inaccessible minimize action", () => {
+  render(<WindowControlsProvider controls={windowActions}>
+    <ApplicationHeader showBrand={false} controls="maximize-close" context="Nome muito longo da imagem.jpg" />
+  </WindowControlsProvider>);
+  expect(screen.queryByRole("button", { name: "Minimizar janela" })).not.toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Maximizar ou restaurar janela" })).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Fechar janela" })).toBeInTheDocument();
+  expect(screen.getByTitle("Nome muito longo da imagem.jpg")).toBeInTheDocument();
+});
