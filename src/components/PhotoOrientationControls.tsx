@@ -25,7 +25,6 @@ export function PhotoOrientationControls({ frames, disabled, onAction, angle }: 
   const angleTenths = photos.every((photo) => photo.transform.fineRotationDegrees === first.fineRotationDegrees)
     ? Math.round(first.fineRotationDegrees * 10) : null;
   const rotate = projectCommandDescriptor("rotate-photo-counterclockwise");
-  const reset = projectCommandDescriptor("reset-photo-rotation");
   const mirror = projectCommandDescriptor("mirror-photo-horizontal");
   return (
     <div className="photo-orientation-controls">
@@ -37,21 +36,12 @@ export function PhotoOrientationControls({ frames, disabled, onAction, angle }: 
       <div className="photo-orientation-row">
         <div className="photo-orientation-label">
           <span>Giro</span>
-          <ActionButton
+          <output
             className="photo-rotation-readout"
-            density="compact"
-            variant="quiet"
-            aria-label={reset.label}
-            title="Dois cliques para restaurar o giro"
-            disabled={disabled || turns === 0}
-            onDoubleClick={() => onAction("resetRotation")}
-            onClick={(event) => {
-              // Native keyboard and assistive activation do not count pointer clicks.
-              if (event.detail === 0) onAction("resetRotation");
-            }}
+            aria-label="Giro das fotos"
           >
-            <output aria-label="Giro das fotos">{turns === null ? "—" : `${((4 - turns) % 4) * 90}°`}</output>
-          </ActionButton>
+            {turns === null ? "—" : `${((4 - turns) % 4) * 90}°`}
+          </output>
         </div>
         <div className="photo-orientation-actions">
           <ActionButton

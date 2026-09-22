@@ -85,12 +85,6 @@ const DEFINITIONS = [
     kind: "domain", contexts: ["frame", "frame-photo"], availability: "implemented", shortcuts: [],
   }),
   command({
-    id: "reset-photo-rotation",
-    label: "Restaurar giro",
-    description: "Retorna o giro das fotos selecionadas a 0°.",
-    kind: "domain", contexts: ["frame", "frame-photo"], availability: "implemented", shortcuts: [],
-  }),
-  command({
     id: "mirror-photo-horizontal",
     label: "Espelhar horizontalmente",
     description: "Alterna o espelhamento horizontal das fotos selecionadas.",

@@ -66,20 +66,15 @@ Os campos numéricos do quadro compartilham a mesma coluna: entrada de 64 px
 e espaço de 24 px para a unidade. Assim, porcentagens, graus e medidas físicas
 mantêm a mesma posição. Entre ajustes, o espaçamento é de 12 px.
 
-Na linha Giro, o valor atual aparece como texto junto ao rótulo. Dois cliques
-nesse valor restauram o giro; não há ícone de restauração, divisão interna ou
-contorno de botão. Um clique simples não altera a foto. O valor mantém nome
-acessível e foco neutro para ativação por Enter, Espaço ou tecnologia assistiva.
-A dica de dois cliques aparece apenas no tooltip. Restaurar continua
-indisponível quando todas as fotos já estão em zero, mantendo o valor legível
-e a geometria estável. Valores diferentes exibem “—”. À direita ficam somente
-Girar 90° e Espelhar, com o tooltip de espelhamento voltado para dentro do
-painel. O Ângulo segue independente do giro em passos de 90°.
+Na linha Giro, o valor atual é somente uma informação junto ao rótulo.
+Ele não recebe foco nem reage a cliques ou dois cliques. A ação de restaurar
+o giro foi retirada do painel e do catálogo de comandos da interface, sem
+botão, ícone, tooltip ou gesto alternativo. Para voltar à posição inicial,
+o usuário continua usando Girar 90° até completar a volta.
 
-Os eventos do valor usam o botão nativo e a interface de mouse do React 19.2.8,
-conforme a [documentação de eventos](https://react.dev/reference/react-dom/components/common#mouseevent-handler).
-A ativação por teclado usa o clique nativo sem contagem de cliques do ponteiro;
-o mouse restaura por `onDoubleClick`, preservando o intervalo do sistema.
+Valores diferentes exibem “—”. À direita ficam Girar 90° e Espelhar, com o
+tooltip de espelhamento voltado para dentro do painel. O Ângulo segue
+independente do giro em passos de 90°.
 
 O nome Borda começa na mesma coluna dos demais rótulos, com a amostra de cor
 ao lado. O slider ocupa toda a largura, sem recuo causado pela amostra. A
