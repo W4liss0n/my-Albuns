@@ -23,10 +23,17 @@ neutro de UI com ícone e texto em um botão compacto, alinhado à esquerda e co
 largura do conteúdo. O usuário rejeitou a primeira apresentação como uma linha
 com checkbox separado; o estado passa a fazer parte do próprio botão.
 
-O estado desligado usa superfície neutra e borda discreta. O estado ligado
-usa fundo azul suave, borda e texto na cor de seleção. Valores diferentes na
-seleção usam borda tracejada, sem simular que a propriedade está ligada em
-todas as fotos. Os ícones seguem o traço compartilhado do programa.
+O estado desligado usa superfície neutra e borda discreta. Após o usuário
+rejeitar o preenchimento azul, o estado ligado passa a parecer pressionado:
+fundo cinza quente, borda neutra, sombra interna suave e texto em grafite.
+O ícone ganha um pouco de peso, de 1,4 px para 1,8 px, sem mudar suas dimensões.
+A indicação permanece ao passar o mouse e ao receber foco por teclado.
+Hover e foco no botão desligado mantêm a superfície clara, para não simular
+ativação. O estado nunca muda a largura ou a posição dos controles.
+
+Valores diferentes na seleção usam borda tracejada e superfície clara, sem
+simular que a propriedade está ligada em todas as fotos. Os ícones vêm do
+componente compartilhado do programa.
 
 O componente reutiliza o botão compartilhado e os tokens de superfície,
 borda, tipografia e espaçamento do programa. O botão tem altura mínima de

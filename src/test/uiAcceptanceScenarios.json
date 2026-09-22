@@ -12355,7 +12355,7 @@
       "comparison": {
         "kind": "implementation-only",
         "surface": "frame-property-toggle",
-        "reason": "Design 0048 refinado: botão compacto de ícone e texto, estado ativo integrado à superfície e foco neutro independente da seleção."
+        "reason": "Design 0048 refinado: botão compacto de ícone e texto, estado ativo neutro com aparência pressionada e foco independente da seleção, sem realce azul."
       },
       "viewport": {
         "width": 1440,
