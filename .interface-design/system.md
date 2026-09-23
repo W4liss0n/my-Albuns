@@ -32,6 +32,9 @@ e a lâmina são o foco; os controles ajudam a trabalhar sem disputar atenção.
   desnecessários que aumentem diálogos ou desloquem itens. Usar o tooltip
   compartilhado para validação de campos e ajuda breve, com acesso por teclado.
   Informações essenciais e progresso necessário continuam disponíveis.
+  No visualizador, trocar para a correção de olhos mantém a foto carregada até
+  a nova área estar pronta; voltar ao modo normal também preserva essa
+  continuidade, sem uma piscada ou animação de desaparecimento.
 - **Escrever pouco e com clareza.** Preferir português simples e orientações
   úteis, seguindo o [guia de escrita aceito](../docs/design/0043-plano-de-simplificacao-dos-textos.md#guia-curto-de-escrita)
   e sua [pesquisa](../docs/research/2026-09-18-padroes-de-escrita-para-interfaces.md).

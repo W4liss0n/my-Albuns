@@ -16668,6 +16668,72 @@
           "selector": ".visual-design-popup .media-preview-card:focus-visible"
         }
       ]
+    },
+    {
+      "id": "image-viewer-correction-repeated-transitions",
+      "title": "Visualizador — entradas e saídas repetidas preservam a fotografia",
+      "implementationPath": "/image-viewer.html?preview=normal&qa=1&fixture=faces-multi",
+      "comparison": {
+        "implementationCaptureSelector": ".image-viewer-window",
+        "reason": "Design0050: a foto carregada permanece até o novo enquadramento estar pronto; captura final complementa a medição por quadro da transição, sem validar detecção/composição.",
+        "kind": "implementation-only",
+        "surface": "image-viewer"
+      },
+      "viewport": {
+        "height": 720,
+        "width": 1050
+      },
+      "readySelector": ".image-viewer__image[style*='opacity: 1']:not([style*='width: 0px']):not([style*='height: 0px'])",
+      "actions": [
+        {
+          "type": "click",
+          "selector": "button[aria-label='Abrir olhos']"
+        },
+        {
+          "type": "assert",
+          "selector": ".image-viewer__stage[data-handoff=\"ready\"]"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label='Fechar correção']"
+        },
+        {
+          "type": "assert",
+          "selector": ".image-viewer__stage:not([data-handoff]) .image-viewer__image[style*=\"opacity: 1\"]"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label='Abrir olhos']"
+        },
+        {
+          "type": "assert",
+          "selector": ".image-viewer__stage[data-handoff=\"ready\"]"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label='Fechar correção']"
+        },
+        {
+          "type": "assert",
+          "selector": ".image-viewer__stage:not([data-handoff]) .image-viewer__image[style*=\"opacity: 1\"]"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label='Abrir olhos']"
+        },
+        {
+          "type": "assert",
+          "selector": ".image-viewer__stage[data-handoff=\"ready\"]"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label='Fechar correção']"
+        },
+        {
+          "type": "assert",
+          "selector": ".image-viewer__stage:not([data-handoff]) .image-viewer__image[style*=\"opacity: 1\"]"
+        }
+      ]
     }
   ]
 }

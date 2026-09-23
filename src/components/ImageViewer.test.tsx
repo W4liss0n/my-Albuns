@@ -199,6 +199,77 @@ test("returning from correction measures the replacement stage and fits navigate
 });
 
 
+test("the displayed photo stays painted until correction geometry is ready, then closing restores it immediately", async () => {
+  const correction: NonNullable<ViewerPresentation["correction"]> = {
+    phase: "browse", referenceMediaId: "reference", referenceName: "Referência.jpg", referenceUrl: "data:image/png;id=slow-reference",
+    referenceState: "ready", canPreviousReference: false, canNextReference: false, resultUrl: null, error: null,
+  };
+  const width = vi.spyOn(Element.prototype, "clientWidth", "get").mockReturnValue(600);
+  const height = vi.spyOn(Element.prototype, "clientHeight", "get").mockReturnValue(500);
+  try {
+    const view = render(<ImageViewer presentation={initial} onNavigate={vi.fn()} onClose={vi.fn()} onCorrection={vi.fn()} />);
+    const displayed = view.container.querySelector<HTMLImageElement>(".image-viewer__image")!;
+    Object.defineProperties(displayed, { naturalWidth: { configurable: true, value: 1200 }, naturalHeight: { configurable: true, value: 800 } });
+    fireEvent.load(displayed);
+    expect(parseFloat(displayed.style.width)).toBeGreaterThan(0);
+
+    view.rerender(<ImageViewer presentation={{ ...initial, correction }} onNavigate={vi.fn()} onClose={vi.fn()} onCorrection={vi.fn()} />);
+    expect(displayed.isConnected).toBe(true);
+    expect(getComputedStyle(displayed.closest(".image-viewer__stage")!).visibility).toBe("visible");
+    expect(parseFloat(displayed.style.width)).toBeGreaterThan(0);
+
+    const target = view.container.querySelector<HTMLImageElement>(".eye-correction__pane:last-child .eye-correction__photo img")!;
+    expect(parseFloat(target.parentElement!.style.width)).toBe(0);
+    Object.defineProperties(target, { naturalWidth: { configurable: true, value: 1200 }, naturalHeight: { configurable: true, value: 800 } });
+    fireEvent.load(target);
+    await waitFor(() => expect(parseFloat(target.parentElement!.style.width)).toBeGreaterThan(0));
+    await waitFor(() => expect(getComputedStyle(displayed.closest(".image-viewer__stage")!).visibility).toBe("hidden"));
+    // A slow reference does not hold the viewer on the old photo.
+    expect(view.container.querySelector(".eye-correction__pane:first-child .eye-correction__photo img")).toBeInTheDocument();
+
+    view.rerender(<ImageViewer presentation={initial} onNavigate={vi.fn()} onClose={vi.fn()} onCorrection={vi.fn()} />);
+    expect(displayed.isConnected).toBe(true);
+    expect(getComputedStyle(displayed.closest(".image-viewer__stage")!).visibility).toBe("visible");
+    expect(parseFloat(displayed.style.width)).toBeGreaterThan(0);
+  } finally { width.mockRestore(); height.mockRestore(); }
+});
+
+test("a quick correction exit and a failed target load never strand or misidentify the normal photo", () => {
+  const correction: NonNullable<ViewerPresentation["correction"]> = {
+    phase: "browse", referenceMediaId: "reference", referenceName: "Referência.jpg", referenceUrl: "data:image/png;id=slow-reference",
+    referenceState: "ready", canPreviousReference: false, canNextReference: false, resultUrl: null, error: null,
+  };
+  const width = vi.spyOn(Element.prototype, "clientWidth", "get").mockReturnValue(600);
+  const height = vi.spyOn(Element.prototype, "clientHeight", "get").mockReturnValue(500);
+  try {
+    const view = render(<ImageViewer presentation={initial} onNavigate={vi.fn()} onClose={vi.fn()} onCorrection={vi.fn()} />);
+    const displayed = view.container.querySelector<HTMLImageElement>(".image-viewer__image")!;
+    Object.defineProperties(displayed, { naturalWidth: { configurable: true, value: 1200 }, naturalHeight: { configurable: true, value: 800 } });
+    fireEvent.load(displayed);
+    const correcting = { ...initial, correction };
+    view.rerender(<ImageViewer presentation={correcting} onNavigate={vi.fn()} onClose={vi.fn()} onCorrection={vi.fn()} />);
+    expect(getComputedStyle(displayed.closest(".image-viewer__stage")!).visibility).toBe("visible");
+    view.rerender(<ImageViewer presentation={initial} onNavigate={vi.fn()} onClose={vi.fn()} onCorrection={vi.fn()} />);
+    expect(displayed.isConnected).toBe(true);
+    expect(getComputedStyle(displayed.closest(".image-viewer__stage")!).visibility).toBe("visible");
+
+    view.rerender(<ImageViewer presentation={correcting} onNavigate={vi.fn()} onClose={vi.fn()} onCorrection={vi.fn()} />);
+    const target = view.container.querySelector<HTMLImageElement>(".eye-correction__pane:last-child .eye-correction__photo img")!;
+    fireEvent.error(target);
+    expect(getComputedStyle(displayed.closest(".image-viewer__stage")!).visibility).toBe("hidden");
+
+    const anotherSession = { ...initial, sessionId: "new-session", correction };
+    view.rerender(<ImageViewer presentation={anotherSession} onNavigate={vi.fn()} onClose={vi.fn()} onCorrection={vi.fn()} />);
+    expect(displayed.isConnected).toBe(false);
+    expect(getComputedStyle(view.container.querySelector(".image-viewer__stage")!).visibility).toBe("hidden");
+
+    const different = { ...initial, sessionId: "new-session", mediaId: "b", name: "Imagem b", url: "data:image/png;id=b", correction };
+    view.rerender(<ImageViewer presentation={different} onNavigate={vi.fn()} onClose={vi.fn()} onCorrection={vi.fn()} />);
+    expect(view.container.querySelector<HTMLImageElement>(".image-viewer__image")).toHaveAttribute("src", different.url);
+    expect(getComputedStyle(view.container.querySelector(".image-viewer__stage")!).visibility).toBe("hidden");
+  } finally { width.mockRestore(); height.mockRestore(); }
+});
+
 test("an applying correction cannot be cancelled or navigated before commit settles", () => {
   const onCorrection = vi.fn();
   const onNavigate = vi.fn();

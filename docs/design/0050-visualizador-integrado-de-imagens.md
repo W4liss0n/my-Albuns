@@ -62,6 +62,21 @@ miniatura. O foco de teclado usa a borda já existente do cartão compartilhado,
 com tom neutro distinguível da seleção, sem mudar dimensões. Tab continua
 indicando qual cartão recebe o teclado; fechar o visualizador restaura o foco.
 
+### Continuidade ao trocar de modo
+
+Ao entrar na correção de olhos, a foto já exibida permanece visível até que a
+imagem de destino esteja carregada e tenha seu tamanho calculado. A troca não
+passa por uma área vazia nem usa uma animação de desaparecimento para disfarçar
+o carregamento. A referência pode carregar independentemente; sua demora ou
+falha não bloqueia o fechamento da correção. A detecção de rostos também não
+atrasa a apresentação das fotos.
+
+Ao sair, o visualizador reaproveita a foto já carregada, sem apagá-la e carregá-la
+de novo. A retenção vale somente para a mesma foto e sessão: navegar ou salvar
+uma nova versão não pode reapresentar conteúdo antigo como se fosse o atual.
+Somente o modo ativo recebe foco e ações; a confirmação de salvamento continua
+sendo exclusiva quando aberta.
+
 ## Aceitação
 
 Verificar entradas do Painel e da Lâmina, ordenação e filtro, mídia clicada fora da âncora, deduplicação, Espaço com arraste, bloqueio das ações do Projeto, navegação nas extremidades, zoom/ajuste, restauração de foco, carregamento tardio, ausência, nome longo e janela estreita. A prova nativa deve cobrir abertura, URL do cache na janela filha, navegação, Esc/fechar, reabilitação do owner e reabertura, inclusive falha de abertura. Para correção, verificar preparação automática, cancelamento com processamento pendente, erro sem repetição automática, retorno à imagem e navegação ao fechar o modo, confirmação de substituição e cancelamento do diálogo sem alterar o arquivo. Em cópias de teste, conferir formato, orientação, conteúdo e atualização das prévias após substituir o original, além da preservação do arquivo em falhas.

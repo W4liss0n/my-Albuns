@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Check, ChevronLeft, ChevronRight, Columns2, EyeOff, RefreshCcw, Save, Scan } from "lucide-react";
 import type { ViewerCorrectionAction, ViewerPresentation } from "../application/imageViewerWindow";
 import { detectFaces, faceBounds, type Face } from "../image-viewer/faceLandmarks";
@@ -10,6 +10,7 @@ interface Props {
   presentation: ViewerPresentation;
   onNavigate(offset: -1 | 1): void;
   onCorrection(action: ViewerCorrectionAction): void;
+  onTargetSettled?(): void;
 }
 
 type Side = "reference" | "target";
@@ -45,12 +46,13 @@ function analysisIssue(state: AnalysisState, photo: "foto de destino" | "referê
   return null;
 }
 
-function FaceImage({ side, url, displayUrl, name, notice, choosing, interactive, selected, onChoose, onStatus, navigation }: {
+function FaceImage({ side, url, displayUrl, name, notice, choosing, interactive, selected, onChoose, onStatus, onVisualSettled, navigation }: {
   side: Side; url: string | null; name: string; choosing: boolean;
   displayUrl?: string | null; interactive?: boolean;
   notice?: string | null;
   selected: number | null; onChoose(index: number, faces: Face[]): void;
   onStatus(state: AnalysisState): void;
+  onVisualSettled?(): void;
   navigation?: { previous: boolean; next: boolean; onNavigate(offset: -1 | 1): void };
 }) {
   const image = useRef<HTMLImageElement>(null);
@@ -67,7 +69,7 @@ function FaceImage({ side, url, displayUrl, name, notice, choosing, interactive,
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const drag = useRef<{ x: number; y: number; panX: number; panY: number; id: number; moved: boolean; captured: boolean; faceButton: HTMLButtonElement | null } | null>(null);
   const suppressFaceClick = useRef<HTMLButtonElement | null>(null);
-  useEffect(() => {
+  useLayoutEffect(() => {
     const element = pane.current;
     if (!element) return;
     const resize = () => setSize({ width: element.clientWidth, height: element.clientHeight });
@@ -102,6 +104,10 @@ function FaceImage({ side, url, displayUrl, name, notice, choosing, interactive,
     ? Math.min(Math.max(0, size.width - 48) / natural.width, Math.max(0, size.height - 48) / natural.height) : 0;
   const imageWidth = natural.width * scale;
   const imageHeight = natural.height * scale;
+  useLayoutEffect(() => {
+    if (!onVisualSettled) return;
+    if (!url || (size.width > 0 && size.height > 0 && imageWidth > 0 && imageHeight > 0 && image.current?.naturalWidth)) onVisualSettled();
+  }, [onVisualSettled, url, size.width, size.height, imageWidth, imageHeight]);
   const zoomedWidth = imageWidth * zoom;
   const zoomedHeight = imageHeight * zoom;
   const bound = (next: { x: number; y: number }, value: number) => ({
@@ -163,7 +169,7 @@ function FaceImage({ side, url, displayUrl, name, notice, choosing, interactive,
           setAnalysis(found.length ? "ready" : "no-face");
         }).catch(() => { if (generation.current === request) setAnalysis("failed"); });
       }
-    }} />
+    }} onError={() => { setAnalysis("failed"); onVisualSettled?.(); }} />
     {displayUrl && <img alt={name} src={displayUrl} draggable={false} style={{ position: "absolute", inset: 0, zIndex: 1 }} />}
     {choosing && faces.length > 0 && imageWidth > 0 && imageHeight > 0 &&
       <div className="eye-correction__face-layer">
@@ -193,7 +199,7 @@ function FaceImage({ side, url, displayUrl, name, notice, choosing, interactive,
   </div>;
 }
 
-export function EyeCorrectionView({ presentation, onNavigate, onCorrection }: Props) {
+export function EyeCorrectionView({ presentation, onNavigate, onCorrection, onTargetSettled }: Props) {
   const correction = presentation.correction!;
   const [targetIndex, setTargetIndex] = useState<number | null>(null);
   const [referenceIndex, setReferenceIndex] = useState<number | null>(null);
@@ -264,7 +270,7 @@ export function EyeCorrectionView({ presentation, onNavigate, onCorrection }: Pr
       <div className="eye-correction__pane">
         <FaceImage key={targetIdentity} side="target" url={presentation.url} displayUrl={currentResult && !showOriginal ? correction.resultUrl : null}
           name={presentation.name} notice={correction.error ?? targetIssue} choosing={targetChoosing} interactive={!busy} selected={targetIndex}
-          onChoose={(index, faces) => { setTargetIndex(index); setTargetFaces(faces); setSelectionRevision((value) => value + 1); }} onStatus={setTargetAnalysis} />
+          onChoose={(index, faces) => { setTargetIndex(index); setTargetFaces(faces); setSelectionRevision((value) => value + 1); }} onStatus={setTargetAnalysis} onVisualSettled={onTargetSettled} />
       </div>
     </div>
   </div>;
