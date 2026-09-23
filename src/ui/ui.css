@@ -443,6 +443,18 @@ kbd {
   background: var(--ui-surface-raised);
 }
 
+.ui-action-button--neutral {
+  border-color: var(--ui-border-strong);
+  color: var(--ui-text);
+  background: var(--ui-surface-muted);
+}
+
+.ui-action-button--neutral:hover:not(:disabled),
+.ui-action-button--neutral:focus-visible:not(:disabled) {
+  border-color: var(--ui-text-secondary);
+  background: var(--ui-canvas);
+}
+
 .ui-action-button--secondary:hover:not(:disabled),
 .ui-action-button--secondary:focus-visible:not(:disabled),
 .ui-action-button--quiet:hover:not(:disabled),

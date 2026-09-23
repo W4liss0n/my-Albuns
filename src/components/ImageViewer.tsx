@@ -1,8 +1,8 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { ChevronLeft, ChevronRight, Scan } from "lucide-react";
+import { ChevronLeft, ChevronRight, Eye, Scan } from "lucide-react";
 import type { ViewerCorrectionAction, ViewerPresentation } from "../application/imageViewerWindow";
 import { EyeCorrectionView } from "./EyeCorrectionView";
-import { AppIcon } from "../ui/AppIcon";
+import { ImageToolButton } from "../ui/ImageToolButton";
 import "./ImageViewer.css";
 
 interface Props {
@@ -114,10 +114,10 @@ export function ImageViewer({ presentation, onNavigate, onClose, onCorrection }:
           onError={() => { setFailedKey(imageKey); setLoaded(null); }} />}
         {!ready && <p aria-live="polite" className="image-viewer__message" role="status">{message}</p>}
         {ready && state !== "ready" && <p className="image-viewer__stale" role="status">Prévia anterior · imagem indisponível</p>}
-        <button aria-label="Imagem anterior" className="image-viewer__nav image-viewer__nav--previous" disabled={!canPrevious} onClick={() => onNavigate(-1)} title="Imagem anterior (←)" type="button"><AppIcon icon={ChevronLeft} size={18} /></button>
-        <button aria-label="Próxima imagem" className="image-viewer__nav image-viewer__nav--next" disabled={!canNext} onClick={() => onNavigate(1)} title="Próxima imagem (→)" type="button"><AppIcon icon={ChevronRight} size={18} /></button>
-        {ready && state === "ready" && onCorrection && <button className="image-viewer__eye-action" type="button" onClick={() => onCorrection({ sessionId: presentation.sessionId, kind: "start" })}>Abrir olhos</button>}
-        {zoom > 1 && <button aria-label="Ajustar à janela" className="image-viewer__fit" onClick={() => { setZoom(1); setPan({ x: 0, y: 0 }); }} title="Ajustar à janela (0)" type="button"><AppIcon icon={Scan} size={16} /></button>}
+        <ImageToolButton label="Imagem anterior" icon={ChevronLeft} className="image-viewer__nav--previous" disabled={!canPrevious} onClick={() => onNavigate(-1)} />
+        <ImageToolButton label="Próxima imagem" icon={ChevronRight} className="image-viewer__nav--next" disabled={!canNext} onClick={() => onNavigate(1)} />
+        {ready && state === "ready" && onCorrection && <ImageToolButton label="Abrir olhos" icon={Eye} className="image-viewer__eye-action" onClick={() => onCorrection({ sessionId: presentation.sessionId, kind: "start" })} />}
+        {zoom > 1 && <ImageToolButton label="Ajustar à janela" icon={Scan} className="image-viewer__fit" onClick={() => { setZoom(1); setPan({ x: 0, y: 0 }); }} />}
       </div>
   </section>;
 }

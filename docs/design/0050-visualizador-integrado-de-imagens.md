@@ -22,6 +22,12 @@ Carregamento, ausência e erro usam a área reservada para a imagem. Uma prévia
 
 A política vigente do Cache limita a prévia a **1.600 pixels no maior lado**. Ampliar a janela aumenta a exibição dessa prévia; não promete pixels do Original. A origem e as dimensões do arquivo continuam administradas pelo Host e pelo Core.
 
+## Correção de olhos no visualizador
+
+A comparação ocupa duas metades com áreas de imagem de mesma altura útil. As decisões **Usar esta foto** e **Trocar referência** ficam em uma faixa estável abaixo da foto esquerda; a faixa correspondente à direita conserva o alinhamento das imagens. No rodapé, **Cancelar** é discreto e **Ver correção** ou **Aplicar** ocupam a mesma posição de confirmação, com grafite e neutros quentes. Erros e progresso cabem em uma linha reservada; a prévia dispensa instrução repetida.
+
+As setas, **Ajustar à janela** e **Abrir olhos** compartilham a ferramenta de imagem: alvo de 42 px, glifo discreto separado visualmente da fotografia, sem disco de fundo, tooltip no hover ou foco, nome acessível e foco visível. Não há tooltip nativo em paralelo. Os marcadores de rosto têm alvo confortável e indicação pequena, deslocada do centro do rosto, limitada à área visível, com seleção anunciada por `aria-pressed`. Aplicar, cancelar e navegar permanecem bloqueados durante a aplicação.
+
 ## Aceitação
 
 Verificar entradas do Painel e da Lâmina, ordenação e filtro, mídia clicada fora da âncora, deduplicação, Espaço com arraste, bloqueio das ações do Projeto, navegação nas extremidades, zoom/ajuste, restauração de foco, carregamento tardio, ausência, nome longo e janela estreita. A prova nativa deve cobrir abertura, URL do cache na janela filha, navegação, Esc/fechar, reabilitação do owner e reabertura, inclusive falha de abertura.

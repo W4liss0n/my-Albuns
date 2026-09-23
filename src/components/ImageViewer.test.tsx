@@ -3,6 +3,9 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { expect, test, vi } from "vitest";
 import { ImageViewer } from "./ImageViewer";
 import type { ViewerPresentation } from "../application/imageViewerWindow";
+import { detectFaces } from "../image-viewer/faceLandmarks";
+
+vi.mock("../image-viewer/faceLandmarks", async (original) => ({ ...(await original()), detectFaces: vi.fn() }));
 
 const initial: ViewerPresentation = { sessionId: "s", revision: 1, mediaId: "a", name: "Imagem a", url: "data:image/png;id=a", state: "ready", canPrevious: false, canNext: true };
 function Harness() {
@@ -75,7 +78,7 @@ test("eye correction opens from a ready viewer and keeps the target fixed beside
   expect(screen.getByRole("img", { name: "Outra foto.jpg" })).toBeInTheDocument();
   fireEvent.click(screen.getByRole("button", { name: "Próxima referência" }));
   expect(onNavigate).toHaveBeenCalledWith(1);
-  fireEvent.click(screen.getByRole("button", { name: "Usar como referência" }));
+  fireEvent.click(screen.getByRole("button", { name: "Usar esta foto" }));
   expect(onCorrection).toHaveBeenCalledWith({ sessionId: "s", kind: "select" });
 });
 
@@ -89,7 +92,7 @@ test("a correction preview offers apply and a way back to browsing", () => {
   } };
   render(<ImageViewer presentation={presentation} onNavigate={vi.fn()} onClose={vi.fn()} onCorrection={onCorrection} />);
   expect(screen.getByRole("img", { name: "Imagem a" })).toHaveAttribute("src", "data:image/png;id=corrected");
-  fireEvent.click(screen.getByRole("button", { name: "Outra referência" }));
+  fireEvent.click(screen.getByRole("button", { name: "Trocar referência" }));
   expect(onCorrection).toHaveBeenCalledWith({ sessionId: "s", kind: "browse" });
   fireEvent.click(screen.getByRole("button", { name: "Aplicar" }));
   expect(onCorrection).toHaveBeenCalledWith({ sessionId: "s", kind: "apply" });
@@ -108,11 +111,55 @@ test("an applying correction cannot be cancelled or navigated before commit sett
   } };
   render(<ImageViewer presentation={presentation} onNavigate={onNavigate} onClose={onClose} onCorrection={onCorrection} />);
   expect(screen.getByRole("button", { name: "Cancelar" })).toBeDisabled();
-  expect(screen.queryByRole("button", { name: "Outra referência" })).not.toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Trocar referência" })).not.toBeInTheDocument();
   expect(screen.queryByRole("button", { name: "Aplicar" })).not.toBeInTheDocument();
   fireEvent.keyDown(window, { key: "Escape" });
   fireEvent.keyDown(window, { key: "ArrowRight" });
   expect(onCorrection).not.toHaveBeenCalled();
   expect(onNavigate).not.toHaveBeenCalled();
   expect(onClose).not.toHaveBeenCalled();
+});
+
+test("image tools show one accessible tooltip on hover and focus, then close", () => {
+  render(<ImageViewer presentation={initial} onNavigate={vi.fn()} onClose={vi.fn()} onCorrection={vi.fn()} />);
+  const image = screen.getByRole("img", { name: "Imagem a" });
+  Object.defineProperties(image, { naturalWidth: { configurable: true, value: 1200 }, naturalHeight: { configurable: true, value: 800 } });
+  fireEvent.load(image);
+  const tool = screen.getByRole("button", { name: "Abrir olhos" });
+  expect(tool).not.toHaveAttribute("title");
+  fireEvent.pointerEnter(tool);
+  expect(screen.getByRole("tooltip")).toHaveTextContent("Abrir olhos");
+  fireEvent.pointerLeave(tool);
+  expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+  fireEvent.focus(tool);
+  expect(screen.getByRole("tooltip")).toBeInTheDocument();
+  fireEvent.blur(tool);
+  expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+});
+
+test("face markers expose selection and unlock preview only after both faces are chosen", async () => {
+  const face = Array.from({ length: 264 }, () => ({ x: .5, y: .5, z: 0 }));
+  vi.mocked(detectFaces).mockResolvedValue([face]);
+  const onCorrection = vi.fn();
+  const presentation: ViewerPresentation = { ...initial, correction: {
+    phase: "select", referenceMediaId: "reference", referenceName: "Referência.jpg", referenceUrl: "data:image/png;id=reference",
+    referenceState: "ready", canPreviousReference: false, canNextReference: false, resultUrl: null, error: null,
+  } };
+  render(<ImageViewer presentation={presentation} onNavigate={vi.fn()} onClose={vi.fn()} onCorrection={onCorrection} />);
+  for (const image of screen.getAllByRole("img")) {
+    Object.defineProperties(image, { naturalWidth: { configurable: true, value: 800 }, naturalHeight: { configurable: true, value: 1200 } });
+    fireEvent.load(image);
+  }
+  const target = await screen.findByRole("button", { name: "Imagem a corrigir: rosto 1" });
+  const reference = screen.getByRole("button", { name: "Referência: rosto 1" });
+  const preview = screen.getByRole("button", { name: "Ver correção" });
+  expect(preview).toBeDisabled();
+  fireEvent.click(target);
+  expect(target).toHaveAttribute("aria-pressed", "true");
+  expect(preview).toBeDisabled();
+  fireEvent.click(reference);
+  expect(reference).toHaveAttribute("aria-pressed", "true");
+  expect(preview).toBeEnabled();
+  fireEvent.click(preview);
+  expect(onCorrection).toHaveBeenCalledWith(expect.objectContaining({ kind: "preview", targetFace: face, referenceFace: face }));
 });

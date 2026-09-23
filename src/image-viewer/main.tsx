@@ -20,8 +20,8 @@ const qaReference = "/.scratch/eye-correction/qa/nikki-open-a.jpg";
 const previewCorrection = (phase: string) => ({
   phase, referenceMediaId: "reference", referenceName: "Referência.jpg",
   referenceUrl: qa ? qaReference : sizedPreview(portraitPreview, 800, 1200),
-  referenceState: "ready" as const, canPreviousReference: false, canNextReference: false,
-  resultUrl: phase === "preview" ? sizedPreview(landscapePreview, 1200, 800) : null, error: null,
+  referenceState: "ready" as const, canPreviousReference: false, canNextReference: phase === "browse",
+  resultUrl: phase === "preview" || phase === "applying" ? qa ? "/.scratch/eye-correction/qa/nikki-corrected.png" : sizedPreview(landscapePreview, 1200, 800) : null, error: null,
 });
 if (!preview) installDesktopWebViewPolicy(document);
 const sizedPreview = (svg: string, width: number, height: number) =>
@@ -67,6 +67,7 @@ function ViewerWindow() {
             : action.kind === "browse" ? previewCorrection("browse")
             : action.kind === "select" ? previewCorrection("select")
             : action.kind === "preview" ? previewCorrection("preview")
+            : action.kind === "apply" ? previewCorrection("applying")
             : current.correction } : current);
           return;
         }

@@ -15741,7 +15741,7 @@
     {
       "id": "image-viewer-correction-browse",
       "title": "Correção de olhos — busca de referência",
-      "implementationPath": "/image-viewer.html?preview=correction-browse",
+      "implementationPath": "/image-viewer.html?preview=correction-browse&qa=1&fixture=faces",
       "comparison": {
         "implementationCaptureSelector": ".image-viewer-window",
         "reason": "Design 0050: painéis divididos e controles discretos da correção de olhos",
@@ -15754,6 +15754,93 @@
       },
       "readySelector": ".eye-correction__panes",
       "actions": []
+    },
+    {
+      "id": "image-viewer-correction-select-faces",
+      "title": "Correção de olhos — rostos selecionáveis (fixture visual determinística)",
+      "implementationPath": "/image-viewer.html?preview=correction-select&qa=1&fixture=faces",
+      "comparison": {
+        "implementationCaptureSelector": ".image-viewer-window",
+        "reason": "Design 0050: marcadores discretos ancorados aos rostos; fixture visual sem validar detecção",
+        "kind": "implementation-only",
+        "surface": "image-viewer"
+      },
+      "viewport": { "height": 720, "width": 1050 },
+      "readySelector": ".eye-correction__face[aria-pressed='true']",
+      "actions": [
+        { "type": "click", "selector": "button[aria-label='Referência: rosto 1']" },
+        { "type": "click", "selector": "button[aria-label='Imagem a corrigir: rosto 1']" }
+      ]
+    },
+    {
+      "id": "image-viewer-correction-preview",
+      "title": "Correção de olhos — prévia e Aplicar",
+      "implementationPath": "/image-viewer.html?preview=correction-preview&qa=1",
+      "comparison": {
+        "implementationCaptureSelector": ".image-viewer-window",
+        "reason": "Design 0050: prévia na foto de destino, ação neutra e alinhamento estável",
+        "kind": "implementation-only",
+        "surface": "image-viewer"
+      },
+      "viewport": { "height": 720, "width": 1050 },
+      "readySelector": "button.ui-action-button--neutral",
+      "actions": []
+    },
+    {
+      "id": "image-viewer-correction-applying",
+      "title": "Correção de olhos — aplicação em andamento",
+      "implementationPath": "/image-viewer.html?preview=correction-applying&qa=1",
+      "comparison": {
+        "implementationCaptureSelector": ".image-viewer-window",
+        "reason": "Design 0050: progresso sem deslocamento e Cancelar bloqueado",
+        "kind": "implementation-only",
+        "surface": "image-viewer"
+      },
+      "viewport": { "height": 720, "width": 1050 },
+      "readySelector": "button[disabled].ui-action-button--quiet",
+      "actions": []
+    },
+    {
+      "id": "image-viewer-correction-narrow",
+      "title": "Correção de olhos — duas fotos na janela estreita",
+      "implementationPath": "/image-viewer.html?preview=correction-preview&qa=1",
+      "comparison": {
+        "implementationCaptureSelector": ".image-viewer-window",
+        "reason": "Design 0050: painéis alinhados na largura mínima da janela",
+        "kind": "implementation-only",
+        "surface": "image-viewer"
+      },
+      "viewport": { "height": 480, "width": 600 },
+      "readySelector": ".eye-correction__panes",
+      "actions": []
+    },
+    {
+      "id": "image-viewer-tool-tooltip",
+      "title": "Visualizador — dica da ferramenta em foco",
+      "implementationPath": "/image-viewer.html?preview=normal",
+      "comparison": {
+        "implementationCaptureSelector": ".image-viewer-window",
+        "reason": "Design 0050: tooltip no foco e ferramenta integrada à fotografia",
+        "kind": "implementation-only",
+        "surface": "image-viewer"
+      },
+      "viewport": { "height": 720, "width": 1050 },
+      "readySelector": ".ui-image-tool__tooltip",
+      "actions": [ { "type": "focus", "selector": "button[aria-label='Abrir olhos']" } ]
+    },
+    {
+      "id": "image-viewer-reference-tooltip",
+      "title": "Correção de olhos — dica da seta ao passar o ponteiro",
+      "implementationPath": "/image-viewer.html?preview=correction-browse&qa=1&fixture=faces",
+      "comparison": {
+        "implementationCaptureSelector": ".image-viewer-window",
+        "reason": "Design 0050: seta compartilhada e tooltip no hover",
+        "kind": "implementation-only",
+        "surface": "image-viewer"
+      },
+      "viewport": { "height": 720, "width": 1050 },
+      "readySelector": ".ui-image-tool__tooltip",
+      "actions": [ { "type": "hover", "selector": "button[aria-label='Próxima referência']" } ]
     },
     {
       "id": "image-viewer-correction-no-face",

@@ -3,6 +3,7 @@ import { forwardRef, type ButtonHTMLAttributes } from "react";
 type ActionButtonVariant =
   | "primary"
   | "secondary"
+  | "neutral"
   | "quiet";
 
 interface ActionButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
