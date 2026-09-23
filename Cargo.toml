@@ -34,6 +34,14 @@ opt-level = 3
 [profile.dev.package.sha2]
 opt-level = 3
 
+# Keep the desktop's eye-correction pixel work responsive without optimizing the whole app at level 3.
+[profile.dev.package.myalbuns-desktop]
+opt-level = 1
+
+# image 0.25 encodes the prepared full-resolution PNG through png 0.18.
+[profile.dev.package."png:0.18.1"]
+opt-level = 3
+
 [workspace.package]
 version = "0.1.0"
 edition = "2024"

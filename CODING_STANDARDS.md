@@ -38,6 +38,16 @@ accepted ADRs, `docs/design/`, and the current visual-reference pointer in
   original file was preserved, replaced, restored, or could not be restored.
   Do not concatenate raw diagnostic errors into user-facing messages.
 
+## Performance evidence
+
+- Reproduce latency with the build profile used by the person reporting it.
+  A fast `release` benchmark does not establish responsive `dev` behavior.
+  For generic pixel operations, verify the profile of the crate instantiating
+  them, not just that of the image dependency.
+- Compare the same inputs and measured boundary before and after a change.
+  Keep compilation outside timed runs and verify output fidelity separately.
+  Do not present a processing-only measurement as end-to-end window latency.
+
 ## Review evidence
 
 - A static CSS or source-string check proves structure, not rendered appearance.

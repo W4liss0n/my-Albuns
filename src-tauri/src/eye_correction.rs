@@ -215,13 +215,14 @@ pub(crate) fn render(target_path: &Path, reference_path: &Path, target_face: &Fa
     let src = [eye(reference_face, reference_size, (33,133), (159,145))?, eye(reference_face, reference_size, (362,263), (386,374))?];
     validate_pair(&dst, &src)?;
     for (dst, src) in dst.iter().zip(src.iter()) { transplant_eye(&mut target, &reference, dst, src)?; }
+    let target = DynamicImage::ImageRgba8(target);
     let preview_scale = (1600.0 / target.width().max(target.height()) as f32).min(1.0);
     let preview_width = ((target.width() as f32 * preview_scale).round() as u32).max(1);
     let preview_height = ((target.height() as f32 * preview_scale).round() as u32).max(1);
     let temporary = output.with_extension("tmp");
     let preview_bytes = std::thread::scope(|scope| {
         let preview = scope.spawn(|| -> Result<Vec<u8>, String> {
-            let preview = DynamicImage::ImageRgba8(image::imageops::resize(&target, preview_width, preview_height, FilterType::Lanczos3));
+            let preview = target.resize_exact(preview_width, preview_height, FilterType::Lanczos3);
             let mut bytes = Cursor::new(Vec::new());
             preview.write_to(&mut bytes, ImageFormat::Png).map_err(|_| "Não foi possível preparar a prévia.")?;
             Ok(bytes.into_inner())
@@ -497,6 +498,29 @@ mod validation_tests {
 #[cfg(test)]
 mod qa_tests {
     use super::*;
+
+    #[test]
+    #[ignore = "requires the ignored 24 MP real-photo QA fixtures"]
+    fn profiles_real_pair_in_desktop_crate() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../.scratch/face-detection-debug-20260923");
+        let results: serde_json::Value = serde_json::from_slice(&std::fs::read(root.join("render-pair-results.json")).unwrap()).unwrap();
+        let target: Face = serde_json::from_value(results[0]["faces"][0].clone()).unwrap();
+        let reference: Face = serde_json::from_value(results[1]["faces"][0].clone()).unwrap();
+        let target_path = root.join("inputs/failing.jpg");
+        let reference_path = root.join("inputs/reference.jpg");
+        let start = std::time::Instant::now();
+        let target_digest = source_digest(&target_path).unwrap();
+        let reference_digest = source_digest(&reference_path).unwrap();
+        let preview = render(&target_path, &reference_path, &target, &reference, &root.join("corrected-desktop-profile.png")).unwrap();
+        assert_eq!(source_digest(&target_path).unwrap(), target_digest);
+        assert_eq!(source_digest(&reference_path).unwrap(), reference_digest);
+        let elapsed = start.elapsed().as_millis();
+        println!("desktop_prepare_with_digests_ms={elapsed} preview_bytes={}", preview.len());
+        if let Ok(budget) = std::env::var("EYE_PREPARE_BUDGET_MS") {
+            let budget: u128 = budget.parse().unwrap();
+            assert!(elapsed < budget, "24 MP desktop preparation exceeded local {budget} ms budget");
+        }
+    }
 
     #[test]
     #[ignore = "requires the ignored real-photo QA fixtures"]
