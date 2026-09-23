@@ -2,4 +2,4 @@
 import type { ViewerCorrectionActionKind } from "./ViewerCorrectionActionKind";
 import type { ViewerFace } from "./ViewerFace";
 
-export type ViewerCorrectionAction = { sessionId: string, kind: ViewerCorrectionActionKind, referenceMediaId?: string, targetFace?: ViewerFace, referenceFace?: ViewerFace, };
+export type ViewerCorrectionAction = { sessionId: string, kind: ViewerCorrectionActionKind, referenceMediaId?: string, targetUrl?: string, referenceUrl?: string, targetFace?: ViewerFace, referenceFace?: ViewerFace, };

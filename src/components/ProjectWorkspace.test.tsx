@@ -715,8 +715,11 @@ async function openEyeCorrectionHarness() {
     cancelCorrection: vi.fn(async (): Promise<void> => undefined),
     applyCorrection: vi.fn(async (_session: string, _token: string) => projection),
   };
+  const mediaPreviews = Object.fromEntries(projection.state.album.media.filter(item => item.kind === "photo").map(item => [
+    item.id, { mediaId: item.id, state: "ready" as const, url: `data:image/png;id=${item.id}` },
+  ]));
   useEditorView.setState({ editingSheetId: "sheet-001", selectedFrameIds: ["frame-001"] });
-  render(<ProjectWorkspace projection={projection} onProjectionChange={vi.fn()} imageViewerWindowPort={viewerPort} />);
+  render(<ProjectWorkspace projection={projection} onProjectionChange={vi.fn()} imageViewerWindowPort={viewerPort} mediaPreviews={mediaPreviews} />);
   const canvas = screen.getByTestId("album-canvas");
   canvas.focus();
   fireEvent.keyDown(canvas, { code: "Space", key: " " });
@@ -725,6 +728,7 @@ async function openEyeCorrectionHarness() {
   const sessionId = latest.sessionId;
   const send = (kind: ViewerCorrectionAction["kind"], targetX = .5) => act(() => correction({
     sessionId, kind, referenceMediaId: latest.correction?.referenceMediaId,
+    targetUrl: latest.url ?? undefined, referenceUrl: latest.correction?.referenceUrl ?? undefined,
     targetFace: [{ x: targetX, y: .5, z: 0 }], referenceFace: [{ x: .5, y: .5, z: 0 }],
   }));
   send("start");

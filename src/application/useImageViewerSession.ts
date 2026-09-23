@@ -13,6 +13,8 @@ interface CorrectionSession {
   token?: string;
   resultUrl?: string;
   error?: string;
+  targetVersion?: string | null;
+  referenceVersion?: string | null;
 }
 
 interface ViewerSession {
@@ -49,6 +51,8 @@ export function useImageViewerSession({ projectId, media, previews, previewUrls,
   const [viewer, setViewer] = useState<ViewerSession | null>(null);
   const current = useRef(viewer);
   current.current = viewer;
+  const currentPreviewUrls = useRef(previewUrls);
+  currentPreviewUrls.current = previewUrls;
   const requestGeneration = useRef(0);
   const cancellation = useRef<Promise<void>>(Promise.resolve());
   const openedSession = useRef<string | null>(null);
@@ -56,11 +60,29 @@ export function useImageViewerSession({ projectId, media, previews, previewUrls,
   const pending = useRef(false);
   const ending = useRef<string | null>(null);
   const active = viewer?.projectId === projectId ? viewer : null;
+  const targetVersion = active ? previewUrls[active.mediaId] ?? null : null;
+  const referenceVersion = active?.correction ? previewUrls[active.correction.referenceMediaId] ?? null : null;
 
   const invalidatePreparation = useCallback((cancel: boolean) => {
     requestGeneration.current++;
     if (cancel) cancellation.current = port?.cancelCorrection?.().catch(() => undefined) ?? Promise.resolve();
   }, [port]);
+
+  const previousVersions = useRef<{ sessionId: string; mediaId: string; referenceMediaId: string; target: string | null; reference: string | null } | null>(null);
+  useEffect(() => {
+    const correction = active?.correction;
+    const next = active && correction ? { sessionId: active.sessionId, mediaId: active.mediaId,
+      referenceMediaId: correction.referenceMediaId, target: targetVersion, reference: referenceVersion } : null;
+    const previous = previousVersions.current;
+    previousVersions.current = next;
+    if (!next || !previous || previous.sessionId !== next.sessionId || previous.mediaId !== next.mediaId
+      || previous.referenceMediaId !== next.referenceMediaId || (previous.target === next.target && previous.reference === next.reference)
+      || correction?.phase === "browse" || correction?.phase === "applying") return;
+    invalidatePreparation(true);
+    setViewer((value) => value?.sessionId === next.sessionId && value.correction?.referenceMediaId === next.referenceMediaId
+      ? { ...value, correction: { ...value.correction, phase: "select", token: undefined, resultUrl: undefined,
+        targetVersion: undefined, referenceVersion: undefined, error: undefined } } : value);
+  }, [active?.sessionId, active?.mediaId, active?.correction?.referenceMediaId, targetVersion, referenceVersion, invalidatePreparation]);
 
   useEffect(() => {
     invalidatePreparation(current.current !== null);
@@ -191,7 +213,12 @@ export function useImageViewerSession({ projectId, media, previews, previewUrls,
         setViewer((value) => value && value.sessionId === action.sessionId && value.correction
           ? { ...value, correction: { ...value.correction, phase: "select", error: undefined } } : value);
       } else if (action.kind === "preview" && action.targetFace && action.referenceFace
-        && action.referenceMediaId === correction.referenceMediaId && port.prepareCorrection) {
+        && action.referenceMediaId === correction.referenceMediaId
+        && action.targetUrl === (currentPreviewUrls.current[session.mediaId] ?? null)
+        && action.referenceUrl === (currentPreviewUrls.current[correction.referenceMediaId] ?? null)
+        && port.prepareCorrection) {
+        const preparedTargetVersion = currentPreviewUrls.current[session.mediaId] ?? null;
+        const preparedReferenceVersion = currentPreviewUrls.current[correction.referenceMediaId] ?? null;
         const request = ++requestGeneration.current;
         setViewer((value) => value && value.sessionId === action.sessionId && value.correction
           ? { ...value, correction: { ...value.correction, phase: "processing", error: undefined } } : value);
@@ -200,17 +227,22 @@ export function useImageViewerSession({ projectId, media, previews, previewUrls,
           return port.prepareCorrection!({ sessionId: action.sessionId, targetMediaId: session.mediaId,
             referenceMediaId: correction.referenceMediaId, targetFace: action.targetFace!, referenceFace: action.referenceFace! });
         }).then((prepared) => {
-          if (!prepared || requestGeneration.current !== request) return;
+          if (!prepared || requestGeneration.current !== request
+            || (currentPreviewUrls.current[session.mediaId] ?? null) !== preparedTargetVersion
+            || (currentPreviewUrls.current[correction.referenceMediaId] ?? null) !== preparedReferenceVersion) return;
           setViewer((value) => value && value.sessionId === action.sessionId && value.mediaId === session.mediaId
             && value.correction?.referenceMediaId === correction.referenceMediaId && value.correction.phase === "processing"
-            ? { ...value, correction: { ...value.correction, phase: "preview", token: prepared.token, resultUrl: prepared.url } } : value);
+            ? { ...value, correction: { ...value.correction, phase: "preview", token: prepared.token, resultUrl: prepared.url,
+              targetVersion: preparedTargetVersion, referenceVersion: preparedReferenceVersion } } : value);
         }).catch((error) => {
           if (requestGeneration.current !== request) return;
           setViewer((value) => value && value.sessionId === action.sessionId && value.mediaId === session.mediaId
             && value.correction?.referenceMediaId === correction.referenceMediaId && value.correction.phase === "processing"
             ? { ...value, correction: { ...value.correction, phase: "select", error: error instanceof Error ? error.message : "Não foi possível corrigir os olhos." } } : value);
         });
-      } else if (action.kind === "apply" && correction.phase === "preview" && correction.token && port.applyCorrection) {
+      } else if (action.kind === "apply" && correction.phase === "preview" && correction.token && port.applyCorrection
+        && correction.targetVersion === (currentPreviewUrls.current[session.mediaId] ?? null)
+        && correction.referenceVersion === (currentPreviewUrls.current[correction.referenceMediaId] ?? null)) {
         const token = correction.token;
         setViewer((value) => value && value.sessionId === action.sessionId && value.correction
           ? { ...value, correction: { ...value.correction, phase: "applying", error: undefined } } : value);

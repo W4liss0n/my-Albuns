@@ -26,8 +26,23 @@ function sameFace(a, b) {
   return smallerArea > 0 && intersection / smallerArea > .6;
 }
 
-function detectFaces(landmarker, image) {
+function yieldToMessages() {
+  return new Promise((resolve) => setTimeout(resolve, 0));
+}
+
+async function detectFaces(landmarker, image, job) {
   const found = [];
+  let passes = 0;
+  let lastYield = performance.now();
+  async function checkpoint() {
+    if (job.cancelled) return true;
+    // Let cancel/new-job messages run between small groups, not inside synchronous detect.
+    if (++passes % 8 === 0 || performance.now() - lastYield >= 64) {
+      await yieldToMessages();
+      lastYield = performance.now();
+    }
+    return job.cancelled;
+  }
   function candidates(faces, left, top, width, height) {
     const result = [];
     for (const face of faces) {
@@ -52,6 +67,7 @@ function detectFaces(landmarker, image) {
     }
   }
   merge(candidates(landmarker.detect(image).faceLandmarks, 0, 0, image.width, image.height));
+  if (await checkpoint()) return null;
 
   // Small faces need a closer view even when a larger face was already found.
   // Three fixed scales with 50% overlap bound discovery to 284 passes.
@@ -77,12 +93,14 @@ function detectFaces(landmarker, image) {
       const left = Math.round((image.width - width) * column / steps);
       const top = Math.round((image.height - height) * row / steps);
       merge(region(left, top, width, height), divisions === 8);
+      if (await checkpoint()) return null;
     }
   }
   // Tile edges and background patterns can produce isolated false positives.
   // Confirm context for every face. The finest tiles need a second close view:
   // tiny patterns in clothes/floors otherwise survive a single confirmation.
-  const confirmed = found.flatMap(({ bounds, fineOnly }) => {
+  const confirmed = [];
+  for (const { bounds, fineOnly } of found) {
     let refined;
     for (const expansion of (fineOnly ? [2, 3] : [3])) {
       const width = (bounds.right - bounds.left) * image.width;
@@ -92,23 +110,37 @@ function detectFaces(landmarker, image) {
       const cropWidth = Math.min(image.width - left, Math.ceil(width * expansion));
       const cropHeight = Math.min(image.height - top, Math.ceil(height * expansion));
       refined = region(left, top, cropWidth, cropHeight).find(item => sameFace(item.bounds, bounds));
-      if (!refined) return [];
+      if (await checkpoint()) return null;
+      if (!refined) break;
     }
     // Use the full face view for the eye coordinates, not a tile-edge estimate.
-    return [refined];
-  });
+    if (refined) confirmed.push(refined);
+  }
   // numFaces limits a model pass, not the number of people in the entire photo.
   return confirmed.sort((a, b) => a.bounds.top - b.bounds.top || a.bounds.left - b.bounds.left).map((item) => item.face);
 }
 
+const jobs = new Map();
 self.onmessage = async ({ data }) => {
+  if (data.cancel !== undefined) {
+    const job = jobs.get(data.cancel);
+    if (job) job.cancelled = true;
+    return;
+  }
+  const job = { cancelled: false };
+  jobs.set(data.id, job);
   try {
-    const faces = detectFaces(await landmarker(), data.image);
-    self.postMessage({ id: data.id, faces: faces.map((face) => face.map(({ x, y, z }) => ({ x, y, z }))) });
+    const model = await landmarker();
+    if (job.cancelled) return;
+    const faces = await detectFaces(model, data.image, job);
+    if (!job.cancelled && faces) self.postMessage({ id: data.id, faces: faces.map((face) => face.map(({ x, y, z }) => ({ x, y, z }))) });
   } catch (error) {
-    detector = null;
-    self.postMessage({ id: data.id, error: error instanceof Error ? error.message : String(error) });
+    if (!job.cancelled) {
+      detector = null;
+      self.postMessage({ id: data.id, error: error instanceof Error ? error.message : String(error) });
+    }
   } finally {
     data.image.close();
+    jobs.delete(data.id);
   }
 };

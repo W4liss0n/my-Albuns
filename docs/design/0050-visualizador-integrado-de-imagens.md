@@ -33,6 +33,13 @@ As ações de correção são uma extensão da ferramenta **Abrir olhos**, no ca
 
 Clicar novamente em um rosto já selecionado conserva a preparação pendente ou a prévia válida para o mesmo par e as mesmas versões das fotos. Após falha na preparação, o mesmo clique permite uma nova tentativa, sem repetição automática. Uma falha ao salvar não descarta a prévia válida nem inicia outra preparação.
 
+Se o conteúdo do destino ou da referência mudar externamente, os pontos e a
+seleção da foto alterada perdem a validade. A nova versão precisa ser analisada
+e seu rosto escolhido novamente, mesmo que o arquivo mantenha o caminho e a
+análise devolva um rosto com o mesmo índice. A preparação anterior também perde
+a validade: uma resposta atrasada não pode reaparecer nem habilitar o salvamento
+para a nova versão.
+
 **Salvar correção** abre o diálogo compartilhado **Substituir foto original?**, identificando o nome do arquivo sem sinais decorativos como « » e explicando que o original será substituído pela versão corrigida. As ações são **Cancelar** e **Substituir original**, com foco inicial seguro em Cancelar. Cancelar preserva a prévia para conferência. A substituição exige confirmação explícita mesmo se a pessoa estiver olhando o original em Antes e depois. Até essa confirmação, analisar, selecionar, comparar e fechar não alteram o arquivo original.
 
 Após confirmar, a correção substitui o conteúdo do arquivo original, preservando seu caminho e formato. Essa decisão substitui a política anterior de manter uma cópia corrigida como novo vínculo. A gravação deve evitar deixar um arquivo incompleto em caso de falha e não pode sobrescrever silenciosamente uma foto alterada externamente desde a preparação. As prévias e os vínculos do Projeto precisam refletir o novo conteúdo; reabrir ou exportar deve usar a foto corrigida. O salvamento da correção não substitui o salvamento do arquivo do Projeto. Enquanto o diálogo está aberto, teclado e ponteiro pertencem à confirmação; Esc cancela somente o diálogo.
@@ -107,6 +114,14 @@ sendo exclusiva quando aberta.
 A sessão da janela, sua apresentação, navegação, invalidação de pedidos e restauração do foco pertencem à aplicação. O editor fornece as entradas do Painel e da Lâmina, a demanda de prévias e o caminho existente de mutação do Projeto. A janela filha recebe a apresentação e devolve ações correlacionadas com a sessão.
 
 A superfície compartilhada da foto decide identidade, prontidão, retenção temporária e descarte, além do encaixe, limite de zoom e deslocamento. O modo normal conserva sua política de não ampliar uma foto pequena no encaixe; as metades da correção conservam a ampliação até o espaço útil. Zoom em torno do ponteiro e enquadramento de rosto permanecem nas interações de seus respectivos modos. A escolha dos rostos, a comparação e o salvamento permanecem na correção; o agendamento e cancelamento de preparações pertencem ao Host.
+
+O módulo de detecção é dono dos pedidos de análise, do compartilhamento entre
+consumidores e do reaproveitamento por versão da foto. Trocar a referência ou
+fechar a correção libera o interesse da área correspondente. Quando nenhum
+consumidor precisa de um pedido, ele sai da fila ou é interrompido entre regiões,
+sem reiniciar o modelo. Liberar uma área não cancela a análise ainda usada pela
+outra. O descarte de trabalho abandonado conserva a busca regional e as
+confirmações da foto atual, incluindo rostos pequenos e grupos.
 
 ## Aceitação
 

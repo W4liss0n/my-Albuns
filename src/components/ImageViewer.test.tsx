@@ -4,10 +4,14 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, expect, test, vi } from "vitest";
 import { ImageViewer } from "./ImageViewer";
 import type { ViewerPresentation } from "../application/imageViewerWindow";
-import { detectFaces } from "../image-viewer/faceLandmarks";
+import { acquireFaces, type Face } from "../image-viewer/faceLandmarks";
 
-vi.mock("../image-viewer/faceLandmarks", async (original) => ({ ...(await original()), detectFaces: vi.fn() }));
-beforeEach(() => { vi.mocked(detectFaces).mockReset().mockResolvedValue([]); });
+vi.mock("../image-viewer/faceLandmarks", async (original) => ({ ...(await original()), acquireFaces: vi.fn() }));
+const detectFaces = vi.fn<(image: HTMLImageElement) => Promise<Face[]>>();
+beforeEach(() => {
+  detectFaces.mockReset().mockResolvedValue([]);
+  vi.mocked(acquireFaces).mockReset().mockImplementation((image) => ({ promise: detectFaces(image), release: vi.fn() }));
+});
 
 const initial: ViewerPresentation = { sessionId: "s", revision: 1, mediaId: "a", name: "Imagem a", url: "data:image/png;id=a", state: "ready", canPrevious: false, canNext: true };
 function Harness() {

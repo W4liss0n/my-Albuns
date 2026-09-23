@@ -5,7 +5,7 @@ import assert from "node:assert/strict";
 
 const source = readFileSync(new URL("../public/models/faceLandmarks.worker.js", import.meta.url), "utf8");
 
-function harness(detect) {
+function harness(detect, options = {}) {
   const postMessage = mock.fn();
   const image = { width: 1000, height: 1600, close: mock.fn() };
   const self = { postMessage };
@@ -15,12 +15,15 @@ function harness(detect) {
     getContext() { return { drawImage: (_image, ...rect) => { this.rect = rect; } }; }
   }
   const detector = { detect: mock.fn(detect) };
-  runInNewContext(source, { self, importScripts: mock.fn(), OffscreenCanvas: Canvas,
-    Vision: { FilesetResolver: { forVisionTasks: async () => ({}) }, FaceLandmarker: { createFromOptions: async () => detector } },
+  const createFromOptions = mock.fn(options.createFromOptions ?? (async () => detector));
+  runInNewContext(source, { self, importScripts: mock.fn(), OffscreenCanvas: Canvas, performance, setTimeout: options.setTimeout ?? setTimeout,
+    Vision: { FilesetResolver: { forVisionTasks: async () => ({}) }, FaceLandmarker: { createFromOptions } },
   });
-  return { image, detector, createCanvas,
+  return { image, detector, createCanvas, createFromOptions, postMessage,
     message: () => JSON.parse(JSON.stringify(postMessage.mock.calls[0].arguments[0])),
-    run: () => self.onmessage({ data: { id: 1, image } }),
+    messages: () => postMessage.mock.calls.map(call => JSON.parse(JSON.stringify(call.arguments[0]))),
+    run: (id = 1, bitmap = image) => self.onmessage({ data: { id, image: bitmap } }),
+    cancel: id => self.onmessage({ data: { cancel: id } }),
   };
 }
 
@@ -130,4 +133,41 @@ test("detector failures reach the caller and release the input bitmap", async ()
   await h.run();
   assert.match(h.message().error, /detector unavailable/);
   assert.equal(h.image.close.mock.callCount(), 1);
+});
+
+test("cancelling before the model loads closes the bitmap without scanning or replying", async () => {
+  let resolveModel;
+  const model = new Promise(resolve => { resolveModel = resolve; });
+  const detector = { detect: mock.fn(() => ({ faceLandmarks: [] })) };
+  const h = harness(() => ({ faceLandmarks: [] }), { createFromOptions: () => model });
+  const first = h.run();
+  await h.cancel(1);
+  resolveModel(detector);
+  await first;
+  assert.equal(detector.detect.mock.callCount(), 0);
+  assert.deepEqual(h.messages(), []);
+  assert.equal(h.image.close.mock.callCount(), 1);
+});
+
+test("cancelling active regional analysis stops at the next checkpoint and preserves the model for another job", async () => {
+  let resumeFirst;
+  let holdFirst = true;
+  const h = harness(() => ({ faceLandmarks: [] }), { setTimeout: callback => {
+    if (holdFirst) { holdFirst = false; resumeFirst = callback; }
+    else setTimeout(callback, 0);
+  } });
+  const abandoned = h.run(1);
+  for (let i = 0; i < 40 && !resumeFirst; i++) await Promise.resolve();
+  assert.ok(resumeFirst, "analysis reached a yielded region checkpoint");
+  const callsBeforeCancel = h.detector.detect.mock.callCount();
+  await h.cancel(1);
+  const nextImage = { width: 1000, height: 1600, close: mock.fn() };
+  const next = h.run(2, nextImage);
+  resumeFirst();
+  await Promise.all([abandoned, next]);
+  assert.equal(h.detector.detect.mock.callCount() - callsBeforeCancel, 284);
+  assert.deepEqual(h.messages(), [{ id: 2, faces: [] }]);
+  assert.equal(h.image.close.mock.callCount(), 1);
+  assert.equal(nextImage.close.mock.callCount(), 1);
+  assert.equal(h.createFromOptions.mock.callCount(), 1);
 });

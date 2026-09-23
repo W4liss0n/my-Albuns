@@ -53,6 +53,12 @@ pub struct ViewerCorrectionAction {
     pub reference_media_id: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
+    pub target_url: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub reference_url: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
     pub target_face: Option<ViewerFace>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
@@ -112,6 +118,7 @@ mod tests {
     fn correction_wire_contract_keeps_actions_phases_and_point_arrays() {
         let action = serde_json::json!({
             "sessionId": "viewer-1", "kind": "preview", "referenceMediaId": "reference-1",
+            "targetUrl": "target-version", "referenceUrl": "reference-version",
             "targetFace": [{"x": 0.25, "y": 0.5, "z": -0.125}],
             "referenceFace": [{"x": 0.75, "y": 0.5, "z": 0.125}]
         });
