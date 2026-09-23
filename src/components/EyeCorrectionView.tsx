@@ -172,14 +172,13 @@ export function EyeCorrectionView({ presentation, onNavigate, onCorrection }: Pr
   const referenceIssue = analysisIssue(referenceAnalysis, "referência");
   const browseBlocked = !correction.referenceUrl || correction.referenceState !== "ready" || Boolean(targetIssue) || Boolean(correction.error);
   const previewBlocked = targetIndex === null || referenceIndex === null || Boolean(targetIssue) || Boolean(referenceIssue);
-  const browseTooltip = correction.error ? `Usar esta foto indisponível. ${correction.error}`
-    : targetIssue ? `Usar esta foto indisponível. ${targetIssue}`
-    : browseBlocked ? "Usar esta foto indisponível: referência não está pronta." : undefined;
-  const previewTooltip = correction.error ? `${correction.error} Use Ver correção para tentar novamente.`
-    : targetIssue || referenceIssue ? `Ver correção indisponível. ${[targetIssue, referenceIssue].filter(Boolean).join(" ")}`
+  const browseTooltip = correction.error ?? targetIssue
+    ?? (browseBlocked ? "Prévia da referência indisponível." : undefined);
+  const previewTooltip = correction.error ? correction.error
+    : targetAnalysis === "no-face" && referenceAnalysis === "no-face" ? "Nenhum rosto encontrado nas duas fotos."
+    : targetIssue || referenceIssue ? [targetIssue, referenceIssue].filter(Boolean).join(" ")
     : previewBlocked ? "Selecione um rosto em cada foto para ver a correção." : undefined;
-  const saveTooltip = correction.error ? `${correction.error} Use Salvar correção para tentar novamente.`
-    : !correction.resultUrl ? "Salvar correção indisponível: não há resultado preparado." : undefined;
+  const saveTooltip = correction.error ?? (!correction.resultUrl ? "Prepare a correção antes de salvar." : undefined);
   const action = (kind: ViewerCorrectionAction["kind"]) => onCorrection({ sessionId: presentation.sessionId, kind });
   return <div className="eye-correction" aria-label="Correção de olhos" aria-busy={correction.phase === "processing" || busy}>
     <div className="eye-correction__tools">
