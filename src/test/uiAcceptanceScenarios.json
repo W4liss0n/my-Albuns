@@ -15622,7 +15622,7 @@
       "implementationPath": "/image-viewer.html?preview=normal",
       "comparison": {
         "implementationCaptureSelector": ".image-viewer-window",
-        "reason": "Design 0050: janela separada, sem barra de ferramentas",
+        "reason": "Design 0050: janela separada e Abrir olhos no canto superior direito",
         "kind": "implementation-only",
         "surface": "image-viewer"
       },
@@ -15739,12 +15739,28 @@
       "actions": []
     },
     {
+      "id": "image-viewer-correction-open",
+      "title": "Correção de olhos — ferramentas expandidas a partir de Abrir olhos",
+      "implementationPath": "/image-viewer.html?preview=normal&qa=1&fixture=faces",
+      "comparison": {
+        "implementationCaptureSelector": ".image-viewer-window",
+        "reason": "Design 0050: Fechar correção ocupa o ponto de Abrir olhos e as ações se estendem à esquerda",
+        "kind": "implementation-only",
+        "surface": "image-viewer"
+      },
+      "viewport": { "height": 720, "width": 1050 },
+      "readySelector": ".eye-correction__tool-extension",
+      "actions": [
+        { "type": "click", "selector": "button[aria-label='Abrir olhos']" }
+      ]
+    },
+    {
       "id": "image-viewer-correction-browse",
       "title": "Correção de olhos — busca de referência",
       "implementationPath": "/image-viewer.html?preview=correction-browse&qa=1&fixture=faces",
       "comparison": {
         "implementationCaptureSelector": ".image-viewer-window",
-        "reason": "Design 0050: painéis divididos e controles discretos da correção de olhos",
+        "reason": "Design 0050: painéis divididos sem nomes de arquivo e ferramentas flutuantes no canto superior direito",
         "kind": "implementation-only",
         "surface": "image-viewer"
       },

@@ -9,11 +9,12 @@ interface ImageToolButtonProps extends Omit<ButtonHTMLAttributes<HTMLButtonEleme
   label: string;
   icon: LucideIcon;
   glyph?: "navigation" | "tool";
+  tooltipPlacement?: "top" | "bottom";
 }
 
-export function ImageToolButton({ label, icon, glyph = "tool", className, disabled, ...props }: ImageToolButtonProps) {
+export function ImageToolButton({ label, icon, glyph = "tool", tooltipPlacement = "top", className, disabled, ...props }: ImageToolButtonProps) {
   const button = useRef<HTMLButtonElement>(null);
-  const tooltip = useUiAnchoredTooltip(button, label, disabled);
+  const tooltip = useUiAnchoredTooltip(button, label, disabled, tooltipPlacement);
   return <>
     <ActionButton {...props} {...tooltip.triggerProps} ref={button} density="compact" variant="quiet" disabled={disabled}
       className={["ui-image-tool", className].filter(Boolean).join(" ")}

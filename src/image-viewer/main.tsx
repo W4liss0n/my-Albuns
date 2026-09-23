@@ -58,7 +58,7 @@ function ViewerWindow() {
   const controls = { ...tauriWindowControls, close };
   return <WindowControlsProvider controls={controls}>
     <div className="image-viewer-window">
-      <ApplicationHeader showBrand={false} controls="maximize-close" context={presentation?.name ?? "Imagem"} />
+      <ApplicationHeader showBrand={false} controls="maximize-close" context={presentation?.correction ? "" : presentation?.name ?? "Imagem"} />
       {presentation ? <ImageViewer presentation={presentation} onNavigate={(offset) => {
         if (preview) { setPresentation((current) => current ? { ...current, mediaId: offset < 0 ? "previous" : "next", name: offset < 0 ? "Retrato.jpg" : "Praia.jpg", url: offset < 0 ? sizedPreview(portraitPreview, 800, 1200) : new URL("../test/dev-media/praia.svg", import.meta.url).href } : current); return; }
         void tauriImageViewerClient.navigate(presentation.sessionId, offset).catch(() => undefined);

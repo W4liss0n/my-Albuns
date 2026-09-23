@@ -77,6 +77,8 @@ test("eye correction opens from a ready viewer and keeps the target fixed beside
   render(<ImageViewer presentation={presentation} onNavigate={onNavigate} onClose={vi.fn()} onCorrection={onCorrection} />);
   expect(screen.getByRole("img", { name: "Imagem a" })).toBeInTheDocument();
   expect(screen.getByRole("img", { name: "Outra foto.jpg" })).toBeInTheDocument();
+  expect(screen.queryByText("Imagem a")).not.toBeInTheDocument();
+  expect(screen.queryByText("Outra foto.jpg")).not.toBeInTheDocument();
   fireEvent.click(screen.getByRole("button", { name: "Próxima referência" }));
   expect(onNavigate).toHaveBeenCalledWith(1);
   fireEvent.click(screen.getByRole("button", { name: "Usar esta foto" }));

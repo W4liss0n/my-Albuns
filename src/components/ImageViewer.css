@@ -8,19 +8,17 @@
 .image-viewer__nav--previous { left: 16px; top: 50%; transform: translateY(-50%); }
 .image-viewer__nav--next { right: 16px; top: 50%; transform: translateY(-50%); }
 .image-viewer__fit { right: 16px; bottom: 16px; }
-.image-viewer__eye-action { left: 16px; top: 16px; }
+.image-viewer__eye-action { right: 16px; top: 16px; }
 .eye-correction { position: relative; display: flex; flex: 1; flex-direction: column; min-width: 0; min-height: 0; background: var(--ui-canvas); }
-.eye-correction__tools { position: absolute; z-index: 4; left: 16px; top: 16px; display: flex; align-items: center; gap: 4px; }
+.eye-correction__tools { position: absolute; z-index: 4; right: 16px; top: 16px; display: flex; flex-direction: row-reverse; align-items: center; gap: 4px; }
 .eye-correction__tools .ui-image-tool { position: relative; }
-.eye-correction__tools .ui-image-tool,
-.eye-correction__tools .ui-image-tool:hover:not(:disabled),
-.eye-correction__tools .ui-image-tool:focus-visible { color: var(--ui-text); }
-.eye-correction__tools .ui-image-tool svg { filter: none; }
+.eye-correction__tool-extension { display: flex; flex-direction: row-reverse; align-items: center; gap: 4px; transform-origin: right center; animation: eye-correction-tools-enter 180ms ease-out both; }
+@keyframes eye-correction-tools-enter { from { opacity: 0; transform: translateX(12px); } to { opacity: 1; transform: translateX(0); } }
+@media (prefers-reduced-motion: reduce) { .eye-correction__tool-extension { animation: none; } }
 .eye-correction__panes { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); flex: 1; min-height: 0; gap: 16px; padding: 64px 24px 24px; }
 .eye-correction__pane { display: flex; flex-direction: column; position: relative; min-width: 0; min-height: 0; }
 .eye-correction__pane:first-child { border-right: 1px solid var(--ui-border); padding-right: 16px; }
-.eye-correction__pane-label { display: flex; align-items: baseline; gap: 8px; height: 24px; color: var(--ui-text-muted); font-size: var(--ui-font-size-label); white-space: nowrap; }
-.eye-correction__pane-label span { min-width: 0; overflow: hidden; text-overflow: ellipsis; color: var(--ui-text); font-size: var(--ui-font-size-control); }
+.eye-correction__pane-label { height: 24px; color: var(--ui-text-muted); font-size: var(--ui-font-size-label); white-space: nowrap; }
 .eye-correction__pane-image { position: relative; display: flex; align-items: center; justify-content: center; flex: 1; min-width: 0; min-height: 0; overflow: hidden; }
 .eye-correction__pane-image img { display: block; width: calc(100% - 48px); height: calc(100% - 48px); object-fit: contain; user-select: none; }
 .eye-correction__pane-image:focus-visible { outline: 2px solid var(--ui-focus-neutral); outline-offset: -3px; }
@@ -33,6 +31,6 @@
 .eye-correction__face:focus-visible { outline: 2px solid var(--ui-focus-neutral); outline-offset: 4px; }
 .eye-correction__nav--previous { left: 4px; top: 50%; transform: translateY(-50%); }
 .eye-correction__nav--next { right: 4px; top: 50%; transform: translateY(-50%); }
-.eye-correction__hint { position: absolute; z-index: 4; top: 16px; right: 24px; width: min(320px, calc(50% - 24px)); min-width: 0; margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ui-text-muted); font-size: var(--ui-font-size-action); line-height: 42px; text-align: right; }
+.eye-correction__hint { position: absolute; z-index: 4; top: 16px; left: 24px; width: min(320px, calc(50% - 24px)); min-width: 0; margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ui-text-muted); font-size: var(--ui-font-size-action); line-height: 42px; }
 .eye-correction__hint:focus-visible { outline: 2px solid var(--ui-focus-neutral); outline-offset: 2px; }
-@media (max-width: 620px) { .eye-correction__panes { gap: 8px; padding: 64px 12px 16px; } .eye-correction__pane:first-child { padding-right: 8px; } .eye-correction__pane-label span { display: none; } .eye-correction__hint { right: 12px; width: calc(50% - 12px); } }
+@media (max-width: 620px) { .eye-correction__panes { gap: 8px; padding: 64px 12px 16px; } .eye-correction__pane:first-child { padding-right: 8px; } .eye-correction__hint { left: 12px; width: calc(50% - 12px); } }

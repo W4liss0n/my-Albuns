@@ -143,22 +143,24 @@ export function EyeCorrectionView({ presentation, onNavigate, onCorrection }: Pr
   const action = (kind: ViewerCorrectionAction["kind"]) => onCorrection({ sessionId: presentation.sessionId, kind });
   return <div className="eye-correction" aria-label="Correção de olhos">
     <div className="eye-correction__tools">
-      <ImageToolButton label="Fechar correção" icon={EyeOff} className="eye-correction__close" disabled={busy} onClick={() => action("cancel")} />
-      {correction.phase === "browse"
-        ? <ImageToolButton label="Usar esta foto" icon={Check} disabled={!correction.referenceUrl || correction.referenceState !== "ready"} onClick={() => action("select")} />
-        : <ImageToolButton label="Trocar referência" icon={RefreshCcw} disabled={busy} onClick={() => action("browse")} />}
-      {correction.phase === "select" && <ImageToolButton label="Ver correção" icon={Sparkles} disabled={targetIndex === null || referenceIndex === null}
-        onClick={() => onCorrection({ sessionId: presentation.sessionId, kind: "preview", referenceMediaId: correction.referenceMediaId, targetFace: targetFaces[targetIndex!], referenceFace: referenceFaces[referenceIndex!] })} />}
-      {(correction.phase === "preview" || busy) && <>
-        <ImageToolButton label={showOriginal ? "Antes e depois: mostrar correção" : "Antes e depois: mostrar original"} icon={Columns2} aria-pressed={showOriginal} disabled={busy || !correction.resultUrl}
-          onClick={() => setComparison({ key: compareKey, original: !showOriginal })} />
-        <ImageToolButton label="Salvar correção" icon={Save} disabled={busy || saveRequested || !correction.resultUrl} onClick={() => {
-          if (savePending.current) return;
-          savePending.current = true;
-          setSaveRequested(true);
-          action("apply");
-        }} />
-      </>}
+      <ImageToolButton label="Fechar correção" icon={EyeOff} tooltipPlacement="bottom" className="eye-correction__close" disabled={busy} onClick={() => action("cancel")} />
+      <div className="eye-correction__tool-extension">
+        {correction.phase === "browse"
+          ? <ImageToolButton label="Usar esta foto" icon={Check} tooltipPlacement="bottom" disabled={!correction.referenceUrl || correction.referenceState !== "ready"} onClick={() => action("select")} />
+          : <ImageToolButton label="Trocar referência" icon={RefreshCcw} tooltipPlacement="bottom" disabled={busy} onClick={() => action("browse")} />}
+        {correction.phase === "select" && <ImageToolButton label="Ver correção" icon={Sparkles} tooltipPlacement="bottom" disabled={targetIndex === null || referenceIndex === null}
+          onClick={() => onCorrection({ sessionId: presentation.sessionId, kind: "preview", referenceMediaId: correction.referenceMediaId, targetFace: targetFaces[targetIndex!], referenceFace: referenceFaces[referenceIndex!] })} />}
+        {(correction.phase === "preview" || busy) && <>
+          <ImageToolButton label={showOriginal ? "Antes e depois: mostrar correção" : "Antes e depois: mostrar original"} icon={Columns2} tooltipPlacement="bottom" aria-pressed={showOriginal} disabled={busy || !correction.resultUrl}
+            onClick={() => setComparison({ key: compareKey, original: !showOriginal })} />
+          <ImageToolButton label="Salvar correção" icon={Save} tooltipPlacement="bottom" disabled={busy || saveRequested || !correction.resultUrl} onClick={() => {
+            if (savePending.current) return;
+            savePending.current = true;
+            setSaveRequested(true);
+            action("apply");
+          }} />
+        </>}
+      </div>
     </div>
     <p {...hintTooltip.triggerProps} ref={hintRef} className="eye-correction__hint" role="status" data-no-faces={targetStatus === "Nenhum rosto encontrado nesta foto." && referenceStatus === "Nenhum rosto encontrado nesta foto."} tabIndex={correction.error ? 0 : undefined}>{correction.error ?? (
       correction.phase === "processing" ? "Preparando correção…" :
@@ -167,13 +169,13 @@ export function EyeCorrectionView({ presentation, onNavigate, onCorrection }: Pr
     {hintTooltip.tooltip}
     <div className="eye-correction__panes">
       <div className="eye-correction__pane">
-        <div className="eye-correction__pane-label">Referência <span title={correction.referenceName}>{correction.referenceName}</span></div>
+        <div className="eye-correction__pane-label">Referência</div>
         <FaceImage side="reference" url={correction.referenceUrl} name={correction.referenceName} choosing={referenceChoosing}
           selected={referenceIndex} onChoose={(index, faces) => { setReferenceIndex(index); setReferenceFaces(faces); }} onStatus={setReferenceStatus}
           navigation={correction.phase === "browse" ? { previous: correction.canPreviousReference, next: correction.canNextReference, onNavigate } : undefined} />
       </div>
       <div className="eye-correction__pane">
-        <div className="eye-correction__pane-label">{targetLabel} <span title={presentation.name}>{presentation.name}</span></div>
+        <div className="eye-correction__pane-label">{targetLabel}</div>
         <FaceImage side="target" url={(correction.phase === "preview" || correction.phase === "applying") && correction.resultUrl && !showOriginal ? correction.resultUrl : presentation.url}
           name={presentation.name} choosing={targetChoosing} selected={targetIndex}
           onChoose={(index, faces) => { setTargetIndex(index); setTargetFaces(faces); }} onStatus={setTargetStatus} />
