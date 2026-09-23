@@ -94,7 +94,7 @@ function extractInvokedCommands(sourcePaths: readonly string[]) {
     sourcePaths.flatMap((path) =>
       Array.from(
         sourceFiles[path].matchAll(
-          /\binvoke(?:ImageProcessing|Photoshop)?(?:<[^>]+>)?\(\s*["']([^"']+)["']/g,
+          /\binvoke(?:ImageProcessing|Photoshop|Correction)?(?:<[^>]+>)?\(\s*["']([^"']+)["']/g,
         ),
         (match) => match[1],
       ),
