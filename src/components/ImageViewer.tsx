@@ -16,6 +16,8 @@ const MIN_ZOOM = 1;
 const MAX_ZOOM = 8;
 
 export function ImageViewer({ presentation, onNavigate, onClose, onCorrection }: Props) {
+  const viewerRef = useRef<HTMLElement>(null);
+  const wasCorrecting = useRef(Boolean(presentation.correction));
   const viewportRef = useRef<HTMLDivElement>(null);
   const { mediaId, name, url, state, canPrevious, canNext } = presentation;
   const imageKey = `${mediaId}:${url ?? ""}`;
@@ -26,6 +28,14 @@ export function ImageViewer({ presentation, onNavigate, onClose, onCorrection }:
   const [viewport, setViewport] = useState({ width: 0, height: 0, fitWidth: 0, fitHeight: 0 });
   const drag = useRef<{ x: number; y: number; panX: number; panY: number; pointerId: number } | null>(null);
   const ready = loaded?.key === imageKey && failedKey !== imageKey;
+
+  useLayoutEffect(() => {
+    const correcting = Boolean(presentation.correction);
+    if (wasCorrecting.current !== correcting) {
+      viewerRef.current?.querySelector<HTMLButtonElement>(correcting ? ".eye-correction__close" : ".image-viewer__eye-action")?.focus();
+      wasCorrecting.current = correcting;
+    }
+  }, [presentation.correction]);
 
   useLayoutEffect(() => {
     setZoom(1);
@@ -99,9 +109,9 @@ export function ImageViewer({ presentation, onNavigate, onClose, onCorrection }:
     : failedKey === imageKey ? "Não foi possível exibir a prévia desta imagem."
     : "Carregando imagem…";
 
-  if (presentation.correction && onCorrection) return <section aria-label="Visualizador de imagens" className="image-viewer"><EyeCorrectionView presentation={presentation} onNavigate={onNavigate} onCorrection={onCorrection} /></section>;
+  if (presentation.correction && onCorrection) return <section ref={viewerRef} aria-label="Visualizador de imagens" className="image-viewer"><EyeCorrectionView presentation={presentation} onNavigate={onNavigate} onCorrection={onCorrection} /></section>;
 
-  return <section aria-label="Visualizador de imagens" className="image-viewer">
+  return <section ref={viewerRef} aria-label="Visualizador de imagens" className="image-viewer">
       <div className="image-viewer__stage" data-zoomed={zoom > 1} ref={viewportRef}
         onWheel={(event) => { event.preventDefault(); if (ready && event.deltaY) changeZoom(zoom * Math.exp(-Math.max(-600, Math.min(600, event.deltaY)) * 0.002), event.clientX, event.clientY); }}
         onPointerDown={(event) => { if (event.button !== 0 || zoom <= 1 || !ready || (event.target as Element).closest("button")) return; drag.current = { x: event.clientX, y: event.clientY, panX: pan.x, panY: pan.y, pointerId: event.pointerId }; event.currentTarget.setPointerCapture(event.pointerId); }}

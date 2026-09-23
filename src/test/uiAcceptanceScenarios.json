@@ -15774,16 +15774,16 @@
     },
     {
       "id": "image-viewer-correction-preview",
-      "title": "Correção de olhos — prévia e Aplicar",
+      "title": "Correção de olhos — prévia e Salvar correção",
       "implementationPath": "/image-viewer.html?preview=correction-preview&qa=1",
       "comparison": {
         "implementationCaptureSelector": ".image-viewer-window",
-        "reason": "Design 0050: prévia na foto de destino, ação neutra e alinhamento estável",
+        "reason": "Design 0050: prévia na foto de destino e ferramentas flutuantes sem barra",
         "kind": "implementation-only",
         "surface": "image-viewer"
       },
       "viewport": { "height": 720, "width": 1050 },
-      "readySelector": "button.ui-action-button--neutral",
+      "readySelector": "button[aria-label='Salvar correção']",
       "actions": []
     },
     {
@@ -15792,12 +15792,12 @@
       "implementationPath": "/image-viewer.html?preview=correction-applying&qa=1",
       "comparison": {
         "implementationCaptureSelector": ".image-viewer-window",
-        "reason": "Design 0050: progresso sem deslocamento e Cancelar bloqueado",
+        "reason": "Design 0050: progresso fora do fluxo e ferramentas bloqueadas",
         "kind": "implementation-only",
         "surface": "image-viewer"
       },
       "viewport": { "height": 720, "width": 1050 },
-      "readySelector": "button[disabled].ui-action-button--quiet",
+      "readySelector": "button[aria-label='Fechar correção']:disabled",
       "actions": []
     },
     {
@@ -15812,6 +15812,36 @@
       },
       "viewport": { "height": 480, "width": 600 },
       "readySelector": ".eye-correction__panes",
+      "actions": []
+    },
+    {
+      "id": "image-viewer-correction-before-after",
+      "title": "Correção de olhos — comparação antes e depois",
+      "implementationPath": "/image-viewer.html?preview=correction-preview&qa=1",
+      "comparison": {
+        "implementationCaptureSelector": ".image-viewer-window",
+        "reason": "Design 0050: somente a foto de destino mostra o original; salvar permanece disponível",
+        "kind": "implementation-only",
+        "surface": "image-viewer"
+      },
+      "viewport": { "height": 720, "width": 1050 },
+      "readySelector": "button[aria-label='Antes e depois: mostrar correção'][aria-pressed='true']",
+      "actions": [
+        { "type": "click", "selector": "button[aria-label='Antes e depois: mostrar original']" }
+      ]
+    },
+    {
+      "id": "image-viewer-correction-error",
+      "title": "Correção de olhos — erro de preparação",
+      "implementationPath": "/image-viewer.html?preview=correction-preview&qa=1&error=1",
+      "comparison": {
+        "implementationCaptureSelector": ".image-viewer-window",
+        "reason": "Design 0050: erro essencial próximo às ferramentas, sem deslocar as fotografias",
+        "kind": "implementation-only",
+        "surface": "image-viewer"
+      },
+      "viewport": { "height": 480, "width": 600 },
+      "readySelector": ".eye-correction__hint[role='status']",
       "actions": []
     },
     {
@@ -15851,11 +15881,11 @@
     },
     {
       "id": "image-viewer-correction-no-face",
-      "title": "Correção de olhos — referência sem rostos",
-      "implementationPath": "/image-viewer.html?preview=correction-select",
+      "title": "Correção de olhos — referência sem rostos (fixture visual determinística)",
+      "implementationPath": "/image-viewer.html?preview=correction-select&fixture=none",
       "comparison": {
         "implementationCaptureSelector": ".image-viewer-window",
-        "reason": "Design 0050: recuperação quando nenhuma das fotos ilustradas contém rostos",
+        "reason": "Design 0050: mensagem de ausência de rosto; fixture visual sem validar detecção",
         "kind": "implementation-only",
         "surface": "image-viewer"
       },
@@ -15863,7 +15893,7 @@
         "height": 720,
         "width": 1050
       },
-      "readySelector": ".eye-correction__panes",
+      "readySelector": ".eye-correction__hint[data-no-faces='true']",
       "actions": []
     }
   ]
