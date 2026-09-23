@@ -15826,7 +15826,11 @@
       },
       "viewport": { "height": 720, "width": 1050 },
       "readySelector": ".ui-floating-tooltip",
-      "actions": [ { "type": "focus", "selector": "button[aria-label='Abrir olhos']" } ]
+      "actions": [
+        { "type": "focus", "selector": "button[aria-label='Próxima imagem']" },
+        { "type": "key", "key": "Tab" },
+        { "type": "assert", "selector": "button[aria-label='Abrir olhos']:focus" }
+      ]
     },
     {
       "id": "image-viewer-reference-tooltip",
@@ -15840,7 +15844,10 @@
       },
       "viewport": { "height": 720, "width": 1050 },
       "readySelector": ".ui-floating-tooltip",
-      "actions": [ { "type": "hover", "selector": "button[aria-label='Próxima referência']" } ]
+      "actions": [
+        { "type": "hover", "selector": ".eye-correction__pane:first-child .eye-correction__pane-image" },
+        { "type": "hover", "selector": "button[aria-label='Próxima referência']" }
+      ]
     },
     {
       "id": "image-viewer-correction-no-face",

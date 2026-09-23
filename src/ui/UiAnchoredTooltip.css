@@ -1,15 +1,29 @@
 .ui-anchored-tooltip.ui-floating-tooltip {
   z-index: 100;
+  top: auto;
+  right: auto;
+  bottom: auto;
+  left: auto;
   width: max-content;
   max-width: calc(100vw - 24px);
   pointer-events: none;
 }
-.ui-floating-tooltip[data-placement="top"]::before {
+.ui-floating-tooltip::before { display: none; }
+.ui-floating-tooltip__arrow {
+  position: absolute;
+  width: 9px;
+  height: 9px;
+  border: 1px solid var(--ui-tooltip-border);
+  border-right: 0;
+  border-bottom: 0;
+  background: var(--ui-tooltip-background);
+}
+.ui-floating-tooltip[data-placement="top"] .ui-floating-tooltip__arrow {
   top: auto;
   bottom: -5px;
   transform: rotate(225deg);
 }
-.ui-floating-tooltip[data-placement="bottom"]::before {
+.ui-floating-tooltip[data-placement="bottom"] .ui-floating-tooltip__arrow {
   top: -5px;
   bottom: auto;
   transform: rotate(45deg);
