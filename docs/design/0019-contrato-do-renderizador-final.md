@@ -2,7 +2,7 @@
 status: accepted
 document: design
 date: 2026-09-01
-updated: 2026-09-17
+updated: 2026-09-23
 ticket: 3-programa-04-renderizador-final
 ---
 
@@ -552,6 +552,12 @@ Nível de Deflate, filtros por scanline, tamanho, chunking e SHA-256 podem mudar
 com o encoder. APNG, chunks de texto, EXIF, horário e metadados herdados não
 integram a saída.
 
+O encoder usa a compressão `Fast` do crate `png`. Em uma lâmina de 25 MP, o
+nível padrão levava de 5,5 a 6,6 s para compactar; o `Fast` leva cerca de
+0,2 s e gera um arquivo cerca de 17% maior. Os pixels continuam idênticos e a
+decodificação de conferência continua obrigatória. Decisão aceita em
+2026-09-23.
+
 ### PDF
 
 PDF não possui compositor próprio. Ele recebe, na ordem das Unidades de
@@ -573,6 +579,13 @@ decimais finais e sem alterar os pixels. Uma imagem RGB8 lossless, associada a u
 embutido e a caixa; renderização por visualizador ou screenshot não é oráculo.
 Compressão Flate, números de objetos, xref, ID e bytes do documento não são
 golden.
+
+O raster de cada página usa Flate no nível 1 (`flate2::Compression::fast`).
+Em uma página de 25 MP, o nível padrão levava de 1,9 a 2,2 s; o nível 1 leva
+cerca de 0,5 s e gera um fluxo cerca de 12% maior. A imagem continua sem perda
+e a descompressão de conferência antes de gravar a página continua obrigatória.
+Embutir a página como JPEG (`/DCTDecode`) reduziria o arquivo, mas tornaria o
+PDF com perda; essa troca não foi adotada. Decisão aceita em 2026-09-23.
 
 A ordem de páginas é exatamente a ordem das Unidades de Exportação. Cada página
 referencia um único raster correspondente e usa `CropBox = MediaBox`, sem
