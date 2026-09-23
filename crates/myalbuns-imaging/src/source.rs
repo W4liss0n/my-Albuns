@@ -1540,16 +1540,71 @@ fn apply_orientation<P: Pixel<Subpixel = u8>>(
         )
     })?;
     pixels.resize(byte_count, 0);
-    let mut output = ImageBuffer::from_raw(width, height, pixels).ok_or_else(|| {
+    let channels = usize::from(P::CHANNEL_COUNT);
+    let source = image.as_raw();
+    let source_stride = source_width as usize * channels;
+    let stride = width as usize * channels;
+    // Square tiles keep both the row-major writes and the strided reads of a
+    // quarter turn in cache; every output pixel is still copied exactly once.
+    const TILE: u32 = 64;
+    for tile_y in (0..height).step_by(TILE as usize) {
+        for tile_x in (0..width).step_by(TILE as usize) {
+            for y in tile_y..(tile_y + TILE).min(height) {
+                let row = y as usize * stride;
+                for x in tile_x..(tile_x + TILE).min(width) {
+                    let (source_x, source_y) = match orientation {
+                        Orientation::NoTransforms => unreachable!(),
+                        Orientation::FlipHorizontal => (source_width - 1 - x, y),
+                        Orientation::FlipVertical => (x, source_height - 1 - y),
+                        Orientation::Rotate180 => (source_width - 1 - x, source_height - 1 - y),
+                        Orientation::Rotate90 => (y, source_height - 1 - x),
+                        Orientation::Rotate270 => (source_width - 1 - y, x),
+                        Orientation::Rotate90FlipH => (y, x),
+                        Orientation::Rotate270FlipH => {
+                            (source_width - 1 - y, source_height - 1 - x)
+                        }
+                    };
+                    let from = source_y as usize * source_stride + source_x as usize * channels;
+                    let to = row + x as usize * channels;
+                    pixels[to..to + channels].copy_from_slice(&source[from..from + channels]);
+                }
+            }
+        }
+    }
+    ImageBuffer::from_raw(width, height, pixels).ok_or_else(|| {
         SourceFailure::new(
             ImagingFailureCode::ResourceLimitExceeded,
             "não foi possível materializar o raster orientado",
         )
-    })?;
-    for y in 0..height {
-        for x in 0..width {
+    })
+}
+
+#[cfg(test)]
+mod orientation_tests {
+    use image::{ImageBuffer, Pixel, Rgb, RgbImage, Rgba, RgbaImage, metadata::Orientation};
+
+    use super::apply_orientation;
+
+    fn per_pixel<P: Pixel<Subpixel = u8>>(
+        image: &ImageBuffer<P, Vec<u8>>,
+        orientation: Orientation,
+    ) -> ImageBuffer<P, Vec<u8>> {
+        let (source_width, source_height) = image.dimensions();
+        let turned = matches!(
+            orientation,
+            Orientation::Rotate90
+                | Orientation::Rotate270
+                | Orientation::Rotate90FlipH
+                | Orientation::Rotate270FlipH
+        );
+        let (width, height) = if turned {
+            (source_height, source_width)
+        } else {
+            (source_width, source_height)
+        };
+        ImageBuffer::from_fn(width, height, |x, y| {
             let (source_x, source_y) = match orientation {
-                Orientation::NoTransforms => unreachable!(),
+                Orientation::NoTransforms => (x, y),
                 Orientation::FlipHorizontal => (source_width - 1 - x, y),
                 Orientation::FlipVertical => (x, source_height - 1 - y),
                 Orientation::Rotate180 => (source_width - 1 - x, source_height - 1 - y),
@@ -1558,10 +1613,30 @@ fn apply_orientation<P: Pixel<Subpixel = u8>>(
                 Orientation::Rotate90FlipH => (y, x),
                 Orientation::Rotate270FlipH => (source_width - 1 - y, source_height - 1 - x),
             };
-            output.put_pixel(x, y, *image.get_pixel(source_x, source_y));
+            *image.get_pixel(source_x, source_y)
+        })
+    }
+
+    #[test]
+    fn tiled_orientation_matches_the_per_pixel_mapping_across_tile_edges() {
+        let rgb = RgbImage::from_fn(131, 67, |x, y| Rgb([x as u8, y as u8, (x ^ y) as u8]));
+        let rgba = RgbaImage::from_fn(65, 129, |x, y| {
+            Rgba([y as u8, x as u8, (x * y) as u8, (x + y) as u8])
+        });
+        for exif in 1..=8 {
+            let orientation = Orientation::from_exif(exif).unwrap();
+            assert_eq!(
+                apply_orientation(rgb.clone(), orientation).unwrap(),
+                per_pixel(&rgb, orientation),
+                "RGB orientation {exif}"
+            );
+            assert_eq!(
+                apply_orientation(rgba.clone(), orientation).unwrap(),
+                per_pixel(&rgba, orientation),
+                "RGBA orientation {exif}"
+            );
         }
     }
-    Ok(output)
 }
 
 #[cfg(test)]
