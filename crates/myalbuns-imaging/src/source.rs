@@ -140,6 +140,11 @@ impl OpenRenderSource {
         self.source_bytes
     }
 
+    /// Progressive JPEG decodes in its own bounded worker process.
+    pub(crate) fn decodes_in_isolated_worker(&self) -> bool {
+        matches!(&self.preflight, SourcePreflight::Jpeg(preflight) if preflight.is_progressive)
+    }
+
     pub(crate) fn pixel_count(&self) -> Result<u64, SourceFailure> {
         let (width, height) = match &self.preflight {
             SourcePreflight::Jpeg(preflight) => (preflight.width, preflight.height),

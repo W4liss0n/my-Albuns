@@ -1,16 +1,23 @@
 use crate::{
     format_output::{PdfOutput, write_png},
     jpeg_output::write_verified_quality,
-    render::{RenderFailure, render_unit},
-    source::{MAX_DECODED_SOURCE_PIXELS_TOTAL, capture_render_source},
+    render::{RenderFailure, composition_workers, render_unit},
+    source::{MAX_DECODED_SOURCE_PIXELS_TOTAL, OpenRenderSource, capture_render_source},
 };
-use myalbuns_core::{ComposedBackground, ComposedOutputUnit, RectUm};
+use image::RgbaImage;
+use myalbuns_core::{ComposedBackground, ComposedOutputUnit, MediaId, RectUm};
 use myalbuns_imaging_protocol::{
     AlbumRenderCompletion, AlbumRenderRequest, ImagingFailureCode, ImagingPathCode,
     ImagingProgressStage, RenderCompletion, RenderFormat,
 };
 use myalbuns_paths::ExpectedObject;
-use std::collections::{HashMap, HashSet};
+use std::{
+    collections::{HashMap, HashSet},
+    sync::{
+        Mutex, PoisonError,
+        atomic::{AtomicUsize, Ordering},
+    },
+};
 
 #[cfg(test)]
 pub(crate) fn render(
@@ -76,6 +83,7 @@ pub(crate) fn render_retaining(
         .map(|output| output.units.len())
         .sum::<usize>() as u32;
     let mut done = 0;
+    let mut decoded = DecodedSources::new(composition_workers());
     for output in &request.outputs {
         let path = request
             .root_bindings
@@ -101,34 +109,10 @@ pub(crate) fn render_retaining(
                 .output_unit(&selected.sheet_id)
                 .map_err(|error| error.to_string())?;
             let required: HashSet<_> = unit.sheet.referenced_media_ids().collect();
-            let mut sources = HashMap::new();
-            let mut pixels = 0_u64;
-            for id in required {
-                let source = &captured[&id];
-                pixels += source.pixel_count().map_err(|failure| failure.message)?;
-                if pixels > MAX_DECODED_SOURCE_PIXELS_TOTAL {
-                    return Err(RenderFailure::typed(
-                        ImagingFailureCode::ResourceLimitExceeded,
-                        Some(id.to_string()),
-                        None,
-                        "As fontes de uma unidade excedem o limite de memória.",
-                    ));
-                }
-                sources.insert(
-                    id,
-                    source.decode_captured().map_err(|failure| {
-                        RenderFailure::typed(
-                            failure.code,
-                            Some(id.to_string()),
-                            failure.path_code,
-                            failure.message,
-                        )
-                    })?,
-                );
-            }
+            let sources = decoded.prepare(&captured, &required)?;
             translate_viewport(&mut unit, &selected.viewport);
             progress(ImagingProgressStage::Composing, done, total)?;
-            let image = render_unit(&unit, request.snapshot.dpi, &sources, &mut |_, _, _| {
+            let image = render_unit(&unit, request.snapshot.dpi, sources, &mut |_, _, _| {
                 progress(ImagingProgressStage::Composing, done, total)
             })?;
             dimensions = (image.width(), image.height());
@@ -171,6 +155,108 @@ pub(crate) fn render_retaining(
     Ok(AlbumRenderCompletion {
         outputs: outputs.clone(),
     })
+}
+
+/// Decoded Originals retained between consecutive units. Page exports and
+/// Decoratives repeated on neighbouring Sheets reuse the same raster instead
+/// of decoding the Original again. Only the current unit's sources are kept,
+/// so the retained set honours the same pixel ceiling as a single unit.
+struct DecodedSources {
+    rasters: HashMap<MediaId, RgbaImage>,
+    workers: usize,
+}
+
+impl DecodedSources {
+    fn new(workers: usize) -> Self {
+        Self {
+            rasters: HashMap::new(),
+            workers: workers.max(1),
+        }
+    }
+
+    fn prepare(
+        &mut self,
+        captured: &HashMap<MediaId, OpenRenderSource>,
+        required: &HashSet<MediaId>,
+    ) -> Result<&HashMap<MediaId, RgbaImage>, RenderFailure> {
+        let mut ordered = required.iter().copied().collect::<Vec<_>>();
+        ordered.sort_by_key(ToString::to_string);
+        let mut pixels = 0_u64;
+        for id in &ordered {
+            pixels += captured[id].pixel_count().map_err(|failure| failure.message)?;
+            if pixels > MAX_DECODED_SOURCE_PIXELS_TOTAL {
+                return Err(RenderFailure::typed(
+                    ImagingFailureCode::ResourceLimitExceeded,
+                    Some(id.to_string()),
+                    None,
+                    "As fontes de uma unidade excedem o limite de memória.",
+                ));
+            }
+        }
+        self.rasters.retain(|id, _| required.contains(id));
+        let missing = ordered
+            .into_iter()
+            .filter(|id| !self.rasters.contains_key(id))
+            .collect::<Vec<_>>();
+        // Isolated progressive decoders own a separate worker budget and stay
+        // sequential. In-process decoders run in parallel: with the retained
+        // rasters they stay within the unit's pixel ceiling, below the peak
+        // later reached while composing the Sheet.
+        let (isolated, in_process): (Vec<_>, Vec<_>) = missing
+            .into_iter()
+            .partition(|id| captured[id].decodes_in_isolated_worker());
+        for id in isolated {
+            let raster = decode(captured, id)?;
+            self.rasters.insert(id, raster);
+        }
+        for (id, raster) in decode_parallel(captured, &in_process, self.workers) {
+            self.rasters.insert(id, raster?);
+        }
+        Ok(&self.rasters)
+    }
+}
+
+fn decode(
+    captured: &HashMap<MediaId, OpenRenderSource>,
+    id: MediaId,
+) -> Result<RgbaImage, RenderFailure> {
+    captured[&id].decode_captured().map_err(|failure| {
+        RenderFailure::typed(
+            failure.code,
+            Some(id.to_string()),
+            failure.path_code,
+            failure.message,
+        )
+    })
+}
+
+fn decode_parallel(
+    captured: &HashMap<MediaId, OpenRenderSource>,
+    ids: &[MediaId],
+    workers: usize,
+) -> Vec<(MediaId, Result<RgbaImage, RenderFailure>)> {
+    if ids.len() <= 1 || workers == 1 {
+        return ids.iter().map(|id| (*id, decode(captured, *id))).collect();
+    }
+    let next = AtomicUsize::new(0);
+    let results = Mutex::new(Vec::with_capacity(ids.len()));
+    std::thread::scope(|scope| {
+        for _ in 0..workers.min(ids.len()) {
+            scope.spawn(|| {
+                while let Some(id) = ids.get(next.fetch_add(1, Ordering::Relaxed)) {
+                    let decoded = decode(captured, *id);
+                    results
+                        .lock()
+                        .unwrap_or_else(PoisonError::into_inner)
+                        .push((*id, decoded));
+                }
+            });
+        }
+    });
+    let mut results = results.into_inner().unwrap_or_else(PoisonError::into_inner);
+    // Report the first failure in media order, as sequential decoding did.
+    results.sort_by_key(|(id, _)| id.to_string());
+    results
 }
 
 /// Translate the already-composed physical geometry. Clipping occurs while rasterizing
@@ -321,5 +407,89 @@ mod recovery_tests {
                 );
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod source_retention_tests {
+    use super::*;
+    use image::{ImageFormat, Rgb, RgbImage};
+    use myalbuns_paths::OperationPathContext;
+
+    const IDS: [&str; 3] = [
+        "8f6d3a53-5a6f-4b11-9d1e-6a0d2f5c7b01",
+        "8f6d3a53-5a6f-4b11-9d1e-6a0d2f5c7b02",
+        "8f6d3a53-5a6f-4b11-9d1e-6a0d2f5c7b03",
+    ];
+
+    fn captured(root: &std::path::Path) -> HashMap<MediaId, OpenRenderSource> {
+        let mut context = OperationPathContext::new();
+        let paths = IDS
+            .iter()
+            .enumerate()
+            .map(|(index, _)| {
+                let path = root.join(format!("photo-{index}.jpg"));
+                RgbImage::from_fn(40 + index as u32, 30, |x, y| {
+                    Rgb([x as u8, y as u8, index as u8 * 60])
+                })
+                .save_with_format(&path, ImageFormat::Jpeg)
+                .unwrap();
+                context.capture(&path).unwrap();
+                path
+            })
+            .collect::<Vec<_>>();
+        let plan = context.freeze();
+        IDS.iter()
+            .zip(paths)
+            .map(|(id, path)| {
+                let resolved = plan
+                    .resolve_existing(&path, ExpectedObject::RegularFile)
+                    .unwrap();
+                (id.parse().unwrap(), capture_render_source(&resolved).unwrap())
+            })
+            .collect()
+    }
+
+    fn failed<T>(failure: RenderFailure) -> T {
+        panic!("{}", failure.message)
+    }
+
+    fn ids(indices: &[usize]) -> HashSet<MediaId> {
+        indices.iter().map(|index| IDS[*index].parse().unwrap()).collect()
+    }
+
+    #[test]
+    fn consecutive_units_decode_each_retained_original_once() {
+        let root = tempfile::tempdir().unwrap();
+        let captured = captured(root.path());
+        // One worker keeps decoding on this thread, where the counter lives.
+        let mut decoded = DecodedSources::new(1);
+        let before = crate::source::jpeg_decode_count();
+        // Both pages of a Page export require the same Sheet sources.
+        for _ in 0..2 {
+            let sources = decoded.prepare(&captured, &ids(&[0, 1])).unwrap_or_else(failed);
+            assert_eq!(sources.len(), 2);
+        }
+        assert_eq!(crate::source::jpeg_decode_count() - before, 2);
+        // A neighbour sharing one Original decodes only the new one and
+        // releases the source it no longer references.
+        let sources = decoded.prepare(&captured, &ids(&[1, 2])).unwrap_or_else(failed);
+        assert_eq!(sources.keys().copied().collect::<HashSet<_>>(), ids(&[1, 2]));
+        assert_eq!(crate::source::jpeg_decode_count() - before, 3);
+    }
+
+    #[test]
+    fn parallel_decoding_returns_the_same_rasters() {
+        let root = tempfile::tempdir().unwrap();
+        let captured = captured(root.path());
+        let serial = DecodedSources::new(1)
+            .prepare(&captured, &ids(&[0, 1, 2]))
+            .unwrap_or_else(failed)
+            .clone();
+        let mut parallel = DecodedSources::new(3);
+        let parallel = parallel
+            .prepare(&captured, &ids(&[0, 1, 2]))
+            .unwrap_or_else(failed);
+        assert_eq!(*parallel, serial);
     }
 }
