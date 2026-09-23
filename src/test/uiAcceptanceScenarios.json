@@ -15772,6 +15772,22 @@
       "actions": []
     },
     {
+      "id": "image-viewer-correction-faces-unselected",
+      "title": "Correção de olhos — caixas neutras sem seleção em retratos claros (fixture visual determinística)",
+      "implementationPath": "/image-viewer.html?preview=correction-select&qa=1&fixture=faces",
+      "comparison": {
+        "implementationCaptureSelector": ".image-viewer-window",
+        "reason": "Contorno claro e escuro das caixas sem Check; fixture visual sem validar detecção",
+        "kind": "implementation-only",
+        "surface": "image-viewer"
+      },
+      "viewport": { "height": 720, "width": 1050 },
+      "readySelector": ".eye-correction__pane:last-child .eye-correction__face[aria-pressed='false']",
+      "actions": [
+        { "type": "assert", "selector": ".eye-correction__pane:first-child .eye-correction__face[aria-pressed='false']" }
+      ]
+    },
+    {
       "id": "image-viewer-correction-select-faces",
       "title": "Correção de olhos — caixas de rostos selecionáveis (fixture visual determinística)",
       "implementationPath": "/image-viewer.html?preview=correction-select&qa=1&fixture=faces",
@@ -15783,6 +15799,39 @@
       },
       "viewport": { "height": 720, "width": 1050 },
       "readySelector": ".eye-correction__face[aria-pressed='true']",
+      "actions": [
+        { "type": "click", "selector": "button[aria-label='Referência: rosto 1']" },
+        { "type": "click", "selector": "button[aria-label='Imagem a corrigir: rosto 1']" }
+      ]
+    },
+    {
+      "id": "image-viewer-correction-faces-dark-unselected",
+      "title": "Correção de olhos — caixas sem seleção em retratos escurecidos (fixture visual determinística)",
+      "implementationPath": "/image-viewer.html?preview=correction-select&qa=1&fixture=faces&fixture-tone=dark",
+      "comparison": {
+        "implementationCaptureSelector": ".image-viewer-window",
+        "reason": "Mesmo retrato escurecido apenas para QA de contraste; fixture visual sem validar detecção",
+        "kind": "implementation-only",
+        "surface": "image-viewer"
+      },
+      "viewport": { "height": 720, "width": 1050 },
+      "readySelector": ".eye-correction__pane:last-child .eye-correction__face[aria-pressed='false']",
+      "actions": [
+        { "type": "assert", "selector": ".eye-correction__pane:first-child .eye-correction__face[aria-pressed='false']" }
+      ]
+    },
+    {
+      "id": "image-viewer-correction-faces-dark-selected",
+      "title": "Correção de olhos — seleção em retratos escurecidos (fixture visual determinística)",
+      "implementationPath": "/image-viewer.html?preview=correction-select&qa=1&fixture=faces&fixture-tone=dark",
+      "comparison": {
+        "implementationCaptureSelector": ".image-viewer-window",
+        "reason": "Contorno reforçado e Check visíveis na fotografia escurecida; fixture visual sem validar detecção",
+        "kind": "implementation-only",
+        "surface": "image-viewer"
+      },
+      "viewport": { "height": 720, "width": 1050 },
+      "readySelector": ".eye-correction__pane:last-child .eye-correction__face[aria-pressed='true'] .eye-correction__face-check",
       "actions": [
         { "type": "click", "selector": "button[aria-label='Referência: rosto 1']" },
         { "type": "click", "selector": "button[aria-label='Imagem a corrigir: rosto 1']" }
@@ -15831,6 +15880,20 @@
       },
       "viewport": { "height": 720, "width": 1050 },
       "readySelector": ".eye-correction[aria-busy='true'] button[aria-label='Fechar correção']:disabled",
+      "actions": []
+    },
+    {
+      "id": "image-viewer-correction-reference-narrow",
+      "title": "Correção de olhos — ação flutuante da referência na janela estreita",
+      "implementationPath": "/image-viewer.html?preview=correction-browse&qa=1&fixture=faces",
+      "comparison": {
+        "implementationCaptureSelector": ".image-viewer-window",
+        "reason": "Usar esta foto no centro inferior da referência sem rodapé nem colisão na largura mínima",
+        "kind": "implementation-only",
+        "surface": "image-viewer"
+      },
+      "viewport": { "height": 480, "width": 600 },
+      "readySelector": ".eye-correction__pane:first-child .eye-correction__reference-action",
       "actions": []
     },
     {

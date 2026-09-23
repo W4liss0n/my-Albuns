@@ -60,4 +60,28 @@ Testes do worker cobrem a conversão dos pontos, a deduplicação, a busca limit
 sem rostos e a preservação do caminho rápido. Isso corrige a reprodução fornecida;
 não representa uma avaliação geral de precisão do modelo.
 
+### Recusa do par IMG_6187 / IMG_6186
+
+A reprodução com `IMG_6187.JPG` como destino e `IMG_6186.JPG` como referência
+encontra um rosto em cada prévia de 1.600 px. O processamento real dos originais
+recusa o par com `Os olhos da referência precisam estar visivelmente mais abertos.`.
+As aberturas normalizadas medidas foram 0,310 / 0,291 no destino e 0,372 / 0,338
+na referência: aumento de aproximadamente 20% / 16%, abaixo dos 35% exigidos
+pela regra existente para cada olho. Os olhos estão abertos nas duas fotografias.
+Não foi alterado o limite para fazer este par passar.
+
+Havia também uma falha de apresentação: o Rust devolve erros serializados como
+texto, mas o consumidor do visualizador só aproveitava mensagens de `Error`.
+O adaptador de correção agora converte esse texto em `Error`, preservando o motivo
+no tooltip da foto; falhas desconhecidas mantêm uma mensagem simples da ação.
+Contrato consultado para `@tauri-apps/api` 2.11.1:
+[tratamento de erros dos comandos Tauri 2](https://v2.tauri.app/develop/calling-rust/#error-handling).
+Os quatro testes de `tauriImageViewerWindow.test.ts` cobrem a mensagem ao preparar
+e aplicar, a resposta desconhecida e o encaminhamento dos pontos e da prévia.
+
+A reprodução local está em `.scratch/face-detection-debug-20260923/render-pair.mjs`
+e `render/Cargo.toml`, que inclui o compositor real. As cópias de diagnóstico e
+os pontos das fotos não são versionados. Esta recusa de qualidade continua
+esperada; a correção foi não esconder sua explicação.
+
 A correção aceita originais de até **36 megapixels**, até 10.000 px por eixo, com perfil sRGB conhecido. Pares com olhos pouco abertos, rostos pequenos ou poses/escalas excessivamente diferentes são recusados para evitar composições ruins. A adaptação local de cor não resolve diferenças fortes de luz, óculos ou oclusões; nesses casos, escolher outra referência é necessário. A avaliação de naturalidade foi feita com um par fotográfico real e não cobre todas as condições de retrato.

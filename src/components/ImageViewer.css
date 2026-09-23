@@ -24,6 +24,7 @@
 .eye-correction__panes { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); flex: 1; min-height: 0; }
 .eye-correction__pane { display: flex; flex-direction: column; position: relative; min-width: 0; min-height: 0; }
 .eye-correction__pane:first-child { border-right: 1px solid var(--ui-border); }
+.eye-correction__reference-action { left: 50%; bottom: 16px; transform: translateX(-50%); }
 .eye-correction__pane-image { position: relative; display: flex; align-items: center; justify-content: center; flex: 1; min-width: 0; min-height: 0; overflow: hidden; }
 .eye-correction__photo { position: absolute; }
 .eye-correction__photo img { display: block; width: 100%; height: 100%; user-select: none; }
@@ -31,9 +32,12 @@
 .eye-correction__pane-image:focus-visible { outline: 2px solid var(--ui-focus-neutral); outline-offset: -3px; }
 .eye-correction__fit { right: 12px; bottom: 12px; }
 .eye-correction__face-layer { position: absolute; z-index: 2; inset: 0; overflow: hidden; pointer-events: none; }
-.eye-correction__face { position: absolute; box-sizing: border-box; border: 1px solid color-mix(in srgb, var(--ui-text) 70%, transparent); border-radius: 2px; background: transparent; cursor: pointer; pointer-events: auto; }
+.eye-correction__face { position: absolute; box-sizing: border-box; border: 1px solid var(--ui-text); border-radius: 2px; background: transparent; cursor: pointer; pointer-events: auto; }
+.eye-correction__face::before { content: ""; position: absolute; inset: 0; border: 1px solid var(--ui-surface); pointer-events: none; }
 .eye-correction__face[data-selected="true"] { border: 2px solid var(--ui-text); }
 .eye-correction__face:hover { border-color: var(--ui-text); }
 .eye-correction__face:focus-visible { outline: 2px solid var(--ui-focus-neutral); outline-offset: 2px; }
+.eye-correction__face-check { position: absolute; top: -7px; right: -7px; display: grid; place-items: center; width: 16px; height: 16px; border: 1px solid var(--ui-text); border-radius: 50%; background: var(--ui-surface); color: var(--ui-text); pointer-events: none; }
+.eye-correction__face-check svg { width: 12px; height: 12px; }
 .eye-correction__nav--previous { left: 4px; top: 50%; transform: translateY(-50%); }
 .eye-correction__nav--next { right: 4px; top: 50%; transform: translateY(-50%); }

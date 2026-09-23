@@ -23,7 +23,7 @@ const previewCorrection = (phase: string) => ({
   referenceUrl: qa ? qaReference : sizedPreview(portraitPreview, 800, 1200),
   referenceState: "ready" as const, canPreviousReference: false, canNextReference: phase === "browse",
   resultUrl: phase === "preview" || phase === "applying" ? qa ? "/.scratch/eye-correction/qa/nikki-corrected.png" : sizedPreview(landscapePreview, 1200, 800) : null,
-  error: qaError === "prepare" && phase === "select" ? "Não foi possível preparar a correção para esta fotografia. Escolha outra referência e tente novamente."
+  error: qaError === "prepare" && phase === "select" ? "Os olhos da referência precisam estar visivelmente mais abertos."
     : qaError === "save" && phase === "preview" ? "Não foi possível salvar a correção. Tente novamente." : null,
 });
 if (!preview) installDesktopWebViewPolicy(document);

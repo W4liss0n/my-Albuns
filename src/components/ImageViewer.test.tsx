@@ -74,11 +74,13 @@ test("eye correction opens from a ready viewer and keeps the target fixed beside
     canPreviousReference: false, canNextReference: true, resultUrl: null, error: null,
   } };
   const onNavigate = vi.fn();
-  render(<ImageViewer presentation={presentation} onNavigate={onNavigate} onClose={vi.fn()} onCorrection={onCorrection} />);
+  const view = render(<ImageViewer presentation={presentation} onNavigate={onNavigate} onClose={vi.fn()} onCorrection={onCorrection} />);
   expect(screen.getByRole("img", { name: "Imagem a" })).toBeInTheDocument();
   expect(screen.getByRole("img", { name: "Outra foto.jpg" })).toBeInTheDocument();
   expect(screen.queryByText("Imagem a")).not.toBeInTheDocument();
   expect(screen.queryByText("Outra foto.jpg")).not.toBeInTheDocument();
+  expect(view.container.querySelector(".eye-correction__pane:first-child .eye-correction__reference-action")).toBe(screen.getByRole("button", { name: "Usar esta foto" }));
+  expect(view.container.querySelector(".eye-correction__tools .eye-correction__reference-action")).not.toBeInTheDocument();
   fireEvent.click(screen.getByRole("button", { name: "Próxima referência" }));
   expect(onNavigate).toHaveBeenCalledWith(1);
   fireEvent.click(screen.getByRole("button", { name: "Usar esta foto" }));
@@ -93,7 +95,7 @@ test("a correction preview compares only the target and saves once even while sh
     canPreviousReference: false, canNextReference: false,
     resultUrl: "data:image/png;id=corrected", error: null,
   } };
-  render(<ImageViewer presentation={presentation} onNavigate={vi.fn()} onClose={vi.fn()} onCorrection={onCorrection} />);
+  const view = render(<ImageViewer presentation={presentation} onNavigate={vi.fn()} onClose={vi.fn()} onCorrection={onCorrection} />);
   expect(screen.getByRole("img", { name: "Imagem a" })).toHaveAttribute("src", "data:image/png;id=corrected");
   const reference = screen.getByRole("img", { name: "Outra foto.jpg" });
   const compare = screen.getByRole("button", { name: "Antes e depois: mostrar original" });
@@ -101,6 +103,7 @@ test("a correction preview compares only the target and saves once even while sh
   fireEvent.click(compare);
   expect(screen.getByRole("img", { name: "Imagem a" })).toHaveAttribute("src", initial.url);
   expect(reference).toHaveAttribute("src", "data:image/png;id=reference");
+  expect(view.container.querySelector(".eye-correction__pane:first-child .eye-correction__reference-action")).toBe(screen.getByRole("button", { name: "Trocar referência" }));
   expect(screen.getByRole("button", { name: "Antes e depois: mostrar correção" })).toHaveAttribute("aria-pressed", "true");
   expect(onCorrection).not.toHaveBeenCalled();
   fireEvent.click(screen.getByRole("button", { name: "Trocar referência" }));
@@ -148,11 +151,12 @@ test("an applying correction cannot be cancelled or navigated before commit sett
     canPreviousReference: true, canNextReference: true,
     resultUrl: "data:image/png;id=corrected", error: null,
   } };
-  render(<ImageViewer presentation={presentation} onNavigate={onNavigate} onClose={onClose} onCorrection={onCorrection} />);
+  const view = render(<ImageViewer presentation={presentation} onNavigate={onNavigate} onClose={onClose} onCorrection={onCorrection} />);
   expect(screen.getByRole("button", { name: "Fechar correção" })).toBeDisabled();
   expect(screen.getByRole("button", { name: "Trocar referência" })).toBeDisabled();
   expect(screen.getByRole("button", { name: "Antes e depois: mostrar original" })).toBeDisabled();
   expect(screen.getByRole("button", { name: "Salvar correção" })).toBeDisabled();
+  expect(view.container.querySelector(".eye-correction__pane:first-child .eye-correction__reference-action")).toBe(screen.getByRole("button", { name: "Trocar referência" }));
   fireEvent.keyDown(window, { key: "Escape" });
   fireEvent.keyDown(window, { key: "ArrowRight" });
   expect(onCorrection).not.toHaveBeenCalled();
@@ -244,6 +248,9 @@ test("face bounds track fit and zoom, clip off-image faces, and allow pan withou
     expect(screen.getByRole("button", { name: "Ver correção" })).toHaveAttribute("aria-disabled", "true");
     fireEvent.click(reference);
     expect(reference).toHaveAttribute("aria-pressed", "true");
+    expect(reference.querySelector(".eye-correction__face-check")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Referência: rosto 2" }).querySelector(".eye-correction__face-check")).not.toBeInTheDocument();
+    expect(target.querySelector(".eye-correction__face-check")).not.toBeInTheDocument();
     fireEvent.wheel(pane, { deltaY: -700 });
     expect(screen.queryByRole("button", { name: "Imagem a corrigir: rosto 1" })).not.toBeInTheDocument();
     expect(parseFloat(photo.style.width)).toBeGreaterThan(fittedWidth * 4);
@@ -262,6 +269,7 @@ test("face bounds track fit and zoom, clip off-image faces, and allow pan withou
     fireEvent.pointerUp(target, { pointerId: 2 });
     fireEvent.click(target);
     expect(target).toHaveAttribute("aria-pressed", "true");
+    expect(target.querySelector(".eye-correction__face-check")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Ver correção" })).not.toHaveAttribute("aria-disabled");
     fireEvent.click(screen.getByRole("button", { name: "Ver correção" }));
     expect(onCorrection).toHaveBeenCalledWith(expect.objectContaining({ kind: "preview", targetFace: center, referenceFace: edge }));
