@@ -1,10 +1,11 @@
 use std::sync::Mutex;
 
-use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter, Manager, State, WebviewWindow, WindowEvent};
 
 use crate::{
-    cache_previews::CachePreviewRegistry, native_dialog_window,
+    cache_previews::CachePreviewRegistry,
+    ipc_contract::{ViewerAction, ViewerPresentation},
+    native_dialog_window,
     product_runtime::PROJECT_WINDOW_LABEL,
 };
 
@@ -12,26 +13,6 @@ pub(crate) const LABEL: &str = "image-viewer";
 pub(crate) const NAVIGATE_EVENT: &str = "myalbuns://image-viewer-navigate";
 pub(crate) const CLOSED_EVENT: &str = "myalbuns://image-viewer-closed";
 pub(crate) const PRESENTATION_EVENT: &str = "myalbuns://image-viewer-presentation";
-
-#[derive(Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub(crate) struct ViewerPresentation {
-    pub(crate) session_id: String,
-    pub(crate) revision: u64,
-    pub(crate) media_id: String,
-    pub(crate) name: String,
-    pub(crate) url: Option<String>,
-    pub(crate) state: String,
-    pub(crate) can_previous: bool,
-    pub(crate) can_next: bool,
-}
-
-#[derive(Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
-struct ViewerAction {
-    session_id: String,
-    offset: i8,
-}
 
 #[derive(Default)]
 pub(crate) struct ViewerStore(Mutex<Option<ViewerPresentation>>);
@@ -142,6 +123,14 @@ pub(crate) async fn open_image_viewer(
                 retire(&app_for_close, &owner, &session_for_close);
             }
         });
+        if store
+            .current()?
+            .as_ref()
+            .is_none_or(|current| current.session_id != presentation.session_id)
+        {
+            let _ = native_dialog_window::dismiss_blocked_window(&window, &viewer, true);
+            return Ok(());
+        }
         native_dialog_window::display_owned_dialog(&window, &viewer)
             .map_err(|error| error.to_string())
     }
@@ -270,6 +259,20 @@ fn retire(app: &AppHandle, owner: &WebviewWindow, session_id: &str) {
     native_dialog_window::release_blocked_owner_if_disabled(owner, true);
 }
 
+pub(crate) fn retire_for_editor_recovery(app: &AppHandle) -> Result<(), String> {
+    let owner = app
+        .get_webview_window(PROJECT_WINDOW_LABEL)
+        .ok_or("the Project window is unavailable")?;
+    if let Some(viewer) = app.get_webview_window(LABEL) {
+        native_dialog_window::dismiss_blocked_window(&owner, &viewer, true)
+            .map_err(|error| error.to_string())?;
+    }
+    if let Some(current) = app.state::<ViewerStore>().current()? {
+        retire(app, &owner, &current.session_id);
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -281,7 +284,7 @@ mod tests {
             media_id: media_id.into(),
             name: media_id.into(),
             url: None,
-            state: "loading".into(),
+            state: crate::ipc_contract::ViewerPreviewState::Loading,
             can_previous: false,
             can_next: true,
         }

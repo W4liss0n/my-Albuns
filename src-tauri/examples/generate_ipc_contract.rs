@@ -12,8 +12,9 @@ use myalbuns_desktop_lib::ipc_contract::{
     ProjectDialogActionEvent, ProjectDialogPresentation, ProjectDialogState,
     ProjectRecoveryDecision, SaveAsProjectCommandError, SaveAsProjectOutcome, SaveAsProjectResult,
     SaveProjectCommandError, SaveProjectOutcome, SaveProjectResult, SettingsPreferenceChange,
-    WorkspacePanelKind, WorkspacePanelPreference, WorkspacePanelPreferences,
-    WorkspacePreferenceChange, WorkspacePreferences,
+    ViewerAction, ViewerPresentation, ViewerPreviewState, WorkspacePanelKind,
+    WorkspacePanelPreference, WorkspacePanelPreferences, WorkspacePreferenceChange,
+    WorkspacePreferences,
 };
 use ts_rs::{Config, TS};
 
@@ -25,6 +26,9 @@ fn main() {
     let config = Config::new()
         .with_out_dir(output_dir)
         .with_large_int("number");
+    ViewerPreviewState::export_all(&config).expect("viewer state bindings");
+    ViewerPresentation::export_all(&config).expect("viewer presentation bindings");
+    ViewerAction::export_all(&config).expect("viewer action bindings");
     myalbuns_desktop_lib::ipc_contract::GenerationView::export_all(&config)
         .expect("generation view bindings");
     myalbuns_desktop_lib::ipc_contract::GenerationProgress::export_all(&config)

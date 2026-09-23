@@ -97,7 +97,7 @@ export function ImageViewer({ presentation, onNavigate, onClose }: Props) {
           onLoad={(event) => { setLoaded({ key: imageKey, width: event.currentTarget.naturalWidth, height: event.currentTarget.naturalHeight }); setFailedKey(null); }}
           onError={() => { setFailedKey(imageKey); setLoaded(null); }} />}
         {!ready && <p aria-live="polite" className="image-viewer__message" role="status">{message}</p>}
-        {ready && state !== "ready" && state !== "available" && <p className="image-viewer__stale" role="status">Prévia anterior · imagem indisponível</p>}
+        {ready && state !== "ready" && <p className="image-viewer__stale" role="status">Prévia anterior · imagem indisponível</p>}
         <button aria-label="Imagem anterior" className="image-viewer__nav image-viewer__nav--previous" disabled={!canPrevious} onClick={() => onNavigate(-1)} title="Imagem anterior (←)" type="button"><AppIcon icon={ChevronLeft} size={18} /></button>
         <button aria-label="Próxima imagem" className="image-viewer__nav image-viewer__nav--next" disabled={!canNext} onClick={() => onNavigate(1)} title="Próxima imagem (→)" type="button"><AppIcon icon={ChevronRight} size={18} /></button>
         {zoom > 1 && <button aria-label="Ajustar à janela" className="image-viewer__fit" onClick={() => { setZoom(1); setPan({ x: 0, y: 0 }); }} title="Ajustar à janela (0)" type="button"><AppIcon icon={Scan} size={16} /></button>}

@@ -60,6 +60,8 @@ export class EditingCanvasNavigation {
     }
     this.updateCursor();
     this.canvas.dataset.editingZoom = scope ? String(this.transform.zoom) : "";
+    this.canvas.dataset.editingPanX = scope ? String(this.transform.x) : "";
+    this.canvas.dataset.editingPanY = scope ? String(this.transform.y) : "";
     return this.transform;
   }
 
@@ -142,6 +144,7 @@ export class EditingCanvasNavigation {
     if (!this.pan) this.pointerAwaitingRelease = null;
     if (event.target !== this.canvas || !this.enabled ||
         !(event.button === 1 || (event.button === 0 && this.spaceHeld))) return;
+    this.readInput()?.editingNavigation?.onPanGesture?.();
     event.preventDefault();
     event.stopImmediatePropagation();
     this.canvas.focus({ preventScroll: true });
@@ -225,5 +228,7 @@ export class EditingCanvasNavigation {
     document.removeEventListener("visibilitychange", this.visibilityChange);
     this.canvas.removeEventListener("auxclick", this.auxClick);
     delete this.canvas.dataset.editingZoom;
+    delete this.canvas.dataset.editingPanX;
+    delete this.canvas.dataset.editingPanY;
   }
 }

@@ -1,4 +1,11 @@
 import type { ComposedSheet } from "../domain/project";
+import type { MediaFileInfo, MediaPreview } from "../application/projectPorts";
+import type { ViewerPreviewState } from "../contracts/generated/ViewerPreviewState";
+
+export function viewerPreviewState(original: MediaFileInfo | undefined, preview: MediaPreview | undefined): ViewerPreviewState {
+  if (original?.state === "absent" || original?.state === "unavailable") return original.state;
+  return preview?.state ?? "loading";
+}
 
 /** The composition order is stable; repeated uses of one photo appear once. */
 export function sheetViewerMediaIds(sheet: ComposedSheet | null): string[] {

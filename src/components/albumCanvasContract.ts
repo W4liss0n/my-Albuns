@@ -105,7 +105,7 @@ export interface AlbumCanvasProps {
   focusedSheetId: string | null;
   centeredSheetId: string | null;
   viewport: ViewportState;
-  editingNavigation?: { disabled: boolean; fitRequest: number };
+  editingNavigation?: { disabled: boolean; fitRequest: number; onPanGesture?: () => void };
   draggedPhotoId?: string | null;
   mediaDrag?: import("./useMediaDragGesture").MediaDrag | null;
   decorativeDropPreview?: import("../domain/project").DecorativeDropPreview | null;

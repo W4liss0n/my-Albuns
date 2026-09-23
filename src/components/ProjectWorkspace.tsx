@@ -39,7 +39,7 @@ import {
   type InspectorContext,
 } from "./InspectorPanel";
 import { MediaPanel, type MediaPanelHandle } from "./MediaPanel";
-import { adjacentViewerDemand, sheetViewerMediaIds } from "./imageViewerModel";
+import { adjacentViewerDemand, sheetViewerMediaIds, viewerPreviewState } from "./imageViewerModel";
 import { ownsEditingKeys } from "./keyboardEventOwnership";
 import { createProjectApplicationMenus } from "./projectApplicationMenus";
 import { useProjectLauncher } from "./useProjectLauncher";
@@ -55,7 +55,7 @@ import { SheetContextMenu } from "./SheetContextMenu";
 import { FrameContextMenu } from "./FrameContextMenu";
 import { ContextMenuSurface } from "../ui/ContextMenuSurface";
 import { MenuItem } from "../ui/MenuItem";
-import { projectCommandDescriptor } from "../application/projectCommandCatalog";
+import { matchProjectCommandShortcut, projectCommandDescriptor } from "../application/projectCommandCatalog";
 import {
   createSheetReorderSession,
   reduceSheetReorderSession,
@@ -155,11 +155,13 @@ export function ProjectWorkspace({
   } | null>(null);
   const openedViewerSession = useRef<string | null>(null);
   const viewerRevision = useRef(0);
+  const viewerPendingRef = useRef(false);
   const spaceCandidate = useRef<{ source: "panel" | "sheet"; mediaId: string; mediaIds: readonly string[]; focus: HTMLElement | null; cancelled: boolean } | null>(null);
   useEffect(() => {
     setMediaSelectionRequest(null);
     setMediaDrag(null);
     setViewer(null);
+    viewerPendingRef.current = false;
     spaceCandidate.current = null;
   }, [projectId]);
   useEffect(() => {
@@ -242,7 +244,7 @@ export function ProjectWorkspace({
 
   useEffect(() => {
     const rejectTerminalKeyboardInput = (event: KeyboardEvent) => {
-      if (!sessionBarrierRef.current) return;
+      if (!sessionBarrierRef.current && !viewerPendingRef.current) return;
       event.preventDefault();
       event.stopImmediatePropagation();
     };
@@ -271,7 +273,8 @@ export function ProjectWorkspace({
       exportActive ||
       projectClose.interactionBlocked ||
       sessionBarrierActive ||
-      graphicsFailure !== null,
+      graphicsFailure !== null ||
+      viewer?.projectId === projectId,
     projection,
     runProjectMutation,
     projectCorePort,
@@ -402,7 +405,8 @@ export function ProjectWorkspace({
     projectClose.interactionBlocked ||
     albumInformationApply.active ||
     sessionBarrierActive ||
-    graphicsFailure !== null;
+    graphicsFailure !== null ||
+    viewer?.projectId === projectId;
   const selectedPhotoFrame = controller.selectedFrames.length === 1 && controller.selectedFrames[0].photo
     ? controller.selectedFrames[0] : null;
   const viewerActive = viewer?.projectId === projectId ? viewer : null;
@@ -410,6 +414,7 @@ export function ProjectWorkspace({
     if (!imageViewerWindowPort || commandsBlocked || mediaDrag || !mediaIds.includes(mediaId)) return;
     setFrameContextMenu(null);
     setSheetContextMenu(null);
+    viewerPendingRef.current = true;
     setViewer({ sessionId: crypto.randomUUID(), projectId, source, mediaId, mediaIds: [...mediaIds], restoreFocus: focus });
   };
   const viewerPresentation = useMemo<ViewerPresentation | null>(() => {
@@ -421,7 +426,7 @@ export function ProjectWorkspace({
       sessionId: viewerActive.sessionId, revision: ++viewerRevision.current,
       mediaId: viewerActive.mediaId, name: media?.name ?? "Imagem",
       url: mediaPreviewUrls[viewerActive.mediaId] ?? null,
-      state: mediaFiles?.[viewerActive.mediaId]?.state ?? preview?.state ?? "loading",
+      state: viewerPreviewState(mediaFiles?.[viewerActive.mediaId], preview),
       canPrevious: position > 0, canNext: position >= 0 && position < viewerActive.mediaIds.length - 1,
     };
   }, [viewerActive, projection.state.album.media, mediaPreviews, mediaPreviewUrls, mediaFiles]);
@@ -439,7 +444,11 @@ export function ProjectWorkspace({
       void (async () => {
         if (previousSession) await imageViewerWindowPort.close(previousSession);
         await imageViewerWindowPort.open(viewerPresentation);
-      })().catch(() => setViewer((current) => current?.sessionId === viewerPresentation.sessionId ? null : current));
+      })().catch(() => { viewerPendingRef.current = false; setViewer((current) => {
+        if (current?.sessionId !== viewerPresentation.sessionId) return current;
+        requestAnimationFrame(() => (current.restoreFocus?.isConnected ? current.restoreFocus : document.querySelector<HTMLElement>(current.source === "panel" ? "#media-panel" : ".canvas-host canvas"))?.focus({ preventScroll: true }));
+        return null;
+      }); });
     } else {
       void imageViewerWindowPort.update(viewerPresentation).catch(() => undefined);
     }
@@ -450,7 +459,7 @@ export function ProjectWorkspace({
     let stopNavigate: (() => void) | undefined;
     let stopClosed: (() => void) | undefined;
     void imageViewerWindowPort.onNavigate(({ sessionId, offset }) => {
-      if (!active) return;
+      if (!active || (offset !== -1 && offset !== 1)) return;
       setViewer((current) => {
         if (!current || current.sessionId !== sessionId) return current;
         const index = current.mediaIds.indexOf(current.mediaId);
@@ -462,6 +471,7 @@ export function ProjectWorkspace({
       if (!active) return;
       setViewer((current) => {
         if (current?.sessionId !== sessionId) return current;
+        viewerPendingRef.current = false;
         requestAnimationFrame(() => (current.restoreFocus?.isConnected ? current.restoreFocus : document.querySelector<HTMLElement>(current.source === "panel" ? "#media-panel" : ".canvas-host canvas"))?.focus({ preventScroll: true }));
         return null;
       });
@@ -475,17 +485,19 @@ export function ProjectWorkspace({
         if (spaceCandidate.current) spaceCandidate.current.cancelled = true;
         return;
       }
-      if (event.repeat || event.ctrlKey || event.altKey || event.metaKey || ownsEditingKeys(event.target) || commandsBlocked || mediaDrag || frameContextMenu || sheetContextMenu) return;
+      if (event.repeat || ownsEditingKeys(event.target) || commandsBlocked || mediaDrag || frameContextMenu || sheetContextMenu) return;
       if (spaceCandidate.current) return;
       const target = event.target instanceof Element ? event.target : null;
       const panel = target?.closest("#media-panel");
       if (panel) {
         const card = target?.closest<HTMLElement>("[data-media-id]");
         if (target?.closest("button, [role=menu], [role=menubar]") && !card) return;
+        if (matchProjectCommandShortcut(event, "media-photo") !== "view-image") return;
         const selection = mediaPanelRef.current?.viewerSelection(card?.dataset.mediaId);
         if (!selection) return;
         spaceCandidate.current = { source: "panel", ...selection, focus: target instanceof HTMLElement ? target : null, cancelled: false };
       } else if (target?.closest(".canvas-host") && !target.closest("button, [role=menu], [role=menubar]")) {
+        if (matchProjectCommandShortcut(event, "frame-photo") !== "view-image") return;
         const frame = selectedPhotoFrame;
         if (!frame?.photo) return;
         const sheet = projection.composition.sheets.find((item) => item.frames.some((candidate) => candidate.frameId === frame.id)) ?? null;
@@ -493,7 +505,7 @@ export function ProjectWorkspace({
         if (!mediaIds.includes(frame.photo.mediaId)) return;
         spaceCandidate.current = { source: "sheet", mediaId: frame.photo.mediaId, mediaIds, focus: target instanceof HTMLElement ? target : null, cancelled: false };
       } else return;
-      event.preventDefault();
+      if (panel) event.preventDefault();
     };
     const keyUp = (event: globalThis.KeyboardEvent) => {
       if (viewerActive) return;
@@ -522,7 +534,7 @@ export function ProjectWorkspace({
     if (canOpenFrameInPhotoshop && selectedPhotoFrame) void photoshop.open({ kind: "frames", frameIds: [selectedPhotoFrame.id] });
   };
   const workspaceInteractionBlocked =
-    mediaRemoval.active || sessionBarrierActive || graphicsFailure !== null;
+    mediaRemoval.active || sessionBarrierActive || graphicsFailure !== null || viewerActive !== null;
   const sheetOrderSignature = projection.state.album.sheets
     .map((sheet) => sheet.id)
     .join(",");
@@ -846,7 +858,8 @@ export function ProjectWorkspace({
             controller.importPending ||
             projectClose.interactionBlocked ||
             sessionBarrierActive ||
-            graphicsFailure !== null
+            graphicsFailure !== null ||
+            viewerActive !== null
           }
           exportMediaPort={exportMediaPort}
           onProjectionChange={onProjectionChange}
@@ -875,7 +888,8 @@ export function ProjectWorkspace({
             sheet={projection.composition.sheets.find((sheet) => sheet.sheetId === controller.layoutPanel.sheetId)!} />}
           <AlbumCanvas
             {...controller.canvasProps}
-            editingNavigation={{ disabled: canvasNavigationBlocked, fitRequest: fitSheetRequest }}
+            editingNavigation={{ disabled: canvasNavigationBlocked, fitRequest: fitSheetRequest,
+              onPanGesture: () => { if (spaceCandidate.current) spaceCandidate.current.cancelled = true; } }}
             onOpenFrameContextMenu={openFrameContextMenu}
             onOpenEmptyCanvasContextMenu={openEmptyCanvasContextMenu}
             draggedPhotoId={draggedPhotoId}

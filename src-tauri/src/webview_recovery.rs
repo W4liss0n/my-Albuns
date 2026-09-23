@@ -397,6 +397,7 @@ fn recover(
             .state::<crate::project_host::ProjectHost>()
             .cancel_close();
         crate::project_dialog_window::retire_editor_dialog(app).map_err(io::Error::other)?;
+        crate::image_viewer_window::retire_for_editor_recovery(app).map_err(io::Error::other)?;
     }
     if label == crate::project_dialog_window::PROJECT_DIALOG_LABEL {
         // Reused export dialogs keep their original URL while the Host advances

@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import ReactDOM from "react-dom/client";
 import { ImageViewer } from "../components/ImageViewer";
 import type { ViewerPresentation } from "../application/imageViewerWindow";
+import { observeViewerPresentation } from "./viewerObservation";
 import { installDesktopWebViewPolicy } from "../platform/desktopWebViewPolicy";
 import { tauriWindowControls } from "../platform/tauriWindowControls";
 import { tauriImageViewerClient } from "./platform/tauriImageViewerClient";
@@ -23,23 +24,16 @@ function ViewerWindow() {
   useEffect(() => {
     if (preview) return;
     let active = true;
-    let stop: (() => void) | undefined;
-    void tauriImageViewerClient.onPresentation((next) => {
-      if (active) setPresentation((current) => current && current.sessionId === next.sessionId && current.revision > next.revision ? current : next);
-    }).then(async (dispose) => {
-      if (!active) { dispose(); return; }
-      stop = dispose;
-      try {
-        const initial = await tauriImageViewerClient.current();
-        if (active) setPresentation(initial);
-      } catch { if (active) setError("O estado desta imagem não está disponível."); }
+    const observation = observeViewerPresentation(tauriImageViewerClient, setPresentation);
+    void observation.ready.then(async () => {
+      if (!active) return;
       const token = Number(new URLSearchParams(location.search).get("ownedReadyToken"));
       if (Number.isSafeInteger(token) && token > 0) {
         try { await tauriImageViewerClient.ready(token); }
         catch { if (active) setError("Não foi possível abrir a janela."); }
       }
-    });
-    return () => { active = false; stop?.(); };
+    }).catch(() => { if (active) setError("O estado desta imagem não está disponível."); });
+    return () => { active = false; observation.dispose(); };
   }, []);
   const close = () => {
     if (preview) return;

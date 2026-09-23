@@ -7,6 +7,8 @@ mod batch;
 pub use batch::*;
 mod generation;
 pub use generation::*;
+mod image_viewer;
+pub use image_viewer::*;
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize, TS)]
 #[serde(rename_all = "camelCase")]

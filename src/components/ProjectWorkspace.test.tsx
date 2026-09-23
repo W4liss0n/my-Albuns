@@ -699,6 +699,43 @@ test("viewer opens from a selected canvas photo on Space release, isolates edito
   await waitFor(() => expect(document.activeElement).toBe(canvas));
 });
 
+test("viewer request blocks editor commands before the native owner is disabled and releases them after open failure", async () => {
+  const opening = deferredValue<void>();
+  const viewerPort = { open: vi.fn(() => opening.promise), update: vi.fn(async () => undefined), close: vi.fn(async () => undefined),
+    onNavigate: vi.fn(async () => () => undefined), onClosed: vi.fn(async () => () => undefined) };
+  useEditorView.setState({ editingSheetId: "sheet-001", selectedFrameIds: ["frame-001"] });
+  const port = projectCorePortWithApply(async () => projection);
+  port.undo = vi.fn(async () => projection);
+  port.applyWithOutcome = vi.fn(async () => ({ projection, affectedFrameId: null, affectedSheetId: null }));
+  render(<ProjectWorkspace projection={projection} projectCorePort={port} onProjectionChange={vi.fn()} imageViewerWindowPort={viewerPort} />);
+  const canvas = screen.getByTestId("album-canvas");
+  canvas.focus();
+  fireEvent.keyDown(canvas, { code: "Space", key: " " });
+  fireEvent.keyUp(canvas, { code: "Space", key: " " });
+  await waitFor(() => expect(viewerPort.open).toHaveBeenCalledOnce());
+  expect(screen.getByRole("menuitem", { name: "Editar" })).toBeDisabled();
+  fireEvent.click(screen.getByRole("menuitem", { name: "Editar" }));
+  expect(screen.queryByRole("menu", { name: "Editar" })).not.toBeInTheDocument();
+  fireEvent.keyDown(canvas, { key: "z", code: "KeyZ", ctrlKey: true });
+  fireEvent.keyDown(canvas, { key: "Delete", code: "Delete" });
+  expect(port.undo).not.toHaveBeenCalled();
+  expect(port.applyWithOutcome).not.toHaveBeenCalled();
+  await act(async () => { opening.reject(new Error("native viewer unavailable")); await opening.promise.catch(() => undefined); });
+  await waitFor(() => expect(screen.getByRole("menuitem", { name: "Editar" })).not.toBeDisabled());
+  await waitFor(() => expect(document.activeElement).toBe(canvas));
+});
+
+test("Shift+Space is not the viewer shortcut", () => {
+  const viewerPort = { open: vi.fn(async () => undefined), update: vi.fn(async () => undefined), close: vi.fn(async () => undefined),
+    onNavigate: vi.fn(async () => () => undefined), onClosed: vi.fn(async () => () => undefined) };
+  useEditorView.setState({ editingSheetId: "sheet-001", selectedFrameIds: ["frame-001"] });
+  render(<ProjectWorkspace projection={projection} onProjectionChange={vi.fn()} imageViewerWindowPort={viewerPort} />);
+  const canvas = screen.getByTestId("album-canvas");
+  fireEvent.keyDown(canvas, { code: "Space", key: " ", shiftKey: true });
+  fireEvent.keyUp(canvas, { code: "Space", key: " ", shiftKey: true });
+  expect(viewerPort.open).not.toHaveBeenCalled();
+});
+
 test("Space with a canvas pointer gesture never opens the viewer, while its photo menu opens the clicked image", () => {
   const viewerPort = { open: vi.fn(async () => undefined), update: vi.fn(async () => undefined), close: vi.fn(async () => undefined),
     onNavigate: vi.fn(async () => () => undefined), onClosed: vi.fn(async () => () => undefined) };
