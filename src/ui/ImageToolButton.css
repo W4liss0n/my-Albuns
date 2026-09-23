@@ -15,7 +15,8 @@
 .ui-action-button.ui-image-tool:focus-visible:not(:disabled) { border: 0; background: transparent; color: var(--ui-text); }
 .ui-action-button.ui-image-tool:focus-visible { box-shadow: none; }
 .ui-image-tool::before { content: ""; position: absolute; z-index: -1; inset: 3px; border-radius: 50%; background: color-mix(in srgb, var(--ui-surface) 56%, transparent); pointer-events: none; transition: background 120ms ease; }
-.ui-image-tool:hover:not(:disabled)::before { background: color-mix(in srgb, var(--ui-surface) 72%, transparent); }
+.ui-image-tool:hover:not(:disabled):not([aria-disabled="true"])::before { background: color-mix(in srgb, var(--ui-surface) 72%, transparent); }
+.ui-image-tool[aria-disabled="true"] { cursor: default; opacity: 0.52; }
 .ui-image-tool svg { width: 18px; height: 18px; }
 .ui-image-tool[data-glyph="navigation"] svg { width: 26px; height: 26px; }
 .ui-image-tool:focus-visible { outline: 2px solid var(--ui-focus-neutral); outline-offset: 2px; }

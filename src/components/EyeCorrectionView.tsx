@@ -3,7 +3,6 @@ import { Check, ChevronLeft, ChevronRight, Columns2, EyeOff, RefreshCcw, Save, S
 import type { ViewerCorrectionAction, ViewerPresentation } from "../application/imageViewerWindow";
 import { detectFaces, faceBounds, type Face } from "../image-viewer/faceLandmarks";
 import { ImageToolButton } from "../ui/ImageToolButton";
-import { useUiAnchoredTooltip } from "../ui/UiAnchoredTooltip";
 
 interface Props {
   presentation: ViewerPresentation;
@@ -12,9 +11,11 @@ interface Props {
 }
 
 type Side = "reference" | "target";
+type AnalysisState = "idle" | "analyzing" | "ready" | "no-face" | "failed";
 // Visual QA only: stable marker positions over the local QA photos. This does not exercise detection.
 const fixtureFaces = import.meta.env.DEV && new URLSearchParams(location.search).get("fixture") === "faces";
 const fixtureNoFaces = import.meta.env.DEV && new URLSearchParams(location.search).get("fixture") === "none";
+const fixtureAnalysisError = import.meta.env.DEV && new URLSearchParams(location.search).get("fixture") === "analysis-error";
 function fixtureFace(side: Side): Face {
   const [centerX, centerY, radiusX, radiusY] = side === "reference"
     ? [.50075, .37648, .14677, .18253] : [.51571, .26458, .14826, .15113];
@@ -24,18 +25,24 @@ function fixtureFace(side: Side): Face {
   });
 }
 
+function analysisIssue(state: AnalysisState, photo: "foto de destino" | "referência") {
+  if (state === "no-face") return `Nenhum rosto encontrado na ${photo}.`;
+  if (state === "failed") return `Não foi possível analisar a ${photo}. Escolha outra foto.`;
+  return null;
+}
+
 function FaceImage({ side, url, name, choosing, selected, onChoose, onStatus, navigation }: {
   side: Side; url: string | null; name: string; choosing: boolean;
   selected: number | null; onChoose(index: number, faces: Face[]): void;
-  onStatus(message: string | null): void;
+  onStatus(state: AnalysisState): void;
   navigation?: { previous: boolean; next: boolean; onNavigate(offset: -1 | 1): void };
 }) {
   const image = useRef<HTMLImageElement>(null);
   const pane = useRef<HTMLDivElement>(null);
   const generation = useRef(0);
   const [faces, setFaces] = useState<Face[]>([]);
-  const [message, setMessage] = useState<string | null>(null);
-  useEffect(() => { onStatus(message); }, [message, onStatus]);
+  const [analysis, setAnalysis] = useState<AnalysisState>("idle");
+  useEffect(() => { onStatus(analysis); }, [analysis, onStatus]);
   const [size, setSize] = useState({ width: 0, height: 0 });
   const [natural, setNatural] = useState({ width: 0, height: 0 });
   const [zoom, setZoom] = useState(1);
@@ -55,19 +62,21 @@ function FaceImage({ side, url, name, choosing, selected, onChoose, onStatus, na
   useEffect(() => {
     const request = ++generation.current;
     setFaces([]);
-    setMessage(null);
+    setAnalysis(choosing ? "analyzing" : "idle");
     const element = image.current;
-    if (!choosing || !url || !element?.complete || !element.naturalWidth) return;
+    if (!choosing) return;
+    if (!url) { setAnalysis("failed"); return; }
+    if (!element?.complete || !element.naturalWidth) return;
     setNatural({ width: element.naturalWidth, height: element.naturalHeight });
-    if (fixtureFaces) { setFaces([fixtureFace(side)]); return; }
-    if (fixtureNoFaces) { setMessage("Nenhum rosto encontrado nesta foto."); return; }
-    setMessage("Analisando rostos…");
+    if (fixtureFaces) { setFaces([fixtureFace(side)]); setAnalysis("ready"); return; }
+    if (fixtureNoFaces) { setAnalysis("no-face"); return; }
+    if (fixtureAnalysisError) { setAnalysis("failed"); return; }
     void detectFaces(element).then((found) => {
       if (generation.current !== request) return;
       setFaces(found);
-      setMessage(found.length ? null : "Nenhum rosto encontrado nesta foto.");
+      setAnalysis(found.length ? "ready" : "no-face");
     }).catch(() => {
-      if (generation.current === request) setMessage("Não foi possível analisar esta foto. Tente outra.");
+      if (generation.current === request) setAnalysis("failed");
     });
     return () => { generation.current++; };
   }, [url, choosing]);
@@ -82,7 +91,7 @@ function FaceImage({ side, url, name, choosing, selected, onChoose, onStatus, na
     y: Math.max(-Math.max(0, (imageHeight * value - size.height) / 2), Math.min(Math.max(0, (imageHeight * value - size.height) / 2), next.y)),
   });
   const fit = () => { setZoom(1); setPan({ x: 0, y: 0 }); };
-  return <div className="eye-correction__pane-image" ref={pane} tabIndex={0}
+  return <div className="eye-correction__pane-image" ref={pane} tabIndex={0} data-analysis={analysis} aria-busy={analysis === "analyzing"}
     onWheel={(event) => { if (!url || !event.deltaY) return; event.preventDefault(); const value = Math.max(1, Math.min(8, zoom * Math.exp(-event.deltaY * 0.002))); setPan(bound(pan, value)); setZoom(value); }}
     onKeyDown={(event) => { if (event.key === "0") { event.preventDefault(); fit(); } else if (event.key === "+" || event.key === "=") { event.preventDefault(); const value = Math.min(8, zoom * 1.25); setPan(bound(pan, value)); setZoom(value); } else if (event.key === "-") { event.preventDefault(); const value = Math.max(1, zoom / 1.25); setPan(bound(pan, value)); setZoom(value); } }}
     onPointerDown={(event) => {
@@ -106,17 +115,18 @@ function FaceImage({ side, url, name, choosing, selected, onChoose, onStatus, na
     {url ? <img ref={image} alt={name} src={url} crossOrigin="anonymous" draggable={false} style={{ transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})` }} onLoad={(event) => {
       setNatural({ width: event.currentTarget.naturalWidth, height: event.currentTarget.naturalHeight });
       if (choosing) {
-        if (fixtureFaces) { setFaces([fixtureFace(side)]); setMessage(null); return; }
-        if (fixtureNoFaces) { setFaces([]); setMessage("Nenhum rosto encontrado nesta foto."); return; }
+        if (fixtureFaces) { setFaces([fixtureFace(side)]); setAnalysis("ready"); return; }
+        if (fixtureNoFaces) { setFaces([]); setAnalysis("no-face"); return; }
+        if (fixtureAnalysisError) { setFaces([]); setAnalysis("failed"); return; }
         const request = ++generation.current;
-        setMessage("Analisando rostos…");
+        setAnalysis("analyzing");
         void detectFaces(event.currentTarget).then((found) => {
           if (generation.current !== request) return;
           setFaces(found);
-          setMessage(found.length ? null : "Nenhum rosto encontrado nesta foto.");
-        }).catch(() => { if (generation.current === request) setMessage("Não foi possível analisar esta foto. Tente outra."); });
+          setAnalysis(found.length ? "ready" : "no-face");
+        }).catch(() => { if (generation.current === request) setAnalysis("failed"); });
       }
-    }} /> : <p className="eye-correction__empty">Prévia indisponível.</p>}
+    }} /> : null}
     {choosing && faces.length > 0 && imageWidth > 0 && imageHeight > 0 &&
       <div className="eye-correction__face-layer" style={{ left: size.width / 2 - zoomedWidth / 2 + pan.x, top: size.height / 2 - zoomedHeight / 2 + pan.y, width: zoomedWidth, height: zoomedHeight }}>
         {faces.map((face, index) => {
@@ -146,13 +156,11 @@ export function EyeCorrectionView({ presentation, onNavigate, onCorrection }: Pr
   const [referenceIndex, setReferenceIndex] = useState<number | null>(null);
   const [targetFaces, setTargetFaces] = useState<Face[]>([]);
   const [referenceFaces, setReferenceFaces] = useState<Face[]>([]);
-  const [targetStatus, setTargetStatus] = useState<string | null>(null);
-  const [referenceStatus, setReferenceStatus] = useState<string | null>(null);
+  const [targetAnalysis, setTargetAnalysis] = useState<AnalysisState>("idle");
+  const [referenceAnalysis, setReferenceAnalysis] = useState<AnalysisState>("idle");
   const [comparison, setComparison] = useState<{ key: string; original: boolean } | null>(null);
   const [saveRequested, setSaveRequested] = useState(false);
   const savePending = useRef(false);
-  const hintRef = useRef<HTMLParagraphElement>(null);
-  const hintTooltip = useUiAnchoredTooltip(hintRef, correction.error ?? "", !correction.error);
   useEffect(() => { setReferenceIndex(null); setReferenceFaces([]); }, [correction.referenceMediaId, correction.phase === "browse"]);
   useEffect(() => { savePending.current = false; setSaveRequested(false); }, [correction.phase, correction.referenceMediaId, correction.resultUrl, correction.error]);
   const referenceChoosing = correction.phase === "select";
@@ -160,20 +168,32 @@ export function EyeCorrectionView({ presentation, onNavigate, onCorrection }: Pr
   const compareKey = `${correction.phase}:${correction.referenceMediaId ?? ""}:${correction.resultUrl ?? ""}`;
   const showOriginal = correction.phase === "preview" && comparison?.key === compareKey && comparison.original;
   const busy = correction.phase === "applying";
+  const targetIssue = analysisIssue(targetAnalysis, "foto de destino");
+  const referenceIssue = analysisIssue(referenceAnalysis, "referência");
+  const browseBlocked = !correction.referenceUrl || correction.referenceState !== "ready" || Boolean(targetIssue) || Boolean(correction.error);
+  const previewBlocked = targetIndex === null || referenceIndex === null || Boolean(targetIssue) || Boolean(referenceIssue);
+  const browseTooltip = correction.error ? `Usar esta foto indisponível. ${correction.error}`
+    : targetIssue ? `Usar esta foto indisponível. ${targetIssue}`
+    : browseBlocked ? "Usar esta foto indisponível: referência não está pronta." : undefined;
+  const previewTooltip = correction.error ? `${correction.error} Use Ver correção para tentar novamente.`
+    : targetIssue || referenceIssue ? `Ver correção indisponível. ${[targetIssue, referenceIssue].filter(Boolean).join(" ")}`
+    : previewBlocked ? "Selecione um rosto em cada foto para ver a correção." : undefined;
+  const saveTooltip = correction.error ? `${correction.error} Use Salvar correção para tentar novamente.`
+    : !correction.resultUrl ? "Salvar correção indisponível: não há resultado preparado." : undefined;
   const action = (kind: ViewerCorrectionAction["kind"]) => onCorrection({ sessionId: presentation.sessionId, kind });
-  return <div className="eye-correction" aria-label="Correção de olhos">
+  return <div className="eye-correction" aria-label="Correção de olhos" aria-busy={correction.phase === "processing" || busy}>
     <div className="eye-correction__tools">
       <ImageToolButton label="Fechar correção" icon={EyeOff} tooltipPlacement="bottom" className="eye-correction__close" disabled={busy} onClick={() => action("cancel")} />
       <div className="eye-correction__tool-extension">
         {correction.phase === "browse"
-          ? <ImageToolButton label="Usar esta foto" icon={Check} tooltipPlacement="bottom" disabled={!correction.referenceUrl || correction.referenceState !== "ready"} onClick={() => action("select")} />
+          ? <ImageToolButton label="Usar esta foto" icon={Check} tooltipPlacement="bottom" tooltipText={browseTooltip} blocked={browseBlocked} onClick={() => action("select")} />
           : <ImageToolButton label="Trocar referência" icon={RefreshCcw} tooltipPlacement="bottom" disabled={busy} onClick={() => action("browse")} />}
-        {correction.phase === "select" && <ImageToolButton label="Ver correção" icon={Sparkles} tooltipPlacement="bottom" disabled={targetIndex === null || referenceIndex === null}
+        {correction.phase === "select" && <ImageToolButton label="Ver correção" icon={Sparkles} tooltipPlacement="bottom" tooltipText={previewTooltip} blocked={previewBlocked}
           onClick={() => onCorrection({ sessionId: presentation.sessionId, kind: "preview", referenceMediaId: correction.referenceMediaId, targetFace: targetFaces[targetIndex!], referenceFace: referenceFaces[referenceIndex!] })} />}
         {(correction.phase === "preview" || busy) && <>
           <ImageToolButton label={showOriginal ? "Antes e depois: mostrar correção" : "Antes e depois: mostrar original"} icon={Columns2} tooltipPlacement="bottom" aria-pressed={showOriginal} disabled={busy || !correction.resultUrl}
             onClick={() => setComparison({ key: compareKey, original: !showOriginal })} />
-          <ImageToolButton label="Salvar correção" icon={Save} tooltipPlacement="bottom" disabled={busy || saveRequested || !correction.resultUrl} onClick={() => {
+          <ImageToolButton label="Salvar correção" icon={Save} tooltipPlacement="bottom" tooltipText={saveTooltip} disabled={busy || saveRequested} blocked={!correction.resultUrl} onClick={() => {
             if (savePending.current) return;
             savePending.current = true;
             setSaveRequested(true);
@@ -182,21 +202,16 @@ export function EyeCorrectionView({ presentation, onNavigate, onCorrection }: Pr
         </>}
       </div>
     </div>
-    <p {...hintTooltip.triggerProps} ref={hintRef} className="eye-correction__hint" role="status" data-no-faces={targetStatus === "Nenhum rosto encontrado nesta foto." && referenceStatus === "Nenhum rosto encontrado nesta foto."} tabIndex={correction.error ? 0 : undefined}>{correction.error ?? (
-      correction.phase === "processing" ? "Preparando correção…" :
-      correction.phase === "applying" ? "Aplicando correção…" : targetStatus ?? referenceStatus ?? ""
-    )}</p>
-    {hintTooltip.tooltip}
     <div className="eye-correction__panes">
       <div className="eye-correction__pane">
         <FaceImage side="reference" url={correction.referenceUrl} name={correction.referenceName} choosing={referenceChoosing}
-          selected={referenceIndex} onChoose={(index, faces) => { setReferenceIndex(index); setReferenceFaces(faces); }} onStatus={setReferenceStatus}
+          selected={referenceIndex} onChoose={(index, faces) => { setReferenceIndex(index); setReferenceFaces(faces); }} onStatus={setReferenceAnalysis}
           navigation={correction.phase === "browse" ? { previous: correction.canPreviousReference, next: correction.canNextReference, onNavigate } : undefined} />
       </div>
       <div className="eye-correction__pane">
         <FaceImage side="target" url={(correction.phase === "preview" || correction.phase === "applying") && correction.resultUrl && !showOriginal ? correction.resultUrl : presentation.url}
           name={presentation.name} choosing={targetChoosing} selected={targetIndex}
-          onChoose={(index, faces) => { setTargetIndex(index); setTargetFaces(faces); }} onStatus={setTargetStatus} />
+          onChoose={(index, faces) => { setTargetIndex(index); setTargetFaces(faces); }} onStatus={setTargetAnalysis} />
       </div>
     </div>
   </div>;

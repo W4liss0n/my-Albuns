@@ -14,7 +14,7 @@
 .eye-correction__tools::before { content: ""; position: absolute; z-index: -1; inset: 3px; border-radius: 18px; background: color-mix(in srgb, var(--ui-surface) 56%, transparent); pointer-events: none; transform-origin: right center; animation: eye-correction-capsule-enter 180ms ease-out both; }
 .eye-correction__tools .ui-image-tool { position: relative; }
 .eye-correction__tools .ui-image-tool::before { background: transparent; }
-.eye-correction__tools .ui-image-tool:hover:not(:disabled)::before,
+.eye-correction__tools .ui-image-tool:hover:not(:disabled):not([aria-disabled="true"])::before,
 .eye-correction__tools .ui-image-tool:focus-visible::before,
 .eye-correction__tools .ui-image-tool[aria-pressed="true"]::before { background: color-mix(in srgb, var(--ui-text) 8%, transparent); }
 .eye-correction__tool-extension { display: flex; flex-direction: row-reverse; align-items: center; transform-origin: right center; animation: eye-correction-tools-enter 180ms ease-out both; }
@@ -28,7 +28,6 @@
 .eye-correction__pane-image img { display: block; width: calc(100% - 48px); height: calc(100% - 48px); object-fit: contain; user-select: none; }
 .eye-correction__pane-image:focus-visible { outline: 2px solid var(--ui-focus-neutral); outline-offset: -3px; }
 .eye-correction__fit { right: 12px; bottom: 12px; }
-.eye-correction__empty { color: var(--ui-text-muted); font-size: var(--ui-font-size-control); }
 .eye-correction__face-layer { position: absolute; z-index: 2; overflow: hidden; pointer-events: none; }
 .eye-correction__face { position: absolute; box-sizing: border-box; border: 1px solid color-mix(in srgb, var(--ui-text) 70%, transparent); border-radius: 2px; background: transparent; cursor: pointer; pointer-events: auto; }
 .eye-correction__face[data-selected="true"] { border: 2px solid var(--ui-text); }
@@ -36,6 +35,3 @@
 .eye-correction__face:focus-visible { outline: 2px solid var(--ui-focus-neutral); outline-offset: 2px; }
 .eye-correction__nav--previous { left: 4px; top: 50%; transform: translateY(-50%); }
 .eye-correction__nav--next { right: 4px; top: 50%; transform: translateY(-50%); }
-.eye-correction__hint { position: absolute; z-index: 4; top: 16px; left: 24px; width: min(320px, calc(50% - 24px)); min-width: 0; margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ui-text-muted); font-size: var(--ui-font-size-action); line-height: 42px; }
-.eye-correction__hint:focus-visible { outline: 2px solid var(--ui-focus-neutral); outline-offset: 2px; }
-@media (max-width: 620px) { .eye-correction__hint { left: 12px; width: calc(50% - 12px); } }

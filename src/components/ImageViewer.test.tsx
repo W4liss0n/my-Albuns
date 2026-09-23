@@ -236,7 +236,7 @@ test("face bounds track fit and zoom, clip off-image faces, and allow pan withou
     expect(parseFloat(layer.style.left) + .4 * parseFloat(layer.style.width)).toBeCloseTo(300 - .1 * fittedWidth);
     expect(parseFloat(target.style.left)).toBeCloseTo(40);
     expect(parseFloat(target.style.width)).toBeCloseTo(20);
-    expect(screen.getByRole("button", { name: "Ver correção" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Ver correção" })).toHaveAttribute("aria-disabled", "true");
     fireEvent.click(reference);
     expect(reference).toHaveAttribute("aria-pressed", "true");
     fireEvent.wheel(pane, { deltaY: -700 });
@@ -257,23 +257,104 @@ test("face bounds track fit and zoom, clip off-image faces, and allow pan withou
     fireEvent.pointerUp(target, { pointerId: 2 });
     fireEvent.click(target);
     expect(target).toHaveAttribute("aria-pressed", "true");
-    expect(screen.getByRole("button", { name: "Ver correção" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Ver correção" })).not.toHaveAttribute("aria-disabled");
     fireEvent.click(screen.getByRole("button", { name: "Ver correção" }));
     expect(onCorrection).toHaveBeenCalledWith(expect.objectContaining({ kind: "preview", targetFace: center, referenceFace: edge }));
   } finally { width.mockRestore(); height.mockRestore(); }
 });
 
-test("long correction errors expose the full message through the shared tooltip", async () => {
+test("a missing destination face blocks reference selection but explains why on focus", async () => {
+  vi.mocked(detectFaces).mockResolvedValue([]);
+  const onCorrection = vi.fn();
+  const presentation: ViewerPresentation = { ...initial, correction: {
+    phase: "browse", referenceMediaId: "reference", referenceName: "Referência.jpg", referenceUrl: "data:image/png;id=reference",
+    referenceState: "ready", canPreviousReference: false, canNextReference: false, resultUrl: null, error: null,
+  } };
+  const view = render(<ImageViewer presentation={presentation} onNavigate={vi.fn()} onClose={vi.fn()} onCorrection={onCorrection} />);
+  const target = screen.getByRole("img", { name: "Imagem a" });
+  Object.defineProperties(target, { naturalWidth: { configurable: true, value: 800 }, naturalHeight: { configurable: true, value: 1200 } });
+  fireEvent.load(target);
+  await waitFor(() => expect(view.container.querySelector(".eye-correction__pane:last-child [data-analysis='no-face']")).toBeInTheDocument());
+  const choose = screen.getByRole("button", { name: "Usar esta foto" });
+  expect(choose).toHaveAttribute("aria-disabled", "true");
+  choose.focus();
+  expect(await screen.findByRole("tooltip")).toHaveTextContent("Nenhum rosto encontrado na foto de destino.");
+  fireEvent.keyDown(choose, { key: "Enter" });
+  fireEvent.keyDown(choose, { key: " " });
+  fireEvent.click(choose);
+  expect(onCorrection).not.toHaveBeenCalled();
+  expect(view.container.querySelector(".eye-correction__hint")).not.toBeInTheDocument();
+});
+
+test("failed reference analysis explains why preview is unavailable", async () => {
+  const face = [{ x: .3, y: .2, z: 0 }, { x: .7, y: .7, z: 0 }];
+  vi.mocked(detectFaces).mockImplementation((image) => image.alt === "Referência.jpg" ? Promise.reject(new Error("analysis failed")) : Promise.resolve([face]));
+  const onCorrection = vi.fn();
+  const presentation: ViewerPresentation = { ...initial, correction: {
+    phase: "select", referenceMediaId: "reference", referenceName: "Referência.jpg", referenceUrl: "data:image/png;id=reference",
+    referenceState: "ready", canPreviousReference: false, canNextReference: false, resultUrl: null, error: null,
+  } };
+  const width = vi.spyOn(Element.prototype, "clientWidth", "get").mockReturnValue(600);
+  const height = vi.spyOn(Element.prototype, "clientHeight", "get").mockReturnValue(500);
+  try {
+    const view = render(<ImageViewer presentation={presentation} onNavigate={vi.fn()} onClose={vi.fn()} onCorrection={onCorrection} />);
+    for (const image of screen.getAllByRole("img")) {
+      Object.defineProperties(image, { naturalWidth: { configurable: true, value: 800 }, naturalHeight: { configurable: true, value: 1200 } });
+      fireEvent.load(image);
+    }
+    await waitFor(() => expect(view.container.querySelector(".eye-correction__pane:first-child [data-analysis='failed']")).toBeInTheDocument());
+    fireEvent.click(await screen.findByRole("button", { name: "Imagem a corrigir: rosto 1" }));
+    const preview = screen.getByRole("button", { name: "Ver correção" });
+    expect(preview).toHaveAttribute("aria-disabled", "true");
+    preview.focus();
+    expect(await screen.findByRole("tooltip")).toHaveTextContent("Não foi possível analisar a referência.");
+    fireEvent.click(preview);
+    expect(onCorrection).not.toHaveBeenCalled();
+  } finally { width.mockRestore(); height.mockRestore(); }
+});
+
+test("preparation errors move to preview tooltip and keep retry available", async () => {
+  const face = [{ x: .3, y: .2, z: 0 }, { x: .7, y: .7, z: 0 }];
+  vi.mocked(detectFaces).mockResolvedValue([face]);
   const error = "Não foi possível preparar a correção para esta fotografia. Escolha outra referência e tente novamente.";
   const presentation: ViewerPresentation = { ...initial, correction: {
-    phase: "preview", referenceMediaId: "reference", referenceName: "Referência.jpg", referenceUrl: "data:image/png;id=reference",
+    phase: "select", referenceMediaId: "reference", referenceName: "Referência.jpg", referenceUrl: "data:image/png;id=reference",
     referenceState: "ready", canPreviousReference: false, canNextReference: false, resultUrl: null, error,
   } };
-  render(<ImageViewer presentation={presentation} onNavigate={vi.fn()} onClose={vi.fn()} onCorrection={vi.fn()} />);
-  const hint = screen.getByRole("status");
-  expect(hint).toHaveTextContent(error);
-  expect(hint).not.toHaveAttribute("title");
-  hint.focus();
-  expect(hint).toHaveFocus();
+  const onCorrection = vi.fn();
+  const width = vi.spyOn(Element.prototype, "clientWidth", "get").mockReturnValue(600);
+  const height = vi.spyOn(Element.prototype, "clientHeight", "get").mockReturnValue(500);
+  try {
+    const view = render(<ImageViewer presentation={presentation} onNavigate={vi.fn()} onClose={vi.fn()} onCorrection={onCorrection} />);
+    for (const image of screen.getAllByRole("img")) {
+      Object.defineProperties(image, { naturalWidth: { configurable: true, value: 800 }, naturalHeight: { configurable: true, value: 1200 } });
+      fireEvent.load(image);
+    }
+    fireEvent.click(await screen.findByRole("button", { name: "Imagem a corrigir: rosto 1" }));
+    fireEvent.click(screen.getByRole("button", { name: "Referência: rosto 1" }));
+    const retry = screen.getByRole("button", { name: "Ver correção" });
+    expect(retry).not.toHaveAttribute("aria-disabled");
+    expect(view.container.querySelector(".eye-correction__hint")).not.toBeInTheDocument();
+    retry.focus();
+    expect(await screen.findByRole("tooltip")).toHaveTextContent(error);
+    fireEvent.click(retry);
+    expect(onCorrection).toHaveBeenCalledWith(expect.objectContaining({ kind: "preview" }));
+  } finally { width.mockRestore(); height.mockRestore(); }
+});
+
+test("save errors move to Save tooltip and still permit one retry", async () => {
+  const error = "Não foi possível salvar a cópia corrigida.";
+  const onCorrection = vi.fn();
+  const presentation: ViewerPresentation = { ...initial, correction: {
+    phase: "preview", referenceMediaId: "reference", referenceName: "Referência.jpg", referenceUrl: "data:image/png;id=reference",
+    referenceState: "ready", canPreviousReference: false, canNextReference: false, resultUrl: "data:image/png;id=corrected", error,
+  } };
+  render(<ImageViewer presentation={presentation} onNavigate={vi.fn()} onClose={vi.fn()} onCorrection={onCorrection} />);
+  const retry = screen.getByRole("button", { name: "Salvar correção" });
+  expect(retry).toBeEnabled();
+  retry.focus();
   expect(await screen.findByRole("tooltip")).toHaveTextContent(error);
+  fireEvent.click(retry);
+  fireEvent.click(retry);
+  expect(onCorrection.mock.calls.filter(([action]) => action.kind === "apply")).toHaveLength(1);
 });

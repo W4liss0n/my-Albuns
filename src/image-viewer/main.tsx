@@ -15,15 +15,16 @@ import "./viewerWindow.css";
 
 const preview = new URLSearchParams(location.search).get("preview");
 const qa = import.meta.env.DEV && new URLSearchParams(location.search).has("qa");
-const qaError = import.meta.env.DEV && new URLSearchParams(location.search).has("error");
+const qaError = import.meta.env.DEV ? new URLSearchParams(location.search).get("error") : null;
 const qaTarget = "/.scratch/eye-correction/qa/nikki-closed.jpg";
 const qaReference = "/.scratch/eye-correction/qa/nikki-open-a.jpg";
 const previewCorrection = (phase: string) => ({
   phase, referenceMediaId: "reference", referenceName: "Referência.jpg",
   referenceUrl: qa ? qaReference : sizedPreview(portraitPreview, 800, 1200),
   referenceState: "ready" as const, canPreviousReference: false, canNextReference: phase === "browse",
-  resultUrl: !qaError && (phase === "preview" || phase === "applying") ? qa ? "/.scratch/eye-correction/qa/nikki-corrected.png" : sizedPreview(landscapePreview, 1200, 800) : null,
-  error: qaError ? "Não foi possível preparar a correção para esta fotografia. Escolha outra referência e tente novamente." : null,
+  resultUrl: phase === "preview" || phase === "applying" ? qa ? "/.scratch/eye-correction/qa/nikki-corrected.png" : sizedPreview(landscapePreview, 1200, 800) : null,
+  error: qaError === "prepare" && phase === "select" ? "Não foi possível preparar a correção para esta fotografia. Escolha outra referência e tente novamente."
+    : qaError === "save" && phase === "preview" ? "Não foi possível salvar a correção. Tente novamente." : null,
 });
 if (!preview) installDesktopWebViewPolicy(document);
 const sizedPreview = (svg: string, width: number, height: number) =>
