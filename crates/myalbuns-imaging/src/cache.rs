@@ -15,8 +15,8 @@ use myalbuns_paths::{AppPaths, ExpectedObject, PreparedCacheStorage};
 use crate::{
     cache_error::{CacheError, CacheWriteMonitor},
     source::{
-        MAX_DECODED_SOURCE_PIXELS_TOTAL, open_cache_bytes, read_fingerprinted_source,
-        verify_source_fingerprint,
+        MAX_DECODED_SOURCE_PIXELS_TOTAL, confirm_source_unchanged, open_cache_bytes,
+        read_fingerprinted_source,
     },
     write_response,
 };
@@ -119,16 +119,18 @@ fn build_cache(
                 .unwrap_or(false)
             }) {
             drop(bytes);
-            verify_source_fingerprint(
+            confirm_source_unchanged(
                 source.media_id(),
                 &request.root_bindings,
                 source.source_path(),
+                &resolved,
                 &fingerprint,
             )?;
             reused_count += 1;
             artifact_from_reusable(source.media_id(), reusable)
         } else {
-            let artifact = generate_preview(&storage, request, job, bytes, fingerprint)?;
+            let artifact =
+                generate_preview(&storage, request, job, &resolved, bytes, fingerprint)?;
             generated_count += 1;
             artifact
         };
@@ -193,6 +195,7 @@ fn generate_preview(
     storage: &PreparedCacheStorage,
     request: &CacheRequest,
     job: &CacheJob,
+    resolved: &myalbuns_paths::ResolvedObject,
     bytes: Vec<u8>,
     fingerprint: CacheFingerprint,
 ) -> Result<CacheArtifact, CacheError> {
@@ -232,10 +235,11 @@ fn generate_preview(
             ))
         },
         || {
-            verify_source_fingerprint(
+            confirm_source_unchanged(
                 source.media_id(),
                 &request.root_bindings,
                 source.source_path(),
+                resolved,
                 &fingerprint,
             )
         },

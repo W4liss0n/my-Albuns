@@ -106,19 +106,37 @@ fn observe_source(
     )
 }
 
-pub(crate) fn verify_source_fingerprint(
+/// Confirms, before a reduced representation is published, that the operation
+/// path still names the Original whose bytes were fingerprinted: same physical
+/// identity, size and times. The content is not read again; a change that
+/// preserves all of them is the risk ADR 0001 already accepts. Without a
+/// physical identity the full digest is compared instead.
+pub(crate) fn confirm_source_unchanged(
     media_id: &str,
     root_bindings: &RootBindingPlan,
     source_path: &std::path::Path,
+    observed: &ResolvedObject,
     expected: &CacheFingerprint,
 ) -> Result<(), String> {
-    let resolved = root_bindings
+    let current = root_bindings
         .resolve_existing(source_path, ExpectedObject::RegularFile)
         .map_err(|error| {
             format!("não foi possível reabrir a mídia {media_id} pelo plano da operação: {error}")
         })?;
-    let current = fingerprint_source(media_id, &resolved)?;
-    if &current != expected {
+    let unchanged = match observed.physical_identity() {
+        Some(identity) => {
+            let metadata = current.file().metadata().map_err(|error| {
+                format!("não foi possível reinspecionar a mídia {media_id}: {error}")
+            })?;
+            current.physical_identity() == Some(identity)
+                && metadata.is_file()
+                && metadata.len() == expected.source_bytes
+                && file_time_millis(metadata.created()) == expected.source_created_unix_ms
+                && file_time_millis(metadata.modified()) == expected.source_modified_unix_ms
+        }
+        None => &fingerprint_source(media_id, &current)? == expected,
+    };
+    if !unchanged {
         return Err(format!(
             "a mídia {media_id} mudou durante a produção da representação reduzida"
         ));
@@ -130,4 +148,86 @@ fn file_time_millis(time: std::io::Result<SystemTime>) -> Option<u64> {
     time.ok()
         .and_then(|time| time.duration_since(UNIX_EPOCH).ok())
         .and_then(|duration| u64::try_from(duration.as_millis()).ok())
+}
+
+#[cfg(test)]
+mod tests {
+    use std::fs::{File, FileTimes, OpenOptions};
+
+    use myalbuns_paths::OperationPathContext;
+
+    use super::*;
+
+    fn fixture(bytes: &[u8]) -> (tempfile::TempDir, std::path::PathBuf, RootBindingPlan) {
+        let root = tempfile::tempdir().unwrap();
+        let path = root.path().join("original.jpg");
+        std::fs::write(&path, bytes).unwrap();
+        let mut context = OperationPathContext::new();
+        context.capture(&path).unwrap();
+        (root, path, context.freeze())
+    }
+
+    fn observed(
+        plan: &RootBindingPlan,
+        path: &std::path::Path,
+    ) -> (ResolvedObject, CacheFingerprint) {
+        let resolved = plan
+            .resolve_existing(path, ExpectedObject::RegularFile)
+            .unwrap();
+        let (fingerprint, bytes) = read_fingerprinted_source("media", &resolved).unwrap();
+        assert_eq!(bytes, std::fs::read(path).unwrap());
+        (resolved, fingerprint)
+    }
+
+    #[test]
+    fn publication_confirms_identity_size_and_times_without_reading_again() {
+        let (_root, path, plan) = fixture(b"original bytes");
+        let (resolved, fingerprint) = observed(&plan, &path);
+        let reads = full_read_count();
+        confirm_source_unchanged("media", &plan, &path, &resolved, &fingerprint).unwrap();
+        assert_eq!(full_read_count(), reads);
+
+        std::fs::write(&path, b"original bytes, now longer").unwrap();
+        assert!(confirm_source_unchanged("media", &plan, &path, &resolved, &fingerprint).is_err());
+    }
+
+    #[test]
+    fn a_replaced_file_with_the_same_size_and_times_is_a_different_original() {
+        let (root, path, plan) = fixture(b"original bytes");
+        let (resolved, fingerprint) = observed(&plan, &path);
+        let modified = std::fs::metadata(&path).unwrap().modified().unwrap();
+        let replacement = root.path().join("replacement.jpg");
+        std::fs::write(&replacement, b"replaced bytes").unwrap();
+        File::options()
+            .write(true)
+            .open(&replacement)
+            .unwrap()
+            .set_times(FileTimes::new().set_modified(modified))
+            .unwrap();
+        std::fs::rename(&replacement, &path).unwrap();
+        assert!(confirm_source_unchanged("media", &plan, &path, &resolved, &fingerprint).is_err());
+    }
+
+    #[test]
+    fn an_in_place_edit_preserving_size_and_times_is_the_accepted_residual_risk() {
+        let (_root, path, plan) = fixture(b"original bytes");
+        let (resolved, fingerprint) = observed(&plan, &path);
+        let modified = std::fs::metadata(&path).unwrap().modified().unwrap();
+        let file = OpenOptions::new().write(true).open(&path).unwrap();
+        std::io::Write::write_all(&mut &file, b"ORIGINAL BYTES").unwrap();
+        file.set_times(FileTimes::new().set_modified(modified)).unwrap();
+        drop(file);
+        // ADR 0001: the same change is also accepted when a Project reopens.
+        confirm_source_unchanged("media", &plan, &path, &resolved, &fingerprint).unwrap();
+        assert_ne!(
+            &fingerprint_source(
+                "media",
+                &plan
+                    .resolve_existing(&path, ExpectedObject::RegularFile)
+                    .unwrap()
+            )
+            .unwrap(),
+            &fingerprint
+        );
+    }
 }

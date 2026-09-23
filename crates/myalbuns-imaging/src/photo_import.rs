@@ -9,7 +9,7 @@ use myalbuns_paths::{AppPaths, ExpectedObject};
 use crate::{
     cache::write_preview,
     cache_error::CacheError,
-    source::{open_cache_bytes, read_fingerprinted_source, verify_source_fingerprint},
+    source::{confirm_source_unchanged, open_cache_bytes, read_fingerprinted_source},
 };
 
 pub(crate) fn run(request: PhotoImportRequest, app_paths: &AppPaths) -> Result<(), String> {
@@ -91,10 +91,11 @@ fn prepare_photo(
         height_px,
     };
     let verify = || {
-        verify_source_fingerprint(
+        confirm_source_unchanged(
             candidate.source_id.as_str(),
             &request.root_bindings,
             candidate.path(),
+            &resolved,
             &fingerprint,
         )
     };
@@ -261,9 +262,9 @@ mod tests {
                 ..
             }
         ));
-        // One read feeds both the digest and the decoder; the other confirms
-        // the Original before the preview is published.
-        assert_eq!(crate::source::full_read_count() - reads, 2);
+        // One read feeds both the digest and the decoder; publication confirms
+        // the Original by identity, size and times without reading it again.
+        assert_eq!(crate::source::full_read_count() - reads, 1);
     }
 
     #[test]

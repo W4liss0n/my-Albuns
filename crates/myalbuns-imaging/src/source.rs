@@ -3,7 +3,7 @@ mod progressive_jpeg;
 
 #[cfg(test)]
 pub(crate) use cache::full_read_count;
-pub(crate) use cache::{read_fingerprinted_source, verify_source_fingerprint};
+pub(crate) use cache::{confirm_source_unchanged, read_fingerprinted_source};
 pub(crate) use progressive_jpeg::{JPEG_WORKER_MODE, run_jpeg_worker};
 
 use std::{

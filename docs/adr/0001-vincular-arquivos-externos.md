@@ -1,6 +1,7 @@
 ---
 status: accepted
 date: 2026-07-27
+updated: 2026-09-23
 ---
 
 # Vincular arquivos de mídia em vez de incorporá-los
@@ -14,6 +15,7 @@ Os Projetos armazenam os caminhos nativos dos arquivos de mídia originais, e su
 - Se o conteúdo de um arquivo for substituído no mesmo caminho, a nova versão é o original autoritativo para todos os Projetos vinculados e para a Exportação.
 - Projetos abertos monitoram seus caminhos vinculados. Eventos rápidos são consolidados e tratados como indícios; quando o arquivo estiver estável e legível, uma inspeção autoritativa confirma o estado. Só então o estado observado e o Cache são atualizados. Ausência confirmada sob uma origem acessível marca o vínculo como ausente, e o retorno ao caminho registrado o recupera sem Religação. Nada disso altera a referência, cria Undo/Redo ou marca o Projeto.
 - Ao reabrir um Projeto, a validação comum compara tamanho e data de alteração, sem recalcular o hash completo de todos os originais. A primeira versão aceita o risco raro de uma mudança externa conservar ambos exatamente e manter temporariamente uma representação interativa antiga; a Exportação continua reabrindo o original atual e nunca usa essa representação como fonte.
+- Ao preparar uma representação reduzida, o Processador lê o original uma vez, calcula o hash completo e decodifica exatamente esses bytes. Antes de publicar a prévia, confirma que o caminho ainda aponta para o mesmo arquivo, com a mesma identidade física, o mesmo tamanho e as mesmas datas, sem ler o conteúdo de novo. O risco aceito é o mesmo da reabertura: uma mudança externa que conserve tudo isso não é percebida nesse momento. Quando o sistema de arquivos não fornece identidade física, a confirmação volta a comparar o hash completo.
 - Cada Projeto corrige suas referências de forma independente, salvo quando o arquivo retorna ao caminho originalmente registrado.
 - Falha de rede ou de acesso que impeça confirmar a existência produz Arquivo indisponível, não Arquivo ausente, e nunca reescreve automaticamente o vínculo.
 - A forma textual do caminho não é usada como identidade física; representações diferentes do mesmo alvo continuam sendo resolvidas pela política do [ADR 0007](0007-tratar-caminhos-windows-e-identidade-fisica.md).
