@@ -183,7 +183,9 @@ impl DecodedSources {
         ordered.sort_by_key(ToString::to_string);
         let mut pixels = 0_u64;
         for id in &ordered {
-            pixels += captured[id].pixel_count().map_err(|failure| failure.message)?;
+            pixels += captured[id]
+                .pixel_count()
+                .map_err(|failure| failure.message)?;
             if pixels > MAX_DECODED_SOURCE_PIXELS_TOTAL {
                 return Err(RenderFailure::typed(
                     ImagingFailureCode::ResourceLimitExceeded,
@@ -445,7 +447,10 @@ mod source_retention_tests {
                 let resolved = plan
                     .resolve_existing(&path, ExpectedObject::RegularFile)
                     .unwrap();
-                (id.parse().unwrap(), capture_render_source(&resolved).unwrap())
+                (
+                    id.parse().unwrap(),
+                    capture_render_source(&resolved).unwrap(),
+                )
             })
             .collect()
     }
@@ -455,7 +460,10 @@ mod source_retention_tests {
     }
 
     fn ids(indices: &[usize]) -> HashSet<MediaId> {
-        indices.iter().map(|index| IDS[*index].parse().unwrap()).collect()
+        indices
+            .iter()
+            .map(|index| IDS[*index].parse().unwrap())
+            .collect()
     }
 
     #[test]
@@ -467,14 +475,21 @@ mod source_retention_tests {
         let before = crate::source::jpeg_decode_count();
         // Both pages of a Page export require the same Sheet sources.
         for _ in 0..2 {
-            let sources = decoded.prepare(&captured, &ids(&[0, 1])).unwrap_or_else(failed);
+            let sources = decoded
+                .prepare(&captured, &ids(&[0, 1]))
+                .unwrap_or_else(failed);
             assert_eq!(sources.len(), 2);
         }
         assert_eq!(crate::source::jpeg_decode_count() - before, 2);
         // A neighbour sharing one Original decodes only the new one and
         // releases the source it no longer references.
-        let sources = decoded.prepare(&captured, &ids(&[1, 2])).unwrap_or_else(failed);
-        assert_eq!(sources.keys().copied().collect::<HashSet<_>>(), ids(&[1, 2]));
+        let sources = decoded
+            .prepare(&captured, &ids(&[1, 2]))
+            .unwrap_or_else(failed);
+        assert_eq!(
+            sources.keys().copied().collect::<HashSet<_>>(),
+            ids(&[1, 2])
+        );
         assert_eq!(crate::source::jpeg_decode_count() - before, 3);
     }
 

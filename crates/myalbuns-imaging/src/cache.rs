@@ -18,8 +18,8 @@ use myalbuns_paths::{AppPaths, ExpectedObject, PreparedCacheStorage};
 use crate::{
     cache_error::{CacheError, CacheWriteMonitor},
     source::{
-        MAX_DECODED_SOURCE_PIXELS_TOTAL, PreviewRaster, confirm_source_unchanged,
-        open_cache_bytes, read_fingerprinted_source, transposes,
+        MAX_DECODED_SOURCE_PIXELS_TOTAL, PreviewRaster, confirm_source_unchanged, open_cache_bytes,
+        read_fingerprinted_source, transposes,
     },
     write_response,
 };
@@ -132,8 +132,7 @@ fn build_cache(
             reused_count += 1;
             artifact_from_reusable(source.media_id(), reusable)
         } else {
-            let artifact =
-                generate_preview(&storage, request, job, &resolved, bytes, fingerprint)?;
+            let artifact = generate_preview(&storage, request, job, &resolved, bytes, fingerprint)?;
             generated_count += 1;
             artifact
         };
@@ -422,5 +421,9 @@ fn reduce(image: DynamicImage, width: u32, height: u32) -> Result<DynamicImage, 
         PixelType::U8x3 => RgbImage::from_raw(width, height, pixels).map(DynamicImage::ImageRgb8),
         _ => RgbaImage::from_raw(width, height, pixels).map(DynamicImage::ImageRgba8),
     };
-    reduced.ok_or_else(|| "a prévia reduzida não corresponde às dimensões esperadas".to_string().into())
+    reduced.ok_or_else(|| {
+        "a prévia reduzida não corresponde às dimensões esperadas"
+            .to_string()
+            .into()
+    })
 }

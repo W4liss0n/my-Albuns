@@ -310,11 +310,7 @@ pub(crate) fn transposes(orientation: Orientation) -> bool {
 
 pub(crate) fn open_cache_bytes(bytes: Vec<u8>) -> Result<OpenRenderSource, SourceFailure> {
     let source_bytes = bytes.len() as u64;
-    inspect_reader(
-        SourceReader::Memory(Cursor::new(bytes)),
-        source_bytes,
-        true,
-    )
+    inspect_reader(SourceReader::Memory(Cursor::new(bytes)), source_bytes, true)
 }
 
 pub(crate) fn capture_render_source(

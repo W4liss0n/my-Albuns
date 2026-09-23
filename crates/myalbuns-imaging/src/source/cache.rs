@@ -215,7 +215,8 @@ mod tests {
         let modified = std::fs::metadata(&path).unwrap().modified().unwrap();
         let file = OpenOptions::new().write(true).open(&path).unwrap();
         std::io::Write::write_all(&mut &file, b"ORIGINAL BYTES").unwrap();
-        file.set_times(FileTimes::new().set_modified(modified)).unwrap();
+        file.set_times(FileTimes::new().set_modified(modified))
+            .unwrap();
         drop(file);
         // ADR 0001: the same change is also accepted when a Project reopens.
         confirm_source_unchanged("media", &plan, &path, &resolved, &fingerprint).unwrap();
