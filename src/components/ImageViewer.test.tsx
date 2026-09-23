@@ -113,23 +113,28 @@ test("a correction preview compares only the target and saves once even while sh
 });
 
 test("a changed correction result clears comparison without resetting target zoom", () => {
-  const correction: NonNullable<ViewerPresentation["correction"]> = {
-    phase: "preview", referenceMediaId: "reference", referenceName: "Referência.jpg", referenceUrl: "data:image/png;id=reference",
-    referenceState: "ready", canPreviousReference: false, canNextReference: false, resultUrl: "data:image/png;id=corrected-1", error: null,
-  };
-  const view = render(<ImageViewer presentation={{ ...initial, correction }} onNavigate={vi.fn()} onClose={vi.fn()} onCorrection={vi.fn()} />);
-  const target = screen.getByRole("img", { name: "Imagem a" });
-  Object.defineProperties(target, { naturalWidth: { configurable: true, value: 1200 }, naturalHeight: { configurable: true, value: 800 } });
-  fireEvent.load(target);
-  fireEvent.wheel(view.container.querySelectorAll(".eye-correction__pane-image")[1], { deltaY: -300 });
-  const transform = target.style.transform;
-  expect(transform).not.toContain("scale(1)");
-  fireEvent.click(screen.getByRole("button", { name: "Antes e depois: mostrar original" }));
-  expect(target).toHaveAttribute("src", initial.url);
-  view.rerender(<ImageViewer presentation={{ ...initial, correction: { ...correction, resultUrl: "data:image/png;id=corrected-2" } }} onNavigate={vi.fn()} onClose={vi.fn()} onCorrection={vi.fn()} />);
-  expect(target).toHaveAttribute("src", "data:image/png;id=corrected-2");
-  expect(target.style.transform).toBe(transform);
-  expect(screen.getByRole("button", { name: "Antes e depois: mostrar original" })).toHaveAttribute("aria-pressed", "false");
+  const paneWidth = vi.spyOn(Element.prototype, "clientWidth", "get").mockReturnValue(800);
+  const paneHeight = vi.spyOn(Element.prototype, "clientHeight", "get").mockReturnValue(600);
+  try {
+    const correction: NonNullable<ViewerPresentation["correction"]> = {
+      phase: "preview", referenceMediaId: "reference", referenceName: "Referência.jpg", referenceUrl: "data:image/png;id=reference",
+      referenceState: "ready", canPreviousReference: false, canNextReference: false, resultUrl: "data:image/png;id=corrected-1", error: null,
+    };
+    const view = render(<ImageViewer presentation={{ ...initial, correction }} onNavigate={vi.fn()} onClose={vi.fn()} onCorrection={vi.fn()} />);
+    const target = screen.getByRole("img", { name: "Imagem a" });
+    Object.defineProperties(target, { naturalWidth: { configurable: true, value: 1200 }, naturalHeight: { configurable: true, value: 800 } });
+    fireEvent.load(target);
+    fireEvent.wheel(view.container.querySelectorAll(".eye-correction__pane-image")[1], { deltaY: -300 });
+    const photo = view.container.querySelectorAll<HTMLElement>(".eye-correction__photo")[1];
+    const width = photo.style.width;
+    expect(parseFloat(width)).toBeGreaterThan(0);
+    fireEvent.click(screen.getByRole("button", { name: "Antes e depois: mostrar original" }));
+    expect(target).toHaveAttribute("src", initial.url);
+    view.rerender(<ImageViewer presentation={{ ...initial, correction: { ...correction, resultUrl: "data:image/png;id=corrected-2" } }} onNavigate={vi.fn()} onClose={vi.fn()} onCorrection={vi.fn()} />);
+    expect(target).toHaveAttribute("src", "data:image/png;id=corrected-2");
+    expect(photo.style.width).toBe(width);
+    expect(screen.getByRole("button", { name: "Antes e depois: mostrar original" })).toHaveAttribute("aria-pressed", "false");
+  } finally { paneWidth.mockRestore(); paneHeight.mockRestore(); }
 });
 
 
@@ -206,7 +211,7 @@ test("correction tooltips follow focus and close when focus leaves the group", a
   expect(await screen.findByRole("tooltip")).toHaveTextContent("Antes e depois: mostrar original");
   screen.getByRole("button", { name: "Salvar correção" }).focus();
   await waitFor(() => expect(screen.getByRole("tooltip")).toHaveTextContent("Salvar correção"));
-  screen.getByRole("img", { name: "Imagem a" }).parentElement?.focus();
+  screen.getByRole("img", { name: "Imagem a" }).closest<HTMLElement>(".eye-correction__pane-image")?.focus();
   await waitFor(() => expect(screen.queryByRole("tooltip")).not.toBeInTheDocument());
 });
 
@@ -230,10 +235,10 @@ test("face bounds track fit and zoom, clip off-image faces, and allow pan withou
     const target = await screen.findByRole("button", { name: "Imagem a corrigir: rosto 2" });
     const reference = screen.getByRole("button", { name: "Referência: rosto 1" });
     const pane = view.container.querySelectorAll<HTMLElement>(".eye-correction__pane-image")[1];
-    const layer = pane.querySelector<HTMLElement>(".eye-correction__face-layer")!;
+    const photo = pane.querySelector<HTMLElement>(".eye-correction__photo")!;
     const fittedWidth = (500 - 48) * 800 / 1200;
-    expect(parseFloat(layer.style.width)).toBeCloseTo(fittedWidth);
-    expect(parseFloat(layer.style.left) + .4 * parseFloat(layer.style.width)).toBeCloseTo(300 - .1 * fittedWidth);
+    expect(parseFloat(photo.style.width)).toBeCloseTo(fittedWidth);
+    expect(parseFloat(photo.style.left) + .4 * parseFloat(photo.style.width)).toBeCloseTo(300 - .1 * fittedWidth);
     expect(parseFloat(target.style.left)).toBeCloseTo(40);
     expect(parseFloat(target.style.width)).toBeCloseTo(20);
     expect(screen.getByRole("button", { name: "Ver correção" })).toHaveAttribute("aria-disabled", "true");
@@ -241,15 +246,15 @@ test("face bounds track fit and zoom, clip off-image faces, and allow pan withou
     expect(reference).toHaveAttribute("aria-pressed", "true");
     fireEvent.wheel(pane, { deltaY: -700 });
     expect(screen.queryByRole("button", { name: "Imagem a corrigir: rosto 1" })).not.toBeInTheDocument();
-    expect(parseFloat(layer.style.width)).toBeGreaterThan(fittedWidth * 4);
-    const beforePan = parseFloat(layer.style.left);
+    expect(parseFloat(photo.style.width)).toBeGreaterThan(fittedWidth * 4);
+    const beforePan = parseFloat(photo.style.left);
     pane.setPointerCapture = vi.fn(); pane.releasePointerCapture = vi.fn();
     fireEvent.pointerDown(target, { pointerId: 1, button: 0, clientX: 200, clientY: 250 });
     expect(pane.setPointerCapture).not.toHaveBeenCalled();
     fireEvent.pointerMove(pane, { pointerId: 1, clientX: 250, clientY: 250 });
     expect(pane.setPointerCapture).toHaveBeenCalledWith(1);
     fireEvent.pointerUp(pane, { pointerId: 1 });
-    expect(parseFloat(layer.style.left)).toBeCloseTo(beforePan + 50);
+    expect(parseFloat(photo.style.left)).toBeCloseTo(beforePan + 50);
     fireEvent.click(target);
     expect(target).toHaveAttribute("aria-pressed", "false");
     fireEvent.pointerDown(target, { pointerId: 2, button: 0, clientX: 200, clientY: 250 });
@@ -277,10 +282,9 @@ test("a missing destination face blocks reference selection and explains why on 
   await waitFor(() => expect(view.container.querySelector(".eye-correction__pane:last-child [data-analysis='no-face']")).toBeInTheDocument());
   const choose = screen.getByRole("button", { name: "Usar esta foto" });
   expect(choose).toHaveAttribute("aria-disabled", "true");
-  target.focus();
+  screen.getByRole("group", { name: "Imagem a corrigir: aviso" }).focus();
   expect(await screen.findByRole("tooltip")).toHaveTextContent("Nenhum rosto encontrado na foto de destino.");
-  fireEvent.mouseLeave(target);
-  target.blur();
+  screen.getByRole("group", { name: "Imagem a corrigir: aviso" }).blur();
   await waitFor(() => expect(screen.queryByRole("tooltip")).not.toBeInTheDocument());
   fireEvent.keyDown(choose, { key: "Enter" });
   fireEvent.keyDown(choose, { key: " " });
@@ -303,11 +307,11 @@ test("each photo owns its no-face tooltip, which closes when focus leaves", asyn
     fireEvent.load(photo);
   }
   await waitFor(() => expect(view.container.querySelectorAll("[data-analysis='no-face']")).toHaveLength(2));
-  reference.focus();
+  screen.getByRole("group", { name: "Referência: aviso" }).focus();
   expect(await screen.findByRole("tooltip")).toHaveTextContent("Nenhum rosto encontrado na referência.");
-  reference.blur();
+  screen.getByRole("group", { name: "Referência: aviso" }).blur();
   await waitFor(() => expect(screen.queryByRole("tooltip")).not.toBeInTheDocument());
-  target.focus();
+  screen.getByRole("group", { name: "Imagem a corrigir: aviso" }).focus();
   expect(await screen.findByRole("tooltip")).toHaveTextContent("Nenhum rosto encontrado na foto de destino.");
 });
 
@@ -331,7 +335,7 @@ test("failed reference analysis explains why preview is unavailable on the refer
     fireEvent.click(await screen.findByRole("button", { name: "Imagem a corrigir: rosto 1" }));
     const preview = screen.getByRole("button", { name: "Ver correção" });
     expect(preview).toHaveAttribute("aria-disabled", "true");
-    screen.getByRole("img", { name: "Referência.jpg" }).focus();
+    screen.getByRole("group", { name: "Referência: aviso" }).focus();
     expect(await screen.findByRole("tooltip")).toHaveTextContent("Não foi possível analisar a referência.");
     fireEvent.click(preview);
     expect(onCorrection).not.toHaveBeenCalled();
@@ -360,7 +364,7 @@ test("preparation errors appear on the destination photo and keep preview retry 
     const retry = screen.getByRole("button", { name: "Ver correção" });
     expect(retry).not.toHaveAttribute("aria-disabled");
     expect(view.container.querySelector(".eye-correction__hint")).not.toBeInTheDocument();
-    screen.getByRole("img", { name: "Imagem a" }).focus();
+    screen.getByRole("group", { name: "Imagem a corrigir: aviso" }).focus();
     expect(await screen.findByRole("tooltip")).toHaveTextContent(error);
     screen.getByRole("button", { name: "Imagem a corrigir: rosto 1" }).focus();
     await waitFor(() => expect(screen.getByRole("tooltip")).toHaveTextContent(error));
@@ -382,7 +386,7 @@ test("save errors appear on the destination photo and still permit one retry", a
   render(<ImageViewer presentation={presentation} onNavigate={vi.fn()} onClose={vi.fn()} onCorrection={onCorrection} />);
   const retry = screen.getByRole("button", { name: "Salvar correção" });
   expect(retry).toBeEnabled();
-  screen.getByRole("img", { name: "Imagem a" }).focus();
+  screen.getByRole("group", { name: "Imagem a corrigir: aviso" }).focus();
   expect(await screen.findByRole("tooltip")).toHaveTextContent(error);
   retry.focus();
   await waitFor(() => expect(screen.getByRole("tooltip")).toHaveTextContent("Salvar correção"));

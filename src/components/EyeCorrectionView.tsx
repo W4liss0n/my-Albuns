@@ -41,7 +41,8 @@ function FaceImage({ side, url, name, notice, choosing, selected, onChoose, onSt
 }) {
   const image = useRef<HTMLImageElement>(null);
   const pane = useRef<HTMLDivElement>(null);
-  const noticeTooltip = useUiAnchoredTooltip(url ? image : pane, notice ?? "", !notice);
+  const photo = useRef<HTMLDivElement>(null);
+  const noticeTooltip = useUiAnchoredTooltip(url ? photo : pane, notice ?? "", !notice);
   const generation = useRef(0);
   const [faces, setFaces] = useState<Face[]>([]);
   const [analysis, setAnalysis] = useState<AnalysisState>("idle");
@@ -115,7 +116,10 @@ function FaceImage({ side, url, name, notice, choosing, selected, onChoose, onSt
     }}
     onPointerUp={(event) => { if (drag.current?.id === event.pointerId) { if (drag.current.moved) suppressFaceClick.current = drag.current.faceButton; if (drag.current.captured) event.currentTarget.releasePointerCapture(event.pointerId); drag.current = null; } }}
     onPointerCancel={() => { drag.current = null; }}>
-    {url ? <img {...noticeTooltip.triggerProps} ref={image} alt={name} src={url} tabIndex={notice ? 0 : undefined} crossOrigin="anonymous" draggable={false} style={{ width: imageWidth || undefined, height: imageHeight || undefined, transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})` }} onLoad={(event) => {
+    {url && <div {...noticeTooltip.triggerProps} ref={photo} className="eye-correction__photo" role={notice ? "group" : undefined}
+      aria-label={notice ? `${side === "reference" ? "Referência" : "Imagem a corrigir"}: aviso` : undefined} tabIndex={notice ? 0 : undefined}
+      style={{ left: size.width / 2 - zoomedWidth / 2 + pan.x, top: size.height / 2 - zoomedHeight / 2 + pan.y, width: zoomedWidth, height: zoomedHeight }}>
+      <img ref={image} alt={name} src={url} crossOrigin="anonymous" draggable={false} onLoad={(event) => {
       setNatural({ width: event.currentTarget.naturalWidth, height: event.currentTarget.naturalHeight });
       if (choosing) {
         if (fixtureFaces) { setFaces([fixtureFace(side)]); setAnalysis("ready"); return; }
@@ -129,22 +133,23 @@ function FaceImage({ side, url, name, notice, choosing, selected, onChoose, onSt
           setAnalysis(found.length ? "ready" : "no-face");
         }).catch(() => { if (generation.current === request) setAnalysis("failed"); });
       }
-    }} /> : null}
+    }} />
     {choosing && faces.length > 0 && imageWidth > 0 && imageHeight > 0 &&
-      <div className="eye-correction__face-layer" style={{ left: size.width / 2 - zoomedWidth / 2 + pan.x, top: size.height / 2 - zoomedHeight / 2 + pan.y, width: zoomedWidth, height: zoomedHeight }}>
+      <div className="eye-correction__face-layer">
         {faces.map((face, index) => {
           const bounds = faceBounds(face);
           if (!bounds) return null;
           const left = size.width / 2 + (bounds.left - .5) * zoomedWidth + pan.x;
           const top = size.height / 2 + (bounds.top - .5) * zoomedHeight + pan.y;
           if (left >= size.width || top >= size.height || left + (bounds.right - bounds.left) * zoomedWidth <= 0 || top + (bounds.bottom - bounds.top) * zoomedHeight <= 0) return null;
-          return <button {...noticeTooltip.triggerProps} key={index} type="button" className="eye-correction__face" data-selected={selected === index}
+          return <button key={index} type="button" className="eye-correction__face" data-selected={selected === index}
             style={{ left: `${bounds.left * 100}%`, top: `${bounds.top * 100}%`, width: `${(bounds.right - bounds.left) * 100}%`, height: `${(bounds.bottom - bounds.top) * 100}%` }}
             aria-pressed={selected === index} aria-label={`${side === "reference" ? "Referência" : "Imagem a corrigir"}: rosto ${index + 1}`}
-            onKeyDown={(event) => { noticeTooltip.triggerProps.onKeyDown?.(event); suppressFaceClick.current = null; }}
-            onClick={(event) => { noticeTooltip.triggerProps.onClick?.(event); if (suppressFaceClick.current === event.currentTarget) { suppressFaceClick.current = null; return; } onChoose(index, faces); }} />;
+            onKeyDown={() => { suppressFaceClick.current = null; }}
+            onClick={(event) => { if (suppressFaceClick.current === event.currentTarget) { suppressFaceClick.current = null; return; } onChoose(index, faces); }} />;
         })}
       </div>}
+    </div>}
     {navigation && <>
       <ImageToolButton label="Referência anterior" icon={ChevronLeft} glyph="navigation" className="eye-correction__nav--previous" disabled={!navigation.previous} onClick={() => navigation.onNavigate(-1)} />
       <ImageToolButton label="Próxima referência" icon={ChevronRight} glyph="navigation" className="eye-correction__nav--next" disabled={!navigation.next} onClick={() => navigation.onNavigate(1)} />

@@ -15878,6 +15878,8 @@
       "actions": [
         { "type": "click", "selector": "button[aria-label='Referência: rosto 1']" },
         { "type": "click", "selector": "button[aria-label='Imagem a corrigir: rosto 1']" },
+        { "type": "hover", "selector": ".ui-application-header" },
+        { "type": "assert", "selector": "body:not(:has(.ui-floating-tooltip))" },
         { "type": "hover", "selector": "button[aria-label='Imagem a corrigir: rosto 1']" }
       ]
     },
