@@ -3,7 +3,7 @@ import type { EditorProjection } from "../domain/project";
 import type { MediaFileInfo, MediaPreview } from "./projectPorts";
 import type { ImageViewerWindowPort, ViewerPresentation } from "./imageViewerWindow";
 import type { ViewerCorrectionPhase } from "../contracts/generated/ViewerCorrectionPhase";
-import type { ProjectMutationRunner } from "../components/useProjectMutationRunner";
+import type { ProjectMutationRunner } from "./projectMutation";
 import { viewerPreviewState } from "./imageViewerModel";
 
 interface CorrectionSession {

@@ -1,10 +1,10 @@
 import { StrictMode } from "react";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { expect, test, vi } from "vitest";
-import type { ImageViewerWindowPort, ViewerCorrectionAction } from "./imageViewerWindow";
-import type { ProjectMutationRunner } from "../components/useProjectMutationRunner";
+import type { ImageViewerWindowPort, ViewerCorrectionAction } from "../application/imageViewerWindow";
+import type { ProjectMutationRunner } from "../application/projectMutation";
 import { representativeProjection } from "../test/projectFixtures";
-import { useImageViewerSession } from "./useImageViewerSession";
+import { useImageViewerSession } from "../application/useImageViewerSession";
 
 function origin() {
   const button = document.createElement("button");

@@ -2,28 +2,8 @@ import { useCallback, useLayoutEffect, useMemo } from "react";
 
 import type { ProjectCorePort } from "../application/projectPorts";
 import type { EditorProjection } from "../domain/project";
-
-export type ProjectMutationOutcome =
-  | { status: "completed"; projection: EditorProjection }
-  | { status: "failed"; error: unknown }
-  | { status: "obsolete" };
-
-export type ProjectMutationOperation = (
-  port: ProjectCorePort,
-  latestProjection: EditorProjection | null,
-) => Promise<EditorProjection>;
-
-interface ProjectMutationRunOptions {
-  cancelAfterPendingFailure?: boolean;
-}
-
-export interface ProjectMutationRunner {
-  run(
-    operation: ProjectMutationOperation,
-    options?: ProjectMutationRunOptions,
-  ): Promise<ProjectMutationOutcome>;
-  waitForIdle(): Promise<ProjectMutationOutcome | null>;
-}
+import type { ProjectMutationOperation, ProjectMutationOutcome, ProjectMutationRunner, ProjectMutationRunOptions } from "../application/projectMutation";
+export type { ProjectMutationOperation, ProjectMutationOutcome, ProjectMutationRunner } from "../application/projectMutation";
 
 interface ProjectMutationContext {
   port: ProjectCorePort;
