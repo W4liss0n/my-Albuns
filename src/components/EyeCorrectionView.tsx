@@ -46,14 +46,13 @@ function analysisIssue(state: AnalysisState, photo: "foto de destino" | "referê
   return null;
 }
 
-function FaceImage({ side, url, displayUrl, name, notice, choosing, interactive, retained, visualHidden, selected, onChoose, onStatus, onVisualSettled, navigation }: {
+function FaceImage({ side, url, displayUrl, name, notice, choosing, interactive, retained, visualHidden, selected, onChoose, onStatus, onVisualSettled }: {
   side: Side; url: string | null; name: string; choosing: boolean;
   displayUrl?: string | null; interactive?: boolean; retained?: boolean; visualHidden?: boolean;
   notice?: string | null;
   selected: number | null; onChoose(index: number, faces: Face[]): void;
   onStatus(state: AnalysisState): void;
   onVisualSettled?(visible: boolean): void;
-  navigation?: { previous: boolean; next: boolean; onNavigate(offset: -1 | 1): void };
 }) {
   const image = useRef<HTMLImageElement>(null);
   const pane = useRef<HTMLDivElement>(null);
@@ -192,11 +191,7 @@ function FaceImage({ side, url, displayUrl, name, notice, choosing, interactive,
         })}
       </div>}
     </div>}
-    {navigation && <>
-      <ImageToolButton label="Referência anterior" icon={ChevronLeft} glyph="navigation" className="eye-correction__nav--previous" disabled={!navigation.previous} onClick={() => navigation.onNavigate(-1)} />
-      <ImageToolButton label="Próxima referência" icon={ChevronRight} glyph="navigation" className="eye-correction__nav--next" disabled={!navigation.next} onClick={() => navigation.onNavigate(1)} />
-    </>}
-    {canManipulateImage && zoom > 1 && <ImageToolButton label={`Ajustar ${side === "reference" ? "referência" : "imagem a corrigir"} à janela`} icon={Scan} className="eye-correction__fit" onClick={fit} />}
+    {(canManipulateImage || retained) && zoom > 1 && <ImageToolButton label={`Ajustar ${side === "reference" ? "referência" : "imagem a corrigir"} à janela`} icon={Scan} className="eye-correction__fit" blocked={retained} aria-busy={retained || undefined} onClick={fit} />}
     {noticeTooltip.tooltip}
   </div>;
 }
@@ -248,6 +243,8 @@ export function EyeCorrectionView({ presentation, onNavigate, onCorrection, onTa
   const referenceChoosing = correction.phase !== "browse";
   const targetChoosing = true;
   const referenceReady = displayedReference?.key === referenceIdentity;
+  const referencePending = !referenceReady && settledReferenceKey !== referenceIdentity
+    && (correction.referenceState === "loading" || correction.referenceState === "ready");
   const retainedReference = correction.phase === "browse" && (correction.referenceState === "ready" || correction.referenceState === "loading")
     && displayedReference?.sessionId === presentation.sessionId && !referenceReady && settledReferenceKey !== referenceIdentity ? displayedReference : null;
   const currentResult = Boolean(correction.resultUrl && resultRevision === selectionRevision && (correction.phase === "preview" || correction.phase === "applying"));
@@ -285,10 +282,13 @@ export function EyeCorrectionView({ presentation, onNavigate, onCorrection, onTa
           retained selected={null} onChoose={() => undefined} onStatus={() => undefined} />}
         <FaceImage key={referenceIdentity} side="reference" url={correction.referenceUrl} name={correction.referenceName} notice={referenceIssue} choosing={referenceChoosing} interactive={!busy}
           visualHidden={Boolean(retainedReference)} onVisualSettled={onReferenceSettled}
-          selected={referenceIndex} onChoose={(index, faces) => { setReferenceIndex(index); setReferenceFaces(faces); setSelectionRevision((value) => value + 1); }} onStatus={setReferenceAnalysis}
-          navigation={correction.phase === "browse" ? { previous: correction.canPreviousReference, next: correction.canNextReference, onNavigate } : undefined} />
+          selected={referenceIndex} onChoose={(index, faces) => { setReferenceIndex(index); setReferenceFaces(faces); setSelectionRevision((value) => value + 1); }} onStatus={setReferenceAnalysis} />
+        {correction.phase === "browse" && <>
+          <ImageToolButton label="Referência anterior" icon={ChevronLeft} glyph="navigation" className="eye-correction__nav--previous" blocked={!correction.canPreviousReference} onClick={() => onNavigate(-1)} />
+          <ImageToolButton label="Próxima referência" icon={ChevronRight} glyph="navigation" className="eye-correction__nav--next" blocked={!correction.canNextReference} onClick={() => onNavigate(1)} />
+        </>}
         {correction.phase === "browse"
-          ? <ImageToolButton label="Usar esta foto" icon={Check} className="eye-correction__reference-action" blocked={browseBlocked} onClick={() => action("select")} />
+          ? <ImageToolButton label="Usar esta foto" icon={Check} className="eye-correction__reference-action" blocked={browseBlocked} aria-busy={referencePending || undefined} onClick={() => action("select")} />
           : <ImageToolButton label="Trocar referência" icon={RefreshCcw} className="eye-correction__reference-action" disabled={busy} onClick={() => action("browse")} />}
       </div>
       <div className="eye-correction__pane">

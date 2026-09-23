@@ -15751,7 +15751,7 @@
       "viewport": { "height": 720, "width": 1050 },
       "readySelector": ".eye-correction__pane:first-child .eye-correction__reference-action",
       "actions": [
-        { "type": "click", "selector": "button[aria-label='Abrir olhos']" }
+        { "type": "click", "selector": "button[aria-label='Abrir olhos']:not([aria-disabled='true'])" }
       ]
     },
     {
@@ -16186,7 +16186,7 @@
       "viewport": { "height": 720, "width": 1050 },
       "readySelector": ".image-viewer__image[style*='opacity: 1']:not([style*='width: 0px']):not([style*='height: 0px'])",
       "actions": [
-        { "type": "click", "selector": "button[aria-label='Abrir olhos']" },
+        { "type": "click", "selector": "button[aria-label='Abrir olhos']:not([aria-disabled='true'])" },
         { "type": "assert", "selector": ".eye-correction__panes" },
         { "type": "click", "selector": "button[aria-label='Fechar correção']" }
       ]
@@ -16204,7 +16204,7 @@
       "viewport": { "height": 720, "width": 1050 },
       "readySelector": ".image-viewer__image[alt='Praia.jpg'][style*='opacity: 1']:not([style*='width: 0px'])",
       "actions": [
-        { "type": "click", "selector": "button[aria-label='Abrir olhos']" },
+        { "type": "click", "selector": "button[aria-label='Abrir olhos']:not([aria-disabled='true'])" },
         { "type": "click", "selector": "button[aria-label='Fechar correção']" },
         { "type": "click", "selector": "button[aria-label='Próxima imagem']" }
       ]
@@ -16687,7 +16687,7 @@
       "actions": [
         {
           "type": "click",
-          "selector": "button[aria-label='Abrir olhos']"
+          "selector": "button[aria-label='Abrir olhos']:not([aria-disabled='true'])"
         },
         {
           "type": "assert",
@@ -16703,7 +16703,7 @@
         },
         {
           "type": "click",
-          "selector": "button[aria-label='Abrir olhos']"
+          "selector": "button[aria-label='Abrir olhos']:not([aria-disabled='true'])"
         },
         {
           "type": "assert",
@@ -16719,7 +16719,7 @@
         },
         {
           "type": "click",
-          "selector": "button[aria-label='Abrir olhos']"
+          "selector": "button[aria-label='Abrir olhos']:not([aria-disabled='true'])"
         },
         {
           "type": "assert",
@@ -16900,6 +16900,102 @@
         {
           "type": "assert",
           "selector": ".eye-correction__pane:last-child .eye-correction__photo img[alt='IMG_6246.JPG']"
+        }
+      ]
+    },
+    {
+      "id": "image-viewer-navigation-eye-focus",
+      "title": "Visualizador — Abrir olhos preserva o foco ao navegar",
+      "implementationPath": "/image-viewer.html?preview=normal&qa=1",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "image-viewer",
+        "implementationCaptureSelector": ".image-viewer-window",
+        "reason": "Design 0050: controle persistente, bloqueado durante carregamento sem piscar; captura final complementa a medição por quadro dos controles."
+      },
+      "viewport": {
+        "width": 1050,
+        "height": 720
+      },
+      "readySelector": "button[aria-label='Abrir olhos']:focus:not([aria-disabled='true'])",
+      "actions": [
+        {
+          "type": "assert",
+          "selector": "button[aria-label='Abrir olhos']:not([aria-disabled='true'])"
+        },
+        {
+          "type": "focus",
+          "selector": "button[aria-label='Abrir olhos']"
+        },
+        {
+          "type": "key",
+          "key": "ArrowRight"
+        },
+        {
+          "type": "assert",
+          "selector": ".image-viewer__image[alt='Praia.jpg'][style*='opacity: 1']"
+        },
+        {
+          "type": "assert",
+          "selector": "button[aria-label='Abrir olhos']:focus"
+        },
+        {
+          "type": "key",
+          "key": "ArrowLeft"
+        },
+        {
+          "type": "assert",
+          "selector": ".image-viewer__image[alt='Retrato.jpg'][style*='opacity: 1']"
+        }
+      ]
+    },
+    {
+      "id": "image-viewer-reference-navigation-focus",
+      "title": "Correção — seta da referência preserva o foco ao trocar de foto",
+      "implementationPath": "/image-viewer.html?preview=correction-browse&qa=1&fixture=faces-multi",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "image-viewer",
+        "implementationCaptureSelector": ".image-viewer-window",
+        "reason": "Design 0050: setas pertencem ao painel persistente; foco e controles permanecem ao navegar na referência."
+      },
+      "viewport": {
+        "width": 1050,
+        "height": 720
+      },
+      "readySelector": "button[aria-label='Próxima referência']:focus",
+      "actions": [
+        {
+          "type": "assert",
+          "selector": "button[aria-label='Usar esta foto']:not([aria-disabled='true'])"
+        },
+        {
+          "type": "focus",
+          "selector": "button[aria-label='Próxima referência']"
+        },
+        {
+          "type": "key",
+          "key": "ArrowRight"
+        },
+        {
+          "type": "assert",
+          "selector": ".eye-correction__pane:first-child .eye-correction__photo img[alt='IMG_6276.JPG']"
+        },
+        {
+          "type": "assert",
+          "selector": "button[aria-label='Próxima referência']:focus"
+        },
+        {
+          "type": "key",
+          "key": "ArrowLeft"
+        },
+        {
+          "type": "assert",
+          "selector": ".eye-correction__pane:first-child .eye-correction__photo img[alt='IMG_6252.JPG']"
+        },
+        {
+          "type": "assert",
+          "selector": "button[aria-label='Usar esta foto']:not([aria-disabled='true'])"
         }
       ]
     }

@@ -42,6 +42,7 @@ function ImageViewerSession({ presentation, onNavigate, onClose, onCorrection, o
   const wasConfirming = useRef(false);
   const drag = useRef<{ x: number; y: number; panX: number; panY: number; pointerId: number } | null>(null);
   const ready = loaded?.key === imageKey && failedKey !== imageKey;
+  const imagePending = !ready && failedKey !== imageKey && (state === "loading" || state === "ready");
   const retained = !ready && (state === "ready" || state === "loading") && failedKey !== imageKey && loaded?.sessionId === presentation.sessionId ? loaded : null;
   const correcting = Boolean(presentation.correction && onCorrection);
   const targetKey = imageKey;
@@ -172,8 +173,10 @@ function ImageViewerSession({ presentation, onNavigate, onClose, onCorrection, o
         {!correcting && ready && state !== "ready" && <p className="image-viewer__stale" role="status">Prévia anterior · imagem indisponível</p>}
         {!correcting && <ImageToolButton label="Imagem anterior" icon={ChevronLeft} glyph="navigation" className="image-viewer__nav--previous" disabled={!canPrevious} onClick={() => onNavigate(-1)} />}
         {!correcting && <ImageToolButton label="Próxima imagem" icon={ChevronRight} glyph="navigation" className="image-viewer__nav--next" disabled={!canNext} onClick={() => onNavigate(1)} />}
-        {!correcting && ready && state === "ready" && onCorrection && <ImageToolButton label="Abrir olhos" icon={Eye} tooltipPlacement="bottom" className="image-viewer__eye-action" onClick={() => onCorrection({ sessionId: presentation.sessionId, kind: "start" })} />}
-        {!correcting && ready && zoom > 1 && <ImageToolButton label="Ajustar à janela" icon={Scan} className="image-viewer__fit" onClick={() => { setZoom(1); setPan({ x: 0, y: 0 }); }} />}
+        {!correcting && onCorrection && <ImageToolButton label="Abrir olhos" icon={Eye} tooltipPlacement="bottom" className="image-viewer__eye-action"
+          blocked={!ready || state !== "ready"} aria-busy={imagePending || undefined} onClick={() => onCorrection({ sessionId: presentation.sessionId, kind: "start" })} />}
+        {!correcting && (ready || retained) && zoom > 1 && <ImageToolButton label="Ajustar à janela" icon={Scan} className="image-viewer__fit"
+          blocked={!ready} aria-busy={imagePending || undefined} onClick={() => { setZoom(1); setPan({ x: 0, y: 0 }); }} />}
       </div>
       {presentation.correction && onCorrection && <div className="image-viewer__correction-content" inert={confirmationOpen} aria-hidden={confirmationOpen}>
         <EyeCorrectionView presentation={presentation} onNavigate={onNavigate} onTargetSettled={markTargetSettled}

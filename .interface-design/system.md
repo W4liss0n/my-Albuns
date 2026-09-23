@@ -37,7 +37,10 @@ e a lâmina são o foco; os controles ajudam a trabalhar sem disputar atenção.
   continuidade, sem uma piscada ou animação de desaparecimento. Avançar ou
   voltar imagens, inclusive a referência, segue o mesmo princípio: manter a
   foto exibida até a próxima estar pronta, com nome coerente e sem permitir
-  ações sobre a foto anterior como se fosse a nova.
+  ações sobre a foto anterior como se fosse a nova. Os controles do visualizador
+  também conservam posição, foco e tom no carregamento transitório: bloquear
+  a ação sem desmontar, piscar ou acrescentar spinner. Erros definitivos
+  continuam distinguíveis pelo estado desabilitado.
 - **Escrever pouco e com clareza.** Preferir português simples e orientações
   úteis, seguindo o [guia de escrita aceito](../docs/design/0043-plano-de-simplificacao-dos-textos.md#guia-curto-de-escrita)
   e sua [pesquisa](../docs/research/2026-09-18-padroes-de-escrita-para-interfaces.md).

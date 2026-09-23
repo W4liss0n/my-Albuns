@@ -27,7 +27,7 @@ test("navigation keeps the painted photo until the next image has geometry witho
     expect(image.isConnected).toBe(true);
     expect(parseFloat(image.style.width)).toBeGreaterThan(0);
     expect(screen.queryByText("Carregando imagem…")).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Abrir olhos" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Abrir olhos" })).toHaveAttribute("aria-disabled", "true");
     expect(screen.getByRole("button", { name: "Próxima imagem" })).toBeDisabled();
     const next = view.container.querySelector<HTMLImageElement>('img[src="data:image/png;id=b"]')!;
     Object.defineProperties(next, { naturalWidth: { configurable: true, value: 1200 }, naturalHeight: { configurable: true, value: 800 } });
@@ -36,6 +36,67 @@ test("navigation keeps the painted photo until the next image has geometry witho
     expect(parseFloat(next.style.width)).toBeGreaterThan(0);
     expect(screen.getByRole("button", { name: "Abrir olhos" })).toBeInTheDocument();
   } finally { width.mockRestore(); height.mockRestore(); }
+});
+
+test("Abrir olhos stays mounted and focusable while the next photo is pending or unavailable, but cannot act", () => {
+  const width = vi.spyOn(Element.prototype, "clientWidth", "get").mockReturnValue(800);
+  const height = vi.spyOn(Element.prototype, "clientHeight", "get").mockReturnValue(600);
+  const onCorrection = vi.fn();
+  const props = { onNavigate: vi.fn(), onClose: vi.fn(), onCorrection };
+  try {
+    const view = render(<ImageViewer presentation={initial} {...props} />);
+    const first = screen.getByRole("img", { name: "Imagem a" });
+    Object.defineProperties(first, { naturalWidth: { configurable: true, value: 1600 }, naturalHeight: { configurable: true, value: 1200 } });
+    fireEvent.load(first);
+    const eye = screen.getByRole("button", { name: "Abrir olhos" });
+    eye.focus();
+    const pending: ViewerPresentation = { ...initial, mediaId: "b", name: "Imagem b", url: null, state: "loading" };
+    view.rerender(<ImageViewer presentation={pending} {...props} />);
+    expect(screen.getByRole("button", { name: "Abrir olhos" })).toBe(eye);
+    expect(eye).toHaveFocus();
+    expect(eye).toHaveAttribute("aria-disabled", "true");
+    expect(eye).toHaveAttribute("aria-busy", "true");
+    fireEvent.click(eye);
+    fireEvent.keyDown(eye, { key: "Enter" });
+    expect(onCorrection).not.toHaveBeenCalled();
+
+    const unavailable: ViewerPresentation = { ...pending, state: "absent" };
+    view.rerender(<ImageViewer presentation={unavailable} {...props} />);
+    expect(screen.getByRole("button", { name: "Abrir olhos" })).toBe(eye);
+    expect(eye).toHaveAttribute("aria-disabled", "true");
+    expect(eye).not.toHaveAttribute("aria-busy");
+
+    const ready: ViewerPresentation = { ...pending, state: "ready", url: "data:image/png;id=b" };
+    view.rerender(<ImageViewer presentation={ready} {...props} />);
+    const next = view.container.querySelector<HTMLImageElement>('img[src="data:image/png;id=b"]')!;
+    Object.defineProperties(next, { naturalWidth: { configurable: true, value: 1200 }, naturalHeight: { configurable: true, value: 800 } });
+    fireEvent.load(next);
+    expect(screen.getByRole("button", { name: "Abrir olhos" })).toBe(eye);
+    expect(eye).not.toHaveAttribute("aria-disabled");
+    fireEvent.click(eye);
+    expect(onCorrection).toHaveBeenCalledWith({ sessionId: "s", kind: "start" });
+  } finally { width.mockRestore(); height.mockRestore(); }
+});
+
+test("reference navigation arrows retain their node, focus and tooltip across a photo change", () => {
+  const correction: NonNullable<ViewerPresentation["correction"]> = {
+    phase: "browse", referenceMediaId: "ref-a", referenceName: "Referência a.jpg", referenceUrl: "data:image/png;id=ref-a",
+    referenceState: "ready", canPreviousReference: false, canNextReference: true, resultUrl: null, error: null,
+  };
+  const props = { onNavigate: vi.fn(), onClose: vi.fn(), onCorrection: vi.fn() };
+  const view = render(<ImageViewer presentation={{ ...initial, correction }} {...props} />);
+  const next = screen.getByRole("button", { name: "Próxima referência" });
+  next.focus();
+  view.rerender(<ImageViewer presentation={{ ...initial, correction: { ...correction, referenceMediaId: "ref-b", referenceName: "Referência b.jpg", referenceUrl: null, referenceState: "loading" } }} {...props} />);
+  expect(screen.getByRole("button", { name: "Próxima referência" })).toBe(next);
+  expect(next).toHaveFocus();
+  expect(view.container.querySelectorAll(".eye-correction__nav--next")).toHaveLength(1);
+  view.rerender(<ImageViewer presentation={{ ...initial, correction: { ...correction, referenceMediaId: "ref-c", referenceName: "Referência c.jpg", referenceUrl: null, referenceState: "loading", canNextReference: false } }} {...props} />);
+  expect(screen.getByRole("button", { name: "Próxima referência" })).toBe(next);
+  expect(next).toHaveFocus();
+  expect(next).toHaveAttribute("aria-disabled", "true");
+  fireEvent.click(next);
+  expect(props.onNavigate).not.toHaveBeenCalled();
 });
 
 test("reference navigation keeps its painted photo while another reference loads", () => {
@@ -51,10 +112,19 @@ test("reference navigation keeps its painted photo while another reference loads
     Object.defineProperties(original, { naturalWidth: { configurable: true, value: 800 }, naturalHeight: { configurable: true, value: 1200 } });
     fireEvent.load(original);
     expect(parseFloat(original.parentElement!.style.width)).toBeGreaterThan(0);
+    fireEvent.wheel(view.container.querySelector(".eye-correction__pane:first-child .eye-correction__pane-image")!, { deltaY: -500 });
+    const fit = view.container.querySelector<HTMLButtonElement>(".eye-correction__pane:first-child .eye-correction__fit")!;
+    expect(fit).toBeInTheDocument();
+    const zoomedWidth = original.parentElement!.style.width;
 
     view.rerender(<ImageViewer presentation={{ ...initial, correction: { ...correction, referenceMediaId: "ref-b", referenceName: "Referência b.jpg", referenceUrl: "data:image/png;id=ref-b", canPreviousReference: true } }} onNavigate={vi.fn()} onClose={vi.fn()} onCorrection={vi.fn()} />);
     expect(original.isConnected).toBe(true);
-    expect(parseFloat(original.parentElement!.style.width)).toBeGreaterThan(0);
+    expect(original.parentElement!.style.width).toBe(zoomedWidth);
+    expect(view.container.querySelector(".eye-correction__pane:first-child .eye-correction__fit")).toBe(fit);
+    expect(fit).toHaveAttribute("aria-disabled", "true");
+    expect(fit).toHaveAttribute("aria-busy", "true");
+    fireEvent.click(fit);
+    expect(original.parentElement!.style.width).toBe(zoomedWidth);
     expect(screen.getByRole("button", { name: "Usar esta foto" })).toHaveAttribute("aria-disabled", "true");
     expect(screen.getByRole("button", { name: "Próxima referência" })).toBeEnabled();
 
@@ -63,6 +133,7 @@ test("reference navigation keeps its painted photo while another reference loads
     fireEvent.load(next);
     expect(original.isConnected).toBe(false);
     expect(parseFloat(next.parentElement!.style.width)).toBeGreaterThan(0);
+    expect(view.container.querySelector(".eye-correction__pane:first-child .eye-correction__fit")).not.toBeInTheDocument();
   } finally { width.mockRestore(); height.mockRestore(); }
 });
 
@@ -78,12 +149,18 @@ test("loading without a URL and A to B to C navigation retain only the last pain
     fireEvent.load(first);
     fireEvent.wheel(view.container.querySelector(".image-viewer__stage")!, { deltaY: -500, clientX: 400, clientY: 300 });
     expect(first.style.transform).not.toContain("scale(1)");
+    const fit = screen.getByRole("button", { name: "Ajustar à janela" });
 
     const loading: ViewerPresentation = { ...initial, mediaId: "b", name: "Imagem b", url: null, state: "loading" };
     view.rerender(<ImageViewer presentation={loading} {...props} />);
     expect(first.isConnected).toBe(true);
     expect(first.style.transform).not.toContain("scale(1)");
     expect(screen.queryByText("Carregando imagem…")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Ajustar à janela" })).toBe(fit);
+    expect(fit).toHaveAttribute("aria-disabled", "true");
+    expect(fit).toHaveAttribute("aria-busy", "true");
+    fireEvent.click(fit);
+    expect(first.style.transform).not.toContain("scale(1)");
     const zoomBeforeKey = first.style.transform;
     fireEvent.keyDown(window, { key: "+" });
     expect(first.style.transform).toBe(zoomBeforeKey);
@@ -102,6 +179,7 @@ test("loading without a URL and A to B to C navigation retain only the last pain
     fireEvent.load(finalImage);
     expect(first.isConnected).toBe(false);
     expect(finalImage.style.transform).toContain("scale(1)");
+    expect(screen.queryByRole("button", { name: "Ajustar à janela" })).not.toBeInTheDocument();
     expect(title).toHaveBeenLastCalledWith("s", "Imagem c");
   } finally { width.mockRestore(); height.mockRestore(); }
 });
@@ -674,9 +752,10 @@ test("each photo owns its no-face tooltip, which closes when focus leaves", asyn
     fireEvent.load(photo);
   }
   await waitFor(() => expect(view.container.querySelectorAll("[data-analysis='no-face']")).toHaveLength(2));
-  screen.getByRole("group", { name: "Referência: aviso" }).focus();
+  const referenceNotice = await screen.findByRole("group", { name: "Referência: aviso" });
+  referenceNotice.focus();
   expect(await screen.findByRole("tooltip")).toHaveTextContent("Nenhum rosto encontrado na referência.");
-  screen.getByRole("group", { name: "Referência: aviso" }).blur();
+  referenceNotice.blur();
   await waitFor(() => expect(screen.queryByRole("tooltip")).not.toBeInTheDocument());
   screen.getByRole("group", { name: "Imagem a corrigir: aviso" }).focus();
   expect(await screen.findByRole("tooltip")).toHaveTextContent("Nenhum rosto encontrado na foto de destino.");

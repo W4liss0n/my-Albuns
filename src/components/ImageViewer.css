@@ -15,6 +15,14 @@
 .image-viewer__nav--next { right: 16px; top: 50%; transform: translateY(-50%); }
 .image-viewer__fit { right: 16px; bottom: 16px; }
 .image-viewer__eye-action { right: 16px; top: 16px; }
+.image-viewer__eye-action[aria-busy="true"][aria-disabled="true"],
+.image-viewer__fit[aria-busy="true"][aria-disabled="true"],
+.eye-correction__fit[aria-busy="true"][aria-disabled="true"],
+.eye-correction__reference-action[aria-busy="true"][aria-disabled="true"] { opacity: 1; }
+.image-viewer__eye-action[aria-busy="true"][aria-disabled="true"]:hover::before,
+.image-viewer__fit[aria-busy="true"][aria-disabled="true"]:hover::before,
+.eye-correction__fit[aria-busy="true"][aria-disabled="true"]:hover::before,
+.eye-correction__reference-action[aria-busy="true"][aria-disabled="true"]:hover::before { background: color-mix(in srgb, var(--ui-surface) 72%, transparent); }
 .eye-correction { position: relative; display: flex; flex: 1; flex-direction: column; min-width: 0; min-height: 0; background: var(--ui-canvas); }
 .eye-correction__tools { position: absolute; isolation: isolate; z-index: 4; right: 16px; top: 16px; display: flex; flex-direction: row-reverse; align-items: center; }
 .eye-correction__tools::before { content: ""; position: absolute; z-index: -1; inset: 3px; border-radius: 18px; background: color-mix(in srgb, var(--ui-surface) 56%, transparent); pointer-events: none; transform-origin: right center; animation: eye-correction-capsule-enter 180ms ease-out both; }

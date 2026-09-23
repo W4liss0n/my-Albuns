@@ -77,6 +77,16 @@ disponível, e somente o pedido mais recente pode assumir a tela. Uma falha
 definitiva ou uma nova sessão não mantém a foto de outro item como resultado.
 Não há acúmulo de fotos retidas; basta a foto exibida e a próxima em preparação.
 
+Os controles também permanecem estáveis durante a navegação. **Abrir olhos**
+mantém posição, foco e aparência enquanto a próxima foto carrega; a ação fica
+bloqueada e anuncia ocupação sem sumir, piscar, ganhar spinner ou texto novo.
+O mesmo vale para **Usar esta foto** na referência e para **Ajustar à janela**
+enquanto uma foto ampliada permanece retida. Ao mostrar a próxima foto já
+encaixada, o ajuste deixa de ser necessário. As setas pertencem à área de
+visualização e não são recriadas junto com cada foto. Uma indisponibilidade
+definitiva mantém a indicação visual de ação desabilitada; não há ação sobre
+uma foto anterior em nome da atual.
+
 Ao entrar na correção de olhos, a foto já exibida permanece visível até que a
 imagem de destino esteja carregada e tenha seu tamanho calculado. A troca não
 passa por uma área vazia nem usa uma animação de desaparecimento para disfarçar
