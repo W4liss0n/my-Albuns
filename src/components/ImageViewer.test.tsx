@@ -245,11 +245,16 @@ test("face bounds track fit and zoom, clip off-image faces, and allow pan withou
     const beforePan = parseFloat(layer.style.left);
     pane.setPointerCapture = vi.fn(); pane.releasePointerCapture = vi.fn();
     fireEvent.pointerDown(target, { pointerId: 1, button: 0, clientX: 200, clientY: 250 });
+    expect(pane.setPointerCapture).not.toHaveBeenCalled();
     fireEvent.pointerMove(pane, { pointerId: 1, clientX: 250, clientY: 250 });
+    expect(pane.setPointerCapture).toHaveBeenCalledWith(1);
     fireEvent.pointerUp(pane, { pointerId: 1 });
     expect(parseFloat(layer.style.left)).toBeCloseTo(beforePan + 50);
     fireEvent.click(target);
     expect(target).toHaveAttribute("aria-pressed", "false");
+    fireEvent.pointerDown(target, { pointerId: 2, button: 0, clientX: 200, clientY: 250 });
+    expect(pane.setPointerCapture).toHaveBeenCalledTimes(1);
+    fireEvent.pointerUp(target, { pointerId: 2 });
     fireEvent.click(target);
     expect(target).toHaveAttribute("aria-pressed", "true");
     expect(screen.getByRole("button", { name: "Ver correção" })).toBeEnabled();

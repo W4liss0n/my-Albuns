@@ -17,7 +17,7 @@ const fixtureFaces = import.meta.env.DEV && new URLSearchParams(location.search)
 const fixtureNoFaces = import.meta.env.DEV && new URLSearchParams(location.search).get("fixture") === "none";
 function fixtureFace(side: Side): Face {
   const [centerX, centerY, radiusX, radiusY] = side === "reference"
-    ? [.51571, .26458, .14826, .15113] : [.50075, .37648, .14677, .18253];
+    ? [.50075, .37648, .14677, .18253] : [.51571, .26458, .14826, .15113];
   return Array.from({ length: 264 }, (_, index) => {
     const angle = index * 2 * Math.PI / 264;
     return { x: centerX + Math.cos(angle) * radiusX, y: centerY + Math.sin(angle) * radiusY, z: 0 };
@@ -40,7 +40,7 @@ function FaceImage({ side, url, name, choosing, selected, onChoose, onStatus, na
   const [natural, setNatural] = useState({ width: 0, height: 0 });
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
-  const drag = useRef<{ x: number; y: number; panX: number; panY: number; id: number; moved: boolean; faceButton: HTMLButtonElement | null } | null>(null);
+  const drag = useRef<{ x: number; y: number; panX: number; panY: number; id: number; moved: boolean; captured: boolean; faceButton: HTMLButtonElement | null } | null>(null);
   const suppressFaceClick = useRef<HTMLButtonElement | null>(null);
   useEffect(() => {
     const element = pane.current;
@@ -89,18 +89,19 @@ function FaceImage({ side, url, name, choosing, selected, onChoose, onStatus, na
       suppressFaceClick.current = null;
       const button = (event.target as Element).closest<HTMLButtonElement>("button");
       if (zoom <= 1 || event.button !== 0 || (button && !button.classList.contains("eye-correction__face"))) return;
-      drag.current = { x: event.clientX, y: event.clientY, panX: pan.x, panY: pan.y, id: event.pointerId, moved: false, faceButton: button };
-      event.currentTarget.setPointerCapture(event.pointerId);
+      drag.current = { x: event.clientX, y: event.clientY, panX: pan.x, panY: pan.y, id: event.pointerId, moved: false, captured: !button, faceButton: button };
+      if (!button) event.currentTarget.setPointerCapture(event.pointerId);
     }}
     onPointerMove={(event) => {
       const current = drag.current;
       if (current?.id !== event.pointerId) return;
       const dx = event.clientX - current.x, dy = event.clientY - current.y;
       if (!current.moved && Math.hypot(dx, dy) < 4) return;
+      if (!current.captured) { event.currentTarget.setPointerCapture(event.pointerId); current.captured = true; }
       current.moved = true;
       setPan(bound({ x: current.panX + dx, y: current.panY + dy }, zoom));
     }}
-    onPointerUp={(event) => { if (drag.current?.id === event.pointerId) { if (drag.current.moved) suppressFaceClick.current = drag.current.faceButton; drag.current = null; event.currentTarget.releasePointerCapture(event.pointerId); } }}
+    onPointerUp={(event) => { if (drag.current?.id === event.pointerId) { if (drag.current.moved) suppressFaceClick.current = drag.current.faceButton; if (drag.current.captured) event.currentTarget.releasePointerCapture(event.pointerId); drag.current = null; } }}
     onPointerCancel={() => { drag.current = null; }}>
     {url ? <img ref={image} alt={name} src={url} crossOrigin="anonymous" draggable={false} style={{ transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})` }} onLoad={(event) => {
       setNatural({ width: event.currentTarget.naturalWidth, height: event.currentTarget.naturalHeight });

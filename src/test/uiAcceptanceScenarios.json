@@ -15801,8 +15801,8 @@
       "viewport": { "height": 720, "width": 1050 },
       "readySelector": ".eye-correction__pane:last-child .eye-correction__face[aria-pressed='true']",
       "actions": [
-        { "type": "click", "selector": "button[aria-label='Imagem a corrigir: rosto 1']" },
-        { "type": "wheel", "selector": ".eye-correction__pane:last-child .eye-correction__pane-image", "deltaY": -450 }
+        { "type": "wheel", "selector": ".eye-correction__pane:last-child .eye-correction__pane-image", "deltaY": -450 },
+        { "type": "click", "selector": "button[aria-label='Imagem a corrigir: rosto 1']" }
       ]
     },
     {
