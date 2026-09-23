@@ -15740,16 +15740,16 @@
     },
     {
       "id": "image-viewer-correction-open",
-      "title": "Correção de olhos — ferramentas expandidas a partir de Abrir olhos",
+      "title": "Correção de olhos — entrada e escolha da referência",
       "implementationPath": "/image-viewer.html?preview=normal&qa=1&fixture=faces",
       "comparison": {
         "implementationCaptureSelector": ".image-viewer-window",
-        "reason": "Design 0050: Fechar correção ocupa o ponto de Abrir olhos e as ações se estendem à esquerda",
+        "reason": "Design 0050: Fechar correção ocupa o ponto de Abrir olhos e Usar esta foto pertence à metade esquerda",
         "kind": "implementation-only",
         "surface": "image-viewer"
       },
       "viewport": { "height": 720, "width": 1050 },
-      "readySelector": ".eye-correction__tool-extension",
+      "readySelector": ".eye-correction__pane:first-child .eye-correction__reference-action",
       "actions": [
         { "type": "click", "selector": "button[aria-label='Abrir olhos']" }
       ]
