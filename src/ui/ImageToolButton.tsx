@@ -10,13 +10,12 @@ interface ImageToolButtonProps extends Omit<ButtonHTMLAttributes<HTMLButtonEleme
   icon: LucideIcon;
   glyph?: "navigation" | "tool";
   tooltipPlacement?: "top" | "bottom";
-  tooltipText?: string;
   blocked?: boolean;
 }
 
-export function ImageToolButton({ label, icon, glyph = "tool", tooltipPlacement = "top", tooltipText, blocked = false, className, disabled, onClick, onKeyDown, ...props }: ImageToolButtonProps) {
+export function ImageToolButton({ label, icon, glyph = "tool", tooltipPlacement = "top", blocked = false, className, disabled, onClick, onKeyDown, ...props }: ImageToolButtonProps) {
   const button = useRef<HTMLButtonElement>(null);
-  const tooltip = useUiAnchoredTooltip(button, tooltipText ?? label, disabled && !blocked, tooltipPlacement);
+  const tooltip = useUiAnchoredTooltip(button, label, disabled && !blocked, tooltipPlacement);
   return <>
     <ActionButton {...props} {...tooltip.triggerProps} ref={button} density="compact" variant="quiet" disabled={disabled && !blocked}
       aria-disabled={blocked || undefined}

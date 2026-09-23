@@ -3,6 +3,7 @@ import { Check, ChevronLeft, ChevronRight, Columns2, EyeOff, RefreshCcw, Save, S
 import type { ViewerCorrectionAction, ViewerPresentation } from "../application/imageViewerWindow";
 import { detectFaces, faceBounds, type Face } from "../image-viewer/faceLandmarks";
 import { ImageToolButton } from "../ui/ImageToolButton";
+import { useUiAnchoredTooltip } from "../ui/UiAnchoredTooltip";
 
 interface Props {
   presentation: ViewerPresentation;
@@ -31,14 +32,16 @@ function analysisIssue(state: AnalysisState, photo: "foto de destino" | "referê
   return null;
 }
 
-function FaceImage({ side, url, name, choosing, selected, onChoose, onStatus, navigation }: {
+function FaceImage({ side, url, name, notice, choosing, selected, onChoose, onStatus, navigation }: {
   side: Side; url: string | null; name: string; choosing: boolean;
+  notice?: string | null;
   selected: number | null; onChoose(index: number, faces: Face[]): void;
   onStatus(state: AnalysisState): void;
   navigation?: { previous: boolean; next: boolean; onNavigate(offset: -1 | 1): void };
 }) {
   const image = useRef<HTMLImageElement>(null);
   const pane = useRef<HTMLDivElement>(null);
+  const noticeTooltip = useUiAnchoredTooltip(url ? image : pane, notice ?? "", !notice);
   const generation = useRef(0);
   const [faces, setFaces] = useState<Face[]>([]);
   const [analysis, setAnalysis] = useState<AnalysisState>("idle");
@@ -91,7 +94,7 @@ function FaceImage({ side, url, name, choosing, selected, onChoose, onStatus, na
     y: Math.max(-Math.max(0, (imageHeight * value - size.height) / 2), Math.min(Math.max(0, (imageHeight * value - size.height) / 2), next.y)),
   });
   const fit = () => { setZoom(1); setPan({ x: 0, y: 0 }); };
-  return <div className="eye-correction__pane-image" ref={pane} tabIndex={0} data-analysis={analysis} aria-busy={analysis === "analyzing"}
+  return <div {...(!url ? noticeTooltip.triggerProps : {})} className="eye-correction__pane-image" ref={pane} tabIndex={0} data-analysis={analysis} aria-busy={analysis === "analyzing"}
     onWheel={(event) => { if (!url || !event.deltaY) return; event.preventDefault(); const value = Math.max(1, Math.min(8, zoom * Math.exp(-event.deltaY * 0.002))); setPan(bound(pan, value)); setZoom(value); }}
     onKeyDown={(event) => { if (event.key === "0") { event.preventDefault(); fit(); } else if (event.key === "+" || event.key === "=") { event.preventDefault(); const value = Math.min(8, zoom * 1.25); setPan(bound(pan, value)); setZoom(value); } else if (event.key === "-") { event.preventDefault(); const value = Math.max(1, zoom / 1.25); setPan(bound(pan, value)); setZoom(value); } }}
     onPointerDown={(event) => {
@@ -112,7 +115,7 @@ function FaceImage({ side, url, name, choosing, selected, onChoose, onStatus, na
     }}
     onPointerUp={(event) => { if (drag.current?.id === event.pointerId) { if (drag.current.moved) suppressFaceClick.current = drag.current.faceButton; if (drag.current.captured) event.currentTarget.releasePointerCapture(event.pointerId); drag.current = null; } }}
     onPointerCancel={() => { drag.current = null; }}>
-    {url ? <img ref={image} alt={name} src={url} crossOrigin="anonymous" draggable={false} style={{ transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})` }} onLoad={(event) => {
+    {url ? <img {...noticeTooltip.triggerProps} ref={image} alt={name} src={url} tabIndex={notice ? 0 : undefined} crossOrigin="anonymous" draggable={false} style={{ width: imageWidth || undefined, height: imageHeight || undefined, transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})` }} onLoad={(event) => {
       setNatural({ width: event.currentTarget.naturalWidth, height: event.currentTarget.naturalHeight });
       if (choosing) {
         if (fixtureFaces) { setFaces([fixtureFace(side)]); setAnalysis("ready"); return; }
@@ -135,11 +138,11 @@ function FaceImage({ side, url, name, choosing, selected, onChoose, onStatus, na
           const left = size.width / 2 + (bounds.left - .5) * zoomedWidth + pan.x;
           const top = size.height / 2 + (bounds.top - .5) * zoomedHeight + pan.y;
           if (left >= size.width || top >= size.height || left + (bounds.right - bounds.left) * zoomedWidth <= 0 || top + (bounds.bottom - bounds.top) * zoomedHeight <= 0) return null;
-          return <button key={index} type="button" className="eye-correction__face" data-selected={selected === index}
+          return <button {...noticeTooltip.triggerProps} key={index} type="button" className="eye-correction__face" data-selected={selected === index}
             style={{ left: `${bounds.left * 100}%`, top: `${bounds.top * 100}%`, width: `${(bounds.right - bounds.left) * 100}%`, height: `${(bounds.bottom - bounds.top) * 100}%` }}
             aria-pressed={selected === index} aria-label={`${side === "reference" ? "Referência" : "Imagem a corrigir"}: rosto ${index + 1}`}
-            onKeyDown={() => { suppressFaceClick.current = null; }}
-            onClick={(event) => { if (suppressFaceClick.current === event.currentTarget) { suppressFaceClick.current = null; return; } onChoose(index, faces); }} />;
+            onKeyDown={(event) => { noticeTooltip.triggerProps.onKeyDown?.(event); suppressFaceClick.current = null; }}
+            onClick={(event) => { noticeTooltip.triggerProps.onClick?.(event); if (suppressFaceClick.current === event.currentTarget) { suppressFaceClick.current = null; return; } onChoose(index, faces); }} />;
         })}
       </div>}
     {navigation && <>
@@ -147,6 +150,7 @@ function FaceImage({ side, url, name, choosing, selected, onChoose, onStatus, na
       <ImageToolButton label="Próxima referência" icon={ChevronRight} glyph="navigation" className="eye-correction__nav--next" disabled={!navigation.next} onClick={() => navigation.onNavigate(1)} />
     </>}
     {zoom > 1 && <ImageToolButton label={`Ajustar ${side === "reference" ? "referência" : "imagem a corrigir"} à janela`} icon={Scan} className="eye-correction__fit" onClick={fit} />}
+    {noticeTooltip.tooltip}
   </div>;
 }
 
@@ -172,27 +176,20 @@ export function EyeCorrectionView({ presentation, onNavigate, onCorrection }: Pr
   const referenceIssue = analysisIssue(referenceAnalysis, "referência");
   const browseBlocked = !correction.referenceUrl || correction.referenceState !== "ready" || Boolean(targetIssue) || Boolean(correction.error);
   const previewBlocked = targetIndex === null || referenceIndex === null || Boolean(targetIssue) || Boolean(referenceIssue);
-  const browseTooltip = correction.error ?? targetIssue
-    ?? (browseBlocked ? "Prévia da referência indisponível." : undefined);
-  const previewTooltip = correction.error ? correction.error
-    : targetAnalysis === "no-face" && referenceAnalysis === "no-face" ? "Nenhum rosto encontrado nas duas fotos."
-    : targetIssue || referenceIssue ? [targetIssue, referenceIssue].filter(Boolean).join(" ")
-    : previewBlocked ? "Selecione um rosto em cada foto para ver a correção." : undefined;
-  const saveTooltip = correction.error ?? (!correction.resultUrl ? "Prepare a correção antes de salvar." : undefined);
   const action = (kind: ViewerCorrectionAction["kind"]) => onCorrection({ sessionId: presentation.sessionId, kind });
   return <div className="eye-correction" aria-label="Correção de olhos" aria-busy={correction.phase === "processing" || busy}>
     <div className="eye-correction__tools">
       <ImageToolButton label="Fechar correção" icon={EyeOff} tooltipPlacement="bottom" className="eye-correction__close" disabled={busy} onClick={() => action("cancel")} />
       <div className="eye-correction__tool-extension">
         {correction.phase === "browse"
-          ? <ImageToolButton label="Usar esta foto" icon={Check} tooltipPlacement="bottom" tooltipText={browseTooltip} blocked={browseBlocked} onClick={() => action("select")} />
+          ? <ImageToolButton label="Usar esta foto" icon={Check} tooltipPlacement="bottom" blocked={browseBlocked} onClick={() => action("select")} />
           : <ImageToolButton label="Trocar referência" icon={RefreshCcw} tooltipPlacement="bottom" disabled={busy} onClick={() => action("browse")} />}
-        {correction.phase === "select" && <ImageToolButton label="Ver correção" icon={Sparkles} tooltipPlacement="bottom" tooltipText={previewTooltip} blocked={previewBlocked}
+        {correction.phase === "select" && <ImageToolButton label="Ver correção" icon={Sparkles} tooltipPlacement="bottom" blocked={previewBlocked}
           onClick={() => onCorrection({ sessionId: presentation.sessionId, kind: "preview", referenceMediaId: correction.referenceMediaId, targetFace: targetFaces[targetIndex!], referenceFace: referenceFaces[referenceIndex!] })} />}
         {(correction.phase === "preview" || busy) && <>
           <ImageToolButton label={showOriginal ? "Antes e depois: mostrar correção" : "Antes e depois: mostrar original"} icon={Columns2} tooltipPlacement="bottom" aria-pressed={showOriginal} disabled={busy || !correction.resultUrl}
             onClick={() => setComparison({ key: compareKey, original: !showOriginal })} />
-          <ImageToolButton label="Salvar correção" icon={Save} tooltipPlacement="bottom" tooltipText={saveTooltip} disabled={busy || saveRequested} blocked={!correction.resultUrl} onClick={() => {
+          <ImageToolButton label="Salvar correção" icon={Save} tooltipPlacement="bottom" disabled={busy || saveRequested} blocked={!correction.resultUrl} onClick={() => {
             if (savePending.current) return;
             savePending.current = true;
             setSaveRequested(true);
@@ -203,13 +200,13 @@ export function EyeCorrectionView({ presentation, onNavigate, onCorrection }: Pr
     </div>
     <div className="eye-correction__panes">
       <div className="eye-correction__pane">
-        <FaceImage side="reference" url={correction.referenceUrl} name={correction.referenceName} choosing={referenceChoosing}
+        <FaceImage side="reference" url={correction.referenceUrl} name={correction.referenceName} notice={referenceIssue} choosing={referenceChoosing}
           selected={referenceIndex} onChoose={(index, faces) => { setReferenceIndex(index); setReferenceFaces(faces); }} onStatus={setReferenceAnalysis}
           navigation={correction.phase === "browse" ? { previous: correction.canPreviousReference, next: correction.canNextReference, onNavigate } : undefined} />
       </div>
       <div className="eye-correction__pane">
         <FaceImage side="target" url={(correction.phase === "preview" || correction.phase === "applying") && correction.resultUrl && !showOriginal ? correction.resultUrl : presentation.url}
-          name={presentation.name} choosing={targetChoosing} selected={targetIndex}
+          name={presentation.name} notice={correction.error ?? targetIssue} choosing={targetChoosing} selected={targetIndex}
           onChoose={(index, faces) => { setTargetIndex(index); setTargetFaces(faces); }} onStatus={setTargetAnalysis} />
       </div>
     </div>

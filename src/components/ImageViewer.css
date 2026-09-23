@@ -26,6 +26,7 @@
 .eye-correction__pane:first-child { border-right: 1px solid var(--ui-border); }
 .eye-correction__pane-image { position: relative; display: flex; align-items: center; justify-content: center; flex: 1; min-width: 0; min-height: 0; overflow: hidden; }
 .eye-correction__pane-image img { display: block; width: calc(100% - 48px); height: calc(100% - 48px); object-fit: contain; user-select: none; }
+.eye-correction__pane-image img:focus-visible { outline: 2px solid var(--ui-focus-neutral); outline-offset: 2px; }
 .eye-correction__pane-image:focus-visible { outline: 2px solid var(--ui-focus-neutral); outline-offset: -3px; }
 .eye-correction__fit { right: 12px; bottom: 12px; }
 .eye-correction__face-layer { position: absolute; z-index: 2; overflow: hidden; pointer-events: none; }

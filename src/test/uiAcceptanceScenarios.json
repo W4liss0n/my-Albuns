@@ -15869,7 +15869,7 @@
       "implementationPath": "/image-viewer.html?preview=correction-select&qa=1&fixture=faces&error=prepare",
       "comparison": {
         "implementationCaptureSelector": ".image-viewer-window",
-        "reason": "Design 0050: erro de preparação no tooltip de Ver correção, sem texto sobre as fotografias",
+        "reason": "Erro de preparação no tooltip da foto de destino, sem texto persistente sobre as fotografias",
         "kind": "implementation-only",
         "surface": "image-viewer"
       },
@@ -15878,7 +15878,7 @@
       "actions": [
         { "type": "click", "selector": "button[aria-label='Referência: rosto 1']" },
         { "type": "click", "selector": "button[aria-label='Imagem a corrigir: rosto 1']" },
-        { "type": "hover", "selector": "button[aria-label='Ver correção']" }
+        { "type": "hover", "selector": "button[aria-label='Imagem a corrigir: rosto 1']" }
       ]
     },
     {
@@ -15887,14 +15887,14 @@
       "implementationPath": "/image-viewer.html?preview=correction-preview&qa=1&error=save",
       "comparison": {
         "implementationCaptureSelector": ".image-viewer-window",
-        "reason": "Design 0050: resultado preservado e erro recuperável no tooltip de Salvar correção",
+        "reason": "Resultado preservado e erro recuperável no tooltip da foto de destino",
         "kind": "implementation-only",
         "surface": "image-viewer"
       },
       "viewport": { "height": 720, "width": 1050 },
       "readySelector": ".ui-floating-tooltip",
       "actions": [
-        { "type": "hover", "selector": "button[aria-label='Salvar correção']" }
+        { "type": "hover", "selector": ".eye-correction__pane:last-child img" }
       ]
     },
     {
@@ -15934,11 +15934,11 @@
     },
     {
       "id": "image-viewer-correction-no-face",
-      "title": "Correção de olhos — rostos ausentes no tooltip de Ver correção (fixture visual determinística)",
+      "title": "Correção de olhos — rostos ausentes no tooltip da referência (fixture visual determinística)",
       "implementationPath": "/image-viewer.html?preview=correction-select&fixture=none",
       "comparison": {
         "implementationCaptureSelector": ".image-viewer-window",
-        "reason": "Design 0050: ausência de rostos no tooltip da ação indisponível, sem texto sobre as fotos; fixture visual sem validar detecção",
+        "reason": "Ausência de rostos no tooltip da foto afetada, sem texto persistente; fixture visual sem validar detecção",
         "kind": "implementation-only",
         "surface": "image-viewer"
       },
@@ -15949,16 +15949,16 @@
       "readySelector": ".ui-floating-tooltip",
       "actions": [
         { "type": "assert", "selector": ".eye-correction__pane:last-child .eye-correction__pane-image[data-analysis='no-face']" },
-        { "type": "hover", "selector": "button[aria-label='Ver correção']" }
+        { "type": "hover", "selector": ".eye-correction__pane:first-child img" }
       ]
     },
     {
       "id": "image-viewer-correction-browse-no-face",
-      "title": "Correção de olhos — destino sem rosto no tooltip de Usar esta foto (fixture visual determinística)",
+      "title": "Correção de olhos — destino sem rosto no tooltip da foto (fixture visual determinística)",
       "implementationPath": "/image-viewer.html?preview=correction-browse&fixture=none",
       "comparison": {
         "implementationCaptureSelector": ".image-viewer-window",
-        "reason": "Design 0050: destino sem rosto bloqueia Usar esta foto e explica a indisponibilidade no tooltip",
+        "reason": "Destino sem rosto bloqueia Usar esta foto e explica o motivo no tooltip da própria foto",
         "kind": "implementation-only",
         "surface": "image-viewer"
       },
@@ -15966,7 +15966,43 @@
       "readySelector": ".ui-floating-tooltip",
       "actions": [
         { "type": "assert", "selector": ".eye-correction__pane:last-child .eye-correction__pane-image[data-analysis='no-face']" },
-        { "type": "hover", "selector": "button[aria-label='Usar esta foto']" }
+        { "type": "hover", "selector": ".eye-correction__pane:last-child img" }
+      ]
+    },
+    {
+      "id": "image-viewer-correction-analysis-error",
+      "title": "Correção de olhos — falha de análise no tooltip da referência (fixture determinística)",
+      "implementationPath": "/image-viewer.html?preview=correction-select&fixture=analysis-error",
+      "comparison": {
+        "implementationCaptureSelector": ".image-viewer-window",
+        "reason": "Falha de análise na foto correspondente, sem texto persistente; fixture visual sem validar detecção",
+        "kind": "implementation-only",
+        "surface": "image-viewer"
+      },
+      "viewport": { "height": 720, "width": 1050 },
+      "readySelector": ".ui-floating-tooltip",
+      "actions": [
+        { "type": "assert", "selector": ".eye-correction__pane:first-child .eye-correction__pane-image[data-analysis='failed']" },
+        { "type": "hover", "selector": ".eye-correction__pane:first-child img" }
+      ]
+    },
+    {
+      "id": "image-viewer-correction-photo-tooltip-closed",
+      "title": "Correção de olhos — tooltip da foto fecha ao sair",
+      "implementationPath": "/image-viewer.html?preview=correction-browse&fixture=none",
+      "comparison": {
+        "implementationCaptureSelector": ".image-viewer-window",
+        "reason": "Tooltip de erro aparece na foto afetada e desaparece ao tirar o ponteiro dela",
+        "kind": "implementation-only",
+        "surface": "image-viewer"
+      },
+      "viewport": { "height": 720, "width": 1050 },
+      "readySelector": "body:not(:has(.ui-floating-tooltip))",
+      "actions": [
+        { "type": "assert", "selector": ".eye-correction__pane:last-child .eye-correction__pane-image[data-analysis='no-face']" },
+        { "type": "hover", "selector": ".eye-correction__pane:last-child img" },
+        { "type": "assert", "selector": ".ui-floating-tooltip" },
+        { "type": "hover", "selector": ".ui-application-header" }
       ]
     }
   ]

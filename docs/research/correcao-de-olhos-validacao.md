@@ -27,4 +27,37 @@ O resultado é guardado numa pasta `.myalbuns-corrections` ao lado do projeto, f
 
 ## Limites conhecidos
 
+### Revisão de detecção em 23 de setembro de 2026
+
+A foto de corpo inteiro `IMG_6187.JPG`, fornecida pelo autor, reproduziu a falha:
+o detector retornava zero rostos na imagem inteira, inclusive após reduzir para
+1.600 px. A foto de controle retornava um. Reduzir o limiar de detecção de 0,55
+até 0,3 não recuperou o rosto; analisar uma região menor da mesma foto recuperou.
+A causa confirmada neste caso foi o tamanho do rosto em relação ao enquadramento.
+
+O worker mantém a primeira análise e os limiares existentes. Se não encontrar
+rostos, analisa nove regiões sobrepostas de metade da largura e altura, com
+superfícies de no máximo 800 px no maior lado. Converte os pontos para as
+coordenadas da foto completa, elimina rostos repetidos e mantém o limite de oito.
+Todo o trabalho permanece no worker. A busca complementar não é executada quando
+a primeira análise já encontrou rostos; portanto, não garante descobrir todos os
+rostos menores de um grupo em que algum rosto maior já foi detectado.
+
+O recorte usa `drawImage` sobre a orientação exibida. Durante a investigação,
+recortar diretamente um `ImageBitmap` com EXIF preservado produziu uma região
+diferente da esperada no navegador; rasterizar o recorte preservou o alinhamento.
+Contratos consultados: [Face Landmarker Web](https://developers.google.com/edge/mediapipe/solutions/vision/face_landmarker/web_js),
+[drawImage](https://developer.mozilla.org/en-US/docs/Web/API/CanvasRenderingContext2D/drawImage)
+e [OffscreenCanvas](https://developer.mozilla.org/en-US/docs/Web/API/OffscreenCanvas),
+além dos tipos instalados de `@mediapipe/tasks-vision` 1.0.1.
+
+Após a correção, a mesma foto retornou um rosto tanto no original orientado de
+4.000 × 6.000 px quanto na prévia JPEG de 1.067 × 1.600 px. O teste real no Edge
+levou aproximadamente 432 ms na prévia, incluindo a preparação do detector; a
+foto de controle continuou retornando um rosto. A reprodução está na área local
+`.scratch/face-detection-debug-20260923/`; a fotografia do autor não é versionada.
+Testes do worker cobrem a conversão dos pontos, a deduplicação, a busca limitada
+sem rostos e a preservação do caminho rápido. Isso corrige a reprodução fornecida;
+não representa uma avaliação geral de precisão do modelo.
+
 A correção aceita originais de até **36 megapixels**, até 10.000 px por eixo, com perfil sRGB conhecido. Pares com olhos pouco abertos, rostos pequenos ou poses/escalas excessivamente diferentes são recusados para evitar composições ruins. A adaptação local de cor não resolve diferenças fortes de luz, óculos ou oclusões; nesses casos, escolher outra referência é necessário. A avaliação de naturalidade foi feita com um par fotográfico real e não cobre todas as condições de retrato.

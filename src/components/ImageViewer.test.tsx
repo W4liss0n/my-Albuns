@@ -263,7 +263,7 @@ test("face bounds track fit and zoom, clip off-image faces, and allow pan withou
   } finally { width.mockRestore(); height.mockRestore(); }
 });
 
-test("a missing destination face blocks reference selection but explains why on focus", async () => {
+test("a missing destination face blocks reference selection and explains why on the photo", async () => {
   vi.mocked(detectFaces).mockResolvedValue([]);
   const onCorrection = vi.fn();
   const presentation: ViewerPresentation = { ...initial, correction: {
@@ -277,8 +277,11 @@ test("a missing destination face blocks reference selection but explains why on 
   await waitFor(() => expect(view.container.querySelector(".eye-correction__pane:last-child [data-analysis='no-face']")).toBeInTheDocument());
   const choose = screen.getByRole("button", { name: "Usar esta foto" });
   expect(choose).toHaveAttribute("aria-disabled", "true");
-  choose.focus();
+  target.focus();
   expect(await screen.findByRole("tooltip")).toHaveTextContent("Nenhum rosto encontrado na foto de destino.");
+  fireEvent.mouseLeave(target);
+  target.blur();
+  await waitFor(() => expect(screen.queryByRole("tooltip")).not.toBeInTheDocument());
   fireEvent.keyDown(choose, { key: "Enter" });
   fireEvent.keyDown(choose, { key: " " });
   fireEvent.click(choose);
@@ -286,7 +289,29 @@ test("a missing destination face blocks reference selection but explains why on 
   expect(view.container.querySelector(".eye-correction__hint")).not.toBeInTheDocument();
 });
 
-test("failed reference analysis explains why preview is unavailable", async () => {
+test("each photo owns its no-face tooltip, which closes when focus leaves", async () => {
+  vi.mocked(detectFaces).mockResolvedValue([]);
+  const presentation: ViewerPresentation = { ...initial, correction: {
+    phase: "select", referenceMediaId: "reference", referenceName: "Referência.jpg", referenceUrl: "data:image/png;id=reference",
+    referenceState: "ready", canPreviousReference: false, canNextReference: false, resultUrl: null, error: null,
+  } };
+  const view = render(<ImageViewer presentation={presentation} onNavigate={vi.fn()} onClose={vi.fn()} onCorrection={vi.fn()} />);
+  const reference = screen.getByRole("img", { name: "Referência.jpg" });
+  const target = screen.getByRole("img", { name: "Imagem a" });
+  for (const photo of [reference, target]) {
+    Object.defineProperties(photo, { naturalWidth: { configurable: true, value: 800 }, naturalHeight: { configurable: true, value: 1200 } });
+    fireEvent.load(photo);
+  }
+  await waitFor(() => expect(view.container.querySelectorAll("[data-analysis='no-face']")).toHaveLength(2));
+  reference.focus();
+  expect(await screen.findByRole("tooltip")).toHaveTextContent("Nenhum rosto encontrado na referência.");
+  reference.blur();
+  await waitFor(() => expect(screen.queryByRole("tooltip")).not.toBeInTheDocument());
+  target.focus();
+  expect(await screen.findByRole("tooltip")).toHaveTextContent("Nenhum rosto encontrado na foto de destino.");
+});
+
+test("failed reference analysis explains why preview is unavailable on the reference photo", async () => {
   const face = [{ x: .3, y: .2, z: 0 }, { x: .7, y: .7, z: 0 }];
   vi.mocked(detectFaces).mockImplementation((image) => image.alt === "Referência.jpg" ? Promise.reject(new Error("analysis failed")) : Promise.resolve([face]));
   const onCorrection = vi.fn();
@@ -306,14 +331,14 @@ test("failed reference analysis explains why preview is unavailable", async () =
     fireEvent.click(await screen.findByRole("button", { name: "Imagem a corrigir: rosto 1" }));
     const preview = screen.getByRole("button", { name: "Ver correção" });
     expect(preview).toHaveAttribute("aria-disabled", "true");
-    preview.focus();
+    screen.getByRole("img", { name: "Referência.jpg" }).focus();
     expect(await screen.findByRole("tooltip")).toHaveTextContent("Não foi possível analisar a referência.");
     fireEvent.click(preview);
     expect(onCorrection).not.toHaveBeenCalled();
   } finally { width.mockRestore(); height.mockRestore(); }
 });
 
-test("preparation errors move to preview tooltip and keep retry available", async () => {
+test("preparation errors appear on the destination photo and keep preview retry available", async () => {
   const face = [{ x: .3, y: .2, z: 0 }, { x: .7, y: .7, z: 0 }];
   vi.mocked(detectFaces).mockResolvedValue([face]);
   const error = "Não foi possível preparar a correção para esta fotografia. Escolha outra referência e tente novamente.";
@@ -335,14 +360,19 @@ test("preparation errors move to preview tooltip and keep retry available", asyn
     const retry = screen.getByRole("button", { name: "Ver correção" });
     expect(retry).not.toHaveAttribute("aria-disabled");
     expect(view.container.querySelector(".eye-correction__hint")).not.toBeInTheDocument();
-    retry.focus();
+    screen.getByRole("img", { name: "Imagem a" }).focus();
     expect(await screen.findByRole("tooltip")).toHaveTextContent(error);
+    screen.getByRole("button", { name: "Imagem a corrigir: rosto 1" }).focus();
+    await waitFor(() => expect(screen.getByRole("tooltip")).toHaveTextContent(error));
+    retry.focus();
+    await waitFor(() => expect(screen.getByRole("tooltip")).toHaveTextContent("Ver correção"));
+    expect(screen.getByRole("tooltip")).not.toHaveTextContent(error);
     fireEvent.click(retry);
     expect(onCorrection).toHaveBeenCalledWith(expect.objectContaining({ kind: "preview" }));
   } finally { width.mockRestore(); height.mockRestore(); }
 });
 
-test("save errors move to Save tooltip and still permit one retry", async () => {
+test("save errors appear on the destination photo and still permit one retry", async () => {
   const error = "Não foi possível salvar a cópia corrigida.";
   const onCorrection = vi.fn();
   const presentation: ViewerPresentation = { ...initial, correction: {
@@ -352,8 +382,11 @@ test("save errors move to Save tooltip and still permit one retry", async () => 
   render(<ImageViewer presentation={presentation} onNavigate={vi.fn()} onClose={vi.fn()} onCorrection={onCorrection} />);
   const retry = screen.getByRole("button", { name: "Salvar correção" });
   expect(retry).toBeEnabled();
-  retry.focus();
+  screen.getByRole("img", { name: "Imagem a" }).focus();
   expect(await screen.findByRole("tooltip")).toHaveTextContent(error);
+  retry.focus();
+  await waitFor(() => expect(screen.getByRole("tooltip")).toHaveTextContent("Salvar correção"));
+  expect(screen.getByRole("tooltip")).not.toHaveTextContent(error);
   fireEvent.click(retry);
   fireEvent.click(retry);
   expect(onCorrection.mock.calls.filter(([action]) => action.kind === "apply")).toHaveLength(1);
