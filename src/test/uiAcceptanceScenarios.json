@@ -15855,30 +15855,71 @@
     {
       "id": "image-viewer-correction-preview",
       "title": "Correção de olhos — prévia e Salvar correção",
-      "implementationPath": "/image-viewer.html?preview=correction-preview&qa=1",
+      "implementationPath": "/image-viewer.html?preview=correction-select&qa=1&fixture=faces",
       "comparison": {
         "implementationCaptureSelector": ".image-viewer-window",
-        "reason": "Design 0050: prévia na foto de destino e ferramentas flutuantes sem barra",
+        "reason": "Design 0050: prévia na foto de destino e ferramentas flutuantes sem barra; estado alcançado pela seleção dos dois rostos com fixture visual determinística.",
         "kind": "implementation-only",
         "surface": "image-viewer"
       },
-      "viewport": { "height": 720, "width": 1050 },
+      "viewport": {
+        "height": 720,
+        "width": 1050
+      },
       "readySelector": "button[aria-label='Salvar correção']",
-      "actions": []
+      "actions": [
+        {
+          "type": "click",
+          "selector": "button[aria-label='Imagem a corrigir: rosto 1']"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label='Referência: rosto 1']"
+        },
+        {
+          "type": "assert",
+          "selector": "button[aria-label='Salvar correção']"
+        }
+      ]
     },
     {
       "id": "image-viewer-correction-applying",
       "title": "Correção de olhos — aplicação em andamento",
-      "implementationPath": "/image-viewer.html?preview=correction-applying&qa=1",
+      "implementationPath": "/image-viewer.html?preview=correction-select&qa=1&fixture=faces",
       "comparison": {
         "implementationCaptureSelector": ".image-viewer-window",
-        "reason": "Design 0050: sem texto de progresso sobre as fotografias; ferramentas bloqueadas",
+        "reason": "Design 0050: sem texto de progresso sobre as fotografias; ferramentas bloqueadas; estado alcançado pela seleção dos dois rostos com fixture visual determinística.",
         "kind": "implementation-only",
         "surface": "image-viewer"
       },
-      "viewport": { "height": 720, "width": 1050 },
+      "viewport": {
+        "height": 720,
+        "width": 1050
+      },
       "readySelector": ".eye-correction[aria-busy='true'] button[aria-label='Fechar correção']:disabled",
-      "actions": []
+      "actions": [
+        {
+          "type": "click",
+          "selector": "button[aria-label='Imagem a corrigir: rosto 1']"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label='Referência: rosto 1']"
+        },
+        {
+          "type": "assert",
+          "selector": "button[aria-label='Salvar correção']"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label='Salvar correção']"
+        },
+        {
+          "type": "click-text",
+          "selector": "button",
+          "text": "Substituir original"
+        }
+      ]
     },
     {
       "id": "image-viewer-correction-reference-narrow",
@@ -15897,31 +15938,65 @@
     {
       "id": "image-viewer-correction-narrow",
       "title": "Correção de olhos — duas fotos na janela estreita",
-      "implementationPath": "/image-viewer.html?preview=correction-preview&qa=1",
+      "implementationPath": "/image-viewer.html?preview=correction-select&qa=1&fixture=faces",
       "comparison": {
         "implementationCaptureSelector": ".image-viewer-window",
-        "reason": "Design 0050: painéis alinhados na largura mínima da janela",
+        "reason": "Design 0050: painéis alinhados na largura mínima da janela; estado alcançado pela seleção dos dois rostos com fixture visual determinística.",
         "kind": "implementation-only",
         "surface": "image-viewer"
       },
-      "viewport": { "height": 480, "width": 600 },
+      "viewport": {
+        "height": 480,
+        "width": 600
+      },
       "readySelector": ".eye-correction__panes",
-      "actions": []
+      "actions": [
+        {
+          "type": "click",
+          "selector": "button[aria-label='Imagem a corrigir: rosto 1']"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label='Referência: rosto 1']"
+        },
+        {
+          "type": "assert",
+          "selector": "button[aria-label='Salvar correção']"
+        }
+      ]
     },
     {
       "id": "image-viewer-correction-before-after",
       "title": "Correção de olhos — comparação antes e depois",
-      "implementationPath": "/image-viewer.html?preview=correction-preview&qa=1",
+      "implementationPath": "/image-viewer.html?preview=correction-select&qa=1&fixture=faces",
       "comparison": {
         "implementationCaptureSelector": ".image-viewer-window",
-        "reason": "Design 0050: somente a foto de destino mostra o original; salvar permanece disponível",
+        "reason": "Design 0050: somente a foto de destino mostra o original; salvar permanece disponível; estado alcançado pela seleção dos dois rostos com fixture visual determinística.",
         "kind": "implementation-only",
         "surface": "image-viewer"
       },
-      "viewport": { "height": 720, "width": 1050 },
+      "viewport": {
+        "height": 720,
+        "width": 1050
+      },
       "readySelector": "button[aria-label='Antes e depois: mostrar correção'][aria-pressed='true']",
       "actions": [
-        { "type": "click", "selector": "button[aria-label='Antes e depois: mostrar original']" }
+        {
+          "type": "click",
+          "selector": "button[aria-label='Imagem a corrigir: rosto 1']"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label='Referência: rosto 1']"
+        },
+        {
+          "type": "assert",
+          "selector": "button[aria-label='Salvar correção']"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label='Antes e depois: mostrar original']"
+        }
       ]
     },
     {
@@ -15947,20 +16022,48 @@
     {
       "id": "image-viewer-correction-save-error",
       "title": "Correção de olhos — erro ao salvar",
-      "implementationPath": "/image-viewer.html?preview=correction-preview&qa=1&error=save",
+      "implementationPath": "/image-viewer.html?preview=correction-select&qa=1&error=save&fixture=faces",
       "comparison": {
         "implementationCaptureSelector": ".image-viewer-window",
-        "reason": "Resultado preservado e erro recuperável no tooltip da foto de destino",
+        "reason": "Resultado preservado e erro recuperável no tooltip da foto de destino; estado alcançado pela seleção dos dois rostos com fixture visual determinística.",
         "kind": "implementation-only",
         "surface": "image-viewer"
       },
-      "viewport": { "height": 720, "width": 1050 },
+      "viewport": {
+        "height": 720,
+        "width": 1050
+      },
       "readySelector": ".ui-floating-tooltip",
       "actions": [
-        { "type": "click", "selector": "button[aria-label='Salvar correção']" },
-        { "type": "click-text", "selector": "button", "text": "Substituir original" },
-        { "type": "assert", "selector": ".image-viewer:not(:has([role='dialog']))" },
-        { "type": "hover", "selector": ".eye-correction__pane:last-child img" }
+        {
+          "type": "click",
+          "selector": "button[aria-label='Imagem a corrigir: rosto 1']"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label='Referência: rosto 1']"
+        },
+        {
+          "type": "assert",
+          "selector": "button[aria-label='Salvar correção']"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label='Salvar correção']"
+        },
+        {
+          "type": "click-text",
+          "selector": "button",
+          "text": "Substituir original"
+        },
+        {
+          "type": "assert",
+          "selector": ".image-viewer:not(:has([role='dialog']))"
+        },
+        {
+          "type": "hover",
+          "selector": ".eye-correction__pane:last-child img"
+        }
       ]
     },
     {
@@ -16109,52 +16212,115 @@
     {
       "id": "image-viewer-correction-confirm-overwrite",
       "title": "Correção de olhos — confirmação antes de substituir o original",
-      "implementationPath": "/image-viewer.html?preview=correction-preview&qa=1",
+      "implementationPath": "/image-viewer.html?preview=correction-select&qa=1&fixture=faces",
       "comparison": {
         "implementationCaptureSelector": ".image-viewer-window",
-        "reason": "Design 0050: diálogo compartilhado sobre as fotos, com Cancelar em foco; captura sem escrita de arquivo",
+        "reason": "Design 0050: diálogo compartilhado sobre as fotos, com Cancelar em foco; captura sem escrita de arquivo; estado alcançado pela seleção dos dois rostos com fixture visual determinística.",
         "kind": "implementation-only",
         "surface": "image-viewer"
       },
-      "viewport": { "height": 720, "width": 1050 },
+      "viewport": {
+        "height": 720,
+        "width": 1050
+      },
       "readySelector": "[role='dialog'] button:focus",
       "actions": [
-        { "type": "click", "selector": "button[aria-label='Salvar correção']" }
+        {
+          "type": "click",
+          "selector": "button[aria-label='Imagem a corrigir: rosto 1']"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label='Referência: rosto 1']"
+        },
+        {
+          "type": "assert",
+          "selector": "button[aria-label='Salvar correção']"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label='Salvar correção']"
+        }
       ]
     },
     {
       "id": "image-viewer-correction-confirm-overwrite-narrow",
       "title": "Correção de olhos — confirmação na janela estreita",
-      "implementationPath": "/image-viewer.html?preview=correction-preview&qa=1",
+      "implementationPath": "/image-viewer.html?preview=correction-select&qa=1&fixture=faces",
       "comparison": {
         "implementationCaptureSelector": ".image-viewer-window",
-        "reason": "Design 0050: texto e ações de confirmação cabem na janela estreita",
+        "reason": "Design 0050: texto e ações de confirmação cabem na janela estreita; estado alcançado pela seleção dos dois rostos com fixture visual determinística.",
         "kind": "implementation-only",
         "surface": "image-viewer"
       },
-      "viewport": { "height": 480, "width": 600 },
+      "viewport": {
+        "height": 480,
+        "width": 600
+      },
       "readySelector": "[role='dialog'] button:focus",
       "actions": [
-        { "type": "click", "selector": "button[aria-label='Salvar correção']" }
+        {
+          "type": "click",
+          "selector": "button[aria-label='Imagem a corrigir: rosto 1']"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label='Referência: rosto 1']"
+        },
+        {
+          "type": "assert",
+          "selector": "button[aria-label='Salvar correção']"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label='Salvar correção']"
+        }
       ]
     },
     {
       "id": "image-viewer-correction-confirm-cancel",
       "title": "Correção de olhos — Esc cancela a confirmação e preserva a prévia",
-      "implementationPath": "/image-viewer.html?preview=correction-preview&qa=1",
+      "implementationPath": "/image-viewer.html?preview=correction-select&qa=1&fixture=faces",
       "comparison": {
         "implementationCaptureSelector": ".image-viewer-window",
-        "reason": "Design 0050: Esc fecha somente a confirmação e devolve o foco a Salvar correção",
+        "reason": "Design 0050: Esc fecha somente a confirmação e devolve o foco a Salvar correção; estado alcançado pela seleção dos dois rostos com fixture visual determinística.",
         "kind": "implementation-only",
         "surface": "image-viewer"
       },
-      "viewport": { "height": 720, "width": 1050 },
+      "viewport": {
+        "height": 720,
+        "width": 1050
+      },
       "readySelector": "button[aria-label='Salvar correção']:focus",
       "actions": [
-        { "type": "click", "selector": "button[aria-label='Salvar correção']" },
-        { "type": "assert", "selector": "[role='dialog']" },
-        { "type": "key", "key": "Escape" },
-        { "type": "assert", "selector": "body:not(:has([role='dialog']))" }
+        {
+          "type": "click",
+          "selector": "button[aria-label='Imagem a corrigir: rosto 1']"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label='Referência: rosto 1']"
+        },
+        {
+          "type": "assert",
+          "selector": "button[aria-label='Salvar correção']"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label='Salvar correção']"
+        },
+        {
+          "type": "assert",
+          "selector": "[role='dialog']"
+        },
+        {
+          "type": "key",
+          "key": "Escape"
+        },
+        {
+          "type": "assert",
+          "selector": "body:not(:has([role='dialog']))"
+        }
       ]
     },
     {
