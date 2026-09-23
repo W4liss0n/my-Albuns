@@ -60,8 +60,12 @@ function detectFaces(landmarker, image) {
   if (!context) throw new Error("Não foi possível preparar a análise da foto.");
   function region(left, top, width, height) {
     const scale = Math.min(1, 800 / Math.max(width, height));
-    canvas.width = Math.max(1, Math.round(width * scale));
-    canvas.height = Math.max(1, Math.round(height * scale));
+    const canvasWidth = Math.max(1, Math.round(width * scale));
+    const canvasHeight = Math.max(1, Math.round(height * scale));
+    // Setting either dimension clears and reallocates the surface, even when
+    // the value is unchanged. Most tiles at a scale share identical dimensions.
+    if (canvas.width !== canvasWidth) canvas.width = canvasWidth;
+    if (canvas.height !== canvasHeight) canvas.height = canvasHeight;
     // drawImage preserves displayed EXIF orientation when cropping a bitmap.
     context.drawImage(image, left, top, width, height, 0, 0, canvas.width, canvas.height);
     return candidates(landmarker.detect(canvas).faceLandmarks, left, top, width, height);

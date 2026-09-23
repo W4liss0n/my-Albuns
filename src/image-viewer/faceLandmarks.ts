@@ -4,6 +4,8 @@ export type Face = FacePoint[];
 let worker: Worker | null = null;
 let serial = 0;
 const pending = new Map<number, { resolve(faces: Face[]): void; reject(error: Error): void }>();
+const results = new Map<string, Promise<Face[]>>();
+const MAX_REUSED_IMAGES = 12;
 
 function getWorker() {
   if (!worker) {
@@ -25,13 +27,29 @@ function getWorker() {
   return worker;
 }
 
-export async function detectFaces(image: HTMLImageElement): Promise<Face[]> {
+async function scanFaces(image: HTMLImageElement): Promise<Face[]> {
   const bitmap = await createImageBitmap(image);
   const id = ++serial;
   return new Promise((resolve, reject) => {
     pending.set(id, { resolve, reject });
     getWorker().postMessage({ id, image: bitmap }, [bitmap]);
   });
+}
+
+export function detectFaces(image: HTMLImageElement): Promise<Face[]> {
+  // Cache preview URLs identify immutable Cache publications. A reference can be
+  // revisited while choosing a face, and React can observe load and mount at once.
+  const key = `${image.currentSrc || image.src}:${image.naturalWidth}x${image.naturalHeight}`;
+  if (!key || key.startsWith(":") || key.startsWith("undefined:")) return scanFaces(image);
+  const reused = results.get(key);
+  if (reused) return reused;
+  const scan = scanFaces(image).catch((error: unknown) => {
+    if (results.get(key) === scan) results.delete(key);
+    throw error;
+  });
+  results.set(key, scan);
+  if (results.size > MAX_REUSED_IMAGES) results.delete(results.keys().next().value!);
+  return scan;
 }
 
 export function faceBounds(face: Face) {

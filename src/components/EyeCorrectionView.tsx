@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Check, ChevronLeft, ChevronRight, Columns2, EyeOff, RefreshCcw, Save, Scan, Sparkles } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, Columns2, EyeOff, RefreshCcw, Save, Scan } from "lucide-react";
 import type { ViewerCorrectionAction, ViewerPresentation } from "../application/imageViewerWindow";
 import { detectFaces, faceBounds, type Face } from "../image-viewer/faceLandmarks";
 import { ImageToolButton } from "../ui/ImageToolButton";
@@ -171,11 +171,10 @@ export function EyeCorrectionView({ presentation, onNavigate, onCorrection }: Pr
   const [referenceFaces, setReferenceFaces] = useState<Face[]>([]);
   const [targetAnalysis, setTargetAnalysis] = useState<AnalysisState>("idle");
   const [referenceAnalysis, setReferenceAnalysis] = useState<AnalysisState>("idle");
+  const [selectionRevision, setSelectionRevision] = useState(0);
+  const requestedPair = useRef<string | null>(null);
   const [comparison, setComparison] = useState<{ key: string; original: boolean } | null>(null);
-  const [saveRequested, setSaveRequested] = useState(false);
-  const savePending = useRef(false);
-  useEffect(() => { setReferenceIndex(null); setReferenceFaces([]); }, [correction.referenceMediaId, correction.phase === "browse"]);
-  useEffect(() => { savePending.current = false; setSaveRequested(false); }, [correction.phase, correction.referenceMediaId, correction.resultUrl, correction.error]);
+  useEffect(() => { setReferenceIndex(null); setReferenceFaces([]); requestedPair.current = null; }, [correction.referenceMediaId, correction.phase === "browse"]);
   const referenceChoosing = correction.phase === "select";
   const targetChoosing = correction.phase === "browse" || correction.phase === "select";
   const compareKey = `${correction.phase}:${correction.referenceMediaId ?? ""}:${correction.resultUrl ?? ""}`;
@@ -184,30 +183,32 @@ export function EyeCorrectionView({ presentation, onNavigate, onCorrection }: Pr
   const targetIssue = analysisIssue(targetAnalysis, "foto de destino");
   const referenceIssue = analysisIssue(referenceAnalysis, "referência");
   const browseBlocked = !correction.referenceUrl || correction.referenceState !== "ready" || Boolean(targetIssue) || Boolean(correction.error);
-  const previewBlocked = targetIndex === null || referenceIndex === null || Boolean(targetIssue) || Boolean(referenceIssue);
   const action = (kind: ViewerCorrectionAction["kind"]) => onCorrection({ sessionId: presentation.sessionId, kind });
+  useEffect(() => {
+    if (correction.phase !== "select" || targetIndex === null || referenceIndex === null
+      || !targetFaces[targetIndex] || !referenceFaces[referenceIndex] || targetIssue || referenceIssue) return;
+    const pair = `${presentation.sessionId}:${correction.referenceMediaId}:${selectionRevision}`;
+    if (requestedPair.current === pair) return;
+    requestedPair.current = pair;
+    onCorrection({ sessionId: presentation.sessionId, kind: "preview", referenceMediaId: correction.referenceMediaId,
+      targetFace: targetFaces[targetIndex], referenceFace: referenceFaces[referenceIndex] });
+  }, [correction.phase, correction.referenceMediaId, presentation.sessionId, selectionRevision,
+    targetIndex, referenceIndex, targetFaces, referenceFaces, targetIssue, referenceIssue, onCorrection]);
   return <div className="eye-correction" aria-label="Correção de olhos" aria-busy={correction.phase === "processing" || busy}>
     <div className="eye-correction__tools">
       <ImageToolButton label="Fechar correção" icon={EyeOff} tooltipPlacement="bottom" className="eye-correction__close" disabled={busy} onClick={() => action("cancel")} />
       <div className="eye-correction__tool-extension">
-        {correction.phase === "select" && <ImageToolButton label="Ver correção" icon={Sparkles} tooltipPlacement="bottom" blocked={previewBlocked}
-          onClick={() => onCorrection({ sessionId: presentation.sessionId, kind: "preview", referenceMediaId: correction.referenceMediaId, targetFace: targetFaces[targetIndex!], referenceFace: referenceFaces[referenceIndex!] })} />}
         {(correction.phase === "preview" || busy) && <>
           <ImageToolButton label={showOriginal ? "Antes e depois: mostrar correção" : "Antes e depois: mostrar original"} icon={Columns2} tooltipPlacement="bottom" aria-pressed={showOriginal} disabled={busy || !correction.resultUrl}
             onClick={() => setComparison({ key: compareKey, original: !showOriginal })} />
-          <ImageToolButton label="Salvar correção" icon={Save} tooltipPlacement="bottom" disabled={busy || saveRequested} blocked={!correction.resultUrl} onClick={() => {
-            if (savePending.current) return;
-            savePending.current = true;
-            setSaveRequested(true);
-            action("apply");
-          }} />
+          <ImageToolButton label="Salvar correção" icon={Save} tooltipPlacement="bottom" disabled={busy} blocked={!correction.resultUrl} onClick={() => action("apply")} />
         </>}
       </div>
     </div>
     <div className="eye-correction__panes">
       <div className="eye-correction__pane">
         <FaceImage side="reference" url={correction.referenceUrl} name={correction.referenceName} notice={referenceIssue} choosing={referenceChoosing}
-          selected={referenceIndex} onChoose={(index, faces) => { setReferenceIndex(index); setReferenceFaces(faces); }} onStatus={setReferenceAnalysis}
+          selected={referenceIndex} onChoose={(index, faces) => { setReferenceIndex(index); setReferenceFaces(faces); setSelectionRevision((value) => value + 1); }} onStatus={setReferenceAnalysis}
           navigation={correction.phase === "browse" ? { previous: correction.canPreviousReference, next: correction.canNextReference, onNavigate } : undefined} />
         {correction.phase === "browse"
           ? <ImageToolButton label="Usar esta foto" icon={Check} className="eye-correction__reference-action" blocked={browseBlocked} onClick={() => action("select")} />
@@ -216,7 +217,7 @@ export function EyeCorrectionView({ presentation, onNavigate, onCorrection }: Pr
       <div className="eye-correction__pane">
         <FaceImage side="target" url={(correction.phase === "preview" || correction.phase === "applying") && correction.resultUrl && !showOriginal ? correction.resultUrl : presentation.url}
           name={presentation.name} notice={correction.error ?? targetIssue} choosing={targetChoosing} selected={targetIndex}
-          onChoose={(index, faces) => { setTargetIndex(index); setTargetFaces(faces); }} onStatus={setTargetAnalysis} />
+          onChoose={(index, faces) => { setTargetIndex(index); setTargetFaces(faces); setSelectionRevision((value) => value + 1); }} onStatus={setTargetAnalysis} />
       </div>
     </div>
   </div>;

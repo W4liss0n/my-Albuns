@@ -1,5 +1,54 @@
 # Correção de olhos — implementação e validação
 
+## Mudança de fluxo em 23 de setembro de 2026
+
+A decisão atual está em `docs/design/0050-visualizador-integrado-de-imagens.md`:
+selecionar os dois rostos prepara a prévia automaticamente; salvar exige a
+confirmação **Substituir foto original?** e substitui o arquivo de origem.
+Cancelar essa confirmação conserva a prévia, sem escrever no arquivo.
+
+### Medições da otimização
+
+Medições locais no Edge, com as mesmas prévias de até 1.600 px. A busca mantém
+os 284 passos e as confirmações: apenas deixa de redimensionar a superfície
+de análise quando suas dimensões já são as necessárias. O consumidor também
+reutiliza análises concluídas ou em andamento para a mesma URL imutável de
+prévia, com limite de 12 imagens; falhas não ficam guardadas.
+
+| Etapa | Antes | Depois | Escopo |
+| --- | --- | --- | --- |
+| Primeira detecção, seis fotos de grupo | 2,76–3,63 s | 1,82–2,59 s | Média de 3,20 para 2,27 s, cerca de 29% menos tempo nesta rodada |
+| Preparação da correção, 4.000 × 6.000 px | 1,078 s | 0,608 s | Leitura e geração da prévia/arquivo completo em paralelo |
+| Nova consulta de foto já analisada | 2,111 / 2,450 s | Abaixo de 1 ms | Controle e IMG_6187, com resultado ainda no cache da janela |
+| Gravação confirmada de JPEG, 4.000 × 6.000 px | Não se aplica | 2,390 s | Codificação e substituição do arquivo; não inclui regenerar as prévias do projeto |
+
+As nove fotos de verificação conservaram as contagens e todos os limites
+normalizados das caixas, com diferença máxima zero. O PNG de resolução completa
+do par IMG_6187 / IMG_6186 ficou idêntico byte a byte ao compositor anterior
+(SHA-256 `9c75ba9f58442e277d88cae3e2059663cad09b073eafb29f395a23767cd59a44`).
+São medições de uma amostra local, não uma garantia
+de tempo ou de detecção de todos os rostos.
+
+Os testes de gravação usaram arquivos descartáveis: JPEG, PNG e TIFF de 8 bits
+por canal mantêm formato e dimensões; a restauração recupera o conteúdo original da cópia; uma
+alteração externa desde a prévia impede a substituição. Um JPEG com orientação
+EXIF 6 conservou o perfil ICC e foi gravado com os pixels orientados corretamente.
+PNG e TIFF com maior profundidade são recusados antes de preparar a prévia e
+antes de substituir o arquivo; os testes conferem que seus bytes permanecem
+intactos. O encoder TIFF de `image` 0.25.10 preserva ICC, mas não grava EXIF:
+não há promessa de conservar as demais tags TIFF. Isso não equivale a validar
+todos os metadados possíveis de cada formato.
+
+Três testes no limite público do `ProjectWorkspace` verificam que respostas
+antigas de sucesso e falha não alteram a nova correção, que o novo preparo espera
+o cancelamento anterior e que fechar a janela descarta o resultado pendente.
+O salvamento usa apenas o token da prévia atual. A confirmação e a saída do modo
+também têm cenários renderizados próprios no manifesto de aceitação.
+
+Os resultados das seções seguintes registram a implementação anterior, que preservava o
+original e vinculava o projeto a uma cópia corrigida. Eles não comprovam a nova
+substituição do original; essa validação deve ser registrada separadamente.
+
 ## Contratos e arquitetura
 
 A ação **Abrir olhos** pertence à janela nativa do visualizador. O `ProjectWorkspace` continua dono da sequência de fotos, da demanda ao cache e da apresentação da janela. A janela filha recebe URLs opacas e devolve apenas ações e pontos faciais; ela não abre caminhos do sistema de arquivos. A busca de referência usa todas as fotos do projeto, exceto a imagem a corrigir. A foto original permanece no mesmo lugar.

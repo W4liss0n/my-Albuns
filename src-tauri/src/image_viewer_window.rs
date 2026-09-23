@@ -3,15 +3,18 @@ use std::{path::PathBuf, sync::Mutex};
 use tauri::{AppHandle, Emitter, Manager, State, WebviewWindow, WindowEvent};
 
 use crate::{
+    cache_engine::CacheEngine,
     cache_previews::CachePreviewRegistry,
+    cache_service::ActiveCacheNamespace,
     eye_correction::{self, Face, PreparedEyes},
     image_processing::ImageProcessingBatch,
     project_host::ProjectHost,
-    project_media_reference::{self, MediaChangeKind},
+    media_runtime::MediaResolver,
     ipc_contract::{ViewerAction, ViewerPresentation},
     native_dialog_window,
     product_runtime::PROJECT_WINDOW_LABEL,
 };
+use myalbuns_paths::AppPaths;
 
 #[cfg(debug_assertions)]
 use crate::desktop_webview_policy;
@@ -276,6 +279,8 @@ struct PendingEyes {
     token: String,
     path: PathBuf,
     url: String,
+    original_path: PathBuf,
+    original_digest: [u8; 32],
 }
 
 #[derive(Default)]
@@ -361,17 +366,23 @@ pub(crate) async fn prepare_eye_correction(
     let reference_path = reference.logical_path.clone();
     let generation = corrections.begin(&previews)?;
     let output_for_render = output.clone();
-    let rendered = tauri::async_runtime::spawn_blocking(move ||
-        eye_correction::render(&target_path, &reference_path, &target_face, &reference_face, &output_for_render)
-    ).await.map_err(|_| "A correção foi interrompida.".to_string());
-    let bytes = match rendered {
-        Ok(Ok(bytes)) => bytes,
+    let rendered = tauri::async_runtime::spawn_blocking(move || {
+        let before = eye_correction::source_digest(&target_path)?;
+        let bytes = eye_correction::render(&target_path, &reference_path, &target_face, &reference_face, &output_for_render)?;
+        if eye_correction::source_digest(&target_path)? != before {
+            return Err("A foto original mudou durante a preparação. Tente novamente.".into());
+        }
+        Ok((bytes, before))
+    }).await.map_err(|_| "A correção foi interrompida.".to_string());
+    let (bytes, original_digest) = match rendered {
+        Ok(Ok(result)) => result,
         Ok(Err(error)) => { let _ = std::fs::remove_file(&output); let _ = std::fs::remove_file(output.with_extension("tmp")); return Err(error); }
         Err(error) => { let _ = std::fs::remove_file(&output); let _ = std::fs::remove_file(output.with_extension("tmp")); return Err(error); }
     };
     let url = previews.publish_viewer_preview(bytes);
     let token = uuid::Uuid::new_v4().to_string();
-    let pending = PendingEyes { session_id, media_id: target_media_id, token: token.clone(), path: output.clone(), url: url.clone() };
+    let pending = PendingEyes { session_id, media_id: target_media_id, token: token.clone(), path: output.clone(), url: url.clone(),
+        original_path: target.logical_path.clone(), original_digest };
     if !corrections.accept(generation, pending) {
         previews.revoke_viewer_preview(&url);
         let _ = std::fs::remove_file(output);
@@ -412,19 +423,92 @@ pub(crate) async fn apply_eye_correction(
     let catalog = host.authorized_media_catalog()?;
     let binding = catalog.bindings.iter().find(|binding| binding.media_id == pending.media_id)
         .ok_or("A foto não pertence mais ao projeto.")?.clone();
+    if binding.logical_path != pending.original_path { return Err("A foto original mudou desde a prévia.".into()); }
+    let affected: Vec<_> = catalog.bindings.iter().filter(|media| media.logical_path == pending.original_path).cloned().collect();
     let mut paths = myalbuns_paths::OperationPathContext::new();
     let cache_root = app.state::<crate::cache_service::ActiveCacheNamespace>().namespace().paths().root().to_path_buf();
     paths.capture(&cache_root).map_err(|error| error.to_string())?;
     for media in &catalog.bindings { paths.capture(&media.logical_path).map_err(|error| error.to_string())?; }
     paths.capture(&pending.path).map_err(|error| error.to_string())?;
     let roots = paths.freeze();
-    let mut progress = ImageProcessingBatch::new(1, |_| {});
-    project_media_reference::change_in_app(&app, binding, pending.path.clone(), roots, MediaChangeKind::Replace, &mut progress).await
+    let engine = app.state::<CacheEngine>();
+    let pause = engine.pause().await;
+    let active = app.state::<ActiveCacheNamespace>();
+    let app_paths = app.state::<AppPaths>();
+    for media in &affected {
+        engine.invalidate_relinked_media(&pause, &app_paths, &active.namespace(), &previews, &media.media_id)
+            .map_err(|error| error.message)?;
+    }
+    let original = pending.original_path.clone();
+    let prepared = pending.path.clone();
+    let digest = pending.original_digest;
+    let replacement = tauri::async_runtime::spawn_blocking(move || eye_correction::replace_original(&original, &prepared, digest))
+        .await.map_err(|_| "A substituição do original foi interrompida.".to_string()).and_then(|value| value);
+    let backup = match replacement {
+        Ok(backup) => backup,
+        Err(error) => {
+            drop(pause);
+            let mut repair = ImageProcessingBatch::new(affected.len() as u32, |_| {});
+            repair.prepare_all_in_plan(&app, affected, roots).await;
+            return Err(error);
+        }
+    };
+    let refreshed = (|| {
+        for media in &affected {
+            let metadata = MediaResolver.inspect_media_binding_in_plan(media, &roots)?;
+            host.observe_photo_source(media, metadata)?;
+        }
+        host.projection()
+    })();
+    let projection = match refreshed {
+        Ok(projection) => projection,
+        Err(error) => {
+            eye_correction::restore_original(&pending.original_path, &backup)?;
+            for media in &affected {
+                if let Ok(metadata) = MediaResolver.inspect_media_binding_in_plan(media, &roots) {
+                    let _ = host.observe_photo_source(media, metadata);
+                }
+            }
+            return Err(error);
+        }
+    };
+    drop(pause);
+    let mut cache_failure = None;
+    let mut completed = 0;
+    let mut progress = ImageProcessingBatch::new(affected.len() as u32, |event| {
+        completed = event.completed_files;
+        if let Some(problem) = event.problem { cache_failure = Some(problem.reason); }
+        if let Some(problem) = event.operation_problem { cache_failure = Some(problem); }
+    });
+    progress.prepare_all_in_plan(&app, affected.clone(), roots.clone()).await;
+    drop(progress);
+    if cache_failure.is_none() && completed < affected.len() as u32 {
+        cache_failure = Some("A atualização da prévia temporária não foi concluída.".into());
+    }
+    if let Some(error) = cache_failure {
+        eye_correction::restore_original(&pending.original_path, &backup)?;
+        for media in &affected {
+            let metadata = MediaResolver.inspect_media_binding_in_plan(media, &roots)?;
+            host.observe_photo_source(media, metadata)?;
+        }
+        let repair_pause = engine.pause().await;
+        for media in &affected {
+            engine.invalidate_relinked_media(&repair_pause, &app_paths, &active.namespace(), &previews, &media.media_id)
+                .map_err(|failure| failure.message)?;
+        }
+        drop(repair_pause);
+        let mut repair = ImageProcessingBatch::new(affected.len() as u32, |_| {});
+        repair.prepare_all_in_plan(&app, affected, roots).await;
+        return Err(format!("Não foi possível atualizar a prévia após substituir o original: {error}"));
+    }
+    let _ = std::fs::remove_file(backup);
+    Ok(projection)
     }.await;
     match result {
         Ok(projection) => {
             corrections.finish();
             previews.revoke_viewer_preview(&pending.url);
+            let _ = std::fs::remove_file(&pending.path);
             Ok(projection)
         }
         Err(error) => {
@@ -476,15 +560,16 @@ mod tests {
     use super::*;
 
     #[test]
-    fn applying_correction_keeps_derivative_until_mutation_finishes() {
+    fn applying_correction_keeps_prepared_candidate_until_mutation_finishes() {
         let path = std::env::temp_dir().join(format!("myalbuns-eye-{}.png", uuid::Uuid::new_v4()));
-        std::fs::write(&path, b"prepared derivative").unwrap();
+        std::fs::write(&path, b"prepared candidate").unwrap();
         let previews = CachePreviewRegistry::new(LABEL);
         let url = previews.publish_viewer_preview(vec![1, 2, 3]);
         let corrections = CorrectionStore::default();
         assert!(corrections.accept(0, PendingEyes {
             session_id: "session".into(), media_id: "target".into(),
             token: "token".into(), path: path.clone(), url,
+            original_path: path.with_extension("jpg"), original_digest: [0; 32],
         }));
         assert!(corrections.claim_for_apply("token", "session").is_some());
         assert!(corrections.clear(&previews).is_none());

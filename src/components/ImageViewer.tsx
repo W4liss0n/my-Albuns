@@ -3,6 +3,7 @@ import { ChevronLeft, ChevronRight, Eye, Scan } from "lucide-react";
 import type { ViewerCorrectionAction, ViewerPresentation } from "../application/imageViewerWindow";
 import { EyeCorrectionView } from "./EyeCorrectionView";
 import { ImageToolButton } from "../ui/ImageToolButton";
+import { ConfirmationDialog, DialogFocusScope } from "../ui";
 import "./ImageViewer.css";
 
 interface Props {
@@ -26,8 +27,22 @@ export function ImageViewer({ presentation, onNavigate, onClose, onCorrection }:
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [viewport, setViewport] = useState({ width: 0, height: 0, fitWidth: 0, fitHeight: 0 });
+  const [confirming, setConfirming] = useState<string | null>(null);
+  const cancelConfirmation = useRef<HTMLButtonElement>(null);
+  const saveIssued = useRef<string | null>(null);
+  const wasConfirming = useRef(false);
   const drag = useRef<{ x: number; y: number; panX: number; panY: number; pointerId: number } | null>(null);
   const ready = loaded?.key === imageKey && failedKey !== imageKey;
+  const correctionKey = `${presentation.sessionId}:${mediaId}:${presentation.correction?.referenceMediaId ?? ""}:${presentation.correction?.resultUrl ?? ""}`;
+  const confirmationOpen = confirming === correctionKey && presentation.correction?.phase === "preview";
+  useEffect(() => { if (saveIssued.current !== correctionKey) saveIssued.current = null; }, [correctionKey]);
+  useEffect(() => { if (presentation.correction?.phase === "preview" && presentation.correction.error) saveIssued.current = null; }, [presentation.correction?.phase, presentation.correction?.error]);
+  useLayoutEffect(() => {
+    if (wasConfirming.current && !confirmationOpen && presentation.correction?.phase === "preview") {
+      viewerRef.current?.querySelector<HTMLButtonElement>('[aria-label="Salvar correção"]')?.focus({ preventScroll: true });
+    }
+    wasConfirming.current = confirmationOpen;
+  }, [confirmationOpen, presentation.correction?.phase]);
 
   useLayoutEffect(() => {
     const correcting = Boolean(presentation.correction);
@@ -65,7 +80,7 @@ export function ImageViewer({ presentation, onNavigate, onClose, onCorrection }:
     });
     observer.observe(element);
     return () => observer.disconnect();
-  }, []);
+  }, [Boolean(presentation.correction)]);
 
   const fittedScale = ready && viewport.fitWidth && viewport.fitHeight
     ? Math.min(1, viewport.fitWidth / loaded.width, viewport.fitHeight / loaded.height) : 0;
@@ -87,7 +102,7 @@ export function ImageViewer({ presentation, onNavigate, onClose, onCorrection }:
   }
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") { event.preventDefault(); if (presentation.correction?.phase === "applying") return; if (presentation.correction && onCorrection) onCorrection({ sessionId: presentation.sessionId, kind: "cancel" }); else onClose(); return; }
+      if (event.key === "Escape") { event.preventDefault(); if (confirmationOpen) { setConfirming(null); return; } if (presentation.correction?.phase === "applying") return; if (presentation.correction && onCorrection) onCorrection({ sessionId: presentation.sessionId, kind: "cancel" }); else onClose(); return; }
       if (event.altKey || event.ctrlKey || event.metaKey || event.repeat) return;
       if (presentation.correction) {
         if (presentation.correction.phase === "browse" && event.key === "ArrowLeft" && presentation.correction.canPreviousReference) { event.preventDefault(); onNavigate(-1); }
@@ -109,7 +124,24 @@ export function ImageViewer({ presentation, onNavigate, onClose, onCorrection }:
     : failedKey === imageKey ? "Não foi possível exibir a prévia desta imagem."
     : "Carregando imagem…";
 
-  if (presentation.correction && onCorrection) return <section ref={viewerRef} aria-label="Visualizador de imagens" className="image-viewer"><EyeCorrectionView presentation={presentation} onNavigate={onNavigate} onCorrection={onCorrection} /></section>;
+  if (presentation.correction && onCorrection) return <section ref={viewerRef} aria-label="Visualizador de imagens" className="image-viewer">
+    <div className="image-viewer__correction-content" inert={confirmationOpen} aria-hidden={confirmationOpen}>
+      <EyeCorrectionView presentation={presentation} onNavigate={onNavigate}
+        onCorrection={(action) => action.kind === "apply" ? setConfirming(correctionKey) : onCorrection(action)} />
+    </div>
+    {confirmationOpen && <DialogFocusScope className="image-viewer__confirmation" focusKey={correctionKey} initialFocusRef={cancelConfirmation} onEscape={() => setConfirming(null)}>
+      <ConfirmationDialog title="Substituir foto original?" tone="neutral"
+        cancelButtonRef={cancelConfirmation}
+        description={`A correção será salva sobre «${name}». O arquivo original será substituído.`}
+        cancelAction={{ label: "Cancelar", onClick: () => setConfirming(null) }}
+        confirmAction={{ label: "Substituir original", onClick: () => {
+          if (saveIssued.current === correctionKey) return;
+          saveIssued.current = correctionKey;
+          setConfirming(null);
+          onCorrection({ sessionId: presentation.sessionId, kind: "apply" });
+        } }} />
+    </DialogFocusScope>}
+  </section>;
 
   return <section ref={viewerRef} aria-label="Visualizador de imagens" className="image-viewer">
       <div className="image-viewer__stage" data-zoomed={zoom > 1} ref={viewportRef}

@@ -11,6 +11,7 @@ type ConfirmationTone = "danger" | "neutral" | "question";
 
 interface ConfirmationDialogProps {
   cancelAction: DialogAction;
+  cancelButtonRef?: Ref<HTMLButtonElement>;
   children?: ReactNode;
   confirmButtonRef?: Ref<HTMLButtonElement>;
   confirmAction: DialogAction;
@@ -22,6 +23,7 @@ interface ConfirmationDialogProps {
 
 export function ConfirmationDialog({
   cancelAction,
+  cancelButtonRef,
   children,
   confirmButtonRef,
   confirmAction,
@@ -49,6 +51,7 @@ export function ConfirmationDialog({
           <ActionButton
             disabled={cancelAction.disabled}
             onClick={cancelAction.onClick}
+            ref={cancelButtonRef}
           >
             {cancelAction.label}
           </ActionButton>

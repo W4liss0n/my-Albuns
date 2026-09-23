@@ -10,6 +10,7 @@ import {
   within,
 } from "@testing-library/react";
 import type { ComponentProps } from "react";
+import type { PreparedEyeCorrection, ViewerCorrectionAction, ViewerPresentation } from "../application/imageViewerWindow";
 import { beforeEach, expect, test, vi } from "vitest";
 
 import type {
@@ -697,6 +698,81 @@ test("viewer opens from a selected canvas photo on Space release, isolates edito
   expect(projection.state.revision).toBe(25);
   act(() => closed(viewerPort.open.mock.calls[0][0].sessionId));
   await waitFor(() => expect(document.activeElement).toBe(canvas));
+});
+
+async function openEyeCorrectionHarness() {
+  let correction!: (action: ViewerCorrectionAction) => void;
+  let closed!: (sessionId: string) => void;
+  let latest!: ViewerPresentation;
+  const viewerPort = {
+    open: vi.fn(async (value: ViewerPresentation) => { latest = value; }),
+    update: vi.fn(async (value: ViewerPresentation) => { latest = value; }),
+    close: vi.fn(async () => undefined),
+    onNavigate: vi.fn(async () => () => undefined),
+    onClosed: vi.fn(async (callback: typeof closed) => { closed = callback; return () => undefined; }),
+    onCorrection: vi.fn(async (callback: typeof correction) => { correction = callback; return () => undefined; }),
+    prepareCorrection: vi.fn<() => Promise<PreparedEyeCorrection>>(),
+    cancelCorrection: vi.fn(async (): Promise<void> => undefined),
+    applyCorrection: vi.fn(async (_session: string, _token: string) => projection),
+  };
+  useEditorView.setState({ editingSheetId: "sheet-001", selectedFrameIds: ["frame-001"] });
+  render(<ProjectWorkspace projection={projection} onProjectionChange={vi.fn()} imageViewerWindowPort={viewerPort} />);
+  const canvas = screen.getByTestId("album-canvas");
+  canvas.focus();
+  fireEvent.keyDown(canvas, { code: "Space", key: " " });
+  fireEvent.keyUp(canvas, { code: "Space", key: " " });
+  await waitFor(() => expect(viewerPort.open).toHaveBeenCalledOnce());
+  const sessionId = latest.sessionId;
+  const send = (kind: ViewerCorrectionAction["kind"]) => act(() => correction({
+    sessionId, kind, referenceMediaId: latest.correction?.referenceMediaId,
+    targetFace: [{ x: .5, y: .5, z: 0 }], referenceFace: [{ x: .5, y: .5, z: 0 }],
+  }));
+  send("start");
+  send("select");
+  return { viewerPort, send, current: () => latest, close: () => act(() => closed(sessionId)) };
+}
+
+test.each(["success", "failure"])("late correction %s cannot replace a newer pair or its save token", async (outcome) => {
+  const { viewerPort, send, current } = await openEyeCorrectionHarness();
+  const older = deferredValue<PreparedEyeCorrection>();
+  const newer = deferredValue<PreparedEyeCorrection>();
+  const cancelling = deferredValue<void>();
+  viewerPort.prepareCorrection.mockImplementationOnce(() => older.promise).mockImplementationOnce(() => newer.promise);
+  viewerPort.cancelCorrection.mockImplementationOnce(() => cancelling.promise);
+  send("preview");
+  await waitFor(() => expect(viewerPort.prepareCorrection).toHaveBeenCalledTimes(1));
+  send("browse");
+  send("select");
+  send("preview");
+  expect(viewerPort.prepareCorrection).toHaveBeenCalledTimes(1);
+  await act(async () => { cancelling.resolve(); await cancelling.promise; });
+  await waitFor(() => expect(viewerPort.prepareCorrection).toHaveBeenCalledTimes(2));
+  await act(async () => {
+    if (outcome === "success") older.resolve({ token: "old", url: "old-preview" });
+    else older.reject(new Error("old preparation failed"));
+    await older.promise.catch(() => undefined);
+  });
+  expect(current().correction).toMatchObject({ phase: "processing", error: null });
+  await act(async () => { newer.resolve({ token: "new", url: "new-preview" }); await newer.promise; });
+  expect(current().correction).toMatchObject({ phase: "preview", resultUrl: "new-preview" });
+  send("apply");
+  await waitFor(() => expect(viewerPort.applyCorrection).toHaveBeenCalledWith(current().sessionId, "new"));
+  expect(viewerPort.applyCorrection).toHaveBeenCalledOnce();
+});
+
+test("closing the viewer discards a pending correction result", async () => {
+  const { viewerPort, send, close } = await openEyeCorrectionHarness();
+  const preparing = deferredValue<PreparedEyeCorrection>();
+  viewerPort.prepareCorrection.mockImplementationOnce(() => preparing.promise);
+  send("preview");
+  await waitFor(() => expect(viewerPort.prepareCorrection).toHaveBeenCalledOnce());
+  close();
+  await waitFor(() => expect(viewerPort.close).toHaveBeenCalledOnce());
+  const updatesAtClose = viewerPort.update.mock.calls.length;
+  await act(async () => { preparing.resolve({ token: "late", url: "late-preview" }); await preparing.promise; });
+  expect(viewerPort.open).toHaveBeenCalledOnce();
+  expect(viewerPort.update).toHaveBeenCalledTimes(updatesAtClose);
+  expect(viewerPort.applyCorrection).not.toHaveBeenCalled();
 });
 
 test("viewer request blocks editor commands before the native owner is disabled and releases them after open failure", async () => {

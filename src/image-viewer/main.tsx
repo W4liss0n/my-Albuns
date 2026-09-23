@@ -23,7 +23,7 @@ const previewCorrection = (phase: string) => ({
   referenceUrl: qa ? qaReference : sizedPreview(portraitPreview, 800, 1200),
   referenceState: "ready" as const, canPreviousReference: false, canNextReference: phase === "browse",
   resultUrl: phase === "preview" || phase === "applying" ? qa ? "/.scratch/eye-correction/qa/nikki-corrected.png" : sizedPreview(landscapePreview, 1200, 800) : null,
-  error: qaError === "prepare" && phase === "select" ? "Os olhos da referência precisam estar visivelmente mais abertos."
+  error: qaError === "prepare" && phase === "select" ? "Os olhos da referência precisam estar abertos."
     : qaError === "save" && phase === "preview" ? "Não foi possível salvar a correção. Tente novamente." : null,
 });
 if (!preview) installDesktopWebViewPolicy(document);
@@ -69,8 +69,8 @@ function ViewerWindow() {
             : action.kind === "start" ? previewCorrection("browse")
             : action.kind === "browse" ? previewCorrection("browse")
             : action.kind === "select" ? previewCorrection("select")
-            : action.kind === "preview" ? previewCorrection("preview")
-            : action.kind === "apply" ? previewCorrection("applying")
+            : action.kind === "preview" ? qaError === "prepare" ? previewCorrection("select") : previewCorrection("preview")
+            : action.kind === "apply" ? qaError === "save" ? previewCorrection("preview") : previewCorrection("applying")
             : current.correction } : current);
           return;
         }

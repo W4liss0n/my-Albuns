@@ -15800,7 +15800,6 @@
       "viewport": { "height": 720, "width": 1050 },
       "readySelector": ".eye-correction__face[aria-pressed='true']",
       "actions": [
-        { "type": "click", "selector": "button[aria-label='Referência: rosto 1']" },
         { "type": "click", "selector": "button[aria-label='Imagem a corrigir: rosto 1']" }
       ]
     },
@@ -15833,7 +15832,6 @@
       "viewport": { "height": 720, "width": 1050 },
       "readySelector": ".eye-correction__pane:last-child .eye-correction__face[aria-pressed='true'] .eye-correction__face-check",
       "actions": [
-        { "type": "click", "selector": "button[aria-label='Referência: rosto 1']" },
         { "type": "click", "selector": "button[aria-label='Imagem a corrigir: rosto 1']" }
       ]
     },
@@ -15959,6 +15957,9 @@
       "viewport": { "height": 720, "width": 1050 },
       "readySelector": ".ui-floating-tooltip",
       "actions": [
+        { "type": "click", "selector": "button[aria-label='Salvar correção']" },
+        { "type": "click-text", "selector": "button", "text": "Substituir original" },
+        { "type": "assert", "selector": ".image-viewer:not(:has([role='dialog']))" },
         { "type": "hover", "selector": ".eye-correction__pane:last-child img" }
       ]
     },
@@ -16049,6 +16050,111 @@
       "actions": [
         { "type": "assert", "selector": ".eye-correction__pane:first-child .eye-correction__pane-image[data-analysis='failed']" },
         { "type": "hover", "selector": ".eye-correction__pane:first-child img" }
+      ]
+    },
+    {
+      "id": "image-viewer-correction-auto-preview",
+      "title": "Correção de olhos — selecionar os dois rostos prepara a prévia automaticamente",
+      "implementationPath": "/image-viewer.html?preview=correction-select&qa=1&fixture=faces",
+      "comparison": {
+        "implementationCaptureSelector": ".image-viewer-window",
+        "reason": "Design 0050: prévia automática sem Ver correção; fixture visual não valida o compositor",
+        "kind": "implementation-only",
+        "surface": "image-viewer"
+      },
+      "viewport": { "height": 720, "width": 1050 },
+      "readySelector": "button[aria-label='Salvar correção']",
+      "actions": [
+        { "type": "click", "selector": "button[aria-label='Imagem a corrigir: rosto 1']" },
+        { "type": "click", "selector": "button[aria-label='Referência: rosto 1']" },
+        { "type": "assert", "selector": "body:not(:has(button[aria-label='Ver correção']))" }
+      ]
+    },
+    {
+      "id": "image-viewer-correction-exit",
+      "title": "Visualizador — imagem reaparece ao fechar a correção",
+      "implementationPath": "/image-viewer.html?preview=normal&qa=1&fixture=faces",
+      "comparison": {
+        "implementationCaptureSelector": ".image-viewer-window",
+        "reason": "Design 0050: a superfície é medida novamente e a imagem permanece visível após sair da correção",
+        "kind": "implementation-only",
+        "surface": "image-viewer"
+      },
+      "viewport": { "height": 720, "width": 1050 },
+      "readySelector": ".image-viewer__image[style*='opacity: 1']:not([style*='width: 0px']):not([style*='height: 0px'])",
+      "actions": [
+        { "type": "click", "selector": "button[aria-label='Abrir olhos']" },
+        { "type": "assert", "selector": ".eye-correction__panes" },
+        { "type": "click", "selector": "button[aria-label='Fechar correção']" }
+      ]
+    },
+    {
+      "id": "image-viewer-correction-exit-navigate",
+      "title": "Visualizador — navegação continua após sair da correção",
+      "implementationPath": "/image-viewer.html?preview=normal&qa=1&fixture=faces",
+      "comparison": {
+        "implementationCaptureSelector": ".image-viewer-window",
+        "reason": "Design 0050: voltar ao visualizador preserva navegação e encaixe",
+        "kind": "implementation-only",
+        "surface": "image-viewer"
+      },
+      "viewport": { "height": 720, "width": 1050 },
+      "readySelector": ".image-viewer__image[alt='Praia.jpg'][style*='opacity: 1']:not([style*='width: 0px'])",
+      "actions": [
+        { "type": "click", "selector": "button[aria-label='Abrir olhos']" },
+        { "type": "click", "selector": "button[aria-label='Fechar correção']" },
+        { "type": "click", "selector": "button[aria-label='Próxima imagem']" }
+      ]
+    },
+    {
+      "id": "image-viewer-correction-confirm-overwrite",
+      "title": "Correção de olhos — confirmação antes de substituir o original",
+      "implementationPath": "/image-viewer.html?preview=correction-preview&qa=1",
+      "comparison": {
+        "implementationCaptureSelector": ".image-viewer-window",
+        "reason": "Design 0050: diálogo compartilhado sobre as fotos, com Cancelar em foco; captura sem escrita de arquivo",
+        "kind": "implementation-only",
+        "surface": "image-viewer"
+      },
+      "viewport": { "height": 720, "width": 1050 },
+      "readySelector": "[role='dialog'] button:focus",
+      "actions": [
+        { "type": "click", "selector": "button[aria-label='Salvar correção']" }
+      ]
+    },
+    {
+      "id": "image-viewer-correction-confirm-overwrite-narrow",
+      "title": "Correção de olhos — confirmação na janela estreita",
+      "implementationPath": "/image-viewer.html?preview=correction-preview&qa=1",
+      "comparison": {
+        "implementationCaptureSelector": ".image-viewer-window",
+        "reason": "Design 0050: texto e ações de confirmação cabem na janela estreita",
+        "kind": "implementation-only",
+        "surface": "image-viewer"
+      },
+      "viewport": { "height": 480, "width": 600 },
+      "readySelector": "[role='dialog'] button:focus",
+      "actions": [
+        { "type": "click", "selector": "button[aria-label='Salvar correção']" }
+      ]
+    },
+    {
+      "id": "image-viewer-correction-confirm-cancel",
+      "title": "Correção de olhos — Esc cancela a confirmação e preserva a prévia",
+      "implementationPath": "/image-viewer.html?preview=correction-preview&qa=1",
+      "comparison": {
+        "implementationCaptureSelector": ".image-viewer-window",
+        "reason": "Design 0050: Esc fecha somente a confirmação e devolve o foco a Salvar correção",
+        "kind": "implementation-only",
+        "surface": "image-viewer"
+      },
+      "viewport": { "height": 720, "width": 1050 },
+      "readySelector": "button[aria-label='Salvar correção']:focus",
+      "actions": [
+        { "type": "click", "selector": "button[aria-label='Salvar correção']" },
+        { "type": "assert", "selector": "[role='dialog']" },
+        { "type": "key", "key": "Escape" },
+        { "type": "assert", "selector": "body:not(:has([role='dialog']))" }
       ]
     },
     {
