@@ -1,18 +1,21 @@
 .ui-action-button.ui-image-tool {
   position: absolute;
+  isolation: isolate;
   z-index: 3;
   width: 42px;
   height: 42px;
   min-height: 42px;
   padding: 0;
   border: 0;
+  border-radius: 50%;
   background: transparent;
-  color: white;
+  color: var(--ui-text);
 }
 .ui-action-button.ui-image-tool:hover:not(:disabled),
-.ui-action-button.ui-image-tool:focus-visible:not(:disabled) { border: 0; background: transparent; color: white; }
+.ui-action-button.ui-image-tool:focus-visible:not(:disabled) { border: 0; background: transparent; color: var(--ui-text); }
 .ui-action-button.ui-image-tool:focus-visible { box-shadow: none; }
-.ui-image-tool svg { width: 18px; height: 18px; filter: drop-shadow(0 1px 2px rgb(0 0 0 / 90%)) drop-shadow(0 -1px 1px rgb(0 0 0 / 65%)); transition: transform 120ms ease; }
+.ui-image-tool::before { content: ""; position: absolute; z-index: -1; inset: 3px; border-radius: 50%; background: color-mix(in srgb, var(--ui-surface) 56%, transparent); pointer-events: none; transition: background 120ms ease; }
+.ui-image-tool:hover:not(:disabled)::before { background: color-mix(in srgb, var(--ui-surface) 72%, transparent); }
+.ui-image-tool svg { width: 18px; height: 18px; }
 .ui-image-tool[data-glyph="navigation"] svg { width: 26px; height: 26px; }
-.ui-image-tool:hover:not(:disabled) svg { transform: scale(1.16); }
 .ui-image-tool:focus-visible { outline: 2px solid var(--ui-focus-neutral); outline-offset: 2px; }
