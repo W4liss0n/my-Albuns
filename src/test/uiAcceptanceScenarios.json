@@ -16734,6 +16734,174 @@
           "selector": ".image-viewer__stage:not([data-handoff]) .image-viewer__image[style*=\"opacity: 1\"]"
         }
       ]
+    },
+    {
+      "id": "image-viewer-navigation-repeated",
+      "title": "Visualizador — próxima e anterior mantêm o enquadramento",
+      "implementationPath": "/image-viewer.html?preview=normal&qa=1&fixture=faces-multi",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "image-viewer",
+        "implementationCaptureSelector": ".image-viewer-window",
+        "reason": "Design 0050: navegação preserva a foto até a próxima estar pronta; captura final complementa medição quadro a quadro, sem validar detecção ou processamento."
+      },
+      "viewport": {
+        "width": 1050,
+        "height": 720
+      },
+      "readySelector": ".image-viewer__image[alt='Retrato.jpg'][style*='opacity: 1']:not([style*='width: 0px'])",
+      "actions": [
+        {
+          "type": "click",
+          "selector": "button[aria-label='Próxima imagem']"
+        },
+        {
+          "type": "assert",
+          "selector": ".image-viewer__image[alt='Praia.jpg'][style*='opacity: 1']:not([style*='width: 0px'])"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label='Imagem anterior']"
+        },
+        {
+          "type": "assert",
+          "selector": ".image-viewer__image[alt='Retrato.jpg'][style*='opacity: 1']:not([style*='width: 0px'])"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label='Próxima imagem']"
+        },
+        {
+          "type": "assert",
+          "selector": ".image-viewer__image[alt='Praia.jpg'][style*='opacity: 1']:not([style*='width: 0px'])"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label='Imagem anterior']"
+        }
+      ]
+    },
+    {
+      "id": "image-viewer-navigation-keyboard",
+      "title": "Visualizador — navegação pelo teclado mantém imagem e nome coerentes",
+      "implementationPath": "/image-viewer.html?preview=normal&qa=1",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "image-viewer",
+        "implementationCaptureSelector": ".image-viewer-window",
+        "reason": "Design 0050: navegação preserva a foto até a próxima estar pronta; captura final complementa medição quadro a quadro, sem validar detecção ou processamento."
+      },
+      "viewport": {
+        "width": 720,
+        "height": 720
+      },
+      "readySelector": ".image-viewer__image[alt='Retrato.jpg'][style*='opacity: 1']:not([style*='width: 0px'])",
+      "actions": [
+        {
+          "type": "key",
+          "key": "ArrowLeft"
+        },
+        {
+          "type": "assert",
+          "selector": ".image-viewer__image[alt='Retrato.jpg'][style*='opacity: 1']:not([style*='width: 0px'])"
+        },
+        {
+          "type": "key",
+          "key": "ArrowRight"
+        },
+        {
+          "type": "assert",
+          "selector": ".image-viewer__image[alt='Praia.jpg'][style*='opacity: 1']:not([style*='width: 0px'])"
+        },
+        {
+          "type": "key",
+          "key": "ArrowLeft"
+        }
+      ]
+    },
+    {
+      "id": "image-viewer-reference-navigation",
+      "title": "Correção — trocar referências preserva a foto de destino",
+      "implementationPath": "/image-viewer.html?preview=correction-browse&qa=1&fixture=faces-multi",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "image-viewer",
+        "implementationCaptureSelector": ".image-viewer-window",
+        "reason": "Design 0050: navegação preserva a foto até a próxima estar pronta; captura final complementa medição quadro a quadro, sem validar detecção ou processamento."
+      },
+      "viewport": {
+        "width": 1050,
+        "height": 720
+      },
+      "readySelector": "button[aria-label='Usar esta foto']:not([aria-disabled='true']):not([disabled])",
+      "actions": [
+        {
+          "type": "click",
+          "selector": "button[aria-label='Próxima referência']"
+        },
+        {
+          "type": "assert",
+          "selector": ".eye-correction__pane:first-child .eye-correction__photo img[alt='IMG_6276.JPG']"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label='Próxima referência']"
+        },
+        {
+          "type": "assert",
+          "selector": ".eye-correction__pane:first-child .eye-correction__photo img[alt='IMG_6300.JPG']"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label='Referência anterior']"
+        },
+        {
+          "type": "assert",
+          "selector": ".eye-correction__pane:first-child .eye-correction__photo img[alt='IMG_6276.JPG']"
+        },
+        {
+          "type": "assert",
+          "selector": ".eye-correction__pane:last-child .eye-correction__photo img[alt='IMG_6246.JPG']"
+        }
+      ]
+    },
+    {
+      "id": "image-viewer-reference-navigation-narrow",
+      "title": "Correção — navegar pela referência em janela estreita",
+      "implementationPath": "/image-viewer.html?preview=correction-browse&qa=1&fixture=faces-multi",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "image-viewer",
+        "implementationCaptureSelector": ".image-viewer-window",
+        "reason": "Design 0050: navegação preserva a foto até a próxima estar pronta; captura final complementa medição quadro a quadro, sem validar detecção ou processamento."
+      },
+      "viewport": {
+        "width": 680,
+        "height": 720
+      },
+      "readySelector": "button[aria-label='Usar esta foto']:not([aria-disabled='true']):not([disabled])",
+      "actions": [
+        {
+          "type": "key",
+          "key": "ArrowRight"
+        },
+        {
+          "type": "assert",
+          "selector": ".eye-correction__pane:first-child .eye-correction__photo img[alt='IMG_6276.JPG']"
+        },
+        {
+          "type": "key",
+          "key": "ArrowLeft"
+        },
+        {
+          "type": "assert",
+          "selector": ".eye-correction__pane:first-child .eye-correction__photo img[alt='IMG_6252.JPG']"
+        },
+        {
+          "type": "assert",
+          "selector": ".eye-correction__pane:last-child .eye-correction__photo img[alt='IMG_6246.JPG']"
+        }
+      ]
     }
   ]
 }

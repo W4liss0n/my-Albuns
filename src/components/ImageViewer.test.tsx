@@ -12,18 +12,149 @@ beforeEach(() => { vi.mocked(detectFaces).mockReset().mockResolvedValue([]); });
 const initial: ViewerPresentation = { sessionId: "s", revision: 1, mediaId: "a", name: "Imagem a", url: "data:image/png;id=a", state: "ready", canPrevious: false, canNext: true };
 function Harness() {
   const [presentation, setPresentation] = useState(initial);
-  return <ImageViewer presentation={presentation} onNavigate={() => setPresentation({ ...presentation, revision: presentation.revision + 1, mediaId: "b", name: "Imagem b", url: "data:image/png;id=b", canPrevious: true, canNext: false })} onClose={() => undefined} />;
+  return <ImageViewer presentation={presentation} onNavigate={() => setPresentation({ ...presentation, revision: presentation.revision + 1, mediaId: "b", name: "Imagem b", url: "data:image/png;id=b", canPrevious: true, canNext: false })} onClose={() => undefined} onCorrection={() => undefined} />;
 }
 
-test("navigation keeps geometry while a new preview loads and hides prior image", () => {
-  render(<Harness />);
-  const image = screen.getByRole("img", { name: "Imagem a" });
-  Object.defineProperties(image, { naturalWidth: { configurable: true, value: 1600 }, naturalHeight: { configurable: true, value: 1200 } });
-  fireEvent.load(image);
-  fireEvent.click(screen.getByRole("button", { name: "Próxima imagem" }));
-  expect(screen.getByRole("img", { name: "Imagem b" })).toHaveStyle({ opacity: "0" });
-  expect(screen.getByText("Carregando imagem…")).toBeInTheDocument();
-  expect(screen.getByRole("button", { name: "Próxima imagem" })).toBeDisabled();
+test("navigation keeps the painted photo until the next image has geometry without exposing old actions", () => {
+  const width = vi.spyOn(Element.prototype, "clientWidth", "get").mockReturnValue(800);
+  const height = vi.spyOn(Element.prototype, "clientHeight", "get").mockReturnValue(600);
+  try {
+    const view = render(<Harness />);
+    const image = screen.getByRole("img", { name: "Imagem a" });
+    Object.defineProperties(image, { naturalWidth: { configurable: true, value: 1600 }, naturalHeight: { configurable: true, value: 1200 } });
+    fireEvent.load(image);
+    fireEvent.click(screen.getByRole("button", { name: "Próxima imagem" }));
+    expect(image.isConnected).toBe(true);
+    expect(parseFloat(image.style.width)).toBeGreaterThan(0);
+    expect(screen.queryByText("Carregando imagem…")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Abrir olhos" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Próxima imagem" })).toBeDisabled();
+    const next = view.container.querySelector<HTMLImageElement>('img[src="data:image/png;id=b"]')!;
+    Object.defineProperties(next, { naturalWidth: { configurable: true, value: 1200 }, naturalHeight: { configurable: true, value: 800 } });
+    fireEvent.load(next);
+    expect(image.isConnected).toBe(false);
+    expect(parseFloat(next.style.width)).toBeGreaterThan(0);
+    expect(screen.getByRole("button", { name: "Abrir olhos" })).toBeInTheDocument();
+  } finally { width.mockRestore(); height.mockRestore(); }
+});
+
+test("reference navigation keeps its painted photo while another reference loads", () => {
+  const width = vi.spyOn(Element.prototype, "clientWidth", "get").mockReturnValue(600);
+  const height = vi.spyOn(Element.prototype, "clientHeight", "get").mockReturnValue(500);
+  const correction: NonNullable<ViewerPresentation["correction"]> = {
+    phase: "browse", referenceMediaId: "ref-a", referenceName: "Referência a.jpg", referenceUrl: "data:image/png;id=ref-a",
+    referenceState: "ready", canPreviousReference: false, canNextReference: true, resultUrl: null, error: null,
+  };
+  try {
+    const view = render(<ImageViewer presentation={{ ...initial, correction }} onNavigate={vi.fn()} onClose={vi.fn()} onCorrection={vi.fn()} />);
+    const original = view.container.querySelector<HTMLImageElement>(".eye-correction__pane:first-child .eye-correction__photo img")!;
+    Object.defineProperties(original, { naturalWidth: { configurable: true, value: 800 }, naturalHeight: { configurable: true, value: 1200 } });
+    fireEvent.load(original);
+    expect(parseFloat(original.parentElement!.style.width)).toBeGreaterThan(0);
+
+    view.rerender(<ImageViewer presentation={{ ...initial, correction: { ...correction, referenceMediaId: "ref-b", referenceName: "Referência b.jpg", referenceUrl: "data:image/png;id=ref-b", canPreviousReference: true } }} onNavigate={vi.fn()} onClose={vi.fn()} onCorrection={vi.fn()} />);
+    expect(original.isConnected).toBe(true);
+    expect(parseFloat(original.parentElement!.style.width)).toBeGreaterThan(0);
+    expect(screen.getByRole("button", { name: "Usar esta foto" })).toHaveAttribute("aria-disabled", "true");
+    expect(screen.getByRole("button", { name: "Próxima referência" })).toBeEnabled();
+
+    const next = view.container.querySelector<HTMLImageElement>('img[src="data:image/png;id=ref-b"]')!;
+    Object.defineProperties(next, { naturalWidth: { configurable: true, value: 1200 }, naturalHeight: { configurable: true, value: 800 } });
+    fireEvent.load(next);
+    expect(original.isConnected).toBe(false);
+    expect(parseFloat(next.parentElement!.style.width)).toBeGreaterThan(0);
+  } finally { width.mockRestore(); height.mockRestore(); }
+});
+
+test("loading without a URL and A to B to C navigation retain only the last painted photo and its zoom", () => {
+  const width = vi.spyOn(Element.prototype, "clientWidth", "get").mockReturnValue(800);
+  const height = vi.spyOn(Element.prototype, "clientHeight", "get").mockReturnValue(600);
+  const title = vi.fn();
+  const props = { onNavigate: vi.fn(), onClose: vi.fn(), onCorrection: vi.fn(), onVisibleNameChange: title };
+  try {
+    const view = render(<ImageViewer presentation={initial} {...props} />);
+    const first = view.container.querySelector<HTMLImageElement>(".image-viewer__image")!;
+    Object.defineProperties(first, { naturalWidth: { configurable: true, value: 1600 }, naturalHeight: { configurable: true, value: 1200 } });
+    fireEvent.load(first);
+    fireEvent.wheel(view.container.querySelector(".image-viewer__stage")!, { deltaY: -500, clientX: 400, clientY: 300 });
+    expect(first.style.transform).not.toContain("scale(1)");
+
+    const loading: ViewerPresentation = { ...initial, mediaId: "b", name: "Imagem b", url: null, state: "loading" };
+    view.rerender(<ImageViewer presentation={loading} {...props} />);
+    expect(first.isConnected).toBe(true);
+    expect(first.style.transform).not.toContain("scale(1)");
+    expect(screen.queryByText("Carregando imagem…")).not.toBeInTheDocument();
+    const zoomBeforeKey = first.style.transform;
+    fireEvent.keyDown(window, { key: "+" });
+    expect(first.style.transform).toBe(zoomBeforeKey);
+    expect(title).toHaveBeenLastCalledWith("s", "Imagem a");
+
+    const second: ViewerPresentation = { ...loading, url: "data:image/png;id=b", state: "ready" };
+    view.rerender(<ImageViewer presentation={second} {...props} />);
+    const pending = view.container.querySelector<HTMLImageElement>('img[src="data:image/png;id=b"]')!;
+    const third: ViewerPresentation = { ...second, mediaId: "c", name: "Imagem c", url: "data:image/png;id=c" };
+    view.rerender(<ImageViewer presentation={third} {...props} />);
+    expect(first.isConnected).toBe(true);
+    fireEvent.load(pending);
+    expect(first.isConnected).toBe(true);
+    const finalImage = view.container.querySelector<HTMLImageElement>('img[src="data:image/png;id=c"]')!;
+    Object.defineProperties(finalImage, { naturalWidth: { configurable: true, value: 1200 }, naturalHeight: { configurable: true, value: 800 } });
+    fireEvent.load(finalImage);
+    expect(first.isConnected).toBe(false);
+    expect(finalImage.style.transform).toContain("scale(1)");
+    expect(title).toHaveBeenLastCalledWith("s", "Imagem c");
+  } finally { width.mockRestore(); height.mockRestore(); }
+});
+
+test("missing or failed next photo releases the retained image without reviving it later", () => {
+  const width = vi.spyOn(Element.prototype, "clientWidth", "get").mockReturnValue(800);
+  const height = vi.spyOn(Element.prototype, "clientHeight", "get").mockReturnValue(600);
+  const props = { onNavigate: vi.fn(), onClose: vi.fn(), onCorrection: vi.fn() };
+  try {
+    const view = render(<ImageViewer presentation={initial} {...props} />);
+    const first = view.container.querySelector<HTMLImageElement>(".image-viewer__image")!;
+    Object.defineProperties(first, { naturalWidth: { configurable: true, value: 1600 }, naturalHeight: { configurable: true, value: 1200 } });
+    fireEvent.load(first);
+    view.rerender(<ImageViewer presentation={{ ...initial, mediaId: "b", name: "Imagem b", url: "data:image/png;id=b" }} {...props} />);
+    expect(first.isConnected).toBe(true);
+    fireEvent.error(view.container.querySelector('img[src="data:image/png;id=b"]')!);
+    expect(first.isConnected).toBe(false);
+    expect(screen.getByText("Não foi possível exibir a prévia desta imagem.")).toBeInTheDocument();
+    view.rerender(<ImageViewer presentation={{ ...initial, mediaId: "c", name: "Imagem c", url: null, state: "absent" }} {...props} />);
+    expect(view.container.querySelector(".image-viewer__image--retained")).not.toBeInTheDocument();
+    expect(screen.getByText("Imagem não encontrada. Localize o arquivo pelo Painel de imagens.")).toBeInTheDocument();
+  } finally { width.mockRestore(); height.mockRestore(); }
+});
+
+test("reference loading, failure and missing states cannot revive an earlier photo", () => {
+  const width = vi.spyOn(Element.prototype, "clientWidth", "get").mockReturnValue(600);
+  const height = vi.spyOn(Element.prototype, "clientHeight", "get").mockReturnValue(500);
+  const correction: NonNullable<ViewerPresentation["correction"]> = {
+    phase: "browse", referenceMediaId: "ref-a", referenceName: "Referência a.jpg", referenceUrl: "data:image/png;id=ref-a",
+    referenceState: "ready", canPreviousReference: false, canNextReference: true, resultUrl: null, error: null,
+  };
+  const props = { onNavigate: vi.fn(), onClose: vi.fn(), onCorrection: vi.fn() };
+  try {
+    const view = render(<ImageViewer presentation={{ ...initial, correction }} {...props} />);
+    const first = view.container.querySelector<HTMLImageElement>('img[src="data:image/png;id=ref-a"]')!;
+    Object.defineProperties(first, { naturalWidth: { configurable: true, value: 800 }, naturalHeight: { configurable: true, value: 1200 } });
+    fireEvent.load(first);
+    const loading: typeof correction = { ...correction, referenceMediaId: "ref-b", referenceName: "Referência b.jpg", referenceUrl: null, referenceState: "loading", canPreviousReference: true };
+    view.rerender(<ImageViewer presentation={{ ...initial, correction: loading }} {...props} />);
+    expect(first.isConnected).toBe(true);
+    expect(screen.getByRole("button", { name: "Usar esta foto" })).toHaveAttribute("aria-disabled", "true");
+    const next: typeof correction = { ...loading, referenceUrl: "data:image/png;id=ref-b", referenceState: "ready" };
+    view.rerender(<ImageViewer presentation={{ ...initial, correction: next }} {...props} />);
+    expect(first.isConnected).toBe(true);
+    fireEvent.error(view.container.querySelector('img[src="data:image/png;id=ref-b"]')!);
+    expect(first.isConnected).toBe(false);
+    const missing: typeof correction = { ...next, referenceMediaId: "ref-c", referenceUrl: null, referenceState: "absent" };
+    view.rerender(<ImageViewer presentation={{ ...initial, correction: missing }} {...props} />);
+    expect(view.container.querySelector('[data-retained="true"]')).not.toBeInTheDocument();
+    const later: typeof correction = { ...missing, referenceMediaId: "ref-d", referenceUrl: null, referenceState: "loading" };
+    view.rerender(<ImageViewer presentation={{ ...initial, correction: later }} {...props} />);
+    expect(view.container.querySelector('[data-retained="true"]')).not.toBeInTheDocument();
+  } finally { width.mockRestore(); height.mockRestore(); }
 });
 
 test("wheel zoom allows bounded pan and fit restores whole image", () => {
@@ -68,24 +199,32 @@ test("fit uses the stage padding for portrait geometry", () => {
 
 
 test("eye correction opens from a ready viewer and keeps the target fixed beside a project reference", () => {
-  const onCorrection = vi.fn();
-  const presentation: ViewerPresentation = { ...initial, correction: {
-    phase: "browse", referenceMediaId: "reference", referenceName: "Outra foto.jpg",
-    referenceUrl: "data:image/png;id=reference", referenceState: "ready",
-    canPreviousReference: false, canNextReference: true, resultUrl: null, error: null,
-  } };
-  const onNavigate = vi.fn();
-  const view = render(<ImageViewer presentation={presentation} onNavigate={onNavigate} onClose={vi.fn()} onCorrection={onCorrection} />);
-  expect(screen.getByRole("img", { name: "Imagem a" })).toBeInTheDocument();
-  expect(screen.getByRole("img", { name: "Outra foto.jpg" })).toBeInTheDocument();
-  expect(screen.queryByText("Imagem a")).not.toBeInTheDocument();
-  expect(screen.queryByText("Outra foto.jpg")).not.toBeInTheDocument();
-  expect(view.container.querySelector(".eye-correction__pane:first-child .eye-correction__reference-action")).toBe(screen.getByRole("button", { name: "Usar esta foto" }));
-  expect(view.container.querySelector(".eye-correction__tools .eye-correction__reference-action")).not.toBeInTheDocument();
-  fireEvent.click(screen.getByRole("button", { name: "Próxima referência" }));
-  expect(onNavigate).toHaveBeenCalledWith(1);
-  fireEvent.click(screen.getByRole("button", { name: "Usar esta foto" }));
-  expect(onCorrection).toHaveBeenCalledWith({ sessionId: "s", kind: "select" });
+  const width = vi.spyOn(Element.prototype, "clientWidth", "get").mockReturnValue(600);
+  const height = vi.spyOn(Element.prototype, "clientHeight", "get").mockReturnValue(500);
+  try {
+    const onCorrection = vi.fn();
+    const presentation: ViewerPresentation = { ...initial, correction: {
+      phase: "browse", referenceMediaId: "reference", referenceName: "Outra foto.jpg",
+      referenceUrl: "data:image/png;id=reference", referenceState: "ready",
+      canPreviousReference: false, canNextReference: true, resultUrl: null, error: null,
+    } };
+    const onNavigate = vi.fn();
+    const view = render(<ImageViewer presentation={presentation} onNavigate={onNavigate} onClose={vi.fn()} onCorrection={onCorrection} />);
+    expect(screen.getByRole("img", { name: "Imagem a" })).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: "Outra foto.jpg" })).toBeInTheDocument();
+    expect(screen.queryByText("Imagem a")).not.toBeInTheDocument();
+    expect(screen.queryByText("Outra foto.jpg")).not.toBeInTheDocument();
+    expect(view.container.querySelector(".eye-correction__pane:first-child .eye-correction__reference-action")).toBe(screen.getByRole("button", { name: "Usar esta foto" }));
+    expect(view.container.querySelector(".eye-correction__tools .eye-correction__reference-action")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Próxima referência" }));
+    expect(onNavigate).toHaveBeenCalledWith(1);
+    expect(screen.getByRole("button", { name: "Usar esta foto" })).toHaveAttribute("aria-disabled", "true");
+    const reference = screen.getByRole("img", { name: "Outra foto.jpg" });
+    Object.defineProperties(reference, { naturalWidth: { configurable: true, value: 800 }, naturalHeight: { configurable: true, value: 1200 } });
+    fireEvent.load(reference);
+    fireEvent.click(screen.getByRole("button", { name: "Usar esta foto" }));
+    expect(onCorrection).toHaveBeenCalledWith({ sessionId: "s", kind: "select" });
+  } finally { width.mockRestore(); height.mockRestore(); }
 });
 
 test("a correction preview compares only the target and saves once even while showing the original", () => {
@@ -188,7 +327,7 @@ test("returning from correction measures the replacement stage and fits navigate
     const returned = screen.getByRole("img", { name: "Imagem a" });
     expect(parseFloat(returned.style.width)).toBeGreaterThan(0);
     fireEvent.click(screen.getByRole("button", { name: "Próxima imagem" }));
-    const next = screen.getByRole("img", { name: "Imagem b" });
+    const next = document.querySelector<HTMLImageElement>('img[src="data:image/png;id=b"]')!;
     Object.defineProperties(next, { naturalWidth: { configurable: true, value: 1200 }, naturalHeight: { configurable: true, value: 800 } });
     fireEvent.load(next);
     expect(parseFloat(next.style.width)).toBeGreaterThan(0);

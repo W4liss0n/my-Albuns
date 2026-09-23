@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import ReactDOM from "react-dom/client";
 import { ImageViewer } from "../components/ImageViewer";
 import type { ViewerPresentation } from "../application/imageViewerWindow";
@@ -20,10 +20,14 @@ const qaMultipleFaces = import.meta.env.DEV && new URLSearchParams(location.sear
 const qaDelayedPreparation = import.meta.env.DEV && new URLSearchParams(location.search).get("delay") === "prepare";
 const qaTarget = qaMultipleFaces ? "/.scratch/face-detection-debug-20260923/inputs/IMG_6246.JPG" : "/.scratch/eye-correction/qa/nikki-closed.jpg";
 const qaReference = qaMultipleFaces ? "/.scratch/face-detection-debug-20260923/inputs/IMG_6252.JPG" : "/.scratch/eye-correction/qa/nikki-open-a.jpg";
-const previewCorrection = (phase: string, version = 0) => ({
-  phase, referenceMediaId: "reference", referenceName: "Referência.jpg",
-  referenceUrl: qa ? qaReference : sizedPreview(portraitPreview, 800, 1200),
-  referenceState: "ready" as const, canPreviousReference: false, canNextReference: phase === "browse",
+const qaReferences = qaMultipleFaces
+  ? ["IMG_6252.JPG", "IMG_6276.JPG", "IMG_6300.JPG"].map((name) => ({ name, url: `/.scratch/face-detection-debug-20260923/inputs/${name}` }))
+  : [{ name: "Referência.jpg", url: qaReference }, { name: "Outra referência.jpg", url: "/.scratch/face-detection-debug-20260923/inputs/reference.jpg" }];
+const referenceIndex = (correction: ViewerPresentation["correction"]) => Number(correction?.referenceMediaId?.split("-")[1] ?? 0);
+const previewCorrection = (phase: string, version = 0, index = 0) => ({
+  phase, referenceMediaId: `reference-${index}`, referenceName: qa ? qaReferences[index].name : "Referência.jpg",
+  referenceUrl: qa ? qaReferences[index].url : sizedPreview(portraitPreview, 800, 1200),
+  referenceState: "ready" as const, canPreviousReference: phase === "browse" && index > 0, canNextReference: phase === "browse" && index < qaReferences.length - 1,
   resultUrl: phase === "preview" || phase === "applying" ? qaMultipleFaces ? `${qaTarget}?v=${version}` : qa ? `/.scratch/eye-correction/qa/nikki-corrected.png${version ? `?v=${version}` : ""}` : sizedPreview(landscapePreview, 1200, 800) : null,
   error: qaError === "prepare" && phase === "select" ? "Os olhos da referência precisam estar abertos."
     : qaError === "save" && phase === "preview" ? "Não foi possível atualizar a prévia da foto. A foto original foi restaurada." : null,
@@ -34,6 +38,10 @@ const sizedPreview = (svg: string, width: number, height: number) =>
 
 function ViewerWindow() {
   const qaPreviewRequest = useRef(0);
+  const [visibleTitle, setVisibleTitle] = useState<{ sessionId: string; name: string } | null>(null);
+  const onVisibleNameChange = useCallback((sessionId: string, name: string) => {
+    setVisibleTitle((current) => current?.sessionId === sessionId && current.name === name ? current : { sessionId, name });
+  }, []);
   const [presentation, setPresentation] = useState<ViewerPresentation | null>(() => preview ? {
     sessionId: "preview", revision: 0, mediaId: "preview", name: qaMultipleFaces ? "IMG_6246.JPG" : qa ? "Nikki — olhos fechados.jpg" : preview === "long" ? "Serra ao amanhecer com todos os detalhes de uma longa viagem de família.jpg" : "Serra ao amanhecer.jpg",
     url: preview === "missing" ? null : qa ? qaTarget : sizedPreview(landscapePreview, 1200, 800),
@@ -62,29 +70,36 @@ function ViewerWindow() {
   const controls = { ...tauriWindowControls, close };
   return <WindowControlsProvider controls={controls}>
     <div className="image-viewer-window">
-      <ApplicationHeader showBrand={false} controls="maximize-close" context={presentation?.correction ? "" : presentation?.name ?? "Imagem"} />
-      {presentation ? <ImageViewer presentation={presentation} onNavigate={(offset) => {
-        if (preview) { setPresentation((current) => current ? { ...current, mediaId: offset < 0 ? "previous" : "next", name: offset < 0 ? "Retrato.jpg" : "Praia.jpg", url: offset < 0 ? sizedPreview(portraitPreview, 800, 1200) : new URL("../test/dev-media/praia.svg", import.meta.url).href } : current); return; }
+      <ApplicationHeader showBrand={false} controls="maximize-close" context={presentation?.correction ? "" : (visibleTitle?.sessionId === presentation?.sessionId ? visibleTitle?.name : presentation?.name) ?? "Imagem"} />
+      {presentation ? <ImageViewer presentation={presentation} onVisibleNameChange={onVisibleNameChange} onNavigate={(offset) => {
+        if (preview) { setPresentation((current) => {
+          if (!current) return current;
+          if (current.correction?.phase === "browse") {
+            const index = Math.max(0, Math.min(qaReferences.length - 1, referenceIndex(current.correction) + offset));
+            return { ...current, correction: previewCorrection("browse", 0, index) };
+          }
+          return { ...current, mediaId: offset < 0 ? "previous" : "next", name: offset < 0 ? "Retrato.jpg" : "Praia.jpg", url: offset < 0 ? sizedPreview(portraitPreview, 800, 1200) : new URL("../test/dev-media/praia.svg", import.meta.url).href };
+        }); return; }
         void tauriImageViewerClient.navigate(presentation.sessionId, offset).catch(() => undefined);
       }} onClose={close} onCorrection={(action) => {
         if (preview) {
           if (action.kind === "preview") {
             const request = ++qaPreviewRequest.current;
-            setPresentation((current) => current ? { ...current, correction: qaDelayedPreparation ? previewCorrection("processing")
-              : qaError === "prepare" ? previewCorrection("select") : previewCorrection("preview", request) } : current);
+            setPresentation((current) => current ? { ...current, correction: qaDelayedPreparation ? previewCorrection("processing", 0, referenceIndex(current.correction))
+              : qaError === "prepare" ? previewCorrection("select", 0, referenceIndex(current.correction)) : previewCorrection("preview", request, referenceIndex(current.correction)) } : current);
             if (qaDelayedPreparation) window.setTimeout(() => {
               if (request !== qaPreviewRequest.current) return;
               setPresentation((current) => current?.correction?.phase === "processing"
-                ? { ...current, correction: qaError === "prepare" ? previewCorrection("select") : previewCorrection("preview", request) } : current);
+                ? { ...current, correction: qaError === "prepare" ? previewCorrection("select", 0, referenceIndex(current.correction)) : previewCorrection("preview", request, referenceIndex(current.correction)) } : current);
             }, 800);
             return;
           }
           if (action.kind === "cancel" || action.kind === "browse" || action.kind === "start" || action.kind === "select") qaPreviewRequest.current++;
           setPresentation((current) => current ? { ...current, correction: action.kind === "cancel" ? undefined
             : action.kind === "start" ? previewCorrection("browse")
-            : action.kind === "browse" ? previewCorrection("browse")
-            : action.kind === "select" ? previewCorrection("select")
-            : action.kind === "apply" ? qaError === "save" ? previewCorrection("preview", qaPreviewRequest.current) : previewCorrection("applying", qaPreviewRequest.current)
+            : action.kind === "browse" ? previewCorrection("browse", 0, referenceIndex(current.correction))
+            : action.kind === "select" ? previewCorrection("select", 0, referenceIndex(current.correction))
+            : action.kind === "apply" ? qaError === "save" ? previewCorrection("preview", qaPreviewRequest.current, referenceIndex(current.correction)) : previewCorrection("applying", qaPreviewRequest.current, referenceIndex(current.correction))
             : current.correction } : current);
           return;
         }

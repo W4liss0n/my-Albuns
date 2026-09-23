@@ -62,7 +62,20 @@ miniatura. O foco de teclado usa a borda já existente do cartão compartilhado,
 com tom neutro distinguível da seleção, sem mudar dimensões. Tab continua
 indicando qual cartão recebe o teclado; fechar o visualizador restaura o foco.
 
-### Continuidade ao trocar de modo
+### Continuidade ao navegar e trocar de modo
+
+Ao avançar ou voltar, por botão ou teclado, a foto exibida permanece até que a
+próxima esteja carregada e tenha seu tamanho calculado. Isso também vale para
+a navegação da referência na correção de olhos. A substituição acontece de uma
+vez, sem quadro vazio, sobreposição das duas fotos ou texto de carregamento
+entre imagens. A foto de destino não muda ao navegar pela referência.
+
+Enquanto a próxima foto carrega, a anterior serve apenas como continuidade
+visual: não recebe zoom, seleção de rosto nem ações de correção em nome da nova
+foto. O nome mostrado deve corresponder à foto visível. A navegação continua
+disponível, e somente o pedido mais recente pode assumir a tela. Uma falha
+definitiva ou uma nova sessão não mantém a foto de outro item como resultado.
+Não há acúmulo de fotos retidas; basta a foto exibida e a próxima em preparação.
 
 Ao entrar na correção de olhos, a foto já exibida permanece visível até que a
 imagem de destino esteja carregada e tenha seu tamanho calculado. A troca não
@@ -72,7 +85,7 @@ falha não bloqueia o fechamento da correção. A detecção de rostos também n
 atrasa a apresentação das fotos.
 
 Ao sair, o visualizador reaproveita a foto já carregada, sem apagá-la e carregá-la
-de novo. A retenção vale somente para a mesma foto e sessão: navegar ou salvar
+de novo. A retenção respeita a identidade da foto e da sessão: navegar ou salvar
 uma nova versão não pode reapresentar conteúdo antigo como se fosse o atual.
 Somente o modo ativo recebe foco e ações; a confirmação de salvamento continua
 sendo exclusiva quando aberta.
