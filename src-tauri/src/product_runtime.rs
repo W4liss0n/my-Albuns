@@ -179,6 +179,7 @@ pub(crate) fn run(
         .manage(crate::project_ui_operations::ProjectUiOperations::default())
         .manage(crate::project_dialog_window::ProjectDialogPresentationStore::default())
         .manage(crate::image_viewer_window::ViewerStore::default())
+        .manage(crate::image_viewer_window::CorrectionStore::default())
         .manage(crate::settings_preferences::SettingsStore::new(&app_paths))
         .manage(crate::photoshop::PhotoshopStateStore::new(&app_paths))
         .manage(layout_catalog)
@@ -310,7 +311,11 @@ pub(crate) fn run(
             crate::image_viewer_window::update_image_viewer,
             crate::image_viewer_window::current_image_viewer,
             crate::image_viewer_window::navigate_image_viewer,
+            crate::image_viewer_window::act_image_viewer_correction,
             crate::image_viewer_window::close_image_viewer,
+            crate::image_viewer_window::prepare_eye_correction,
+            crate::image_viewer_window::cancel_eye_correction,
+            crate::image_viewer_window::apply_eye_correction,
             crate::media_preview_commands::prepare_media_previews,
             crate::media_preview_commands::read_media_files,
             crate::export_commands::normal::export_project,

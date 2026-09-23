@@ -2,6 +2,6 @@
   "permission": [{
     "identifier": "image-viewer-window-commands",
     "description": "Only presentation and navigation for the owned image viewer.",
-    "commands": { "allow": ["owned_window_content_ready", "current_image_viewer", "navigate_image_viewer", "close_image_viewer"], "deny": [] }
+    "commands": { "allow": ["owned_window_content_ready", "current_image_viewer", "navigate_image_viewer", "close_image_viewer", "act_image_viewer_correction"], "deny": [] }
   }]
 }

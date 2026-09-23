@@ -960,6 +960,14 @@ impl ProjectHost {
         })
     }
 
+    pub(crate) fn project_directory(&self) -> Result<std::path::PathBuf, String> {
+        self.project()?
+            .project_path()
+            .parent()
+            .map(std::path::Path::to_path_buf)
+            .ok_or_else(|| "O projeto não tem uma pasta de destino.".into())
+    }
+
     pub(crate) fn export_destination(&self) -> Result<String, String> {
         let project = self.project()?;
         let path = project.project_path();

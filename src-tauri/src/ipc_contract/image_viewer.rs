@@ -24,6 +24,9 @@ pub struct ViewerPresentation {
     pub(crate) state: ViewerPreviewState,
     pub(crate) can_previous: bool,
     pub(crate) can_next: bool,
+    #[serde(default)]
+    #[ts(optional)]
+    pub(crate) correction: Option<ViewerCorrectionPresentation>,
 }
 
 #[derive(Clone, Debug, Serialize, TS)]
@@ -31,4 +34,18 @@ pub struct ViewerPresentation {
 pub struct ViewerAction {
     pub(crate) session_id: String,
     pub(crate) offset: i8,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub struct ViewerCorrectionPresentation {
+    pub(crate) phase: String,
+    pub(crate) reference_media_id: String,
+    pub(crate) reference_name: String,
+    pub(crate) reference_url: Option<String>,
+    pub(crate) reference_state: ViewerPreviewState,
+    pub(crate) can_previous_reference: bool,
+    pub(crate) can_next_reference: bool,
+    pub(crate) result_url: Option<String>,
+    pub(crate) error: Option<String>,
 }

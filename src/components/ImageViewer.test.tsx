@@ -60,3 +60,59 @@ test("fit uses the stage padding for portrait geometry", () => {
     expect((442 - parseFloat(image.style.height)) / 2).toBe(24);
   } finally { width.mockRestore(); height.mockRestore(); computedStyle.mockRestore(); }
 });
+
+
+test("eye correction opens from a ready viewer and keeps the target fixed beside a project reference", () => {
+  const onCorrection = vi.fn();
+  const presentation: ViewerPresentation = { ...initial, correction: {
+    phase: "browse", referenceMediaId: "reference", referenceName: "Outra foto.jpg",
+    referenceUrl: "data:image/png;id=reference", referenceState: "ready",
+    canPreviousReference: false, canNextReference: true, resultUrl: null, error: null,
+  } };
+  const onNavigate = vi.fn();
+  render(<ImageViewer presentation={presentation} onNavigate={onNavigate} onClose={vi.fn()} onCorrection={onCorrection} />);
+  expect(screen.getByRole("img", { name: "Imagem a" })).toBeInTheDocument();
+  expect(screen.getByRole("img", { name: "Outra foto.jpg" })).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "Próxima referência" }));
+  expect(onNavigate).toHaveBeenCalledWith(1);
+  fireEvent.click(screen.getByRole("button", { name: "Usar como referência" }));
+  expect(onCorrection).toHaveBeenCalledWith({ sessionId: "s", kind: "select" });
+});
+
+test("a correction preview offers apply and a way back to browsing", () => {
+  const onCorrection = vi.fn();
+  const presentation: ViewerPresentation = { ...initial, correction: {
+    phase: "preview", referenceMediaId: "reference", referenceName: "Outra foto.jpg",
+    referenceUrl: "data:image/png;id=reference", referenceState: "ready",
+    canPreviousReference: false, canNextReference: false,
+    resultUrl: "data:image/png;id=corrected", error: null,
+  } };
+  render(<ImageViewer presentation={presentation} onNavigate={vi.fn()} onClose={vi.fn()} onCorrection={onCorrection} />);
+  expect(screen.getByRole("img", { name: "Imagem a" })).toHaveAttribute("src", "data:image/png;id=corrected");
+  fireEvent.click(screen.getByRole("button", { name: "Outra referência" }));
+  expect(onCorrection).toHaveBeenCalledWith({ sessionId: "s", kind: "browse" });
+  fireEvent.click(screen.getByRole("button", { name: "Aplicar" }));
+  expect(onCorrection).toHaveBeenCalledWith({ sessionId: "s", kind: "apply" });
+});
+
+
+test("an applying correction cannot be cancelled or navigated before commit settles", () => {
+  const onCorrection = vi.fn();
+  const onNavigate = vi.fn();
+  const onClose = vi.fn();
+  const presentation: ViewerPresentation = { ...initial, correction: {
+    phase: "applying", referenceMediaId: "reference", referenceName: "Outra foto.jpg",
+    referenceUrl: "data:image/png;id=reference", referenceState: "ready",
+    canPreviousReference: true, canNextReference: true,
+    resultUrl: "data:image/png;id=corrected", error: null,
+  } };
+  render(<ImageViewer presentation={presentation} onNavigate={onNavigate} onClose={onClose} onCorrection={onCorrection} />);
+  expect(screen.getByRole("button", { name: "Cancelar" })).toBeDisabled();
+  expect(screen.queryByRole("button", { name: "Outra referência" })).not.toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Aplicar" })).not.toBeInTheDocument();
+  fireEvent.keyDown(window, { key: "Escape" });
+  fireEvent.keyDown(window, { key: "ArrowRight" });
+  expect(onCorrection).not.toHaveBeenCalled();
+  expect(onNavigate).not.toHaveBeenCalled();
+  expect(onClose).not.toHaveBeenCalled();
+});

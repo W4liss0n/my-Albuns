@@ -14,15 +14,25 @@ import "../ui/ui.css";
 import "./viewerWindow.css";
 
 const preview = new URLSearchParams(location.search).get("preview");
+const qa = import.meta.env.DEV && new URLSearchParams(location.search).has("qa");
+const qaTarget = "/.scratch/eye-correction/qa/nikki-closed.jpg";
+const qaReference = "/.scratch/eye-correction/qa/nikki-open-a.jpg";
+const previewCorrection = (phase: string) => ({
+  phase, referenceMediaId: "reference", referenceName: "Referência.jpg",
+  referenceUrl: qa ? qaReference : sizedPreview(portraitPreview, 800, 1200),
+  referenceState: "ready" as const, canPreviousReference: false, canNextReference: false,
+  resultUrl: phase === "preview" ? sizedPreview(landscapePreview, 1200, 800) : null, error: null,
+});
 if (!preview) installDesktopWebViewPolicy(document);
 const sizedPreview = (svg: string, width: number, height: number) =>
   `data:image/svg+xml,${encodeURIComponent(svg.replace("<svg ", `<svg width="${width}" height="${height}" `))}`;
 
 function ViewerWindow() {
   const [presentation, setPresentation] = useState<ViewerPresentation | null>(() => preview ? {
-    sessionId: "preview", revision: 0, mediaId: "preview", name: preview === "long" ? "Serra ao amanhecer com todos os detalhes de uma longa viagem de família.jpg" : "Serra ao amanhecer.jpg",
-    url: preview === "missing" ? null : sizedPreview(landscapePreview, 1200, 800),
+    sessionId: "preview", revision: 0, mediaId: "preview", name: qa ? "Nikki — olhos fechados.jpg" : preview === "long" ? "Serra ao amanhecer com todos os detalhes de uma longa viagem de família.jpg" : "Serra ao amanhecer.jpg",
+    url: preview === "missing" ? null : qa ? qaTarget : sizedPreview(landscapePreview, 1200, 800),
     state: preview === "missing" ? "absent" : "ready", canPrevious: true, canNext: true,
+    correction: preview?.startsWith("correction-") ? previewCorrection(preview.slice("correction-".length)) : undefined,
   } : null);
   const [error, setError] = useState<string | null>(null);
   useEffect(() => {
@@ -40,7 +50,7 @@ function ViewerWindow() {
     return () => { active = false; observation.dispose(); };
   }, []);
   const close = () => {
-    if (preview) return;
+    if (presentation?.correction?.phase === "applying" || preview) return;
     if (presentation) void tauriImageViewerClient.close(presentation.sessionId).catch(() => undefined);
   };
   const controls = { ...tauriWindowControls, close };
@@ -50,7 +60,18 @@ function ViewerWindow() {
       {presentation ? <ImageViewer presentation={presentation} onNavigate={(offset) => {
         if (preview) { setPresentation((current) => current ? { ...current, mediaId: offset < 0 ? "previous" : "next", name: offset < 0 ? "Retrato.jpg" : "Praia.jpg", url: offset < 0 ? sizedPreview(portraitPreview, 800, 1200) : new URL("../test/dev-media/praia.svg", import.meta.url).href } : current); return; }
         void tauriImageViewerClient.navigate(presentation.sessionId, offset).catch(() => undefined);
-      }} onClose={close} /> : <div className="image-viewer-window__empty" role="status">{error ?? "Carregando imagem…"}</div>}
+      }} onClose={close} onCorrection={(action) => {
+        if (preview) {
+          setPresentation((current) => current ? { ...current, correction: action.kind === "cancel" ? undefined
+            : action.kind === "start" ? previewCorrection("browse")
+            : action.kind === "browse" ? previewCorrection("browse")
+            : action.kind === "select" ? previewCorrection("select")
+            : action.kind === "preview" ? previewCorrection("preview")
+            : current.correction } : current);
+          return;
+        }
+        void tauriImageViewerClient.correction(action).catch(() => undefined);
+      }} /> : <div className="image-viewer-window__empty" role="status">{error ?? "Carregando imagem…"}</div>}
     </div>
   </WindowControlsProvider>;
 }

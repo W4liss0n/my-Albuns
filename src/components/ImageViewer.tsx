@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight, Scan } from "lucide-react";
-import type { ViewerPresentation } from "../application/imageViewerWindow";
+import type { ViewerCorrectionAction, ViewerPresentation } from "../application/imageViewerWindow";
+import { EyeCorrectionView } from "./EyeCorrectionView";
 import { AppIcon } from "../ui/AppIcon";
 import "./ImageViewer.css";
 
@@ -8,12 +9,13 @@ interface Props {
   presentation: ViewerPresentation;
   onNavigate(offset: -1 | 1): void;
   onClose(): void;
+  onCorrection?(action: ViewerCorrectionAction): void;
 }
 
 const MIN_ZOOM = 1;
 const MAX_ZOOM = 8;
 
-export function ImageViewer({ presentation, onNavigate, onClose }: Props) {
+export function ImageViewer({ presentation, onNavigate, onClose, onCorrection }: Props) {
   const viewportRef = useRef<HTMLDivElement>(null);
   const { mediaId, name, url, state, canPrevious, canNext } = presentation;
   const imageKey = `${mediaId}:${url ?? ""}`;
@@ -75,8 +77,13 @@ export function ImageViewer({ presentation, onNavigate, onClose }: Props) {
   }
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") { event.preventDefault(); onClose(); return; }
+      if (event.key === "Escape") { event.preventDefault(); if (presentation.correction?.phase === "applying") return; if (presentation.correction && onCorrection) onCorrection({ sessionId: presentation.sessionId, kind: "cancel" }); else onClose(); return; }
       if (event.altKey || event.ctrlKey || event.metaKey || event.repeat) return;
+      if (presentation.correction) {
+        if (presentation.correction.phase === "browse" && event.key === "ArrowLeft" && presentation.correction.canPreviousReference) { event.preventDefault(); onNavigate(-1); }
+        else if (presentation.correction.phase === "browse" && event.key === "ArrowRight" && presentation.correction.canNextReference) { event.preventDefault(); onNavigate(1); }
+        return;
+      }
       if (event.key === "ArrowLeft" && canPrevious) { event.preventDefault(); onNavigate(-1); }
       else if (event.key === "ArrowRight" && canNext) { event.preventDefault(); onNavigate(1); }
       else if (event.key === "+" || event.key === "=") { event.preventDefault(); changeZoom(zoom * 1.25); }
@@ -91,6 +98,8 @@ export function ImageViewer({ presentation, onNavigate, onClose }: Props) {
     : state === "cache_unavailable" || state === "cache_paused" ? "Prévia temporariamente indisponível."
     : failedKey === imageKey ? "Não foi possível exibir a prévia desta imagem."
     : "Carregando imagem…";
+
+  if (presentation.correction && onCorrection) return <section aria-label="Visualizador de imagens" className="image-viewer"><EyeCorrectionView presentation={presentation} onNavigate={onNavigate} onCorrection={onCorrection} /></section>;
 
   return <section aria-label="Visualizador de imagens" className="image-viewer">
       <div className="image-viewer__stage" data-zoomed={zoom > 1} ref={viewportRef}
@@ -107,6 +116,7 @@ export function ImageViewer({ presentation, onNavigate, onClose }: Props) {
         {ready && state !== "ready" && <p className="image-viewer__stale" role="status">Prévia anterior · imagem indisponível</p>}
         <button aria-label="Imagem anterior" className="image-viewer__nav image-viewer__nav--previous" disabled={!canPrevious} onClick={() => onNavigate(-1)} title="Imagem anterior (←)" type="button"><AppIcon icon={ChevronLeft} size={18} /></button>
         <button aria-label="Próxima imagem" className="image-viewer__nav image-viewer__nav--next" disabled={!canNext} onClick={() => onNavigate(1)} title="Próxima imagem (→)" type="button"><AppIcon icon={ChevronRight} size={18} /></button>
+        {ready && state === "ready" && onCorrection && <button className="image-viewer__eye-action" type="button" onClick={() => onCorrection({ sessionId: presentation.sessionId, kind: "start" })}>Abrir olhos</button>}
         {zoom > 1 && <button aria-label="Ajustar à janela" className="image-viewer__fit" onClick={() => { setZoom(1); setPan({ x: 0, y: 0 }); }} title="Ajustar à janela (0)" type="button"><AppIcon icon={Scan} size={16} /></button>}
       </div>
   </section>;

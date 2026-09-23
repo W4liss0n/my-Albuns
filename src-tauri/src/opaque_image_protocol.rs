@@ -174,7 +174,8 @@ fn trusted_tauri_origin(
     let trusted = matches!(
         value,
         "http://tauri.localhost" | "https://tauri.localhost" | "tauri://localhost"
-    ) || (cfg!(debug_assertions) && value == "http://localhost:1437");
+    ) || (cfg!(debug_assertions)
+        && matches!(value, "http://localhost:1437" | "http://127.0.0.1:1437"));
     trusted.then(|| origin.clone())
 }
 

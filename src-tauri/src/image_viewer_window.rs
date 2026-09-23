@@ -1,9 +1,13 @@
-use std::sync::Mutex;
+use std::{path::PathBuf, sync::Mutex};
 
 use tauri::{AppHandle, Emitter, Manager, State, WebviewWindow, WindowEvent};
 
 use crate::{
     cache_previews::CachePreviewRegistry,
+    eye_correction::{self, Face, PreparedEyes},
+    image_processing::ImageProcessingBatch,
+    project_host::ProjectHost,
+    project_media_reference::{self, MediaChangeKind},
     ipc_contract::{ViewerAction, ViewerPresentation},
     native_dialog_window,
     product_runtime::PROJECT_WINDOW_LABEL,
@@ -78,6 +82,12 @@ fn validate(
         .is_some_and(|url| !previews.is_published_url(url))
     {
         return Err("the viewer URL is not a published cache preview".into());
+    }
+    if let Some(correction) = &presentation.correction {
+        if correction.reference_url.as_deref().is_some_and(|url| !previews.is_published_url(url))
+            || correction.result_url.as_deref().is_some_and(|url| !previews.is_published_url(url)) {
+            return Err("a correction URL is not a published preview".into());
+        }
     }
     Ok(())
 }
@@ -215,8 +225,8 @@ pub(crate) fn navigate_image_viewer(
         return Ok(());
     };
     if current.session_id != session_id
-        || (offset == -1 && !current.can_previous)
-        || (offset == 1 && !current.can_next)
+        || (offset == -1 && !current.correction.as_ref().map_or(current.can_previous, |correction| correction.can_previous_reference))
+        || (offset == 1 && !current.correction.as_ref().map_or(current.can_next, |correction| correction.can_next_reference))
     {
         return Ok(());
     }
@@ -248,6 +258,9 @@ pub(crate) fn close_image_viewer(
     let owner = app
         .get_webview_window(PROJECT_WINDOW_LABEL)
         .ok_or("the Project window is unavailable")?;
+    if app.state::<CorrectionStore>().is_applying() {
+        return Err("A correção está sendo aplicada.".into());
+    }
     if let Some(viewer) = app.get_webview_window(LABEL) {
         native_dialog_window::dismiss_blocked_window(&owner, &viewer, true)
             .map_err(|error| error.to_string())?;
@@ -256,6 +269,173 @@ pub(crate) fn close_image_viewer(
     Ok(())
 }
 
+#[derive(Clone)]
+struct PendingEyes {
+    session_id: String,
+    media_id: String,
+    token: String,
+    path: PathBuf,
+    url: String,
+}
+
+#[derive(Default)]
+struct CorrectionState { generation: u64, pending: Option<PendingEyes>, applying: bool }
+
+#[derive(Default)]
+pub(crate) struct CorrectionStore(Mutex<CorrectionState>);
+
+impl CorrectionStore {
+    fn clear(&self, previews: &CachePreviewRegistry) -> Option<u64> {
+        let mut state = self.0.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+        if state.applying { return None; }
+        state.generation = state.generation.wrapping_add(1);
+        if let Some(pending) = state.pending.take() {
+            previews.revoke_viewer_preview(&pending.url);
+            let _ = std::fs::remove_file(pending.path);
+        }
+        Some(state.generation)
+    }
+
+    fn begin(&self, previews: &CachePreviewRegistry) -> Result<u64, String> {
+        self.clear(previews).ok_or_else(|| "A correção está sendo aplicada.".into())
+    }
+
+    fn accept(&self, generation: u64, pending: PendingEyes) -> bool {
+        let mut state = self.0.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+        if state.generation != generation { return false; }
+        state.pending = Some(pending);
+        true
+    }
+
+    fn is_applying(&self) -> bool {
+        self.0.lock().unwrap_or_else(std::sync::PoisonError::into_inner).applying
+    }
+
+    fn claim_for_apply(&self, token: &str, session_id: &str) -> Option<PendingEyes> {
+        let mut state = self.0.lock().ok()?;
+        if state.applying { return None; }
+        let pending = state.pending.as_ref().filter(|pending|
+            pending.token == token && pending.session_id == session_id
+        )?.clone();
+        state.applying = true;
+        Some(pending)
+    }
+
+    fn release_apply(&self) {
+        self.0.lock().unwrap_or_else(std::sync::PoisonError::into_inner).applying = false;
+    }
+
+    fn finish(&self) {
+        let mut state = self.0.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+        state.generation = state.generation.wrapping_add(1);
+        state.pending = None;
+        state.applying = false;
+    }
+}
+
+#[tauri::command]
+pub(crate) async fn prepare_eye_correction(
+    window: WebviewWindow,
+    session_id: String,
+    target_media_id: String,
+    reference_media_id: String,
+    target_face: Face,
+    reference_face: Face,
+    viewer: State<'_, ViewerStore>,
+    corrections: State<'_, CorrectionStore>,
+    previews: State<'_, CachePreviewRegistry>,
+    host: State<'_, ProjectHost>,
+) -> Result<PreparedEyes, String> {
+    if window.label() != PROJECT_WINDOW_LABEL { return Err("A correção só pode ser preparada pelo Projeto.".into()); }
+    if viewer.current()?.as_ref().is_none_or(|current|
+        current.session_id != session_id || current.media_id != target_media_id
+    ) { return Err("Esta sessão do visualizador não está mais ativa.".into()); }
+    let catalog = host.authorized_media_catalog()?;
+    let target = catalog.bindings.iter().find(|binding| binding.media_id == target_media_id && binding.kind == myalbuns_core::MediaKind::Photo)
+        .ok_or("A foto de destino não pertence ao projeto.")?;
+    let reference = catalog.bindings.iter().find(|binding| binding.media_id == reference_media_id && binding.kind == myalbuns_core::MediaKind::Photo)
+        .ok_or("A foto de referência não pertence ao projeto.")?;
+    if target.media_id == reference.media_id { return Err("Escolha outra foto como referência.".into()); }
+    let output = eye_correction::corrected_path(&host.project_directory()?, &target.logical_path)?;
+    let target_path = target.logical_path.clone();
+    let reference_path = reference.logical_path.clone();
+    let generation = corrections.begin(&previews)?;
+    let output_for_render = output.clone();
+    let rendered = tauri::async_runtime::spawn_blocking(move ||
+        eye_correction::render(&target_path, &reference_path, &target_face, &reference_face, &output_for_render)
+    ).await.map_err(|_| "A correção foi interrompida.".to_string());
+    let bytes = match rendered {
+        Ok(Ok(bytes)) => bytes,
+        Ok(Err(error)) => { let _ = std::fs::remove_file(&output); let _ = std::fs::remove_file(output.with_extension("tmp")); return Err(error); }
+        Err(error) => { let _ = std::fs::remove_file(&output); let _ = std::fs::remove_file(output.with_extension("tmp")); return Err(error); }
+    };
+    let url = previews.publish_viewer_preview(bytes);
+    let token = uuid::Uuid::new_v4().to_string();
+    let pending = PendingEyes { session_id, media_id: target_media_id, token: token.clone(), path: output.clone(), url: url.clone() };
+    if !corrections.accept(generation, pending) {
+        previews.revoke_viewer_preview(&url);
+        let _ = std::fs::remove_file(output);
+        return Err("A correção foi cancelada.".into());
+    }
+    Ok(PreparedEyes { token, url })
+}
+
+#[tauri::command]
+pub(crate) fn cancel_eye_correction(
+    window: WebviewWindow,
+    corrections: State<'_, CorrectionStore>,
+    previews: State<'_, CachePreviewRegistry>,
+) -> Result<(), String> {
+    if window.label() != PROJECT_WINDOW_LABEL { return Err("A correção só pode ser cancelada pelo Projeto.".into()); }
+    corrections.clear(&previews).ok_or("A correção está sendo aplicada.")?;
+    Ok(())
+}
+
+#[tauri::command]
+pub(crate) async fn apply_eye_correction(
+    app: AppHandle,
+    window: WebviewWindow,
+    session_id: String,
+    token: String,
+    viewer: State<'_, ViewerStore>,
+    corrections: State<'_, CorrectionStore>,
+    previews: State<'_, CachePreviewRegistry>,
+    host: State<'_, ProjectHost>,
+) -> Result<myalbuns_core::EditorProjection, String> {
+    if window.label() != PROJECT_WINDOW_LABEL { return Err("A correção só pode ser aplicada pelo Projeto.".into()); }
+    let pending = corrections.claim_for_apply(&token, &session_id).ok_or("A prévia da correção expirou.")?;
+    let result = async {
+    if viewer.current()?.as_ref().is_none_or(|current|
+        current.session_id != session_id || current.media_id != pending.media_id
+    ) { return Err("Esta sessão do visualizador não está mais ativa.".into()); }
+    let _operation = crate::project_ui_operations::begin(&app)?;
+    let catalog = host.authorized_media_catalog()?;
+    let binding = catalog.bindings.iter().find(|binding| binding.media_id == pending.media_id)
+        .ok_or("A foto não pertence mais ao projeto.")?.clone();
+    let mut paths = myalbuns_paths::OperationPathContext::new();
+    let cache_root = app.state::<crate::cache_service::ActiveCacheNamespace>().namespace().paths().root().to_path_buf();
+    paths.capture(&cache_root).map_err(|error| error.to_string())?;
+    for media in &catalog.bindings { paths.capture(&media.logical_path).map_err(|error| error.to_string())?; }
+    paths.capture(&pending.path).map_err(|error| error.to_string())?;
+    let roots = paths.freeze();
+    let mut progress = ImageProcessingBatch::new(1, |_| {});
+    project_media_reference::change_in_app(&app, binding, pending.path.clone(), roots, MediaChangeKind::Replace, &mut progress).await
+    }.await;
+    match result {
+        Ok(projection) => {
+            corrections.finish();
+            previews.revoke_viewer_preview(&pending.url);
+            Ok(projection)
+        }
+        Err(error) => {
+            corrections.release_apply();
+            let session_active = viewer.current().ok().flatten()
+                .is_some_and(|current| current.session_id == session_id);
+            if !session_active { let _ = corrections.clear(&previews); }
+            Err(error)
+        }
+    }
+}
 fn retire(app: &AppHandle, owner: &WebviewWindow, session_id: &str) {
     let store = app.state::<ViewerStore>();
     if store
@@ -270,6 +450,7 @@ fn retire(app: &AppHandle, owner: &WebviewWindow, session_id: &str) {
         && current.session_id == session_id
     {
         let _ = store.clear(session_id);
+        let _ = app.state::<CorrectionStore>().clear(&app.state::<CachePreviewRegistry>());
         app.state::<CachePreviewRegistry>().set_viewer_access(false);
         let _ = owner.emit(CLOSED_EVENT, current.session_id);
     }
@@ -294,6 +475,27 @@ pub(crate) fn retire_for_editor_recovery(app: &AppHandle) -> Result<(), String> 
 mod tests {
     use super::*;
 
+    #[test]
+    fn applying_correction_keeps_derivative_until_mutation_finishes() {
+        let path = std::env::temp_dir().join(format!("myalbuns-eye-{}.png", uuid::Uuid::new_v4()));
+        std::fs::write(&path, b"prepared derivative").unwrap();
+        let previews = CachePreviewRegistry::new(LABEL);
+        let url = previews.publish_viewer_preview(vec![1, 2, 3]);
+        let corrections = CorrectionStore::default();
+        assert!(corrections.accept(0, PendingEyes {
+            session_id: "session".into(), media_id: "target".into(),
+            token: "token".into(), path: path.clone(), url,
+        }));
+        assert!(corrections.claim_for_apply("token", "session").is_some());
+        assert!(corrections.clear(&previews).is_none());
+        assert!(path.exists(), "cancellation must not unlink a derivative during commit");
+        assert!(corrections.is_applying());
+        // A failed commit after viewer retirement releases ownership, then discards the orphan.
+        corrections.release_apply();
+        assert!(corrections.clear(&previews).is_some());
+        assert!(!path.exists(), "a failed retired commit must discard its orphan");
+    }
+
     fn presentation(session_id: &str, revision: u64, media_id: &str) -> ViewerPresentation {
         ViewerPresentation {
             session_id: session_id.into(),
@@ -304,6 +506,7 @@ mod tests {
             state: crate::ipc_contract::ViewerPreviewState::Loading,
             can_previous: false,
             can_next: true,
+            correction: None,
         }
     }
 
@@ -318,4 +521,33 @@ mod tests {
         assert!(store.clear("one").unwrap());
         store.replace(presentation("two", 1, "d")).unwrap();
     }
+}
+
+
+
+#[derive(Clone, Debug, serde::Deserialize, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct CorrectionAction {
+    session_id: String,
+    kind: String,
+    reference_media_id: Option<String>,
+    target_face: Option<Face>,
+    reference_face: Option<Face>,
+}
+
+#[tauri::command]
+pub(crate) fn act_image_viewer_correction(
+    app: AppHandle,
+    window: WebviewWindow,
+    action: CorrectionAction,
+    store: State<'_, ViewerStore>,
+) -> Result<(), String> {
+    if window.label() != LABEL || !matches!(action.kind.as_str(), "start" | "browse" | "select" | "preview" | "apply" | "cancel") {
+        return Err("Ação do visualizador inválida.".into());
+    }
+    if store.current()?.as_ref().is_none_or(|current| current.session_id != action.session_id) {
+        return Ok(());
+    }
+    app.emit_to(PROJECT_WINDOW_LABEL, "myalbuns://image-viewer-correction", action)
+        .map_err(|error| error.to_string())
 }

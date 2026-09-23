@@ -28,6 +28,7 @@ mod global_runtime;
 mod graphics_launch_gate;
 mod image_processing;
 mod image_viewer_window;
+mod eye_correction;
 mod image_work_admission;
 mod imaging_processor;
 #[cfg(test)]
@@ -410,6 +411,22 @@ mod tests {
                 .iter()
                 .all(|window| { window["decorations"] == serde_json::Value::Bool(false) })
         );
+    }
+
+    #[test]
+    fn eye_correction_commands_preserve_viewer_and_project_authority() {
+        let viewer: serde_json::Value =
+            serde_json::from_str(include_str!("../permissions/image-viewer.json")).unwrap();
+        let project: serde_json::Value =
+            serde_json::from_str(include_str!("../permissions/project-window.json")).unwrap();
+        let viewer = allowed_commands(&viewer);
+        let project = allowed_commands(&project);
+        assert!(viewer.contains("act_image_viewer_correction"));
+        assert!(!project.contains("act_image_viewer_correction"));
+        for command in ["prepare_eye_correction", "cancel_eye_correction", "apply_eye_correction"] {
+            assert!(project.contains(command));
+            assert!(!viewer.contains(command));
+        }
     }
 
     #[test]

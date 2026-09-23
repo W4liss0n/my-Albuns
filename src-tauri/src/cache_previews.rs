@@ -91,6 +91,27 @@ impl CachePreviewRegistry {
             .unwrap_or_else(std::sync::PoisonError::into_inner) = enabled;
     }
 
+    pub(crate) fn publish_viewer_preview(&self, bytes: Vec<u8>) -> String {
+        let token = format!("{}.png", uuid::Uuid::new_v4().simple());
+        self.publication
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .previews_by_token
+            .insert(token.clone(), Arc::new(PreparedCachePreview {
+                format: ImageFormat::Png,
+                bytes,
+            }));
+        opaque_image_url(CACHE_MEDIA_PROTOCOL_SCHEME, &token)
+    }
+
+    pub(crate) fn revoke_viewer_preview(&self, url: &str) {
+        let mut publication = self.publication
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        publication.previews_by_token.retain(|token, _| {
+            opaque_image_url(CACHE_MEDIA_PROTOCOL_SCHEME, token) != url
+        });
+    }
     pub(crate) fn is_published_url(&self, url: &str) -> bool {
         self.publication
             .lock()

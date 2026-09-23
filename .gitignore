@@ -19,3 +19,4 @@ benchmark-data/albums/*
 !benchmark-data/albums/README.md
 *.log
 .DS_Store
+.scratch/eye-correction/
