@@ -34,10 +34,14 @@ export async function detectFaces(image: HTMLImageElement): Promise<Face[]> {
   });
 }
 
-export function faceCenter(face: Face) {
-  const points = [face[33], face[263], face[1], face[152]].filter(Boolean);
-  return {
-    x: points.reduce((sum, point) => sum + point.x, 0) / points.length,
-    y: points.reduce((sum, point) => sum + point.y, 0) / points.length,
-  };
+export function faceBounds(face: Face) {
+  let left = Infinity, top = Infinity, right = -Infinity, bottom = -Infinity;
+  for (const point of face) {
+    if (!Number.isFinite(point.x) || !Number.isFinite(point.y)) continue;
+    left = Math.min(left, point.x);
+    top = Math.min(top, point.y);
+    right = Math.max(right, point.x);
+    bottom = Math.max(bottom, point.y);
+  }
+  return Number.isFinite(left) && right > left && bottom > top ? { left, top, right, bottom } : null;
 }

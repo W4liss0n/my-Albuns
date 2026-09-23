@@ -15760,7 +15760,7 @@
       "implementationPath": "/image-viewer.html?preview=correction-browse&qa=1&fixture=faces",
       "comparison": {
         "implementationCaptureSelector": ".image-viewer-window",
-        "reason": "Design 0050: painéis divididos sem nomes de arquivo e ferramentas flutuantes no canto superior direito",
+        "reason": "Design 0050: fotografias inteiras sem rótulos e ferramentas em uma cápsula no canto superior direito",
         "kind": "implementation-only",
         "surface": "image-viewer"
       },
@@ -15773,11 +15773,11 @@
     },
     {
       "id": "image-viewer-correction-select-faces",
-      "title": "Correção de olhos — rostos selecionáveis (fixture visual determinística)",
+      "title": "Correção de olhos — caixas de rostos selecionáveis (fixture visual determinística)",
       "implementationPath": "/image-viewer.html?preview=correction-select&qa=1&fixture=faces",
       "comparison": {
         "implementationCaptureSelector": ".image-viewer-window",
-        "reason": "Design 0050: marcadores discretos ancorados aos rostos; fixture visual sem validar detecção",
+        "reason": "Design 0050: caixas delimitadas pelos pontos do rosto; fixture visual sem validar detecção",
         "kind": "implementation-only",
         "surface": "image-viewer"
       },
@@ -15786,6 +15786,23 @@
       "actions": [
         { "type": "click", "selector": "button[aria-label='Referência: rosto 1']" },
         { "type": "click", "selector": "button[aria-label='Imagem a corrigir: rosto 1']" }
+      ]
+    },
+    {
+      "id": "image-viewer-correction-bbox-zoom",
+      "title": "Correção de olhos — caixa do rosto ampliada (fixture visual determinística)",
+      "implementationPath": "/image-viewer.html?preview=correction-select&qa=1&fixture=faces",
+      "comparison": {
+        "implementationCaptureSelector": ".image-viewer-window",
+        "reason": "Design 0050: a caixa acompanha o enquadramento e permanece recortada na foto ampliada; fixture visual sem validar detecção",
+        "kind": "implementation-only",
+        "surface": "image-viewer"
+      },
+      "viewport": { "height": 720, "width": 1050 },
+      "readySelector": ".eye-correction__pane:last-child .eye-correction__face[aria-pressed='true']",
+      "actions": [
+        { "type": "click", "selector": "button[aria-label='Imagem a corrigir: rosto 1']" },
+        { "type": "wheel", "selector": ".eye-correction__pane:last-child .eye-correction__pane-image", "deltaY": -450 }
       ]
     },
     {

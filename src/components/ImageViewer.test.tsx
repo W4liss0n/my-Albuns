@@ -95,13 +95,11 @@ test("a correction preview compares only the target and saves once even while sh
   } };
   render(<ImageViewer presentation={presentation} onNavigate={vi.fn()} onClose={vi.fn()} onCorrection={onCorrection} />);
   expect(screen.getByRole("img", { name: "Imagem a" })).toHaveAttribute("src", "data:image/png;id=corrected");
-  expect(screen.getByText("Corrigida", { selector: ".eye-correction__pane-label" })).toBeInTheDocument();
   const reference = screen.getByRole("img", { name: "Outra foto.jpg" });
   const compare = screen.getByRole("button", { name: "Antes e depois: mostrar original" });
   expect(compare).toHaveAttribute("aria-pressed", "false");
   fireEvent.click(compare);
   expect(screen.getByRole("img", { name: "Imagem a" })).toHaveAttribute("src", initial.url);
-  expect(screen.getByText("Original", { selector: ".eye-correction__pane-label" })).toBeInTheDocument();
   expect(reference).toHaveAttribute("src", "data:image/png;id=reference");
   expect(screen.getByRole("button", { name: "Antes e depois: mostrar correção" })).toHaveAttribute("aria-pressed", "true");
   expect(onCorrection).not.toHaveBeenCalled();
@@ -212,31 +210,52 @@ test("correction tooltips follow focus and close when focus leaves the group", a
   await waitFor(() => expect(screen.queryByRole("tooltip")).not.toBeInTheDocument());
 });
 
-test("face markers expose selection and unlock preview only after both faces are chosen", async () => {
-  const face = Array.from({ length: 264 }, () => ({ x: .5, y: .5, z: 0 }));
-  vi.mocked(detectFaces).mockResolvedValue([face]);
+test("face bounds track fit and zoom, clip off-image faces, and allow pan without accidental selection", async () => {
+  const edge = [{ x: .03, y: .25, z: 0 }, { x: .15, y: .55, z: 0 }];
+  const center = [{ x: .4, y: .25, z: 0 }, { x: .6, y: .55, z: 0 }];
+  vi.mocked(detectFaces).mockResolvedValue([edge, center]);
+  const width = vi.spyOn(Element.prototype, "clientWidth", "get").mockReturnValue(600);
+  const height = vi.spyOn(Element.prototype, "clientHeight", "get").mockReturnValue(500);
   const onCorrection = vi.fn();
   const presentation: ViewerPresentation = { ...initial, correction: {
     phase: "select", referenceMediaId: "reference", referenceName: "Referência.jpg", referenceUrl: "data:image/png;id=reference",
     referenceState: "ready", canPreviousReference: false, canNextReference: false, resultUrl: null, error: null,
   } };
-  render(<ImageViewer presentation={presentation} onNavigate={vi.fn()} onClose={vi.fn()} onCorrection={onCorrection} />);
-  for (const image of screen.getAllByRole("img")) {
-    Object.defineProperties(image, { naturalWidth: { configurable: true, value: 800 }, naturalHeight: { configurable: true, value: 1200 } });
-    fireEvent.load(image);
-  }
-  const target = await screen.findByRole("button", { name: "Imagem a corrigir: rosto 1" });
-  const reference = screen.getByRole("button", { name: "Referência: rosto 1" });
-  const preview = screen.getByRole("button", { name: "Ver correção" });
-  expect(preview).toBeDisabled();
-  fireEvent.click(target);
-  expect(target).toHaveAttribute("aria-pressed", "true");
-  expect(preview).toBeDisabled();
-  fireEvent.click(reference);
-  expect(reference).toHaveAttribute("aria-pressed", "true");
-  expect(preview).toBeEnabled();
-  fireEvent.click(preview);
-  expect(onCorrection).toHaveBeenCalledWith(expect.objectContaining({ kind: "preview", targetFace: face, referenceFace: face }));
+  try {
+    const view = render(<ImageViewer presentation={presentation} onNavigate={vi.fn()} onClose={vi.fn()} onCorrection={onCorrection} />);
+    for (const image of screen.getAllByRole("img")) {
+      Object.defineProperties(image, { naturalWidth: { configurable: true, value: 800 }, naturalHeight: { configurable: true, value: 1200 } });
+      fireEvent.load(image);
+    }
+    const target = await screen.findByRole("button", { name: "Imagem a corrigir: rosto 2" });
+    const reference = screen.getByRole("button", { name: "Referência: rosto 1" });
+    const pane = view.container.querySelectorAll<HTMLElement>(".eye-correction__pane-image")[1];
+    const layer = pane.querySelector<HTMLElement>(".eye-correction__face-layer")!;
+    const fittedWidth = (500 - 48) * 800 / 1200;
+    expect(parseFloat(layer.style.width)).toBeCloseTo(fittedWidth);
+    expect(parseFloat(layer.style.left) + .4 * parseFloat(layer.style.width)).toBeCloseTo(300 - .1 * fittedWidth);
+    expect(parseFloat(target.style.left)).toBeCloseTo(40);
+    expect(parseFloat(target.style.width)).toBeCloseTo(20);
+    expect(screen.getByRole("button", { name: "Ver correção" })).toBeDisabled();
+    fireEvent.click(reference);
+    expect(reference).toHaveAttribute("aria-pressed", "true");
+    fireEvent.wheel(pane, { deltaY: -700 });
+    expect(screen.queryByRole("button", { name: "Imagem a corrigir: rosto 1" })).not.toBeInTheDocument();
+    expect(parseFloat(layer.style.width)).toBeGreaterThan(fittedWidth * 4);
+    const beforePan = parseFloat(layer.style.left);
+    pane.setPointerCapture = vi.fn(); pane.releasePointerCapture = vi.fn();
+    fireEvent.pointerDown(target, { pointerId: 1, button: 0, clientX: 200, clientY: 250 });
+    fireEvent.pointerMove(pane, { pointerId: 1, clientX: 250, clientY: 250 });
+    fireEvent.pointerUp(pane, { pointerId: 1 });
+    expect(parseFloat(layer.style.left)).toBeCloseTo(beforePan + 50);
+    fireEvent.click(target);
+    expect(target).toHaveAttribute("aria-pressed", "false");
+    fireEvent.click(target);
+    expect(target).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: "Ver correção" })).toBeEnabled();
+    fireEvent.click(screen.getByRole("button", { name: "Ver correção" }));
+    expect(onCorrection).toHaveBeenCalledWith(expect.objectContaining({ kind: "preview", targetFace: center, referenceFace: edge }));
+  } finally { width.mockRestore(); height.mockRestore(); }
 });
 
 test("long correction errors expose the full message through the shared tooltip", async () => {
