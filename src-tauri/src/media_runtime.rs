@@ -92,6 +92,10 @@ impl MediaObservation {
     pub(crate) fn logical_path(&self) -> &std::path::Path {
         &self.logical_path
     }
+
+    pub(crate) fn source_bytes(&self) -> Option<u64> {
+        self.source_bytes
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]

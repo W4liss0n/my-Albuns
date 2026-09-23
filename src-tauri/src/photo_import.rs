@@ -136,30 +136,68 @@ impl PhotoImportAttempt {
         if !self.roots.covers(self.namespace.paths().root()) {
             return Vec::new();
         }
-        let candidates = self
+        let sources = self
             .sources
             .iter()
             .filter(|source| self.roots.covers(source.candidate.path()))
-            .map(|source| source.candidate.clone())
             .collect::<Vec<_>>();
-        let batch_size = candidates
-            .len()
-            .div_ceil(capacity)
-            .clamp(1, PHOTO_IMPORT_PROCESS_BATCH);
-        candidates
-            .chunks(batch_size)
-            .map(|candidates| PhotoImportRequest {
+        // The compressed size already observed at capture ranks decode work
+        // closely enough to balance batches without reading the Originals again.
+        let work = sources
+            .iter()
+            .map(|source| source.before.source_bytes().unwrap_or(0))
+            .collect::<Vec<_>>();
+        balanced_batches(&work, capacity)
+            .into_iter()
+            .map(|batch| PhotoImportRequest {
                 protocol_version: IMAGING_PROTOCOL_VERSION,
                 request_id: format!("import-{}", uuid::Uuid::new_v4().simple()),
                 attempt_id: self.id.clone(),
                 project_id: self.catalog.project_id.clone(),
                 cache_paths: self.namespace.paths().clone(),
-                candidates: candidates.to_vec(),
+                candidates: batch
+                    .into_iter()
+                    .map(|index| sources[index].candidate.clone())
+                    .collect(),
                 policy: CacheRepresentationPolicy::measured_v1(),
                 root_bindings: self.roots.clone(),
             })
             .collect()
     }
+}
+
+/// Selection order often groups similar cameras, so contiguous chunks leave
+/// workers idle behind the heaviest batch. Assigning the largest remaining
+/// source to the lightest batch keeps every wave of `capacity` processes
+/// busy; each batch keeps the selection order of its members.
+fn balanced_batches(work: &[u64], capacity: usize) -> Vec<Vec<usize>> {
+    if work.is_empty() {
+        return Vec::new();
+    }
+    let capacity = capacity.max(1);
+    let waves = work
+        .len()
+        .div_ceil(capacity.saturating_mul(PHOTO_IMPORT_PROCESS_BATCH));
+    let batch_count = capacity.saturating_mul(waves).min(work.len());
+    let mut heaviest_first = (0..work.len()).collect::<Vec<_>>();
+    heaviest_first.sort_by(|left, right| work[*right].cmp(&work[*left]).then(left.cmp(right)));
+    let mut batches = vec![(0_u64, Vec::new()); batch_count];
+    for index in heaviest_first {
+        let (load, members) = batches
+            .iter_mut()
+            .filter(|(_, members)| members.len() < PHOTO_IMPORT_PROCESS_BATCH)
+            .min_by_key(|(load, members)| (*load, members.len()))
+            .expect("the batch count covers every source within the batch limit");
+        *load = load.saturating_add(work[index]);
+        members.push(index);
+    }
+    batches
+        .into_iter()
+        .map(|(_, mut members)| {
+            members.sort_unstable();
+            members
+        })
+        .collect()
 }
 
 pub(crate) async fn import_selected_media(
@@ -992,6 +1030,49 @@ mod tests {
                 reason: "Prévias temporárias indisponível".into(),
             },
         }
+    }
+
+    #[test]
+    fn balanced_batches_cover_each_source_once_within_the_batch_limit() {
+        for (count, capacity) in [
+            (1_usize, 8_usize),
+            (7, 8),
+            (8, 8),
+            (88, 8),
+            (256, 8),
+            (300, 8),
+            (70, 2),
+        ] {
+            let work = (0..count)
+                .map(|index| if index % 3 == 0 { 24 } else { 6 })
+                .collect::<Vec<u64>>();
+            let batches = balanced_batches(&work, capacity);
+            let waves = count.div_ceil(capacity * PHOTO_IMPORT_PROCESS_BATCH);
+            assert_eq!(batches.len(), (capacity * waves).min(count));
+            let mut seen = batches.iter().flatten().copied().collect::<Vec<_>>();
+            seen.sort_unstable();
+            assert_eq!(seen, (0..count).collect::<Vec<_>>());
+            for batch in &batches {
+                assert!(!batch.is_empty() && batch.len() <= PHOTO_IMPORT_PROCESS_BATCH);
+                assert!(batch.windows(2).all(|pair| pair[0] < pair[1]));
+            }
+        }
+    }
+
+    #[test]
+    fn balanced_batches_spread_heavy_sources_grouped_by_selection_order() {
+        // A folder often lists every heavy camera file before the light ones.
+        let work = [vec![24_u64; 30], vec![6_u64; 58]].concat();
+        let batches = balanced_batches(&work, 8);
+        let loads = batches
+            .iter()
+            .map(|batch| batch.iter().map(|index| work[*index]).sum::<u64>())
+            .collect::<Vec<_>>();
+        let ideal = work.iter().sum::<u64>().div_ceil(8);
+        let heaviest = *loads.iter().max().unwrap();
+        assert!(heaviest <= ideal + 24, "loads {loads:?}, ideal {ideal}");
+        // The previous contiguous chunks of 11 made the first batches 264 units.
+        assert!(heaviest < 11 * 24);
     }
 
     #[test]
