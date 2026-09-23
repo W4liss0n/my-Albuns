@@ -188,10 +188,10 @@ test("keeps media hover and selection on the straight image border", () => {
     /\.media-preview-card\[data-dimmed="true"\] \.media-preview-thumbnail img\s*\{[^}]*opacity:\s*0\.45;/s,
   );
   expect(mediaPreviewCardStyles).toMatch(
-    /\.media-preview-card:focus-visible \.media-preview-thumbnail\s*\{[^}]*outline:\s*1px solid var\(--ui-focus-neutral\);/s,
+    /\.media-preview-card:focus-visible \.media-preview-thumbnail\s*\{[^}]*border-color:\s*var\(--ui-focus-neutral\);[^}]*outline:\s*0;/s,
   );
   expect(mediaPreviewCardStyles).not.toMatch(
-    /\.media-preview-card:focus(?:-visible)? \.media-preview-thumbnail\s*\{[^}]*border-color:/s,
+    /\.media-preview-card:focus(?:-visible)? \.media-preview-thumbnail\s*\{[^}]*(?:outline:\s*[1-9]|box-shadow:)/s,
   );
 });
 
