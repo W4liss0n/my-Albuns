@@ -221,7 +221,7 @@ impl OpenRenderSource {
         }
     }
 
-    pub(crate) fn decode_preview(self) -> Result<DynamicImage, SourceFailure> {
+    pub(crate) fn decode_preview(self) -> Result<PreviewRaster, SourceFailure> {
         // Progressive JPEG keeps its bounded worker and RGBA transport. Other
         // formats keep the canonical normalization, including alpha and 16-bit.
         match self.preflight {
@@ -232,9 +232,15 @@ impl OpenRenderSource {
                 let raw = decode_jpeg_raw(self.reader, &preflight)?;
                 let image = RgbImage::from_raw(preflight.width, preflight.height, raw)
                     .ok_or_else(decoded_size_failure)?;
-                apply_orientation(image, preflight.orientation).map(DynamicImage::ImageRgb8)
+                Ok(PreviewRaster {
+                    image: DynamicImage::ImageRgb8(image),
+                    pending: preflight.orientation,
+                })
             }
-            _ => self.decode().map(DynamicImage::ImageRgba8),
+            _ => self.decode().map(|image| PreviewRaster {
+                image: DynamicImage::ImageRgba8(image),
+                pending: Orientation::NoTransforms,
+            }),
         }
     }
 
@@ -256,6 +262,52 @@ impl OpenRenderSource {
 }
 
 /// Inspects the bytes whose digest the Cache just recorded.
+/// A decoded Original for the reduced representation. Its EXIF orientation may
+/// still be pending, so the reduction can orient far fewer pixels.
+pub(crate) struct PreviewRaster {
+    pub(crate) image: DynamicImage,
+    pub(crate) pending: Orientation,
+}
+
+impl PreviewRaster {
+    pub(crate) fn oriented_dimensions(&self) -> (u32, u32) {
+        let (width, height) = (self.image.width(), self.image.height());
+        if transposes(self.pending) {
+            (height, width)
+        } else {
+            (width, height)
+        }
+    }
+
+    /// Applies the pending orientation to an already reduced raster.
+    pub(crate) fn orient(
+        image: DynamicImage,
+        orientation: Orientation,
+    ) -> Result<DynamicImage, SourceFailure> {
+        match image {
+            DynamicImage::ImageRgb8(image) => {
+                apply_orientation(image, orientation).map(DynamicImage::ImageRgb8)
+            }
+            DynamicImage::ImageRgba8(image) => {
+                apply_orientation(image, orientation).map(DynamicImage::ImageRgba8)
+            }
+            other => {
+                apply_orientation(other.into_rgba8(), orientation).map(DynamicImage::ImageRgba8)
+            }
+        }
+    }
+}
+
+pub(crate) fn transposes(orientation: Orientation) -> bool {
+    matches!(
+        orientation,
+        Orientation::Rotate90
+            | Orientation::Rotate270
+            | Orientation::Rotate90FlipH
+            | Orientation::Rotate270FlipH
+    )
+}
+
 pub(crate) fn open_cache_bytes(bytes: Vec<u8>) -> Result<OpenRenderSource, SourceFailure> {
     let source_bytes = bytes.len() as u64;
     inspect_reader(
@@ -1573,12 +1625,10 @@ fn apply_orientation<P: Pixel<Subpixel = u8>>(
         return Ok(image);
     }
     let (source_width, source_height) = image.dimensions();
-    let (width, height) = match orientation {
-        Orientation::Rotate90
-        | Orientation::Rotate270
-        | Orientation::Rotate90FlipH
-        | Orientation::Rotate270FlipH => (source_height, source_width),
-        _ => (source_width, source_height),
+    let (width, height) = if transposes(orientation) {
+        (source_height, source_width)
+    } else {
+        (source_width, source_height)
     };
     let byte_count = u64::from(width)
         .checked_mul(u64::from(height))
@@ -1722,37 +1772,33 @@ mod render_source_tests {
         for orientation in 1..=8 {
             let mut bytes = jpeg.clone();
             insert_exif_orientation(&mut bytes, orientation);
-            let canonical = image::DynamicImage::ImageRgba8(decode_fixture(&bytes).unwrap());
+            let canonical = decode_fixture(&bytes).unwrap();
             let preview = open_fixture(&bytes).unwrap().decode_preview().unwrap();
-            assert!(preview.as_rgb8().is_some());
-            assert_eq!(preview.to_rgba8(), canonical.to_rgba8());
-            for edge in [1, 31, 1600] {
-                let canonical = if edge < 97 {
-                    canonical.thumbnail(edge, edge)
-                } else {
-                    canonical.clone()
-                };
-                let preview = if edge < 97 {
-                    preview.thumbnail(edge, edge)
-                } else {
-                    preview.clone()
-                };
-                assert_eq!(preview.to_rgba8(), canonical.to_rgba8());
-                let mut expected = Vec::new();
-                let mut actual = Vec::new();
-                JpegEncoder::new_with_quality(&mut expected, 84)
-                    .encode_image(canonical.as_rgba8().unwrap())
-                    .unwrap();
-                JpegEncoder::new_with_quality(&mut actual, 84)
-                    .encode_image(preview.as_rgb8().unwrap())
-                    .unwrap();
-                assert_eq!(actual, expected);
-            }
+            assert!(preview.image.as_rgb8().is_some());
+            assert_eq!(preview.pending.to_exif(), orientation as u8);
+            assert_eq!(
+                preview.oriented_dimensions(),
+                (canonical.width(), canonical.height())
+            );
+            // Orientation is deferred for the fast RGB path; applying it later
+            // yields the canonical pixels and the same encoded preview bytes.
+            let oriented = super::PreviewRaster::orient(preview.image, preview.pending).unwrap();
+            assert_eq!(oriented.to_rgba8(), canonical);
+            let mut expected = Vec::new();
+            let mut actual = Vec::new();
+            JpegEncoder::new_with_quality(&mut expected, 84)
+                .encode_image(&canonical)
+                .unwrap();
+            JpegEncoder::new_with_quality(&mut actual, 84)
+                .encode_image(oriented.as_rgb8().unwrap())
+                .unwrap();
+            assert_eq!(actual, expected);
         }
         let gray = jpeg_fixture(None, ExtendedColorType::L8, &[73]);
         let preview = open_fixture(&gray).unwrap().decode_preview().unwrap();
-        assert!(preview.as_rgba8().is_some());
-        assert_eq!(preview.into_rgba8(), decode_fixture(&gray).unwrap());
+        assert!(preview.image.as_rgba8().is_some());
+        assert_eq!(preview.pending, image::metadata::Orientation::NoTransforms);
+        assert_eq!(preview.image.into_rgba8(), decode_fixture(&gray).unwrap());
     }
 
     #[test]

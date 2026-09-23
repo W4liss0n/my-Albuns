@@ -1,7 +1,10 @@
 use std::io::{BufReader, BufWriter, Write};
 
+use fast_image_resize::{
+    FilterType, PixelType, ResizeAlg, ResizeOptions, Resizer, images::Image as ResizeImage,
+};
 use image::{
-    DynamicImage, ExtendedColorType, GenericImageView, ImageEncoder,
+    DynamicImage, ExtendedColorType, ImageEncoder, RgbImage, RgbaImage,
     codecs::{jpeg::JpegEncoder, png::PngEncoder},
 };
 use myalbuns_imaging::preview::{CachePreviewSpec, SRGB_PROFILE, validate_cache_preview};
@@ -15,8 +18,8 @@ use myalbuns_paths::{AppPaths, ExpectedObject, PreparedCacheStorage};
 use crate::{
     cache_error::{CacheError, CacheWriteMonitor},
     source::{
-        MAX_DECODED_SOURCE_PIXELS_TOTAL, confirm_source_unchanged, open_cache_bytes,
-        read_fingerprinted_source,
+        MAX_DECODED_SOURCE_PIXELS_TOTAL, PreviewRaster, confirm_source_unchanged,
+        open_cache_bytes, read_fingerprinted_source, transposes,
     },
     write_response,
 };
@@ -270,16 +273,25 @@ pub(crate) struct PreviewOutput {
 pub(crate) fn write_preview(
     storage: &PreparedCacheStorage,
     policy: myalbuns_imaging_protocol::CacheRepresentationPolicy,
-    decoded: DynamicImage,
+    decoded: PreviewRaster,
     paths: impl FnOnce(CacheArtifactFormat) -> Result<(std::path::PathBuf, std::path::PathBuf), String>,
     verify_source: impl FnOnce() -> Result<(), String>,
 ) -> Result<PreviewOutput, CacheError> {
-    let (width, height) = decoded.dimensions();
+    let (width, height) = decoded.oriented_dimensions();
     let preview = if width > policy.max_edge_px || height > policy.max_edge_px {
-        decoded.thumbnail(policy.max_edge_px, policy.max_edge_px)
+        let (width, height) = reduced_dimensions(width, height, policy.max_edge_px);
+        // Reduce the raster as decoded, then orient only the reduced pixels.
+        let (width, height) = if transposes(decoded.pending) {
+            (height, width)
+        } else {
+            (width, height)
+        };
+        reduce(decoded.image, width, height)?
     } else {
-        decoded
+        decoded.image
     };
+    let preview =
+        PreviewRaster::orient(preview, decoded.pending).map_err(|failure| failure.message)?;
     let format = if preview
         .as_rgba8()
         .is_some_and(|rgba| rgba.pixels().any(|pixel| pixel[3] != u8::MAX))
@@ -362,4 +374,53 @@ pub(crate) fn write_preview(
         bytes: preview_bytes,
         format,
     })
+}
+
+/// The size rule of `DynamicImage::thumbnail` used by representation 1:
+/// preserve the aspect ratio and fit both edges within `max_edge`.
+fn reduced_dimensions(width: u32, height: u32, max_edge: u32) -> (u32, u32) {
+    let ratio = f64::min(
+        f64::from(max_edge) / f64::from(width),
+        f64::from(max_edge) / f64::from(height),
+    );
+    let edge = |value: u32| ((f64::from(value) * ratio).round() as u32).max(1);
+    (edge(width), edge(height))
+}
+
+/// Area-averaging reduction. Transparent pixels are weighted by alpha, so
+/// their hidden colour does not bleed into visible neighbours.
+fn reduce(image: DynamicImage, width: u32, height: u32) -> Result<DynamicImage, CacheError> {
+    let image = match image {
+        DynamicImage::ImageRgb8(_) | DynamicImage::ImageRgba8(_) => image,
+        other => DynamicImage::ImageRgba8(other.into_rgba8()),
+    };
+    let pixel_type = if image.as_rgb8().is_some() {
+        PixelType::U8x3
+    } else {
+        PixelType::U8x4
+    };
+    let failed = |error: &dyn std::fmt::Display| {
+        CacheError::from(format!("não foi possível reduzir a prévia: {error}"))
+    };
+    let source = ResizeImage::from_vec_u8(
+        image.width(),
+        image.height(),
+        image.into_bytes(),
+        pixel_type,
+    )
+    .map_err(|error| failed(&error))?;
+    let mut target = ResizeImage::new(width, height, pixel_type);
+    Resizer::new()
+        .resize(
+            &source,
+            &mut target,
+            &ResizeOptions::new().resize_alg(ResizeAlg::Convolution(FilterType::Box)),
+        )
+        .map_err(|error| failed(&error))?;
+    let pixels = target.into_vec();
+    let reduced = match pixel_type {
+        PixelType::U8x3 => RgbImage::from_raw(width, height, pixels).map(DynamicImage::ImageRgb8),
+        _ => RgbaImage::from_raw(width, height, pixels).map(DynamicImage::ImageRgba8),
+    };
+    reduced.ok_or_else(|| "a prévia reduzida não corresponde às dimensões esperadas".to_string().into())
 }

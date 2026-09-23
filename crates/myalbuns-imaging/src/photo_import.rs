@@ -1,4 +1,3 @@
-use image::GenericImageView;
 use myalbuns_imaging_protocol::{
     CacheArtifactProperties, CacheReusableGeneration, ImagingProgressStage, ImagingResponse,
     ImportedPhotoDimensions, ImportedPhotoPreview, PhotoImportCandidate, PhotoImportCompletion,
@@ -85,7 +84,7 @@ fn prepare_photo(
     let source_page_count = opened.source_page_count();
     let basic_color_profile = opened.basic_color_profile();
     let decoded = opened.decode_preview().map_err(|failure| failure.message)?;
-    let (width_px, height_px) = decoded.dimensions();
+    let (width_px, height_px) = decoded.oriented_dimensions();
     let dimensions = ImportedPhotoDimensions {
         width_px,
         height_px,
@@ -170,7 +169,7 @@ fn prepare_photo(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use image::{ImageFormat, Rgb, RgbImage};
+    use image::{GenericImageView, ImageFormat, Rgb, RgbImage};
     use myalbuns_imaging_protocol::{
         CacheRepresentationPolicy, IMAGING_PROTOCOL_VERSION, PhotoImportSourceId,
     };

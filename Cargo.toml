@@ -34,6 +34,10 @@ opt-level = 3
 [profile.dev.package.sha2]
 opt-level = 3
 
+# The reduced representation is resized by this crate's SIMD kernels.
+[profile.dev.package.fast_image_resize]
+opt-level = 3
+
 # Keep the desktop's eye-correction pixel work responsive without optimizing the whole app at level 3.
 [profile.dev.package.myalbuns-desktop]
 opt-level = 1

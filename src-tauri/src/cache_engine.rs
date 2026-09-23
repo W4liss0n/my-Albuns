@@ -5003,7 +5003,10 @@ mod tests {
             let metadata: serde_json::Value = serde_json::from_slice(&metadata_bytes)
                 .expect("the disposable index is valid JSON");
             assert_eq!(metadata["schemaVersion"], 6);
-            assert_eq!(metadata["representationVersion"], 1);
+            assert_eq!(
+                metadata["representationVersion"],
+                myalbuns_imaging_protocol::CACHE_REPRESENTATION_VERSION
+            );
             assert_eq!(metadata["policy"]["maxEdgePx"], 1_600);
             assert_eq!(metadata["entries"].as_array().map(Vec::len), Some(2));
             assert_eq!(metadata["entries"][0]["mediaId"], "photo-a");

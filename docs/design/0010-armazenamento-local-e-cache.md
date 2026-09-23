@@ -1,7 +1,7 @@
 ---
 status: accepted
 document: design
-updated: 2026-09-14
+updated: 2026-09-23
 ---
 
 # Armazenamento local e Cache
@@ -201,8 +201,19 @@ O maior lado mede no máximo `1.600 px`. Conteúdo opaco usa JPEG qualidade `84`
 O formato é propriedade do artefato derivado e integra seu caminho e o índice
 do Cache. Essa escolha não altera o original nem permite que a Exportação use a
 representação reduzida. Ambos os formatos carregam o perfil canônico
-`sRGB2014.icc`; a orientação EXIF/TIFF é aplicada exatamente uma vez antes da
-redução.
+`sRGB2014.icc`; a orientação EXIF/TIFF é aplicada exatamente uma vez.
+
+A representação versão `2` reduz o raster por média de área (filtro Box do
+crate `fast_image_resize`), com a mesma regra de dimensões da versão `1`:
+proporção preservada e maior lado de `1.600 px`. Pixels transparentes pesam
+pelo alfa, sem espalhar cor oculta. Em JPEG colorido não progressivo, a
+orientação EXIF é aplicada depois da redução, sobre os pixels já reduzidos;
+nos demais casos, continua aplicada na decodificação. O codificador JPEG, a
+qualidade `84`, a escolha de PNG e o perfil não mudaram. Na mesma máquina, a importação
+de 172 JPEGs levou de 10,1 a 11,9 s, contra 12,4 a 14,0 s na versão `1`.
+As prévias são visualmente equivalentes e têm contornos finos menos
+serrilhados. Trocar de versão invalida o índice e regenera uma vez as prévias
+existentes. Decisão aceita em 2026-09-23.
 
 O Processador aceita JPEG, PNG e TIFF de uma página e recusa TIFF multipágina.
 Antes de materializar o raster, impõe `134.217.728` pixels e `512 MiB` de
