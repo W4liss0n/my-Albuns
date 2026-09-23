@@ -41,3 +41,22 @@ test("wheel zoom allows bounded pan and fit restores whole image", () => {
     expect(image.style.transform).toBe("translate(0px, 0px) scale(1)");
   } finally { width.mockRestore(); height.mockRestore(); }
 });
+
+test("fit uses the stage padding for portrait geometry", () => {
+  const width = vi.spyOn(Element.prototype, "clientWidth", "get").mockReturnValue(600);
+  const height = vi.spyOn(Element.prototype, "clientHeight", "get").mockReturnValue(442);
+  const actualComputedStyle = window.getComputedStyle;
+  const computedStyle = vi.spyOn(window, "getComputedStyle").mockImplementation((element) =>
+    element.classList.contains("image-viewer__stage")
+      ? { paddingLeft: "24px", paddingRight: "24px", paddingTop: "24px", paddingBottom: "24px" } as CSSStyleDeclaration
+      : actualComputedStyle(element));
+  try {
+    render(<Harness />);
+    const image = screen.getByRole("img", { name: "Imagem a" });
+    Object.defineProperties(image, { naturalWidth: { configurable: true, value: 800 }, naturalHeight: { configurable: true, value: 1200 } });
+    fireEvent.load(image);
+    expect(parseFloat(image.style.width)).toBeCloseTo(394 * 800 / 1200);
+    expect(parseFloat(image.style.height)).toBe(394);
+    expect((442 - parseFloat(image.style.height)) / 2).toBe(24);
+  } finally { width.mockRestore(); height.mockRestore(); computedStyle.mockRestore(); }
+});

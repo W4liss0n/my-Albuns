@@ -13555,6 +13555,34 @@
       ]
     },
     {
+      "id": "image-viewer-portrait",
+      "title": "Visualizador — retrato inteiro com respiro",
+      "implementationPath": "/image-viewer.html?preview=normal",
+      "comparison": {
+        "implementationCaptureSelector": ".image-viewer-window",
+        "reason": "Design 0050: retrato proporcional e centralizado, com margem de pelo menos 24 px no encaixe",
+        "kind": "implementation-only",
+        "surface": "image-viewer"
+      },
+      "viewport": { "height": 720, "width": 1050 },
+      "readySelector": ".image-viewer__image[alt='Retrato.jpg'][style*='opacity: 1']",
+      "actions": [{ "type": "click", "selector": "button[aria-label='Imagem anterior']" }]
+    },
+    {
+      "id": "image-viewer-portrait-narrow",
+      "title": "Visualizador — retrato inteiro na janela estreita",
+      "implementationPath": "/image-viewer.html?preview=normal",
+      "comparison": {
+        "implementationCaptureSelector": ".image-viewer-window",
+        "reason": "Design 0050: o encaixe do retrato conserva 24 px de respiro também na janela estreita",
+        "kind": "implementation-only",
+        "surface": "image-viewer"
+      },
+      "viewport": { "height": 480, "width": 600 },
+      "readySelector": ".image-viewer__image[alt='Retrato.jpg'][style*='opacity: 1']",
+      "actions": [{ "type": "click", "selector": "button[aria-label='Imagem anterior']" }]
+    },
+    {
       "id": "image-viewer-missing",
       "title": "Visualizador — imagem ausente",
       "implementationPath": "/image-viewer.html?preview=missing",

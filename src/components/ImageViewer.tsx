@@ -21,7 +21,7 @@ export function ImageViewer({ presentation, onNavigate, onClose }: Props) {
   const [failedKey, setFailedKey] = useState<string | null>(null);
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
-  const [viewport, setViewport] = useState({ width: 0, height: 0 });
+  const [viewport, setViewport] = useState({ width: 0, height: 0, fitWidth: 0, fitHeight: 0 });
   const drag = useRef<{ x: number; y: number; panX: number; panY: number; pointerId: number } | null>(null);
   const ready = loaded?.key === imageKey && failedKey !== imageKey;
 
@@ -34,8 +34,15 @@ export function ImageViewer({ presentation, onNavigate, onClose }: Props) {
     const element = viewportRef.current;
     if (!element) return;
     const update = () => {
-      const next = { width: element.clientWidth, height: element.clientHeight };
-      setViewport((previous) => previous.width === next.width && previous.height === next.height ? previous : next);
+      const style = getComputedStyle(element);
+      const width = element.clientWidth;
+      const height = element.clientHeight;
+      const next = {
+        width, height,
+        fitWidth: Math.max(0, width - (parseFloat(style.paddingLeft) || 0) - (parseFloat(style.paddingRight) || 0)),
+        fitHeight: Math.max(0, height - (parseFloat(style.paddingTop) || 0) - (parseFloat(style.paddingBottom) || 0)),
+      };
+      setViewport((previous) => previous.width === width && previous.height === height && previous.fitWidth === next.fitWidth && previous.fitHeight === next.fitHeight ? previous : next);
     };
     update();
     if (typeof ResizeObserver === "undefined") return;
@@ -48,8 +55,8 @@ export function ImageViewer({ presentation, onNavigate, onClose }: Props) {
     return () => observer.disconnect();
   }, []);
 
-  const fittedScale = ready && viewport.width && viewport.height
-    ? Math.min(1, viewport.width / loaded.width, viewport.height / loaded.height) : 1;
+  const fittedScale = ready && viewport.fitWidth && viewport.fitHeight
+    ? Math.min(1, viewport.fitWidth / loaded.width, viewport.fitHeight / loaded.height) : 0;
   const fittedWidth = ready ? loaded.width * fittedScale : 0;
   const fittedHeight = ready ? loaded.height * fittedScale : 0;
   function boundedPan(next: { x: number; y: number }, nextZoom: number) {
@@ -93,7 +100,7 @@ export function ImageViewer({ presentation, onNavigate, onClose }: Props) {
         onPointerUp={(event) => { if (drag.current?.pointerId === event.pointerId) { drag.current = null; event.currentTarget.releasePointerCapture(event.pointerId); } }}
         onPointerCancel={() => { drag.current = null; }}>
         {url && <img alt={name} className="image-viewer__image" draggable={false} key={imageKey} src={url}
-          style={{ opacity: ready ? 1 : 0, transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})` }}
+          style={{ width: fittedWidth, height: fittedHeight, opacity: ready ? 1 : 0, transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})` }}
           onLoad={(event) => { setLoaded({ key: imageKey, width: event.currentTarget.naturalWidth, height: event.currentTarget.naturalHeight }); setFailedKey(null); }}
           onError={() => { setFailedKey(imageKey); setLoaded(null); }} />}
         {!ready && <p aria-live="polite" className="image-viewer__message" role="status">{message}</p>}
