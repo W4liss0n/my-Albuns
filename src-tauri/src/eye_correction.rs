@@ -61,8 +61,8 @@ fn eye(face: &Face, size: (u32, u32), corners: (usize, usize), lids: (usize, usi
 
 fn validate_pair(target: &[Eye; 2], reference: &[Eye; 2]) -> Result<(), String> {
     for (dst, src) in target.iter().zip(reference.iter()) {
-        if src.openness < 0.12 || src.openness < dst.openness * 1.35 {
-            return Err("Os olhos da referência precisam estar visivelmente mais abertos.".into());
+        if src.openness < 0.12 {
+            return Err("Os olhos da referência precisam estar abertos.".into());
         }
         if !(0.35..=3.0).contains(&(dst.width / src.width)) {
             return Err("Os rostos têm escalas muito diferentes para uma correção natural.".into());
@@ -222,6 +222,48 @@ pub(crate) fn corrected_path(project_folder: &Path, original: &Path) -> Result<P
     let stem = original.file_stem().and_then(|name| name.to_str()).unwrap_or("foto");
     let stem: String = stem.chars().filter(|character| character.is_alphanumeric() || matches!(character, '-' | '_')).take(48).collect();
     Ok(folder.join(format!("{stem}-olhos-{}.png", uuid::Uuid::new_v4().simple())))
+}
+
+#[cfg(test)]
+mod validation_tests {
+    use super::*;
+
+    fn eyes(widths: [f32; 2], openings: [f32; 2]) -> [Eye; 2] {
+        std::array::from_fn(|index| Eye {
+            center: V2 { x: 0.0, y: 0.0 },
+            along: V2 { x: 1.0, y: 0.0 },
+            width: widths[index],
+            openness: openings[index],
+        })
+    }
+
+    #[test]
+    fn accepts_open_reference_with_similar_target_opening() {
+        assert!(validate_pair(&eyes([24.0, 24.0], [0.18, 0.19]), &eyes([24.0, 24.0], [0.18, 0.18])).is_ok());
+    }
+
+    #[test]
+    fn accepts_reference_when_one_target_eye_is_already_open() {
+        assert!(validate_pair(&eyes([24.0, 24.0], [0.04, 0.20]), &eyes([24.0, 24.0], [0.18, 0.18])).is_ok());
+    }
+
+    #[test]
+    fn rejects_a_closed_reference_eye() {
+        let result = validate_pair(&eyes([24.0, 24.0], [0.04, 0.04]), &eyes([24.0, 24.0], [0.11, 0.18]));
+        assert_eq!(result.unwrap_err(), "Os olhos da referência precisam estar abertos.");
+    }
+
+    #[test]
+    fn still_rejects_incompatible_scale_and_pose() {
+        assert_eq!(
+            validate_pair(&eyes([20.0, 20.0], [0.04, 0.04]), &eyes([80.0, 80.0], [0.18, 0.18])).unwrap_err(),
+            "Os rostos têm escalas muito diferentes para uma correção natural."
+        );
+        assert_eq!(
+            validate_pair(&eyes([20.0, 20.0], [0.04, 0.04]), &eyes([20.0, 40.0], [0.18, 0.18])).unwrap_err(),
+            "A posição dos rostos é diferente demais. Escolha outra referência."
+        );
+    }
 }
 
 

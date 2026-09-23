@@ -289,7 +289,7 @@ test("a missing destination face blocks reference selection and explains why on 
   fireEvent.load(target);
   await waitFor(() => expect(view.container.querySelector(".eye-correction__pane:last-child [data-analysis='no-face']")).toBeInTheDocument());
   const choose = screen.getByRole("button", { name: "Usar esta foto" });
-  expect(choose).toHaveAttribute("aria-disabled", "true");
+  await waitFor(() => expect(choose).toHaveAttribute("aria-disabled", "true"));
   screen.getByRole("group", { name: "Imagem a corrigir: aviso" }).focus();
   expect(await screen.findByRole("tooltip")).toHaveTextContent("Nenhum rosto encontrado na foto de destino.");
   screen.getByRole("group", { name: "Imagem a corrigir: aviso" }).blur();

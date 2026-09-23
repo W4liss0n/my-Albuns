@@ -4,7 +4,7 @@
 
 A ação **Abrir olhos** pertence à janela nativa do visualizador. O `ProjectWorkspace` continua dono da sequência de fotos, da demanda ao cache e da apresentação da janela. A janela filha recebe URLs opacas e devolve apenas ações e pontos faciais; ela não abre caminhos do sistema de arquivos. A busca de referência usa todas as fotos do projeto, exceto a imagem a corrigir. A foto original permanece no mesmo lugar.
 
-A detecção usa MediaPipe Tasks Vision **1.0.1**, fixado em `package-lock.json`, com Face Landmarker local em um Web Worker. A configuração permite até oito rostos para escolha explícita e não depende de rede durante o uso. O modelo `face_landmarker.task` tem 3.758.596 bytes e SHA-256 `64184e229b263107bc2b804c6625db1341ff2bb731874b0bcc2fe6544e0bc9ff`. O bundle JS tem 155.465 bytes; as três variantes JS/WASM somam 35.444.140 bytes. O pacote e os componentes BlazeFace/Face Mesh V2 estão sob Apache-2.0; a cópia da licença está em `public/models/LICENSE-APACHE-2.0.txt`. Fontes: [guia Web do Face Landmarker](https://developers.google.com/edge/mediapipe/solutions/vision/face_landmarker/web_js), [cartão do Face Mesh V2](https://storage.googleapis.com/mediapipe-assets/Model%20Card%20MediaPipe%20Face%20Mesh%20V2.pdf) e [cartão do BlazeFace](https://storage.googleapis.com/mediapipe-assets/MediaPipe%20BlazeFace%20Model%20Card%20%28Short%20Range%29.pdf).
+A detecção usa MediaPipe Tasks Vision **1.0.1**, fixado em `package-lock.json`, com Face Landmarker local em um Web Worker. O modelo permite oito rostos **por análise de região**; a combinação das regiões não trunca a foto a oito pessoas. O uso não depende de rede. O modelo `face_landmarker.task` tem 3.758.596 bytes e SHA-256 `64184e229b263107bc2b804c6625db1341ff2bb731874b0bcc2fe6544e0bc9ff`. O bundle JS tem 155.465 bytes; as três variantes JS/WASM somam 35.444.140 bytes. O pacote e os componentes BlazeFace/Face Mesh V2 estão sob Apache-2.0; a cópia da licença está em `public/models/LICENSE-APACHE-2.0.txt`. Fontes: [guia Web do Face Landmarker](https://developers.google.com/edge/mediapipe/solutions/vision/face_landmarker/web_js), [cartão do Face Mesh V2](https://storage.googleapis.com/mediapipe-assets/Model%20Card%20MediaPipe%20Face%20Mesh%20V2.pdf) e [cartão do BlazeFace](https://storage.googleapis.com/mediapipe-assets/MediaPipe%20BlazeFace%20Model%20Card%20%28Short%20Range%29.pdf).
 
 O Host valida a sessão e os IDs autorizados. A composição usa os originais na resolução completa, orienta JPEG/TIFF conforme EXIF, limita dimensões e decodificação, alinha cada olho pelos cantos, rejeita pares com abertura/escala/pose inadequadas, adapta a cor da pele e suaviza a borda. O trabalho pesado roda em `spawn_blocking`; a prévia opaca tem até 1.600 px, enquanto o PNG aplicado é produzido diretamente da imagem completa. Esta implementação usa o Host para composição, com os limites e a validação de perfil sRGB da infraestrutura de imagem; mover a operação para o processador de imagens continua sendo uma possível evolução arquitetural.
 
@@ -35,13 +35,27 @@ o detector retornava zero rostos na imagem inteira, inclusive após reduzir para
 até 0,3 não recuperou o rosto; analisar uma região menor da mesma foto recuperou.
 A causa confirmada neste caso foi o tamanho do rosto em relação ao enquadramento.
 
-O worker mantém a primeira análise e os limiares existentes. Se não encontrar
-rostos, analisa nove regiões sobrepostas de metade da largura e altura, com
-superfícies de no máximo 800 px no maior lado. Converte os pontos para as
-coordenadas da foto completa, elimina rostos repetidos e mantém o limite de oito.
-Todo o trabalho permanece no worker. A busca complementar não é executada quando
-a primeira análise já encontrou rostos; portanto, não garante descobrir todos os
-rostos menores de um grupo em que algum rosto maior já foi detectado.
+A primeira correção buscava nove regiões apenas quando a foto inteira não
+retornava rostos. A revisão com fotos de grupo demonstrou que esse caminho
+interrompia a descoberta dos demais rostos e que metade do enquadramento ainda
+era grande demais em vários casos. Essa política foi substituída: o worker
+mantém a primeira análise e os limiares de 0,55 e sempre complementa a busca em
+regiões de metade, um quarto e um oitavo da largura e altura, com sobreposição
+de 50%. São 284 análises de descoberta, usando uma superfície reutilizada de
+no máximo 800 px no maior lado, seguidas de até duas confirmações por candidato.
+
+Os pontos voltam às coordenadas da foto completa, incluindo a escala de
+profundidade. Rostos repetidos são combinados, priorizando pontos afastados
+das bordas do recorte. Cada candidato precisa ser encontrado novamente em
+um recorte com contexto de três vezes seu tamanho. Candidatos encontrados
+apenas nos recortes de um oitavo também precisam passar por um recorte de duas
+vezes seu tamanho: uma única confirmação ainda aceitava padrões do piso e
+do cenário como rostos em `IMG_6186` e `IMG_6187`. Exigir esse recorte mais
+fechado de todos os candidatos, por outro lado, removia um rosto parcialmente
+encoberto de `IMG_6276` que já era encontrado nas regiões maiores. A saída usa
+os pontos da confirmação com contexto, em vez dos pontos iniciais que podiam
+representar apenas a parte inferior desse rosto junto à borda de um recorte.
+Todo o processamento continua no worker; não há novo aviso dentro da imagem.
 
 O recorte usa `drawImage` sobre a orientação exibida. Durante a investigação,
 recortar diretamente um `ImageBitmap` com EXIF preservado produziu uma região
@@ -51,24 +65,50 @@ Contratos consultados: [Face Landmarker Web](https://developers.google.com/edge/
 e [OffscreenCanvas](https://developer.mozilla.org/en-US/docs/Web/API/OffscreenCanvas),
 além dos tipos instalados de `@mediapipe/tasks-vision` 1.0.1.
 
-Após a correção, a mesma foto retornou um rosto tanto no original orientado de
-4.000 × 6.000 px quanto na prévia JPEG de 1.067 × 1.600 px. O teste real no Edge
-levou aproximadamente 432 ms na prévia, incluindo a preparação do detector; a
-foto de controle continuou retornando um rosto. A reprodução está na área local
-`.scratch/face-detection-debug-20260923/`; a fotografia do autor não é versionada.
-Testes do worker cobrem a conversão dos pontos, a deduplicação, a busca limitada
-sem rostos e a preservação do caminho rápido. Isso corrige a reprodução fornecida;
-não representa uma avaliação geral de precisão do modelo.
+Validação com o worker de produção no Edge, em prévias JPEG de até 1.600 px:
+
+| Foto | Antes desta revisão | Depois | Conferência visual |
+| --- | ---: | ---: | --- |
+| IMG_6246 | 1 | 4 | Quatro pessoas, sem marcação no cenário |
+| IMG_6252 | 3 | 6 | Seis pessoas |
+| IMG_6276 | 7 | 7 | Sete pessoas, incluindo rosto parcialmente encoberto |
+| IMG_6300 | 3 | 4 | Quatro pessoas |
+| IMG_6510 | 4 | 5 | Cinco pessoas, sem marcação no piso |
+| IMG_6498 | 0 | 9 | Melhora parcial; ainda há rostos sem detecção na turma distante |
+| IMG_6187 / IMG_6186 | 1 / 1 | 1 / 1 | Nenhuma marcação adicional no piso ou cenário |
+| Controle Nikki | 1 | 1 | Rosto preservado |
+
+A análise mais completa custa aproximadamente 2–3 segundos por foto nesta
+máquina, em vez dos cerca de 0,1–0,4 segundo do caminho anterior. É uma troca
+explícita por cobertura maior; o worker evita bloquear a interface. Fotos
+distantes, escuras, de perfil ou com oclusão continuam limitadas pelo modelo
+e pela resolução da prévia. Não há garantia de localizar todos os rostos.
+
+`node --test scripts/Test-FaceLandmarksWorker.mjs` cobre busca com resultado
+inicial parcial, duas escalas de rostos pequenos, mais de oito rostos,
+coordenadas, deduplicação, confirmação de candidatos e liberação do bitmap
+em sucesso e falha. Os 12 testes passaram. Os 20 testes do visualizador e
+adaptador também passaram; a espera de um teste foi corrigida para observar
+a propagação assíncrona do estado da imagem ao botão antes de verificar o bloqueio.
+A reprodução local e as fotografias ficam em
+`.scratch/face-detection-debug-20260923/`, fora do versionamento. Essa amostra
+não constitui uma avaliação geral de precisão do modelo nem uma nova validação
+visual de todos os cenários da interface.
 
 ### Recusa do par IMG_6187 / IMG_6186
 
 A reprodução com `IMG_6187.JPG` como destino e `IMG_6186.JPG` como referência
 encontra um rosto em cada prévia de 1.600 px. O processamento real dos originais
-recusa o par com `Os olhos da referência precisam estar visivelmente mais abertos.`.
+recusava o par com `Os olhos da referência precisam estar visivelmente mais abertos.`.
 As aberturas normalizadas medidas foram 0,310 / 0,291 no destino e 0,372 / 0,338
 na referência: aumento de aproximadamente 20% / 16%, abaixo dos 35% exigidos
 pela regra existente para cada olho. Os olhos estão abertos nas duas fotografias.
-Não foi alterado o limite para fazer este par passar.
+A decisão anterior de preservar essa regra foi revista após a nova solicitação
+do autor: ela também impedia corrigir uma piscada quando um dos olhos do destino
+já estava aberto. A comparação relativa de 35% foi removida. Continua exigida
+abertura mínima absoluta de 0,12 nos dois olhos da referência, além dos limites
+de tamanho, escala, pose e perfil de cor. A mensagem agora é
+`Os olhos da referência precisam estar abertos.`.
 
 Havia também uma falha de apresentação: o Rust devolve erros serializados como
 texto, mas o consumidor do visualizador só aproveitava mensagens de `Error`.
@@ -81,7 +121,11 @@ e aplicar, a resposta desconhecida e o encaminhamento dos pontos e da prévia.
 
 A reprodução local está em `.scratch/face-detection-debug-20260923/render-pair.mjs`
 e `render/Cargo.toml`, que inclui o compositor real. As cópias de diagnóstico e
-os pontos das fotos não são versionados. Esta recusa de qualidade continua
-esperada; a correção foi não esconder sua explicação.
+os pontos das fotos não são versionados. O compositor real passou a gerar prévia
+e PNG de 4.000 × 6.000 px para esse par, sem sobrescrever as fotos originais.
+Quatro testes Rust verificam referência aberta com abertura semelhante,
+destino com um olho já aberto, referência fechada e escala/pose incompatíveis.
+Todos passaram. Gerar a composição comprova o funcionamento do fluxo; não
+garante naturalidade para qualquer par escolhido pelo usuário.
 
 A correção aceita originais de até **36 megapixels**, até 10.000 px por eixo, com perfil sRGB conhecido. Pares com olhos pouco abertos, rostos pequenos ou poses/escalas excessivamente diferentes são recusados para evitar composições ruins. A adaptação local de cor não resolve diferenças fortes de luz, óculos ou oclusões; nesses casos, escolher outra referência é necessário. A avaliação de naturalidade foi feita com um par fotográfico real e não cobre todas as condições de retrato.

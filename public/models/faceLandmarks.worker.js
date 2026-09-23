@@ -27,36 +27,74 @@ function sameFace(a, b) {
 }
 
 function detectFaces(landmarker, image) {
-  const faces = landmarker.detect(image).faceLandmarks;
-  if (faces.length) return faces;
-
-  // Whole-body portraits can lose small faces when the detector reduces the
-  // full frame. Search nine overlapping regions only after an empty first pass.
-  const width = Math.ceil(image.width / 2), height = Math.ceil(image.height / 2);
-  const scale = Math.min(1, 800 / Math.max(width, height));
-  const canvas = new OffscreenCanvas(Math.max(1, Math.round(width * scale)), Math.max(1, Math.round(height * scale)));
-  const context = canvas.getContext("2d");
-  if (!context) throw new Error("Não foi possível preparar a análise da foto.");
   const found = [];
-  for (const row of [0, .5, 1]) for (const column of [0, .5, 1]) {
-    const left = Math.round((image.width - width) * column);
-    const top = Math.round((image.height - height) * row);
-    // Rasterize the displayed orientation before detection, including EXIF
-    // images whose ImageBitmap crop coordinates may refer to encoded pixels.
-    context.drawImage(image, left, top, width, height, 0, 0, canvas.width, canvas.height);
-    for (const face of landmarker.detect(canvas).faceLandmarks) {
+  function candidates(faces, left, top, width, height) {
+    const result = [];
+    for (const face of faces) {
       if (!face.length || face.some(({ x, y, z }) => !Number.isFinite(x + y + z) || x < 0 || y < 0 || x > 1 || y > 1)) continue;
       const local = faceBounds(face);
       const margin = Math.min(local.left, local.top, 1 - local.right, 1 - local.bottom);
       const mapped = face.map(({ x, y, z }) => ({ x: (left + x * width) / image.width, y: (top + y * height) / image.height, z: z * width / image.width }));
       const bounds = faceBounds(mapped);
-      const duplicate = found.findIndex((item) => sameFace(item.bounds, bounds));
-      const candidate = { face: mapped, bounds, margin };
+      if (bounds.right > bounds.left && bounds.bottom > bounds.top) result.push({ face: mapped, bounds, margin });
+    }
+    return result;
+  }
+  function merge(items, fineOnly = false) {
+    for (const candidate of items) {
+      const duplicate = found.findIndex((item) => sameFace(item.bounds, candidate.bounds));
+      candidate.fineOnly = fineOnly;
       if (duplicate < 0) found.push(candidate);
-      else if (margin > found[duplicate].margin) found[duplicate] = candidate;
+      else if (candidate.margin > found[duplicate].margin) {
+        candidate.fineOnly = candidate.fineOnly && found[duplicate].fineOnly;
+        found[duplicate] = candidate;
+      }
     }
   }
-  return found.sort((a, b) => a.bounds.top - b.bounds.top || a.bounds.left - b.bounds.left).slice(0, 8).map((item) => item.face);
+  merge(candidates(landmarker.detect(image).faceLandmarks, 0, 0, image.width, image.height));
+
+  // Small faces need a closer view even when a larger face was already found.
+  // Three fixed scales with 50% overlap bound discovery to 284 passes.
+  const canvas = new OffscreenCanvas(1, 1);
+  const context = canvas.getContext("2d");
+  if (!context) throw new Error("Não foi possível preparar a análise da foto.");
+  function region(left, top, width, height) {
+    const scale = Math.min(1, 800 / Math.max(width, height));
+    canvas.width = Math.max(1, Math.round(width * scale));
+    canvas.height = Math.max(1, Math.round(height * scale));
+    // drawImage preserves displayed EXIF orientation when cropping a bitmap.
+    context.drawImage(image, left, top, width, height, 0, 0, canvas.width, canvas.height);
+    return candidates(landmarker.detect(canvas).faceLandmarks, left, top, width, height);
+  }
+  for (const divisions of [2, 4, 8]) {
+    const width = Math.ceil(image.width / divisions), height = Math.ceil(image.height / divisions);
+    const steps = 2 * (divisions - 1);
+    for (let row = 0; row <= steps; row++) for (let column = 0; column <= steps; column++) {
+      const left = Math.round((image.width - width) * column / steps);
+      const top = Math.round((image.height - height) * row / steps);
+      merge(region(left, top, width, height), divisions === 8);
+    }
+  }
+  // Tile edges and background patterns can produce isolated false positives.
+  // Confirm context for every face. The finest tiles need a second close view:
+  // tiny patterns in clothes/floors otherwise survive a single confirmation.
+  const confirmed = found.flatMap(({ bounds, fineOnly }) => {
+    let refined;
+    for (const expansion of (fineOnly ? [2, 3] : [3])) {
+      const width = (bounds.right - bounds.left) * image.width;
+      const height = (bounds.bottom - bounds.top) * image.height;
+      const left = Math.max(0, Math.floor(bounds.left * image.width - width * (expansion - 1) / 2));
+      const top = Math.max(0, Math.floor(bounds.top * image.height - height * (expansion - 1) / 2));
+      const cropWidth = Math.min(image.width - left, Math.ceil(width * expansion));
+      const cropHeight = Math.min(image.height - top, Math.ceil(height * expansion));
+      refined = region(left, top, cropWidth, cropHeight).find(item => sameFace(item.bounds, bounds));
+      if (!refined) return [];
+    }
+    // Use the full face view for the eye coordinates, not a tile-edge estimate.
+    return [refined];
+  });
+  // numFaces limits a model pass, not the number of people in the entire photo.
+  return confirmed.sort((a, b) => a.bounds.top - b.bounds.top || a.bounds.left - b.bounds.left).map((item) => item.face);
 }
 
 self.onmessage = async ({ data }) => {
