@@ -9,6 +9,9 @@ use crate::{
     product_runtime::PROJECT_WINDOW_LABEL,
 };
 
+#[cfg(debug_assertions)]
+use crate::desktop_webview_policy;
+
 pub(crate) const LABEL: &str = "image-viewer";
 pub(crate) const NAVIGATE_EVENT: &str = "myalbuns://image-viewer-navigate";
 pub(crate) const CLOSED_EVENT: &str = "myalbuns://image-viewer-closed";
@@ -101,6 +104,20 @@ pub(crate) async fn open_image_viewer(
             return native_dialog_window::display_owned_dialog(&window, &existing)
                 .map_err(|error| error.to_string());
         }
+        #[cfg(debug_assertions)]
+        let browser_arguments = desktop_webview_policy::replacement_webview_debug_arguments(
+            std::env::var_os("MYALBUNS_DEV_IMAGE_VIEWER_WEBVIEW_DEBUG_PORT"),
+        )
+        .map_err(|error| error.to_string())?;
+        #[cfg(debug_assertions)]
+        let browser_data_directory = desktop_webview_policy::project_dialog_debug_data_directory(
+            std::env::var_os("MYALBUNS_DEV_IMAGE_VIEWER_WEBVIEW_DATA_DIRECTORY"),
+        )
+        .map_err(|error| error.to_string())?;
+        #[cfg(not(debug_assertions))]
+        let browser_arguments: Option<String> = None;
+        #[cfg(not(debug_assertions))]
+        let browser_data_directory: Option<std::path::PathBuf> = None;
         let viewer = native_dialog_window::build_hidden_owned_viewer_window(
             &app,
             &window,
@@ -109,8 +126,8 @@ pub(crate) async fn open_image_viewer(
                 url: "image-viewer.html",
                 width: 1050.0,
                 height: 720.0,
-                browser_arguments: None,
-                browser_data_directory: None,
+                browser_arguments: browser_arguments.as_deref(),
+                browser_data_directory: browser_data_directory.as_deref(),
             },
         )
         .await
