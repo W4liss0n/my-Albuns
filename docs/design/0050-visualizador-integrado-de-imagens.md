@@ -31,7 +31,7 @@ As ações de correção são uma extensão da ferramenta **Abrir olhos**, no ca
 
 **Usar esta foto** ao escolher a referência e **Trocar referência** após essa escolha ocupam o mesmo ponto flutuante no centro inferior da metade esquerda, a 16 px da borda, com o círculo translúcido de ferramenta de imagem e sem rodapé. Selecionar um rosto no destino e um na referência prepara a correção automaticamente, sem botão **Ver correção**. Cada novo par completo dispara uma preparação; uma falha não provoca tentativas infinitas. Resultados de uma seleção anterior não podem substituir a seleção atual, reaparecer após cancelar ou ser salvos por engano. Com o resultado pronto, a cápsula oferece **Antes e depois** e **Salvar correção**. Antes e depois alterna somente a foto de destino entre original e resultado, sem alterar a referência, o enquadramento, o Projeto ou a correção preparada. A alternância tem estado acessível, tooltip e indicação neutra no próprio botão, sem texto sobre as fotos; trocar a referência ou preparar outro resultado encerra a comparação anterior.
 
-**Salvar correção** abre o diálogo compartilhado **Substituir foto original?**, identificando o nome do arquivo e explicando que o original será substituído. As ações são **Cancelar** e **Substituir original**, com foco inicial seguro em Cancelar. Cancelar preserva a prévia para conferência. A substituição exige confirmação explícita mesmo se a pessoa estiver olhando o original em Antes e depois. Até essa confirmação, analisar, selecionar, comparar e fechar não alteram o arquivo original.
+**Salvar correção** abre o diálogo compartilhado **Substituir foto original?**, identificando o nome do arquivo sem sinais decorativos como « » e explicando que o original será substituído pela versão corrigida. As ações são **Cancelar** e **Substituir original**, com foco inicial seguro em Cancelar. Cancelar preserva a prévia para conferência. A substituição exige confirmação explícita mesmo se a pessoa estiver olhando o original em Antes e depois. Até essa confirmação, analisar, selecionar, comparar e fechar não alteram o arquivo original.
 
 Após confirmar, a correção substitui o conteúdo do arquivo original, preservando seu caminho e formato. Essa decisão substitui a política anterior de manter uma cópia corrigida como novo vínculo. A gravação deve evitar deixar um arquivo incompleto em caso de falha e não pode sobrescrever silenciosamente uma foto alterada externamente desde a preparação. As prévias e os vínculos do Projeto precisam refletir o novo conteúdo; reabrir ou exportar deve usar a foto corrigida. O salvamento da correção não substitui o salvamento do arquivo do Projeto. Enquanto o diálogo está aberto, teclado e ponteiro pertencem à confirmação; Esc cancela somente o diálogo.
 
@@ -40,6 +40,27 @@ No modo de correção, não há mensagens soltas sobre as imagens. Ausência de 
 As setas, **Ajustar à janela**, **Abrir olhos** e suas ações de correção compartilham a ferramenta de imagem: alvo de 42 px, setas de 26 px e ferramentas de 18 px, com ícones em grafite e superfície clara translúcida, sem sombra. Controles isolados usam círculos de 36 px; na correção, os comandos do olho compartilham a cápsula contínua de mesma altura e tom. A superfície usa o tema a 56% em repouso, com realce discreto sob o comando em hover, sem acumular camadas de opacidade. O tooltip React Aria no hover ou foco, o nome acessível e o foco visível permanecem disponíveis. Não há tooltip nativo em paralelo. Salvar, fechar a correção e trocar de referência permanecem bloqueados enquanto a correção é salva.
 
 Cada rosto selecionável recebe uma caixa de contorno calculada a partir dos seus pontos detectados, sem número visível e sem preencher a área do rosto. Duas linhas finas, uma escura e uma clara, separam a caixa de retratos claros e escuros sem sombra difusa nem cor saturada. Ao selecionar, o contorno se firma e um pequeno **Check** em disco neutro contrastante integra o canto da caixa; `aria-pressed` anuncia o mesmo estado. A caixa acompanha o enquadramento da foto durante encaixe, ampliação, deslocamento e redimensionamento, sendo recortada pela área de visualização; não se desloca artificialmente para a borda quando o rosto sai de vista. O nome acessível identifica a foto e o rosto.
+
+As caixas e a seleção continuam disponíveis durante a preparação, na prévia e
+em Antes e depois. Selecionar outro rosto no destino ou na referência prepara
+automaticamente o novo par, sem sair do modo de correção nem repetir a análise
+da mesma foto. Os pontos continuam ligados à imagem original; a prévia corrigida
+não provoca nova detecção. Cada par usa o destino original como base, sem
+acumular o ajuste da seleção anterior. Um resultado antigo não pode aparecer
+ou ser salvo para o novo par. Durante o salvamento, a seleção fica bloqueada;
+a confirmação mantém sua exclusividade de teclado e ponteiro.
+
+Com um rosto selecionado, roda e teclas de zoom aproximam esse rosto,
+centralizando-o na medida permitida pelos limites da imagem. Selecionar por
+si só não amplia a foto. Ao trocar de rosto com a imagem ampliada, o nível de
+zoom é mantido e o foco acompanha o novo rosto. Cada metade conserva seu
+enquadramento ao alternar a comparação ou receber a prévia. Ajustar à janela
+e a tecla 0 continuam mostrando a foto inteira.
+
+No Painel de imagens, pressionar Espaço não acrescenta um contorno externo à
+miniatura. O foco de teclado usa a borda já existente do cartão compartilhado,
+com tom neutro distinguível da seleção, sem mudar dimensões. Tab continua
+indicando qual cartão recebe o teclado; fechar o visualizador restaura o foco.
 
 ## Aceitação
 

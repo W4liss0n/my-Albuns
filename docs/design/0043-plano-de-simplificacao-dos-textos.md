@@ -196,6 +196,10 @@ Detalhes de diagnóstico ficam no canal de registro já existente, sem serem
 concatenados ao aviso para a pessoa. Preservar limites e formatos necessários
 para compreender a restrição.
 
+Nomes de arquivo nas confirmações aparecem como foram nomeados, sem acrescentar
+delimitadores decorativos como « ». A frase deve identificar a ação e sua
+consequência sem depender desses sinais.
+
 ## Etapas de aplicação
 
 | Etapa | Trabalho | Donos principais | Critério de conclusão |

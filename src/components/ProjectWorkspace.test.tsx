@@ -723,9 +723,9 @@ async function openEyeCorrectionHarness() {
   fireEvent.keyUp(canvas, { code: "Space", key: " " });
   await waitFor(() => expect(viewerPort.open).toHaveBeenCalledOnce());
   const sessionId = latest.sessionId;
-  const send = (kind: ViewerCorrectionAction["kind"]) => act(() => correction({
+  const send = (kind: ViewerCorrectionAction["kind"], targetX = .5) => act(() => correction({
     sessionId, kind, referenceMediaId: latest.correction?.referenceMediaId,
-    targetFace: [{ x: .5, y: .5, z: 0 }], referenceFace: [{ x: .5, y: .5, z: 0 }],
+    targetFace: [{ x: targetX, y: .5, z: 0 }], referenceFace: [{ x: .5, y: .5, z: 0 }],
   }));
   send("start");
   send("select");
@@ -758,6 +758,30 @@ test.each(["success", "failure"])("late correction %s cannot replace a newer pai
   send("apply");
   await waitFor(() => expect(viewerPort.applyCorrection).toHaveBeenCalledWith(current().sessionId, "new"));
   expect(viewerPort.applyCorrection).toHaveBeenCalledOnce();
+});
+
+test.each(["success", "failure"])("changing the destination face during preparation discards a late %s without cancelling the newer pair", async (outcome) => {
+  const { viewerPort, send, current } = await openEyeCorrectionHarness();
+  const older = deferredValue<PreparedEyeCorrection>();
+  const newer = deferredValue<PreparedEyeCorrection>();
+  viewerPort.prepareCorrection.mockImplementationOnce(() => older.promise).mockImplementationOnce(() => newer.promise);
+  send("preview", .3);
+  await waitFor(() => expect(viewerPort.prepareCorrection).toHaveBeenCalledOnce());
+  send("preview", .7);
+  await waitFor(() => expect(viewerPort.prepareCorrection).toHaveBeenCalledTimes(2));
+  expect(viewerPort.prepareCorrection).toHaveBeenNthCalledWith(1, expect.objectContaining({ targetFace: [{ x: .3, y: .5, z: 0 }] }));
+  expect(viewerPort.prepareCorrection).toHaveBeenNthCalledWith(2, expect.objectContaining({ targetFace: [{ x: .7, y: .5, z: 0 }] }));
+  expect(viewerPort.cancelCorrection).not.toHaveBeenCalled();
+  await act(async () => {
+    if (outcome === "success") older.resolve({ token: "old", url: "old-preview" });
+    else older.reject(new Error("old preparation failed"));
+    await older.promise.catch(() => undefined);
+  });
+  expect(current().correction).toMatchObject({ phase: "processing", error: null });
+  await act(async () => { newer.resolve({ token: "new", url: "new-preview" }); await newer.promise; });
+  expect(current().correction).toMatchObject({ phase: "preview", resultUrl: "new-preview" });
+  send("apply");
+  await waitFor(() => expect(viewerPort.applyCorrection).toHaveBeenCalledWith(current().sessionId, "new"));
 });
 
 test("closing the viewer discards a pending correction result", async () => {

@@ -1,12 +1,13 @@
 import { useState } from "react";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { expect, test, vi } from "vitest";
+import { beforeEach, expect, test, vi } from "vitest";
 import { ImageViewer } from "./ImageViewer";
 import type { ViewerPresentation } from "../application/imageViewerWindow";
 import { detectFaces } from "../image-viewer/faceLandmarks";
 
 vi.mock("../image-viewer/faceLandmarks", async (original) => ({ ...(await original()), detectFaces: vi.fn() }));
+beforeEach(() => { vi.mocked(detectFaces).mockReset().mockResolvedValue([]); });
 
 const initial: ViewerPresentation = { sessionId: "s", revision: 1, mediaId: "a", name: "Imagem a", url: "data:image/png;id=a", state: "ready", canPrevious: false, canNext: true };
 function Harness() {
@@ -111,7 +112,7 @@ test("a correction preview compares only the target and saves once even while sh
   const save = screen.getByRole("button", { name: "Salvar correção" });
   fireEvent.click(save);
   expect(screen.getByRole("dialog", { name: "Substituir foto original?" })).toBeInTheDocument();
-  expect(screen.getByText("A foto «Imagem a» será substituída pela versão corrigida.")).toBeInTheDocument();
+  expect(screen.getByText("A foto Imagem a será substituída pela versão corrigida.")).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Cancelar" })).toHaveFocus();
   fireEvent.click(screen.getByRole("button", { name: "Substituir original" }));
   fireEvent.click(save);
@@ -119,6 +120,7 @@ test("a correction preview compares only the target and saves once even while sh
 });
 
 test("a changed correction result clears comparison without resetting target zoom", () => {
+  vi.mocked(detectFaces).mockResolvedValue([]);
   const paneWidth = vi.spyOn(Element.prototype, "clientWidth", "get").mockReturnValue(800);
   const paneHeight = vi.spyOn(Element.prototype, "clientHeight", "get").mockReturnValue(600);
   try {
@@ -127,7 +129,7 @@ test("a changed correction result clears comparison without resetting target zoo
       referenceState: "ready", canPreviousReference: false, canNextReference: false, resultUrl: "data:image/png;id=corrected-1", error: null,
     };
     const view = render(<ImageViewer presentation={{ ...initial, correction }} onNavigate={vi.fn()} onClose={vi.fn()} onCorrection={vi.fn()} />);
-    const target = screen.getByRole("img", { name: "Imagem a" });
+    const target = view.container.querySelector<HTMLImageElement>(".eye-correction__pane:last-child .eye-correction__photo img:first-child")!;
     Object.defineProperties(target, { naturalWidth: { configurable: true, value: 1200 }, naturalHeight: { configurable: true, value: 800 } });
     fireEvent.load(target);
     fireEvent.wheel(view.container.querySelectorAll(".eye-correction__pane-image")[1], { deltaY: -300 });
@@ -137,7 +139,7 @@ test("a changed correction result clears comparison without resetting target zoo
     fireEvent.click(screen.getByRole("button", { name: "Antes e depois: mostrar original" }));
     expect(target).toHaveAttribute("src", initial.url);
     view.rerender(<ImageViewer presentation={{ ...initial, correction: { ...correction, resultUrl: "data:image/png;id=corrected-2" } }} onNavigate={vi.fn()} onClose={vi.fn()} onCorrection={vi.fn()} />);
-    expect(target).toHaveAttribute("src", "data:image/png;id=corrected-2");
+    expect(screen.getByRole("img", { name: "Imagem a" })).toHaveAttribute("src", "data:image/png;id=corrected-2");
     expect(photo.style.width).toBe(width);
     expect(screen.getByRole("button", { name: "Antes e depois: mostrar original" })).toHaveAttribute("aria-pressed", "false");
   } finally { paneWidth.mockRestore(); paneHeight.mockRestore(); }
@@ -353,6 +355,99 @@ test("a missing destination face blocks reference selection and explains why on 
   fireEvent.click(choose);
   expect(onCorrection).not.toHaveBeenCalled();
   expect(view.container.querySelector(".eye-correction__hint")).not.toBeInTheDocument();
+});
+
+test("zoom centers the selected face without zooming on selection and keeps the level when another face is chosen", async () => {
+  const first = [{ x: .57, y: .24, z: 0 }, { x: .63, y: .36, z: 0 }];
+  const second = [{ x: .65, y: .24, z: 0 }, { x: .71, y: .36, z: 0 }];
+  vi.mocked(detectFaces).mockResolvedValue([first, second]);
+  const width = vi.spyOn(Element.prototype, "clientWidth", "get").mockReturnValue(600);
+  const height = vi.spyOn(Element.prototype, "clientHeight", "get").mockReturnValue(500);
+  const correction: NonNullable<ViewerPresentation["correction"]> = {
+    phase: "select", referenceMediaId: "reference", referenceName: "Referência.jpg", referenceUrl: "data:image/png;id=reference",
+    referenceState: "ready", canPreviousReference: false, canNextReference: false, resultUrl: null, error: null,
+  };
+  try {
+    const view = render(<ImageViewer presentation={{ ...initial, correction }} onNavigate={vi.fn()} onClose={vi.fn()} onCorrection={vi.fn()} />);
+    for (const image of screen.getAllByRole("img")) {
+      Object.defineProperties(image, { naturalWidth: { configurable: true, value: 800 }, naturalHeight: { configurable: true, value: 1200 } });
+      fireEvent.load(image);
+    }
+    const pane = view.container.querySelectorAll<HTMLElement>(".eye-correction__pane-image")[1];
+    const photo = pane.querySelector<HTMLElement>(".eye-correction__photo")!;
+    fireEvent.click(await screen.findByRole("button", { name: "Imagem a corrigir: rosto 1" }));
+    const fittedWidth = parseFloat(photo.style.width);
+    expect(screen.queryByRole("button", { name: "Ajustar imagem a corrigir à janela" })).not.toBeInTheDocument();
+    fireEvent.wheel(pane, { deltaY: -700 });
+    const zoomedWidth = parseFloat(photo.style.width);
+    expect(zoomedWidth).toBeGreaterThan(fittedWidth * 3);
+    expect(parseFloat(photo.style.left) + .6 * zoomedWidth).toBeCloseTo(300);
+    fireEvent.click(screen.getByRole("button", { name: "Imagem a corrigir: rosto 2" }));
+    expect(parseFloat(photo.style.width)).toBeCloseTo(zoomedWidth);
+    expect(parseFloat(photo.style.left) + .68 * zoomedWidth).toBeCloseTo(300);
+    fireEvent.keyDown(pane, { key: "+" });
+    expect(parseFloat(photo.style.left) + .68 * parseFloat(photo.style.width)).toBeCloseTo(300);
+    for (let step = 0; step < 12; step++) fireEvent.keyDown(pane, { key: "-" });
+    expect(parseFloat(photo.style.width)).toBeCloseTo(fittedWidth);
+    expect(parseFloat(photo.style.left)).toBeCloseTo((600 - fittedWidth) / 2);
+    fireEvent.wheel(pane, { deltaY: -700 });
+    fireEvent.keyDown(pane, { key: "0" });
+    expect(parseFloat(photo.style.width)).toBeCloseTo(fittedWidth);
+    expect(parseFloat(photo.style.left)).toBeCloseTo((600 - fittedWidth) / 2);
+  } finally { width.mockRestore(); height.mockRestore(); }
+});
+
+test("face boxes and original-image analysis survive processing, preview and comparison while a new pair replaces the old result", async () => {
+  vi.mocked(detectFaces).mockClear();
+  const first = [{ x: .35, y: .24, z: 0 }, { x: .45, y: .36, z: 0 }];
+  const second = [{ x: .55, y: .24, z: 0 }, { x: .65, y: .36, z: 0 }];
+  vi.mocked(detectFaces).mockResolvedValue([first, second]);
+  const correction: NonNullable<ViewerPresentation["correction"]> = {
+    phase: "select", referenceMediaId: "reference", referenceName: "Referência.jpg", referenceUrl: "data:image/png;id=reference",
+    referenceState: "ready", canPreviousReference: false, canNextReference: false, resultUrl: null, error: null,
+  };
+  const onCorrection = vi.fn();
+  const width = vi.spyOn(Element.prototype, "clientWidth", "get").mockReturnValue(600);
+  const height = vi.spyOn(Element.prototype, "clientHeight", "get").mockReturnValue(500);
+  try {
+    const view = render(<ImageViewer presentation={{ ...initial, correction }} onNavigate={vi.fn()} onClose={vi.fn()} onCorrection={onCorrection} />);
+    for (const image of screen.getAllByRole("img")) {
+      Object.defineProperties(image, { naturalWidth: { configurable: true, value: 800 }, naturalHeight: { configurable: true, value: 1200 } });
+      fireEvent.load(image);
+    }
+    fireEvent.click(await screen.findByRole("button", { name: "Imagem a corrigir: rosto 1" }));
+    fireEvent.click(screen.getByRole("button", { name: "Referência: rosto 1" }));
+    await waitFor(() => expect(onCorrection.mock.calls.filter(([action]) => action.kind === "preview")).toHaveLength(1));
+    expect(vi.mocked(detectFaces)).toHaveBeenCalledTimes(2);
+    view.rerender(<ImageViewer presentation={{ ...initial, correction: { ...correction, phase: "processing" } }} onNavigate={vi.fn()} onClose={vi.fn()} onCorrection={onCorrection} />);
+    expect(screen.getByRole("button", { name: "Imagem a corrigir: rosto 1" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: "Referência: rosto 1" })).toHaveAttribute("aria-pressed", "true");
+    fireEvent.click(screen.getByRole("button", { name: "Imagem a corrigir: rosto 2" }));
+    await waitFor(() => expect(onCorrection.mock.calls.filter(([action]) => action.kind === "preview")).toHaveLength(2));
+    expect(screen.queryByRole("button", { name: "Salvar correção" })).not.toBeInTheDocument();
+    view.rerender(<ImageViewer presentation={{ ...initial, correction: { ...correction, phase: "preview", resultUrl: "data:image/png;id=corrected-1" } }} onNavigate={vi.fn()} onClose={vi.fn()} onCorrection={onCorrection} />);
+    expect(screen.getByRole("img", { name: "Imagem a" })).toHaveAttribute("src", "data:image/png;id=corrected-1");
+    expect(screen.getByRole("button", { name: "Imagem a corrigir: rosto 1" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Antes e depois: mostrar original" }));
+    expect(screen.getByRole("button", { name: "Imagem a corrigir: rosto 1" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Antes e depois: mostrar correção" }));
+    expect(vi.mocked(detectFaces)).toHaveBeenCalledTimes(2);
+    fireEvent.click(screen.getByRole("button", { name: "Imagem a corrigir: rosto 1" }));
+    await waitFor(() => expect(onCorrection.mock.calls.filter(([action]) => action.kind === "preview")).toHaveLength(3));
+    fireEvent.click(screen.getByRole("button", { name: "Imagem a corrigir: rosto 2" }));
+    await waitFor(() => expect(onCorrection.mock.calls.filter(([action]) => action.kind === "preview")).toHaveLength(4));
+    expect(onCorrection.mock.calls[onCorrection.mock.calls.length - 1]?.[0]).toEqual(expect.objectContaining({ targetFace: second, referenceFace: first }));
+    expect(screen.queryByRole("button", { name: "Salvar correção" })).not.toBeInTheDocument();
+    view.rerender(<ImageViewer presentation={{ ...initial, correction: { ...correction, phase: "processing", resultUrl: "data:image/png;id=corrected-1" } }} onNavigate={vi.fn()} onClose={vi.fn()} onCorrection={onCorrection} />);
+    expect(screen.getByRole("img", { name: "Imagem a" })).toHaveAttribute("src", initial.url);
+    expect(screen.getByRole("button", { name: "Imagem a corrigir: rosto 2" })).toHaveAttribute("aria-pressed", "true");
+    view.rerender(<ImageViewer presentation={{ ...initial, correction: { ...correction, phase: "preview", resultUrl: "data:image/png;id=corrected-2" } }} onNavigate={vi.fn()} onClose={vi.fn()} onCorrection={onCorrection} />);
+    expect(screen.getByRole("img", { name: "Imagem a" })).toHaveAttribute("src", "data:image/png;id=corrected-2");
+    fireEvent.click(screen.getByRole("button", { name: "Referência: rosto 2" }));
+    await waitFor(() => expect(onCorrection.mock.calls.filter(([action]) => action.kind === "preview")).toHaveLength(5));
+    expect(onCorrection.mock.calls[onCorrection.mock.calls.length - 1]?.[0]).toEqual(expect.objectContaining({ targetFace: second, referenceFace: second }));
+    expect(vi.mocked(detectFaces)).toHaveBeenCalledTimes(2);
+  } finally { width.mockRestore(); height.mockRestore(); }
 });
 
 test("each photo owns its no-face tooltip, which closes when focus leaves", async () => {

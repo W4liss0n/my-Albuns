@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import ReactDOM from "react-dom/client";
 import { ImageViewer } from "../components/ImageViewer";
 import type { ViewerPresentation } from "../application/imageViewerWindow";
@@ -16,13 +16,15 @@ import "./viewerWindow.css";
 const preview = new URLSearchParams(location.search).get("preview");
 const qa = import.meta.env.DEV && new URLSearchParams(location.search).has("qa");
 const qaError = import.meta.env.DEV ? new URLSearchParams(location.search).get("error") : null;
-const qaTarget = "/.scratch/eye-correction/qa/nikki-closed.jpg";
-const qaReference = "/.scratch/eye-correction/qa/nikki-open-a.jpg";
-const previewCorrection = (phase: string) => ({
+const qaMultipleFaces = import.meta.env.DEV && new URLSearchParams(location.search).get("fixture") === "faces-multi";
+const qaDelayedPreparation = import.meta.env.DEV && new URLSearchParams(location.search).get("delay") === "prepare";
+const qaTarget = qaMultipleFaces ? "/.scratch/face-detection-debug-20260923/inputs/IMG_6246.JPG" : "/.scratch/eye-correction/qa/nikki-closed.jpg";
+const qaReference = qaMultipleFaces ? "/.scratch/face-detection-debug-20260923/inputs/IMG_6252.JPG" : "/.scratch/eye-correction/qa/nikki-open-a.jpg";
+const previewCorrection = (phase: string, version = 0) => ({
   phase, referenceMediaId: "reference", referenceName: "Referência.jpg",
   referenceUrl: qa ? qaReference : sizedPreview(portraitPreview, 800, 1200),
   referenceState: "ready" as const, canPreviousReference: false, canNextReference: phase === "browse",
-  resultUrl: phase === "preview" || phase === "applying" ? qa ? "/.scratch/eye-correction/qa/nikki-corrected.png" : sizedPreview(landscapePreview, 1200, 800) : null,
+  resultUrl: phase === "preview" || phase === "applying" ? qaMultipleFaces ? `${qaTarget}?v=${version}` : qa ? `/.scratch/eye-correction/qa/nikki-corrected.png${version ? `?v=${version}` : ""}` : sizedPreview(landscapePreview, 1200, 800) : null,
   error: qaError === "prepare" && phase === "select" ? "Os olhos da referência precisam estar abertos."
     : qaError === "save" && phase === "preview" ? "Não foi possível atualizar a prévia da foto. A foto original foi restaurada." : null,
 });
@@ -31,8 +33,9 @@ const sizedPreview = (svg: string, width: number, height: number) =>
   `data:image/svg+xml,${encodeURIComponent(svg.replace("<svg ", `<svg width="${width}" height="${height}" `))}`;
 
 function ViewerWindow() {
+  const qaPreviewRequest = useRef(0);
   const [presentation, setPresentation] = useState<ViewerPresentation | null>(() => preview ? {
-    sessionId: "preview", revision: 0, mediaId: "preview", name: qa ? "Nikki — olhos fechados.jpg" : preview === "long" ? "Serra ao amanhecer com todos os detalhes de uma longa viagem de família.jpg" : "Serra ao amanhecer.jpg",
+    sessionId: "preview", revision: 0, mediaId: "preview", name: qaMultipleFaces ? "IMG_6246.JPG" : qa ? "Nikki — olhos fechados.jpg" : preview === "long" ? "Serra ao amanhecer com todos os detalhes de uma longa viagem de família.jpg" : "Serra ao amanhecer.jpg",
     url: preview === "missing" ? null : qa ? qaTarget : sizedPreview(landscapePreview, 1200, 800),
     state: preview === "missing" ? "absent" : "ready", canPrevious: true, canNext: true,
     correction: preview?.startsWith("correction-") ? previewCorrection(preview.slice("correction-".length)) : undefined,
@@ -65,12 +68,23 @@ function ViewerWindow() {
         void tauriImageViewerClient.navigate(presentation.sessionId, offset).catch(() => undefined);
       }} onClose={close} onCorrection={(action) => {
         if (preview) {
+          if (action.kind === "preview") {
+            const request = ++qaPreviewRequest.current;
+            setPresentation((current) => current ? { ...current, correction: qaDelayedPreparation ? previewCorrection("processing")
+              : qaError === "prepare" ? previewCorrection("select") : previewCorrection("preview", request) } : current);
+            if (qaDelayedPreparation) window.setTimeout(() => {
+              if (request !== qaPreviewRequest.current) return;
+              setPresentation((current) => current?.correction?.phase === "processing"
+                ? { ...current, correction: qaError === "prepare" ? previewCorrection("select") : previewCorrection("preview", request) } : current);
+            }, 800);
+            return;
+          }
+          if (action.kind === "cancel" || action.kind === "browse" || action.kind === "start" || action.kind === "select") qaPreviewRequest.current++;
           setPresentation((current) => current ? { ...current, correction: action.kind === "cancel" ? undefined
             : action.kind === "start" ? previewCorrection("browse")
             : action.kind === "browse" ? previewCorrection("browse")
             : action.kind === "select" ? previewCorrection("select")
-            : action.kind === "preview" ? qaError === "prepare" ? previewCorrection("select") : previewCorrection("preview")
-            : action.kind === "apply" ? qaError === "save" ? previewCorrection("preview") : previewCorrection("applying")
+            : action.kind === "apply" ? qaError === "save" ? previewCorrection("preview", qaPreviewRequest.current) : previewCorrection("applying", qaPreviewRequest.current)
             : current.correction } : current);
           return;
         }

@@ -16175,6 +16175,333 @@
         { "type": "assert", "selector": ".ui-floating-tooltip" },
         { "type": "hover", "selector": ".ui-application-header" }
       ]
+    },
+    {
+      "id": "image-viewer-correction-selected-face-wheel",
+      "title": "Correção de olhos — roda amplia o rosto selecionado fora do centro",
+      "implementationPath": "/image-viewer.html?preview=correction-select&qa=1&fixture=faces-multi&delay=prepare",
+      "comparison": {
+        "implementationCaptureSelector": ".image-viewer-window",
+        "reason": "Design 0050: caixas persistentes, zoom no rosto selecionado e troca do par sem reiniciar; fotos locais e faces determinísticas, sem validar detecção nem composição.",
+        "kind": "implementation-only",
+        "surface": "image-viewer"
+      },
+      "viewport": {
+        "height": 720,
+        "width": 1050
+      },
+      "readySelector": "button[aria-label='Ajustar imagem a corrigir à janela']",
+      "actions": [
+        {
+          "type": "click",
+          "selector": "button[aria-label='Imagem a corrigir: rosto 1']"
+        },
+        {
+          "type": "wheel",
+          "selector": ".eye-correction__pane:last-child .eye-correction__pane-image",
+          "deltaY": -550
+        },
+        {
+          "type": "assert",
+          "selector": ".eye-correction__pane:last-child .eye-correction__face[aria-pressed='true']"
+        }
+      ]
+    },
+    {
+      "id": "image-viewer-correction-selected-reference-keyboard",
+      "title": "Correção de olhos — teclado amplia a referência selecionada",
+      "implementationPath": "/image-viewer.html?preview=correction-select&qa=1&fixture=faces-multi&delay=prepare",
+      "comparison": {
+        "implementationCaptureSelector": ".image-viewer-window",
+        "reason": "Design 0050: caixas persistentes, zoom no rosto selecionado e troca do par sem reiniciar; fotos locais e faces determinísticas, sem validar detecção nem composição.",
+        "kind": "implementation-only",
+        "surface": "image-viewer"
+      },
+      "viewport": {
+        "height": 720,
+        "width": 1050
+      },
+      "readySelector": "button[aria-label='Ajustar referência à janela']",
+      "actions": [
+        {
+          "type": "click",
+          "selector": "button[aria-label='Referência: rosto 1']"
+        },
+        {
+          "type": "key",
+          "key": "Plus"
+        },
+        {
+          "type": "key",
+          "key": "Plus"
+        },
+        {
+          "type": "key",
+          "key": "Plus"
+        },
+        {
+          "type": "key",
+          "key": "Plus"
+        },
+        {
+          "type": "assert",
+          "selector": ".eye-correction__pane:first-child .eye-correction__face[aria-pressed='true']"
+        }
+      ]
+    },
+    {
+      "id": "image-viewer-correction-switch-target-preview",
+      "title": "Correção de olhos — trocar o destino mantém as caixas e substitui a prévia",
+      "implementationPath": "/image-viewer.html?preview=correction-select&qa=1&fixture=faces-multi&delay=prepare",
+      "comparison": {
+        "implementationCaptureSelector": ".image-viewer-window",
+        "reason": "Design 0050: caixas persistentes, zoom no rosto selecionado e troca do par sem reiniciar; fotos locais e faces determinísticas, sem validar detecção nem composição.",
+        "kind": "implementation-only",
+        "surface": "image-viewer"
+      },
+      "viewport": {
+        "height": 720,
+        "width": 1050
+      },
+      "readySelector": "button[aria-label='Salvar correção']:not(:disabled)",
+      "actions": [
+        {
+          "type": "click",
+          "selector": "button[aria-label='Imagem a corrigir: rosto 1']"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label='Referência: rosto 1']"
+        },
+        {
+          "type": "assert",
+          "selector": ".eye-correction__pane:last-child img[src*='v=1']"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label='Imagem a corrigir: rosto 2']"
+        },
+        {
+          "type": "assert",
+          "selector": ".eye-correction__pane:last-child img[src*='v=2']"
+        },
+        {
+          "type": "assert",
+          "selector": "button[aria-label='Imagem a corrigir: rosto 2'][aria-pressed='true']"
+        },
+        {
+          "type": "assert",
+          "selector": "button[aria-label='Referência: rosto 1'][aria-pressed='true']"
+        }
+      ]
+    },
+    {
+      "id": "image-viewer-correction-switch-reference-preview",
+      "title": "Correção de olhos — trocar o rosto da referência atualiza a prévia",
+      "implementationPath": "/image-viewer.html?preview=correction-select&qa=1&fixture=faces-multi&delay=prepare",
+      "comparison": {
+        "implementationCaptureSelector": ".image-viewer-window",
+        "reason": "Design 0050: caixas persistentes, zoom no rosto selecionado e troca do par sem reiniciar; fotos locais e faces determinísticas, sem validar detecção nem composição.",
+        "kind": "implementation-only",
+        "surface": "image-viewer"
+      },
+      "viewport": {
+        "height": 720,
+        "width": 1050
+      },
+      "readySelector": "button[aria-label='Salvar correção']:not(:disabled)",
+      "actions": [
+        {
+          "type": "click",
+          "selector": "button[aria-label='Imagem a corrigir: rosto 1']"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label='Referência: rosto 1']"
+        },
+        {
+          "type": "assert",
+          "selector": ".eye-correction__pane:last-child img[src*='v=1']"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label='Referência: rosto 2']"
+        },
+        {
+          "type": "assert",
+          "selector": ".eye-correction__pane:last-child img[src*='v=2']"
+        },
+        {
+          "type": "assert",
+          "selector": "button[aria-label='Referência: rosto 2'][aria-pressed='true']"
+        }
+      ]
+    },
+    {
+      "id": "image-viewer-correction-persistent-processing-faces",
+      "title": "Correção de olhos — caixas continuam disponíveis durante o processamento",
+      "implementationPath": "/image-viewer.html?preview=correction-processing&qa=1&fixture=faces-multi&delay=prepare",
+      "comparison": {
+        "implementationCaptureSelector": ".image-viewer-window",
+        "reason": "Design 0050: caixas persistentes, zoom no rosto selecionado e troca do par sem reiniciar; fotos locais e faces determinísticas, sem validar detecção nem composição.",
+        "kind": "implementation-only",
+        "surface": "image-viewer"
+      },
+      "viewport": {
+        "height": 720,
+        "width": 1050
+      },
+      "readySelector": "button[aria-label='Imagem a corrigir: rosto 2'][aria-pressed='true']",
+      "actions": [
+        {
+          "type": "click",
+          "selector": "button[aria-label='Imagem a corrigir: rosto 2']"
+        },
+        {
+          "type": "assert",
+          "selector": ".eye-correction[aria-busy='true']"
+        },
+        {
+          "type": "assert",
+          "selector": "button[aria-label='Referência: rosto 2']:not(:disabled)"
+        },
+        {
+          "type": "assert",
+          "selector": "body:not(:has(button[aria-label='Salvar correção']))"
+        }
+      ]
+    },
+    {
+      "id": "image-viewer-correction-persistent-comparison-faces",
+      "title": "Correção de olhos — antes e depois preserva a seleção dos dois rostos",
+      "implementationPath": "/image-viewer.html?preview=correction-select&qa=1&fixture=faces-multi&delay=prepare",
+      "comparison": {
+        "implementationCaptureSelector": ".image-viewer-window",
+        "reason": "Design 0050: caixas persistentes, zoom no rosto selecionado e troca do par sem reiniciar; fotos locais e faces determinísticas, sem validar detecção nem composição.",
+        "kind": "implementation-only",
+        "surface": "image-viewer"
+      },
+      "viewport": {
+        "height": 720,
+        "width": 1050
+      },
+      "readySelector": "button[aria-label='Antes e depois: mostrar correção'][aria-pressed='true']",
+      "actions": [
+        {
+          "type": "click",
+          "selector": "button[aria-label='Imagem a corrigir: rosto 1']"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label='Referência: rosto 1']"
+        },
+        {
+          "type": "assert",
+          "selector": ".eye-correction__pane:last-child img[src*='v=1']"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label='Antes e depois: mostrar original']"
+        },
+        {
+          "type": "assert",
+          "selector": "button[aria-label='Referência: rosto 1'][aria-pressed='true']"
+        },
+        {
+          "type": "assert",
+          "selector": "button[aria-label='Imagem a corrigir: rosto 1'][aria-pressed='true']"
+        }
+      ]
+    },
+    {
+      "id": "media-panel-space-focus",
+      "title": "Painel Fotos — Espaço mantém o foco na borda existente da foto",
+      "implementationPath": "/media-panel-preview.html?acceptance=editor",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "media-panel",
+        "implementationCaptureSelector": ".media-panel-preview[data-acceptance-surface=\"editor\"] > .media-panel",
+        "reason": "Design 0050: foco compartilhado na própria borda da miniatura. Prévia do componente valida foco de teclado, não a abertura da janela nativa."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "readySelector": ".media-grid .media-preview-card:focus-visible",
+      "actions": [
+        {
+          "type": "click",
+          "selector": ".media-grid [data-media-id]"
+        },
+        {
+          "type": "key",
+          "key": "Space"
+        }
+      ]
+    },
+    {
+      "id": "media-panel-tab-focus",
+      "title": "Painel Fotos — Tab distingue foco e seleção nas miniaturas",
+      "implementationPath": "/media-panel-preview.html?acceptance=editor",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "media-panel",
+        "implementationCaptureSelector": ".media-panel-preview[data-acceptance-surface=\"editor\"] > .media-panel",
+        "reason": "Design 0050: foco compartilhado na própria borda da miniatura. Prévia do componente valida foco de teclado, não a abertura da janela nativa."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "readySelector": ".media-grid .media-preview-card:focus-visible",
+      "actions": [
+        {
+          "type": "click",
+          "selector": ".media-grid [data-media-id]"
+        },
+        {
+          "type": "key",
+          "key": "Space"
+        },
+        {
+          "type": "key",
+          "key": "Tab"
+        }
+      ]
+    },
+    {
+      "id": "workspace-sheet-design-background-picker-keyboard-focus",
+      "title": "Design da lâmina — foco nas miniaturas do seletor de fundo",
+      "implementationPath": "/workspace-preview.html?frame=decorations&context=sheet&decoration-state=neutral",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "sheet-design",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "Componente MediaPreviewCard compartilhado: teclado distingue a miniatura com sua borda existente, sem contorno externo."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "readySelector": ".sheet-design-inspector",
+      "actions": [
+        {
+          "type": "assert",
+          "selector": ".canvas-host:has(canvas):not(:has(.canvas-loading))"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label=\"Escolher decorativo para fundo\"]"
+        },
+        {
+          "type": "key",
+          "key": "ArrowRight"
+        },
+        {
+          "type": "assert",
+          "selector": ".visual-design-popup .media-preview-card:focus-visible"
+        }
+      ]
     }
   ]
 }

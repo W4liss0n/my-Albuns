@@ -19,13 +19,13 @@
   outline: 0;
 }
 
-.media-preview-card:focus-visible .media-preview-thumbnail {
-  outline: 1px solid var(--ui-focus-neutral);
-  outline-offset: 2px;
-}
-
 .media-preview-card[data-selected="true"] .media-preview-thumbnail {
   border-color: var(--ui-accent);
+}
+
+.media-preview-card:focus-visible .media-preview-thumbnail {
+  border-color: var(--ui-focus-neutral);
+  outline: 0;
 }
 
 .media-preview-card[data-dimmed="true"] .media-preview-thumbnail img {
