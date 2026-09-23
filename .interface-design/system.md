@@ -2,6 +2,7 @@
 status: accepted
 document: design
 date: 2026-09-22
+updated: 2026-09-23
 ---
 
 # Direção visual do MyAlbuns
@@ -32,7 +33,11 @@ e a lâmina são o foco; os controles ajudam a trabalhar sem disputar atenção.
   compartilhado para validação de campos e ajuda breve, com acesso por teclado.
   Informações essenciais e progresso necessário continuam disponíveis.
 - **Escrever pouco e com clareza.** Preferir português simples e orientações
-  úteis. Evitar termos técnicos, instruções repetidas e descrições óbvias da ação.
+  úteis, seguindo o [guia de escrita aceito](../docs/design/0043-plano-de-simplificacao-dos-textos.md#guia-curto-de-escrita)
+  e sua [pesquisa](../docs/research/2026-09-18-padroes-de-escrita-para-interfaces.md).
+  O padrão vale também para funcionalidades novas, tooltips, nomes acessíveis
+  e erros recebidos do Rust. Orientar apenas ações disponíveis e descrever a
+  consequência real, sem expor diagnóstico técnico bruto.
 - **Simplificar conforme a função.** Usar ícones com tooltip e nome acessível nos
   controles compactos em que esse padrão foi aprovado. Manter texto quando ele
   ajuda a entender a ação; não transformar todos os botões em ícones.

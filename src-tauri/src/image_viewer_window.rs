@@ -370,7 +370,7 @@ pub(crate) async fn prepare_eye_correction(
         let before = eye_correction::source_digest(&target_path)?;
         let bytes = eye_correction::render(&target_path, &reference_path, &target_face, &reference_face, &output_for_render)?;
         if eye_correction::source_digest(&target_path)? != before {
-            return Err("A foto original mudou durante a preparação. Tente novamente.".into());
+            return Err("A foto original mudou durante a preparação. Feche a correção e use Abrir olhos novamente.".into());
         }
         Ok((bytes, before))
     }).await.map_err(|_| "A correção foi interrompida.".to_string());
@@ -423,7 +423,7 @@ pub(crate) async fn apply_eye_correction(
     let catalog = host.authorized_media_catalog()?;
     let binding = catalog.bindings.iter().find(|binding| binding.media_id == pending.media_id)
         .ok_or("A foto não pertence mais ao projeto.")?.clone();
-    if binding.logical_path != pending.original_path { return Err("A foto original mudou desde a prévia.".into()); }
+    if binding.logical_path != pending.original_path { return Err("A foto original mudou desde a prévia. Feche a correção e use Abrir olhos novamente.".into()); }
     let affected: Vec<_> = catalog.bindings.iter().filter(|media| media.logical_path == pending.original_path).cloned().collect();
     let mut paths = myalbuns_paths::OperationPathContext::new();
     let cache_root = app.state::<crate::cache_service::ActiveCacheNamespace>().namespace().paths().root().to_path_buf();
@@ -463,13 +463,14 @@ pub(crate) async fn apply_eye_correction(
     let projection = match refreshed {
         Ok(projection) => projection,
         Err(error) => {
+            tracing::warn!(target: "myalbuns.desktop", error = %error, event = "eye_correction_project_refresh_failed");
             eye_correction::restore_original(&pending.original_path, &backup)?;
             for media in &affected {
                 if let Ok(metadata) = MediaResolver.inspect_media_binding_in_plan(media, &roots) {
                     let _ = host.observe_photo_source(media, metadata);
                 }
             }
-            return Err(error);
+            return Err("Não foi possível atualizar o projeto após salvar a correção. A foto original foi restaurada.".into());
         }
     };
     drop(pause);
@@ -486,20 +487,27 @@ pub(crate) async fn apply_eye_correction(
         cache_failure = Some("A atualização da prévia temporária não foi concluída.".into());
     }
     if let Some(error) = cache_failure {
+        tracing::warn!(target: "myalbuns.desktop", error = %error, event = "eye_correction_cache_refresh_failed");
         eye_correction::restore_original(&pending.original_path, &backup)?;
-        for media in &affected {
-            let metadata = MediaResolver.inspect_media_binding_in_plan(media, &roots)?;
-            host.observe_photo_source(media, metadata)?;
+        let repair_result: Result<(), String> = async {
+            for media in &affected {
+                let metadata = MediaResolver.inspect_media_binding_in_plan(media, &roots)?;
+                host.observe_photo_source(media, metadata)?;
+            }
+            let repair_pause = engine.pause().await;
+            for media in &affected {
+                engine.invalidate_relinked_media(&repair_pause, &app_paths, &active.namespace(), &previews, &media.media_id)
+                    .map_err(|failure| failure.message)?;
+            }
+            drop(repair_pause);
+            let mut repair = ImageProcessingBatch::new(affected.len() as u32, |_| {});
+            repair.prepare_all_in_plan(&app, affected, roots).await;
+            Ok(())
+        }.await;
+        if let Err(repair_error) = repair_result {
+            tracing::warn!(target: "myalbuns.desktop", error = %repair_error, event = "eye_correction_restored_cache_repair_failed");
         }
-        let repair_pause = engine.pause().await;
-        for media in &affected {
-            engine.invalidate_relinked_media(&repair_pause, &app_paths, &active.namespace(), &previews, &media.media_id)
-                .map_err(|failure| failure.message)?;
-        }
-        drop(repair_pause);
-        let mut repair = ImageProcessingBatch::new(affected.len() as u32, |_| {});
-        repair.prepare_all_in_plan(&app, affected, roots).await;
-        return Err(format!("Não foi possível atualizar a prévia após substituir o original: {error}"));
+        return Err("Não foi possível atualizar a prévia da foto. A foto original foi restaurada.".into());
     }
     let _ = std::fs::remove_file(backup);
     Ok(projection)

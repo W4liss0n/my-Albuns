@@ -39,11 +39,11 @@ struct Eye {
 }
 
 fn point(face: &Face, index: usize, width: u32, height: u32) -> Result<V2, String> {
-    let point = face.0.get(index).ok_or("Rosto incompleto. Escolha outra foto.")?;
+    let point = face.0.get(index).ok_or("Não foi possível identificar os olhos deste rosto. Selecione outro rosto.")?;
     if !point.x.is_finite() || !point.y.is_finite() || !point.z.is_finite()
         || !(-0.1..=1.1).contains(&point.x) || !(-0.1..=1.1).contains(&point.y)
     {
-        return Err("Os pontos do rosto são inválidos. Escolha outra foto.".into());
+        return Err("Não foi possível identificar os olhos deste rosto. Selecione outro rosto.".into());
     }
     Ok(V2 { x: point.x * width as f32, y: point.y * height as f32 })
 }
@@ -65,13 +65,13 @@ fn validate_pair(target: &[Eye; 2], reference: &[Eye; 2]) -> Result<(), String> 
             return Err("Os olhos da referência precisam estar abertos.".into());
         }
         if !(0.35..=3.0).contains(&(dst.width / src.width)) {
-            return Err("Os rostos têm escalas muito diferentes para uma correção natural.".into());
+            return Err("Os rostos têm tamanhos muito diferentes. Escolha outra referência.".into());
         }
     }
     let target_ratio = target[0].width / target[1].width;
     let reference_ratio = reference[0].width / reference[1].width;
     if !(0.6..=1.65).contains(&(target_ratio / reference_ratio)) {
-        return Err("A posição dos rostos é diferente demais. Escolha outra referência.".into());
+        return Err("Os rostos estão em posições muito diferentes. Escolha outra referência.".into());
     }
     Ok(())
 }
@@ -167,37 +167,37 @@ fn validate_profile(profile: &[u8]) -> Result<(), String> {
         || (profile.len() == 3_144 && Sha256::digest(profile)[..] == LEGACY_SRGB_SHA256) {
         Ok(())
     } else {
-        Err("O perfil de cor da foto não é sRGB compatível com esta correção.".into())
+        Err("O perfil de cor desta foto não é compatível com a correção. Use uma foto em sRGB.".into())
     }
 }
 
 fn validate_depth(color: ColorType) -> Result<(), String> {
     if matches!(color, ColorType::L16 | ColorType::La16 | ColorType::Rgb16 | ColorType::Rgba16 | ColorType::Rgb32F | ColorType::Rgba32F) {
-        Err("A foto tem mais de 8 bits por canal e não pode ser substituída por esta correção.".into())
+        Err("Esta correção aceita apenas fotos com até 8 bits por canal.".into())
     } else { Ok(()) }
 }
 
 fn open_upright(path: &Path) -> Result<RgbaImage, String> {
-    let reader = ImageReader::open(path).map_err(|_| "Não foi possível abrir um dos originais.")?
-        .with_guessed_format().map_err(|_| "O formato do original é inválido.")?;
+    let reader = ImageReader::open(path).map_err(|_| "Não foi possível abrir uma das fotos.")?
+        .with_guessed_format().map_err(|_| "Não foi possível identificar o formato de uma das fotos.")?;
     let format = reader.format();
-    let mut decoder = reader.into_decoder().map_err(|_| "Não foi possível decodificar um dos originais.")?;
+    let mut decoder = reader.into_decoder().map_err(|_| "Não foi possível ler uma das fotos.")?;
     validate_depth(decoder.color_type())?;
     let (width, height) = decoder.dimensions();
     if width == 0 || height == 0 || width > 10_000 || height > 10_000
         || u64::from(width) * u64::from(height) > 36_000_000 {
-        return Err("A foto excede o limite de 36 megapixels para esta correção.".into());
+        return Err("Esta correção aceita fotos de até 36 MP, com largura e altura de até 10.000 pixels.".into());
     }
     let mut limits = Limits::default();
     limits.max_image_width = Some(10_000);
     limits.max_image_height = Some(10_000);
     limits.max_alloc = Some(256 * 1024 * 1024);
-    decoder.set_limits(limits).map_err(|_| "A foto excede o limite de memória da correção.".to_string())?;
-    if let Some(profile) = decoder.icc_profile().map_err(|_| "Não foi possível ler o perfil de cor do original.")? {
+    decoder.set_limits(limits).map_err(|_| "A foto é grande demais para esta correção.".to_string())?;
+    if let Some(profile) = decoder.icc_profile().map_err(|_| "Não foi possível ler o perfil de cor da foto.")? {
         validate_profile(&profile)?;
     }
-    let orientation = decoder.orientation().map_err(|_| "Não foi possível ler a orientação do original.")?;
-    let mut image = DynamicImage::from_decoder(decoder).map_err(|_| "Não foi possível decodificar um dos originais.")?;
+    let orientation = decoder.orientation().map_err(|_| "Não foi possível ler a orientação da foto.")?;
+    let mut image = DynamicImage::from_decoder(decoder).map_err(|_| "Não foi possível ler uma das fotos.")?;
     if matches!(format, Some(ImageFormat::Jpeg | ImageFormat::Tiff)) { image.apply_orientation(orientation); }
     Ok(image.to_rgba8())
 }
@@ -279,10 +279,10 @@ pub(crate) fn encode_replacement(prepared: &Path, original: &Path, staging: &Pat
         .into_decoder().map_err(|_| "Não foi possível ler os metadados do original.")?;
     validate_depth(decoder.color_type())?;
     let dimensions = decoder.dimensions();
-    let icc = decoder.icc_profile().map_err(|_| "Não foi possível ler o perfil de cor do original.")?;
+    let icc = decoder.icc_profile().map_err(|_| "Não foi possível ler o perfil de cor da foto.")?;
     if let Some(profile) = &icc { validate_profile(profile)?; }
     let mut exif = decoder.exif_metadata().map_err(|_| "Não foi possível ler os metadados do original.")?;
-    let orientation = decoder.orientation().map_err(|_| "Não foi possível ler a orientação do original.")?;
+    let orientation = decoder.orientation().map_err(|_| "Não foi possível ler a orientação da foto.")?;
     if let Some(metadata) = &mut exif { let _ = Orientation::remove_from_exif_chunk(metadata); }
     let corrected = image::open(prepared).map_err(|_| "Não foi possível ler a correção preparada.")?.to_rgba8();
     let (width, height) = corrected.dimensions();
@@ -294,24 +294,24 @@ pub(crate) fn encode_replacement(prepared: &Path, original: &Path, staging: &Pat
     match format {
         ImageFormat::Jpeg => {
             let mut encoder = image::codecs::jpeg::JpegEncoder::new_with_quality(&mut writer, 95);
-            if let Some(profile) = icc { encoder.set_icc_profile(profile).map_err(|_| "Não foi possível preservar o perfil de cor.")?; }
-            if let Some(metadata) = exif { encoder.set_exif_metadata(metadata).map_err(|_| "Não foi possível preservar os metadados.")?; }
+            if let Some(profile) = icc { encoder.set_icc_profile(profile).map_err(|_| "Não foi possível salvar a foto mantendo o perfil de cor.")?; }
+            if let Some(metadata) = exif { encoder.set_exif_metadata(metadata).map_err(|_| "Não foi possível salvar a foto mantendo os metadados.")?; }
             let rgb = DynamicImage::ImageRgba8(corrected).to_rgb8();
             encoder.write_image(rgb.as_raw(), width, height, ExtendedColorType::Rgb8)
-                .map_err(|_| "Não foi possível codificar a foto corrigida em JPEG.")?;
+                .map_err(|_| "Não foi possível salvar a foto corrigida em JPEG.")?;
         }
         ImageFormat::Png => {
             let mut encoder = image::codecs::png::PngEncoder::new(&mut writer);
-            if let Some(profile) = icc { encoder.set_icc_profile(profile).map_err(|_| "Não foi possível preservar o perfil de cor.")?; }
-            if let Some(metadata) = exif { encoder.set_exif_metadata(metadata).map_err(|_| "Não foi possível preservar os metadados.")?; }
+            if let Some(profile) = icc { encoder.set_icc_profile(profile).map_err(|_| "Não foi possível salvar a foto mantendo o perfil de cor.")?; }
+            if let Some(metadata) = exif { encoder.set_exif_metadata(metadata).map_err(|_| "Não foi possível salvar a foto mantendo os metadados.")?; }
             encoder.write_image(corrected.as_raw(), width, height, ExtendedColorType::Rgba8)
-                .map_err(|_| "Não foi possível codificar a foto corrigida em PNG.")?;
+                .map_err(|_| "Não foi possível salvar a foto corrigida em PNG.")?;
         }
         ImageFormat::Tiff => {
             let mut encoder = image::codecs::tiff::TiffEncoder::new(&mut writer);
-            if let Some(profile) = icc { encoder.set_icc_profile(profile).map_err(|_| "Não foi possível preservar o perfil de cor.")?; }
+            if let Some(profile) = icc { encoder.set_icc_profile(profile).map_err(|_| "Não foi possível salvar a foto mantendo o perfil de cor.")?; }
             encoder.write_image(corrected.as_raw(), width, height, ExtendedColorType::Rgba8)
-                .map_err(|_| "Não foi possível codificar a foto corrigida em TIFF.")?;
+                .map_err(|_| "Não foi possível salvar a foto corrigida em TIFF.")?;
         }
         _ => unreachable!(),
     }
@@ -344,14 +344,14 @@ fn replace_file(original: &Path, staging: &Path, backup: &Path) -> Result<(), St
 }
 
 pub(crate) fn replace_original(original: &Path, prepared: &Path, expected_digest: [u8; 32]) -> Result<PathBuf, String> {
-    if source_digest(original)? != expected_digest { return Err("A foto original mudou desde a prévia. Prepare a correção novamente.".into()); }
+    if source_digest(original)? != expected_digest { return Err("A foto original mudou desde a prévia. Feche a correção e use Abrir olhos novamente.".into()); }
     let folder = original.parent().ok_or("A localização do original é inválida.")?;
     let nonce = uuid::Uuid::new_v4().simple().to_string();
     let staging = folder.join(format!(".myalbuns-eye-{nonce}.stage"));
     let backup = folder.join(format!(".myalbuns-eye-{nonce}.backup"));
     let result = (|| {
         encode_replacement(prepared, original, &staging)?;
-        if source_digest(original)? != expected_digest { return Err("A foto original mudou desde a prévia. Prepare a correção novamente.".into()); }
+        if source_digest(original)? != expected_digest { return Err("A foto original mudou desde a prévia. Feche a correção e use Abrir olhos novamente.".into()); }
         replace_file(original, &staging, &backup)?;
         Ok(backup.clone())
     })();
@@ -406,11 +406,11 @@ mod validation_tests {
     fn still_rejects_incompatible_scale_and_pose() {
         assert_eq!(
             validate_pair(&eyes([20.0, 20.0], [0.04, 0.04]), &eyes([80.0, 80.0], [0.18, 0.18])).unwrap_err(),
-            "Os rostos têm escalas muito diferentes para uma correção natural."
+            "Os rostos têm tamanhos muito diferentes. Escolha outra referência."
         );
         assert_eq!(
             validate_pair(&eyes([20.0, 20.0], [0.04, 0.04]), &eyes([20.0, 40.0], [0.18, 0.18])).unwrap_err(),
-            "A posição dos rostos é diferente demais. Escolha outra referência."
+            "Os rostos estão em posições muito diferentes. Escolha outra referência."
         );
     }
 
@@ -460,8 +460,8 @@ mod validation_tests {
             image::ImageBuffer::<Rgba<u16>, Vec<u16>>::from_pixel(24, 16, Rgba([1000, 2000, 3000, 65535]))
                 .save_with_format(&original, format).unwrap();
             let digest = source_digest(&original).unwrap();
-            assert!(open_upright(&original).unwrap_err().contains("mais de 8 bits"));
-            assert!(replace_original(&original, &prepared, digest).unwrap_err().contains("mais de 8 bits"));
+            assert!(open_upright(&original).unwrap_err().contains("até 8 bits por canal"));
+            assert!(replace_original(&original, &prepared, digest).unwrap_err().contains("até 8 bits por canal"));
             assert_eq!(source_digest(&original).unwrap(), digest);
             assert!(prepared.exists());
         }

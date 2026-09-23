@@ -24,7 +24,7 @@ const previewCorrection = (phase: string) => ({
   referenceState: "ready" as const, canPreviousReference: false, canNextReference: phase === "browse",
   resultUrl: phase === "preview" || phase === "applying" ? qa ? "/.scratch/eye-correction/qa/nikki-corrected.png" : sizedPreview(landscapePreview, 1200, 800) : null,
   error: qaError === "prepare" && phase === "select" ? "Os olhos da referência precisam estar abertos."
-    : qaError === "save" && phase === "preview" ? "Não foi possível salvar a correção. Tente novamente." : null,
+    : qaError === "save" && phase === "preview" ? "Não foi possível atualizar a prévia da foto. A foto original foi restaurada." : null,
 });
 if (!preview) installDesktopWebViewPolicy(document);
 const sizedPreview = (svg: string, width: number, height: number) =>

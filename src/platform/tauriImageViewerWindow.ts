@@ -21,5 +21,5 @@ export const tauriImageViewerWindow: ImageViewerWindowPort = {
   onCorrection: (callback) => listen<ViewerCorrectionAction>("myalbuns://image-viewer-correction", (event) => callback(event.payload)),
   prepareCorrection: (request) => invokeCorrection<PreparedEyeCorrection>("prepare_eye_correction", request, "Não foi possível corrigir os olhos."),
   cancelCorrection: () => invoke<void>("cancel_eye_correction"),
-  applyCorrection: (sessionId, token) => invokeCorrection("apply_eye_correction", { sessionId, token }, "Não foi possível aplicar a correção."),
+  applyCorrection: (sessionId, token) => invokeCorrection("apply_eye_correction", { sessionId, token }, "Não foi possível salvar a correção."),
 };

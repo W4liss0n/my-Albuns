@@ -45,6 +45,16 @@ records the author's accepted visual direction and reusable interaction patterns
 apply them within their documented scope and keep them current when later explicit
 user decisions refine them.
 
+### User-facing copy
+
+Before adding or changing user-facing text, read
+`docs/research/2026-09-18-padroes-de-escrita-para-interfaces.md` and the accepted
+writing guide in `docs/design/0043-plano-de-simplificacao-dos-textos.md`.
+Apply the guide to new features as well as existing flows, including tooltips,
+accessible names, confirmations, and Rust errors forwarded to the UI. Verify
+the actual outcome and available next action before choosing the wording;
+keep support diagnostics in the existing diagnostic channel.
+
 ### Issue tracker
 
 Issues are tracked as GitHub issues in `W4liss0n/my-Albuns` via the `gh` CLI. See `docs/agents/issue-tracker.md`.

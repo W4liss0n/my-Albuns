@@ -111,6 +111,7 @@ test("a correction preview compares only the target and saves once even while sh
   const save = screen.getByRole("button", { name: "Salvar correção" });
   fireEvent.click(save);
   expect(screen.getByRole("dialog", { name: "Substituir foto original?" })).toBeInTheDocument();
+  expect(screen.getByText("A foto «Imagem a» será substituída pela versão corrigida.")).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Cancelar" })).toHaveFocus();
   fireEvent.click(screen.getByRole("button", { name: "Substituir original" }));
   fireEvent.click(save);

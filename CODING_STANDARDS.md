@@ -28,6 +28,16 @@ accepted ADRs, `docs/design/`, and the current visual-reference pointer in
   field-validation tooltip and accessible description; do not add in-flow error
   messages that displace adjacent controls.
 
+## User-facing copy
+
+- Review user-facing strings against the accepted writing guide in
+  `docs/design/0043-plano-de-simplificacao-dos-textos.md`, including native errors
+  forwarded through adapters, tooltips, and accessible names.
+- Check instructions against actions available in that state. Confirmations and
+  failure messages must describe the actual consequence, including whether an
+  original file was preserved, replaced, restored, or could not be restored.
+  Do not concatenate raw diagnostic errors into user-facing messages.
+
 ## Review evidence
 
 - A static CSS or source-string check proves structure, not rendered appearance.

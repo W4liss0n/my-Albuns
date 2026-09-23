@@ -2,7 +2,7 @@
 status: accepted
 document: design
 date: 2026-09-18
-updated: 2026-09-18
+updated: 2026-09-23
 implementation-readiness: ready-for-agent
 ---
 
@@ -181,6 +181,20 @@ Usar maiúscula no início de rótulos e em nomes próprios: “Salvar projeto�
 10. **Acessibilidade junto do rótulo.** Revisar texto visível, tooltip, nome acessível e valores interpolados na mesma alteração. Nenhuma informação essencial deve depender apenas de passar o mouse.
 
 Esses critérios aplicam as fontes da pesquisa ao produto; não são uma declaração de conformidade com WCAG nem uma obrigação de copiar a aparência de outros sistemas.
+
+### Aplicação contínua
+
+Decisão reafirmada em 23/09/2026: este guia continua obrigatório nas novas
+funcionalidades. A revisão acompanha a mensagem desde sua origem, incluindo
+erros do Rust repassados pelos adaptadores, até o texto visível, o tooltip e o
+nome acessível. Uma mensagem técnica não fica fora do padrão por vir do backend.
+
+Orientações devem citar ações disponíveis naquele estado. Se uma tentativa de
+salvar falhar, distinguir o arquivo mantido, substituído e restaurado; só afirmar
+que o original foi restaurado depois de confirmar o sucesso da restauração.
+Detalhes de diagnóstico ficam no canal de registro já existente, sem serem
+concatenados ao aviso para a pessoa. Preservar limites e formatos necessários
+para compreender a restrição.
 
 ## Etapas de aplicação
 

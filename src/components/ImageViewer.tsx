@@ -132,7 +132,7 @@ export function ImageViewer({ presentation, onNavigate, onClose, onCorrection }:
     {confirmationOpen && <DialogFocusScope className="image-viewer__confirmation" focusKey={correctionKey} initialFocusRef={cancelConfirmation} onEscape={() => setConfirming(null)}>
       <ConfirmationDialog title="Substituir foto original?" tone="neutral"
         cancelButtonRef={cancelConfirmation}
-        description={`A correção será salva sobre «${name}». O arquivo original será substituído.`}
+        description={`A foto «${name}» será substituída pela versão corrigida.`}
         cancelAction={{ label: "Cancelar", onClick: () => setConfirming(null) }}
         confirmAction={{ label: "Substituir original", onClick: () => {
           if (saveIssued.current === correctionKey) return;

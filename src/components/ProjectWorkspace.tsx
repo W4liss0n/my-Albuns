@@ -582,7 +582,7 @@ export function ProjectWorkspace({
             setViewer((value) => value?.sessionId === action.sessionId ? { ...value, correction: undefined } : value);
           } else if (outcome.status === "failed") {
             setViewer((value) => value?.sessionId === action.sessionId && value.correction
-              ? { ...value, correction: { ...value.correction, phase: "preview", error: outcome.error instanceof Error ? outcome.error.message : "Não foi possível aplicar a correção." } } : value);
+              ? { ...value, correction: { ...value.correction, phase: "preview", error: outcome.error instanceof Error ? outcome.error.message : "Não foi possível salvar a correção." } } : value);
           }
         });
       }
