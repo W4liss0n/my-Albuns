@@ -15,7 +15,7 @@ use myalbuns_paths::{AppPaths, ExpectedObject, PreparedCacheStorage};
 use crate::{
     cache_error::{CacheError, CacheWriteMonitor},
     source::{
-        MAX_DECODED_SOURCE_PIXELS_TOTAL, fingerprint_source, open_cache_source,
+        MAX_DECODED_SOURCE_PIXELS_TOTAL, open_cache_bytes, read_fingerprinted_source,
         verify_source_fingerprint,
     },
     write_response,
@@ -100,7 +100,7 @@ fn build_cache(
                     source.media_id()
                 )
             })?;
-        let fingerprint = fingerprint_source(source.media_id(), &resolved)?;
+        let (fingerprint, bytes) = read_fingerprinted_source(source.media_id(), &resolved)?;
         source_bytes = source_bytes
             .checked_add(fingerprint.source_bytes)
             .ok_or_else(|| "o tamanho total das mídias excedeu o limite".to_string())?;
@@ -118,6 +118,7 @@ fn build_cache(
                 )
                 .unwrap_or(false)
             }) {
+            drop(bytes);
             verify_source_fingerprint(
                 source.media_id(),
                 &request.root_bindings,
@@ -127,7 +128,7 @@ fn build_cache(
             reused_count += 1;
             artifact_from_reusable(source.media_id(), reusable)
         } else {
-            let artifact = generate_preview(&storage, request, job, &resolved, fingerprint)?;
+            let artifact = generate_preview(&storage, request, job, bytes, fingerprint)?;
             generated_count += 1;
             artifact
         };
@@ -192,11 +193,11 @@ fn generate_preview(
     storage: &PreparedCacheStorage,
     request: &CacheRequest,
     job: &CacheJob,
-    resolved: &myalbuns_paths::ResolvedObject,
+    bytes: Vec<u8>,
     fingerprint: CacheFingerprint,
 ) -> Result<CacheArtifact, CacheError> {
     let source = &job.source;
-    let opened = open_cache_source(resolved).map_err(|failure| failure.message)?;
+    let opened = open_cache_bytes(bytes).map_err(|failure| failure.message)?;
     let pixel_count = opened.pixel_count().map_err(|failure| failure.message)?;
     if pixel_count > request.policy.max_decoded_pixels {
         return Err(format!(

@@ -1,7 +1,5 @@
 #[cfg(debug_assertions)]
 use std::fs;
-#[cfg(not(test))]
-use std::fs::File;
 use std::{
     ffi::OsString,
     io::{BufReader, Cursor, Read, Write},
@@ -165,7 +163,7 @@ fn working_range_failure() -> SourceFailure {
 
 #[cfg(not(test))]
 pub(super) fn decode_in_worker(
-    mut reader: BufReader<File>,
+    mut reader: super::SourceReader,
     preflight: JpegPreflight,
 ) -> Result<RgbaImage, SourceFailure> {
     let compressed = read_segment(&mut reader, preflight.compressed_bytes)?;

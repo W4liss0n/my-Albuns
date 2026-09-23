@@ -1,12 +1,14 @@
 mod cache;
 mod progressive_jpeg;
 
-pub(crate) use cache::{fingerprint_source, verify_source_fingerprint};
+#[cfg(test)]
+pub(crate) use cache::full_read_count;
+pub(crate) use cache::{read_fingerprinted_source, verify_source_fingerprint};
 pub(crate) use progressive_jpeg::{JPEG_WORKER_MODE, run_jpeg_worker};
 
 use std::{
     fs::File,
-    io::{BufRead, BufReader, Read, Seek, SeekFrom},
+    io::{BufRead, BufReader, Cursor, Read, Seek, SeekFrom},
 };
 
 use image::{
@@ -69,9 +71,51 @@ impl SourceFailure {
 }
 
 pub(crate) struct OpenRenderSource {
-    reader: BufReader<File>,
+    reader: SourceReader,
     preflight: SourcePreflight,
     source_bytes: u64,
+}
+
+/// An Original held open for Export, or bytes the Cache already read once to
+/// fingerprint them. Decoding the fingerprinted bytes proves they are the
+/// bytes the digest describes and avoids reading the Original again.
+pub(crate) enum SourceReader {
+    File(BufReader<File>),
+    Memory(Cursor<Vec<u8>>),
+}
+
+impl Read for SourceReader {
+    fn read(&mut self, buffer: &mut [u8]) -> std::io::Result<usize> {
+        match self {
+            Self::File(reader) => reader.read(buffer),
+            Self::Memory(reader) => reader.read(buffer),
+        }
+    }
+}
+
+impl BufRead for SourceReader {
+    fn fill_buf(&mut self) -> std::io::Result<&[u8]> {
+        match self {
+            Self::File(reader) => reader.fill_buf(),
+            Self::Memory(reader) => reader.fill_buf(),
+        }
+    }
+
+    fn consume(&mut self, amount: usize) {
+        match self {
+            Self::File(reader) => reader.consume(amount),
+            Self::Memory(reader) => reader.consume(amount),
+        }
+    }
+}
+
+impl Seek for SourceReader {
+    fn seek(&mut self, position: SeekFrom) -> std::io::Result<u64> {
+        match self {
+            Self::File(reader) => reader.seek(position),
+            Self::Memory(reader) => reader.seek(position),
+        }
+    }
 }
 
 #[derive(Clone)]
@@ -123,14 +167,22 @@ struct TiffPreflight {
 
 impl OpenRenderSource {
     pub(crate) fn decode_captured(&self) -> Result<RgbaImage, SourceFailure> {
-        let mut file = self.reader.get_ref().try_clone().map_err(|error| {
-            SourceFailure::path(ImagingPathCode::from_io_error(&error), error.to_string())
-        })?;
-        file.seek(SeekFrom::Start(0)).map_err(|error| {
-            SourceFailure::path(ImagingPathCode::from_io_error(&error), error.to_string())
-        })?;
+        let reader = match &self.reader {
+            SourceReader::File(reader) => {
+                let mut file = reader.get_ref().try_clone().map_err(|error| {
+                    SourceFailure::path(ImagingPathCode::from_io_error(&error), error.to_string())
+                })?;
+                file.seek(SeekFrom::Start(0)).map_err(|error| {
+                    SourceFailure::path(ImagingPathCode::from_io_error(&error), error.to_string())
+                })?;
+                SourceReader::File(BufReader::new(file))
+            }
+            SourceReader::Memory(reader) => {
+                SourceReader::Memory(Cursor::new(reader.get_ref().clone()))
+            }
+        };
         Self {
-            reader: BufReader::new(file),
+            reader,
             preflight: self.preflight.clone(),
             source_bytes: self.source_bytes,
         }
@@ -203,23 +255,14 @@ impl OpenRenderSource {
     }
 }
 
-pub(crate) fn open_cache_source(
-    resolved: &ResolvedObject,
-) -> Result<OpenRenderSource, SourceFailure> {
-    open_source(resolved, true)
-}
-
-fn open_source(
-    resolved: &ResolvedObject,
-    allow_single_page_tiff: bool,
-) -> Result<OpenRenderSource, SourceFailure> {
-    let file = resolved.reopen_for_read().map_err(|error| {
-        SourceFailure::path(
-            ImagingPathCode::from_io_error(&error),
-            format!("não foi possível abrir a fonte original para leitura: {error}"),
-        )
-    })?;
-    inspect_open_source(file, allow_single_page_tiff)
+/// Inspects the bytes whose digest the Cache just recorded.
+pub(crate) fn open_cache_bytes(bytes: Vec<u8>) -> Result<OpenRenderSource, SourceFailure> {
+    let source_bytes = bytes.len() as u64;
+    inspect_reader(
+        SourceReader::Memory(Cursor::new(bytes)),
+        source_bytes,
+        true,
+    )
 }
 
 pub(crate) fn capture_render_source(
@@ -250,8 +293,18 @@ fn inspect_open_source(
             "a fonte original não é um arquivo regular",
         ));
     }
-    let source_bytes = metadata.len();
-    let mut reader = BufReader::new(file);
+    inspect_reader(
+        SourceReader::File(BufReader::new(file)),
+        metadata.len(),
+        allow_single_page_tiff,
+    )
+}
+
+fn inspect_reader(
+    mut reader: SourceReader,
+    source_bytes: u64,
+    allow_single_page_tiff: bool,
+) -> Result<OpenRenderSource, SourceFailure> {
     let mut signature = [0_u8; 8];
     let signature_length = read_signature(&mut reader, &mut signature)?;
     rewind(&mut reader)?;
@@ -727,7 +780,7 @@ fn validate_collected_jpeg_profile(
 }
 
 fn preflight_png(
-    reader: &mut BufReader<File>,
+    reader: &mut SourceReader,
     source_bytes: u64,
 ) -> Result<PngPreflight, SourceFailure> {
     let mut signature = [0_u8; 8];
@@ -1137,7 +1190,7 @@ fn preflight_tiff(reader: &mut (impl Read + Seek)) -> Result<TiffPreflight, Sour
 }
 
 fn decode_render_jpeg(
-    reader: BufReader<File>,
+    reader: SourceReader,
     preflight: JpegPreflight,
 ) -> Result<RgbaImage, SourceFailure> {
     if preflight.is_progressive {
@@ -1148,7 +1201,7 @@ fn decode_render_jpeg(
 }
 
 fn decode_render_tiff(
-    reader: BufReader<File>,
+    reader: SourceReader,
     preflight: TiffPreflight,
 ) -> Result<RgbaImage, SourceFailure> {
     let mut decoder = TiffDecoder::new(reader).map_err(|error| {
@@ -1273,7 +1326,7 @@ fn decode_jpeg_raw<R: BufRead + Seek>(
 }
 
 fn decode_render_png(
-    reader: BufReader<File>,
+    reader: SourceReader,
     preflight: PngPreflight,
 ) -> Result<RgbaImage, SourceFailure> {
     let mut limits = Limits::default();

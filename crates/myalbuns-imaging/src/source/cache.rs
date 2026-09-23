@@ -7,9 +7,39 @@ use myalbuns_imaging_protocol::CacheFingerprint;
 use myalbuns_paths::{ExpectedObject, ResolvedObject, RootBindingPlan};
 use sha2::{Digest, Sha256};
 
-pub(crate) fn fingerprint_source(
+#[cfg(test)]
+std::thread_local! {
+    static FULL_READS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+}
+
+#[cfg(test)]
+pub(crate) fn full_read_count() -> usize {
+    FULL_READS.get()
+}
+
+fn fingerprint_source(
     media_id: &str,
     resolved: &ResolvedObject,
+) -> Result<CacheFingerprint, String> {
+    observe_source(media_id, resolved, None)
+}
+
+/// Reads the whole Original once, returning its fingerprint and the exact
+/// bytes that produced the digest. The buffer is reserved fallibly from the
+/// observed size before any byte is read.
+pub(crate) fn read_fingerprinted_source(
+    media_id: &str,
+    resolved: &ResolvedObject,
+) -> Result<(CacheFingerprint, Vec<u8>), String> {
+    let mut bytes = Vec::new();
+    let fingerprint = observe_source(media_id, resolved, Some(&mut bytes))?;
+    Ok((fingerprint, bytes))
+}
+
+fn observe_source(
+    media_id: &str,
+    resolved: &ResolvedObject,
+    mut retained: Option<&mut Vec<u8>>,
 ) -> Result<CacheFingerprint, String> {
     let file = resolved.reopen_for_read().map_err(|error| {
         format!("não foi possível abrir a mídia {media_id} no Processador: {error}")
@@ -20,8 +50,17 @@ pub(crate) fn fingerprint_source(
     if !metadata.is_file() {
         return Err(format!("a mídia {media_id} não é um arquivo regular"));
     }
+    if let Some(bytes) = retained.as_deref_mut() {
+        let capacity = usize::try_from(metadata.len())
+            .map_err(|_| format!("o tamanho da mídia {media_id} excedeu o limite"))?;
+        bytes
+            .try_reserve_exact(capacity)
+            .map_err(|_| format!("não há memória suficiente para ler a mídia {media_id}"))?;
+    }
     let source_created_unix_ms = file_time_millis(metadata.created());
     let source_modified_unix_ms = file_time_millis(metadata.modified());
+    #[cfg(test)]
+    FULL_READS.set(FULL_READS.get() + 1);
     let mut reader = BufReader::new(file);
     let mut hasher = Sha256::new();
     let mut observed_bytes = 0_u64;
@@ -36,7 +75,15 @@ pub(crate) fn fingerprint_source(
         observed_bytes = observed_bytes
             .checked_add(read as u64)
             .ok_or_else(|| format!("o tamanho da mídia {media_id} excedeu o limite"))?;
+        if observed_bytes > metadata.len() {
+            return Err(format!(
+                "a mídia {media_id} mudou durante a leitura do Processador"
+            ));
+        }
         hasher.update(&buffer[..read]);
+        if let Some(bytes) = retained.as_deref_mut() {
+            bytes.extend_from_slice(&buffer[..read]);
+        }
     }
     let final_metadata = reader
         .get_ref()

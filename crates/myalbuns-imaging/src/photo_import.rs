@@ -9,7 +9,7 @@ use myalbuns_paths::{AppPaths, ExpectedObject};
 use crate::{
     cache::write_preview,
     cache_error::CacheError,
-    source::{fingerprint_source, open_cache_source, verify_source_fingerprint},
+    source::{open_cache_bytes, read_fingerprinted_source, verify_source_fingerprint},
 };
 
 pub(crate) fn run(request: PhotoImportRequest, app_paths: &AppPaths) -> Result<(), String> {
@@ -75,8 +75,8 @@ fn prepare_photo(
         .root_bindings
         .resolve_existing(candidate.path(), ExpectedObject::RegularFile)
         .map_err(|error| error.to_string())?;
-    let fingerprint = fingerprint_source(candidate.source_id.as_str(), &resolved)?;
-    let opened = open_cache_source(&resolved).map_err(|failure| failure.message)?;
+    let (fingerprint, bytes) = read_fingerprinted_source(candidate.source_id.as_str(), &resolved)?;
+    let opened = open_cache_bytes(bytes).map_err(|failure| failure.message)?;
     if opened.pixel_count().map_err(|failure| failure.message)? > request.policy.max_decoded_pixels
     {
         return Err("O Original excede o limite de pixels do Cache.".into());
@@ -244,6 +244,26 @@ mod tests {
             let image = image::open(output).unwrap().to_rgba8();
             assert_eq!(image.get_pixel(0, 0).0, [21, 70, 150, 100]);
         }
+    }
+
+    #[test]
+    fn a_prepared_photo_decodes_the_bytes_it_fingerprinted() {
+        let root = tempfile::tempdir().unwrap();
+        let paths = AppPaths::from_roots(&root.path().join("roaming"), &root.path().join("local"));
+        let request = request(root.path(), &paths, 1);
+        let reads = crate::source::full_read_count();
+        let completion = prepare(&request, &paths, |_, _| Ok(())).unwrap();
+        completion.validate_for(&request).unwrap();
+        assert!(matches!(
+            completion.photos[0].outcome,
+            PhotoImportOutcome::Validated {
+                preview: ImportedPhotoPreview::Prepared { .. },
+                ..
+            }
+        ));
+        // One read feeds both the digest and the decoder; the other confirms
+        // the Original before the preview is published.
+        assert_eq!(crate::source::full_read_count() - reads, 2);
     }
 
     #[test]
