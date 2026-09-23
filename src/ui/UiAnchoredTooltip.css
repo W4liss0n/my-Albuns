@@ -1,0 +1,16 @@
+.ui-anchored-tooltip.ui-floating-tooltip {
+  z-index: 100;
+  width: max-content;
+  max-width: calc(100vw - 24px);
+  pointer-events: none;
+}
+.ui-floating-tooltip[data-placement="top"]::before {
+  top: auto;
+  bottom: -5px;
+  transform: rotate(225deg);
+}
+.ui-floating-tooltip[data-placement="bottom"]::before {
+  top: -5px;
+  bottom: auto;
+  transform: rotate(45deg);
+}

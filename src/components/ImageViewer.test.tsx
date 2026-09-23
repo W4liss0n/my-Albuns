@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { expect, test, vi } from "vitest";
 import { ImageViewer } from "./ImageViewer";
 import type { ViewerPresentation } from "../application/imageViewerWindow";
@@ -120,21 +121,20 @@ test("an applying correction cannot be cancelled or navigated before commit sett
   expect(onClose).not.toHaveBeenCalled();
 });
 
-test("image tools show one accessible tooltip on hover and focus, then close", () => {
+test("image tools show an accessible tooltip on keyboard focus and close on blur", async () => {
   render(<ImageViewer presentation={initial} onNavigate={vi.fn()} onClose={vi.fn()} onCorrection={vi.fn()} />);
   const image = screen.getByRole("img", { name: "Imagem a" });
   Object.defineProperties(image, { naturalWidth: { configurable: true, value: 1200 }, naturalHeight: { configurable: true, value: 800 } });
   fireEvent.load(image);
   const tool = screen.getByRole("button", { name: "Abrir olhos" });
   expect(tool).not.toHaveAttribute("title");
-  fireEvent.pointerEnter(tool);
-  expect(screen.getByRole("tooltip")).toHaveTextContent("Abrir olhos");
-  fireEvent.pointerLeave(tool);
-  expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
-  fireEvent.focus(tool);
-  expect(screen.getByRole("tooltip")).toBeInTheDocument();
-  fireEvent.blur(tool);
-  expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+  const user = userEvent.setup();
+  await user.tab();
+  await user.tab();
+  expect(tool).toHaveFocus();
+  expect(await screen.findByRole("tooltip")).toHaveTextContent("Abrir olhos");
+  await user.tab();
+  await waitFor(() => expect(screen.queryByRole("tooltip")).not.toBeInTheDocument());
 });
 
 test("face markers expose selection and unlock preview only after both faces are chosen", async () => {
@@ -162,4 +162,22 @@ test("face markers expose selection and unlock preview only after both faces are
   expect(preview).toBeEnabled();
   fireEvent.click(preview);
   expect(onCorrection).toHaveBeenCalledWith(expect.objectContaining({ kind: "preview", targetFace: face, referenceFace: face }));
+});
+
+test("long correction errors expose the full message through the shared tooltip", async () => {
+  const error = "Não foi possível preparar a correção para esta fotografia. Escolha outra referência e tente novamente.";
+  const presentation: ViewerPresentation = { ...initial, correction: {
+    phase: "preview", referenceMediaId: "reference", referenceName: "Referência.jpg", referenceUrl: "data:image/png;id=reference",
+    referenceState: "ready", canPreviousReference: false, canNextReference: false, resultUrl: null, error,
+  } };
+  render(<ImageViewer presentation={presentation} onNavigate={vi.fn()} onClose={vi.fn()} onCorrection={vi.fn()} />);
+  const hint = screen.getByRole("status");
+  expect(hint).toHaveTextContent(error);
+  expect(hint).not.toHaveAttribute("title");
+  const user = userEvent.setup();
+  await user.tab();
+  await user.tab();
+  await user.tab();
+  expect(hint).toHaveFocus();
+  expect(await screen.findByRole("tooltip")).toHaveTextContent(error);
 });

@@ -24,9 +24,9 @@ A política vigente do Cache limita a prévia a **1.600 pixels no maior lado**. 
 
 ## Correção de olhos no visualizador
 
-A comparação ocupa duas metades com áreas de imagem de mesma altura útil. As decisões **Usar esta foto** e **Trocar referência** ficam em uma faixa estável abaixo da foto esquerda; a faixa correspondente à direita conserva o alinhamento das imagens. No rodapé, **Cancelar** é discreto e **Ver correção** ou **Aplicar** ocupam a mesma posição de confirmação, com grafite e neutros quentes. Erros e progresso cabem em uma linha reservada; a prévia dispensa instrução repetida.
+A comparação ocupa duas metades com áreas de imagem de mesma altura útil. Na mesma faixa inferior, **Usar esta foto** ou **Trocar referência** fica sob a metade esquerda, enquanto **Cancelar** e **Ver correção** ou **Aplicar** ficam alinhados à direita. A confirmação conserva sua posição entre as fases, com grafite e neutros quentes. Erros e progresso cabem em uma linha reservada acima das ações, sem deslocá-las; a prévia dispensa instrução repetida.
 
-As setas, **Ajustar à janela** e **Abrir olhos** compartilham a ferramenta de imagem: alvo de 42 px, glifo discreto separado visualmente da fotografia, sem disco de fundo, tooltip no hover ou foco, nome acessível e foco visível. Não há tooltip nativo em paralelo. Os marcadores de rosto têm alvo confortável e indicação pequena, deslocada do centro do rosto, limitada à área visível, com seleção anunciada por `aria-pressed`. Aplicar, cancelar e navegar permanecem bloqueados durante a aplicação.
+As setas, **Ajustar à janela** e **Abrir olhos** compartilham a ferramenta de imagem: alvo de 42 px, setas de 26 px e ferramentas de 18 px, com glifos separados visualmente da fotografia, sem disco de fundo, tooltip React Aria no hover ou foco, nome acessível e foco visível. Não há tooltip nativo em paralelo. Os marcadores de rosto têm alvo confortável e indicação pequena, deslocada do centro do rosto, limitada à área visível, com seleção anunciada por `aria-pressed`. Aplicar, cancelar e navegar permanecem bloqueados durante a aplicação.
 
 ## Aceitação
 

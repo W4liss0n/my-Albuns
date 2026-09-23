@@ -27,10 +27,11 @@
 .eye-correction__face:focus-visible { outline: 2px solid var(--ui-focus-neutral); outline-offset: 4px; }
 .eye-correction__nav--previous { left: 4px; top: 50%; transform: translateY(-50%); }
 .eye-correction__nav--next { right: 4px; top: 50%; transform: translateY(-50%); }
-.eye-correction__reference-actions { display: flex; flex: none; align-items: center; height: 36px; }
-.eye-correction__footer { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 56px; padding: 8px 24px 16px; }
-.eye-correction__hint { flex: 1; min-width: 0; margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ui-text-muted); font-size: var(--ui-font-size-action); line-height: 1.35; }
-.eye-correction__actions { display: flex; flex: none; align-items: center; gap: 8px; }
+.eye-correction__footer { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); grid-template-rows: 18px 31px; align-items: center; column-gap: 16px; row-gap: 4px; padding: 8px 24px 16px; }
+.eye-correction__hint { grid-column: 1 / -1; min-width: 0; margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ui-text-muted); font-size: var(--ui-font-size-action); line-height: 1.35; }
+.eye-correction__hint:focus-visible { outline: 2px solid var(--ui-focus-neutral); outline-offset: 2px; }
+.eye-correction__reference-actions { display: flex; min-width: 0; align-items: center; }
+.eye-correction__actions { display: flex; min-width: 0; align-items: center; justify-content: flex-end; gap: 8px; }
 .eye-correction__confirm-slot { display: flex; width: 116px; justify-content: flex-end; }
 .eye-correction__confirm-slot button { white-space: nowrap; }
-@media (max-width: 620px) { .eye-correction__panes { gap: 8px; padding: 16px 12px 8px; } .eye-correction__pane:first-child { padding-right: 8px; } .eye-correction__footer { padding: 8px 12px 12px; } .eye-correction__pane-label span { display: none; } .eye-correction__hint { max-width: 42%; } }
+@media (max-width: 620px) { .eye-correction__panes { gap: 8px; padding: 16px 12px 8px; } .eye-correction__pane:first-child { padding-right: 8px; } .eye-correction__footer { column-gap: 8px; padding: 8px 12px 12px; } .eye-correction__pane-label span { display: none; } }

@@ -15825,7 +15825,7 @@
         "surface": "image-viewer"
       },
       "viewport": { "height": 720, "width": 1050 },
-      "readySelector": ".ui-image-tool__tooltip",
+      "readySelector": ".ui-floating-tooltip",
       "actions": [ { "type": "focus", "selector": "button[aria-label='Abrir olhos']" } ]
     },
     {
@@ -15839,7 +15839,7 @@
         "surface": "image-viewer"
       },
       "viewport": { "height": 720, "width": 1050 },
-      "readySelector": ".ui-image-tool__tooltip",
+      "readySelector": ".ui-floating-tooltip",
       "actions": [ { "type": "hover", "selector": "button[aria-label='Próxima referência']" } ]
     },
     {

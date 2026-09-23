@@ -4,6 +4,7 @@ import type { ViewerCorrectionAction, ViewerPresentation } from "../application/
 import { detectFaces, faceCenter, type Face } from "../image-viewer/faceLandmarks";
 import { ActionButton } from "../ui/ActionButton";
 import { ImageToolButton } from "../ui/ImageToolButton";
+import { useUiAnchoredTooltip } from "../ui/UiAnchoredTooltip";
 
 interface Props {
   presentation: ViewerPresentation;
@@ -108,8 +109,8 @@ function FaceImage({ side, url, name, choosing, selected, onChoose, onStatus, na
         onClick={() => onChoose(index, faces)}><span>{index + 1}</span></button>;
     })}
     {navigation && <>
-      <ImageToolButton label="Referência anterior" icon={ChevronLeft} className="eye-correction__nav--previous" disabled={!navigation.previous} onClick={() => navigation.onNavigate(-1)} />
-      <ImageToolButton label="Próxima referência" icon={ChevronRight} className="eye-correction__nav--next" disabled={!navigation.next} onClick={() => navigation.onNavigate(1)} />
+      <ImageToolButton label="Referência anterior" icon={ChevronLeft} glyph="navigation" className="eye-correction__nav--previous" disabled={!navigation.previous} onClick={() => navigation.onNavigate(-1)} />
+      <ImageToolButton label="Próxima referência" icon={ChevronRight} glyph="navigation" className="eye-correction__nav--next" disabled={!navigation.next} onClick={() => navigation.onNavigate(1)} />
     </>}
     {zoom > 1 && <ImageToolButton label={`Ajustar ${side === "reference" ? "referência" : "imagem a corrigir"} à janela`} icon={Scan} className="eye-correction__fit" onClick={fit} />}
   </div>;
@@ -123,6 +124,8 @@ export function EyeCorrectionView({ presentation, onNavigate, onCorrection }: Pr
   const [referenceFaces, setReferenceFaces] = useState<Face[]>([]);
   const [targetStatus, setTargetStatus] = useState<string | null>(null);
   const [referenceStatus, setReferenceStatus] = useState<string | null>(null);
+  const hintRef = useRef<HTMLParagraphElement>(null);
+  const hintTooltip = useUiAnchoredTooltip(hintRef, correction.error ?? "", !correction.error);
   useEffect(() => { setReferenceIndex(null); setReferenceFaces([]); }, [correction.referenceMediaId, correction.phase === "browse"]);
   const referenceChoosing = correction.phase === "select";
   const targetChoosing = correction.phase === "browse" || correction.phase === "select";
@@ -134,24 +137,24 @@ export function EyeCorrectionView({ presentation, onNavigate, onCorrection }: Pr
         <FaceImage side="reference" url={correction.referenceUrl} name={correction.referenceName} choosing={referenceChoosing}
           selected={referenceIndex} onChoose={(index, faces) => { setReferenceIndex(index); setReferenceFaces(faces); }} onStatus={setReferenceStatus}
           navigation={correction.phase === "browse" ? { previous: correction.canPreviousReference, next: correction.canNextReference, onNavigate } : undefined} />
-        <div className="eye-correction__reference-actions">
-          {correction.phase === "browse" && <ActionButton variant="quiet" disabled={!correction.referenceUrl || correction.referenceState !== "ready"} onClick={() => action("select")}>Usar esta foto</ActionButton>}
-          {(correction.phase === "select" || correction.phase === "preview") && <ActionButton variant="quiet" onClick={() => action("browse")}>Trocar referência</ActionButton>}
-        </div>
       </div>
       <div className="eye-correction__pane">
         <div className="eye-correction__pane-label">Imagem a corrigir <span title={presentation.name}>{presentation.name}</span></div>
         <FaceImage side="target" url={(correction.phase === "preview" || correction.phase === "applying") && correction.resultUrl ? correction.resultUrl : presentation.url}
           name={presentation.name} choosing={targetChoosing} selected={targetIndex}
           onChoose={(index, faces) => { setTargetIndex(index); setTargetFaces(faces); }} onStatus={setTargetStatus} />
-        <div className="eye-correction__reference-actions" aria-hidden="true" />
       </div>
     </div>
     <div className="eye-correction__footer">
-      <p className="eye-correction__hint" role="status" title={correction.error ?? undefined}>{correction.error ?? (
+      <p {...hintTooltip.triggerProps} ref={hintRef} className="eye-correction__hint" role="status" tabIndex={correction.error ? 0 : undefined}>{correction.error ?? (
         correction.phase === "processing" ? "Preparando correção…" :
         correction.phase === "applying" ? "Aplicando correção…" : targetStatus ?? referenceStatus ?? ""
       )}</p>
+      {hintTooltip.tooltip}
+      <div className="eye-correction__reference-actions">
+        {correction.phase === "browse" && <ActionButton variant="quiet" disabled={!correction.referenceUrl || correction.referenceState !== "ready"} onClick={() => action("select")}>Usar esta foto</ActionButton>}
+        {(correction.phase === "select" || correction.phase === "preview") && <ActionButton variant="quiet" onClick={() => action("browse")}>Trocar referência</ActionButton>}
+      </div>
       <div className="eye-correction__actions">
         <ActionButton variant="quiet" disabled={correction.phase === "applying"} onClick={() => action("cancel")}>Cancelar</ActionButton>
         <span className="eye-correction__confirm-slot">

@@ -114,8 +114,8 @@ export function ImageViewer({ presentation, onNavigate, onClose, onCorrection }:
           onError={() => { setFailedKey(imageKey); setLoaded(null); }} />}
         {!ready && <p aria-live="polite" className="image-viewer__message" role="status">{message}</p>}
         {ready && state !== "ready" && <p className="image-viewer__stale" role="status">Prévia anterior · imagem indisponível</p>}
-        <ImageToolButton label="Imagem anterior" icon={ChevronLeft} className="image-viewer__nav--previous" disabled={!canPrevious} onClick={() => onNavigate(-1)} />
-        <ImageToolButton label="Próxima imagem" icon={ChevronRight} className="image-viewer__nav--next" disabled={!canNext} onClick={() => onNavigate(1)} />
+        <ImageToolButton label="Imagem anterior" icon={ChevronLeft} glyph="navigation" className="image-viewer__nav--previous" disabled={!canPrevious} onClick={() => onNavigate(-1)} />
+        <ImageToolButton label="Próxima imagem" icon={ChevronRight} glyph="navigation" className="image-viewer__nav--next" disabled={!canNext} onClick={() => onNavigate(1)} />
         {ready && state === "ready" && onCorrection && <ImageToolButton label="Abrir olhos" icon={Eye} className="image-viewer__eye-action" onClick={() => onCorrection({ sessionId: presentation.sessionId, kind: "start" })} />}
         {zoom > 1 && <ImageToolButton label="Ajustar à janela" icon={Scan} className="image-viewer__fit" onClick={() => { setZoom(1); setPan({ x: 0, y: 0 }); }} />}
       </div>

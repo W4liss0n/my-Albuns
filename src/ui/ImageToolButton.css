@@ -12,16 +12,7 @@
 .ui-action-button.ui-image-tool:hover:not(:disabled),
 .ui-action-button.ui-image-tool:focus-visible:not(:disabled) { border: 0; background: transparent; color: white; }
 .ui-action-button.ui-image-tool:focus-visible { box-shadow: none; }
-.ui-image-tool svg { width: 26px; height: 26px; filter: drop-shadow(0 1px 2px rgb(0 0 0 / 90%)) drop-shadow(0 -1px 1px rgb(0 0 0 / 65%)); transition: transform 120ms ease; }
+.ui-image-tool svg { width: 18px; height: 18px; filter: drop-shadow(0 1px 2px rgb(0 0 0 / 90%)) drop-shadow(0 -1px 1px rgb(0 0 0 / 65%)); transition: transform 120ms ease; }
+.ui-image-tool[data-glyph="navigation"] svg { width: 26px; height: 26px; }
 .ui-image-tool:hover:not(:disabled) svg { transform: scale(1.16); }
 .ui-image-tool:focus-visible { outline: 2px solid var(--ui-focus-neutral); outline-offset: 2px; }
-.ui-anchored-tooltip.ui-image-tool__tooltip {
-  --ui-tooltip-pointer-inline-start: calc(50% - 5px);
-  position: fixed;
-  z-index: 100;
-  right: auto;
-  width: max-content;
-  max-width: calc(100vw - 24px);
-  transform: translateX(-50%);
-  pointer-events: none;
-}
