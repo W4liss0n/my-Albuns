@@ -1,6 +1,6 @@
 import { expect, test } from "vitest";
 import { representativeProjection } from "../test/projectFixtures";
-import { adjacentViewerDemand, sheetViewerMediaIds, viewerPreviewState } from "./imageViewerModel";
+import { adjacentViewerDemand, sheetViewerMediaIds, viewerPreviewState } from "../application/imageViewerModel";
 
 test("sheet sequence follows composed frame order and includes each photo once", () => {
   const sheet = structuredClone(representativeProjection.composition.sheets[0]);

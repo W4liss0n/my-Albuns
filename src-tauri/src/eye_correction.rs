@@ -1,25 +1,8 @@
 use std::{fs::File, io::{BufWriter, Cursor, Read, Write}, path::{Path, PathBuf}};
 
 use image::{ColorType, DynamicImage, ExtendedColorType, ImageDecoder, ImageEncoder, ImageFormat, ImageReader, Limits, Rgba, RgbaImage, imageops::FilterType, metadata::Orientation};
-use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-
-#[derive(Clone, Copy, Debug, Deserialize, Serialize)]
-pub(crate) struct Point {
-    pub x: f32,
-    pub y: f32,
-    pub z: f32,
-}
-
-#[derive(Clone, Debug, Deserialize, Serialize)]
-pub(crate) struct Face(pub Vec<Point>);
-
-#[derive(Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub(crate) struct PreparedEyes {
-    pub token: String,
-    pub url: String,
-}
+pub(crate) use crate::ipc_contract::{PreparedEyeCorrection as PreparedEyes, ViewerFace as Face};
 
 #[derive(Clone, Copy)]
 struct V2 { x: f32, y: f32 }
@@ -202,19 +185,28 @@ fn open_upright(path: &Path) -> Result<RgbaImage, String> {
     Ok(image.to_rgba8())
 }
 
-pub(crate) fn render(target_path: &Path, reference_path: &Path, target_face: &Face, reference_face: &Face, output: &Path) -> Result<Vec<u8>, String> {
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum RenderStage { Decode, Composite, Encode }
+
+pub(crate) fn render_with_checkpoint(
+    target_path: &Path, reference_path: &Path, target_face: &Face, reference_face: &Face,
+    output: &Path, checkpoint: impl Fn(RenderStage) -> Result<(), String>,
+) -> Result<Vec<u8>, String> {
+    checkpoint(RenderStage::Decode)?;
     let (mut target, reference) = std::thread::scope(|scope| {
         let reference = scope.spawn(|| open_upright(reference_path));
         let target = open_upright(target_path)?;
         let reference = reference.join().map_err(|_| "A leitura da referência foi interrompida.")??;
         Ok::<_, String>((target, reference))
     })?;
+    checkpoint(RenderStage::Composite)?;
     let target_size = target.dimensions();
     let reference_size = reference.dimensions();
     let dst = [eye(target_face, target_size, (33,133), (159,145))?, eye(target_face, target_size, (362,263), (386,374))?];
     let src = [eye(reference_face, reference_size, (33,133), (159,145))?, eye(reference_face, reference_size, (362,263), (386,374))?];
     validate_pair(&dst, &src)?;
     for (dst, src) in dst.iter().zip(src.iter()) { transplant_eye(&mut target, &reference, dst, src)?; }
+    checkpoint(RenderStage::Encode)?;
     let target = DynamicImage::ImageRgba8(target);
     let preview_scale = (1600.0 / target.width().max(target.height()) as f32).min(1.0);
     let preview_width = ((target.width() as f32 * preview_scale).round() as u32).max(1);
@@ -235,6 +227,11 @@ pub(crate) fn render(target_path: &Path, reference_path: &Path, target_face: &Fa
     })?;
     std::fs::rename(&temporary,output).map_err(|_| "Não foi possível concluir a imagem corrigida.")?;
     Ok(preview_bytes)
+}
+
+#[cfg(test)]
+pub(crate) fn render(target_path: &Path, reference_path: &Path, target_face: &Face, reference_face: &Face, output: &Path) -> Result<Vec<u8>, String> {
+    render_with_checkpoint(target_path, reference_path, target_face, reference_face, output, |_| Ok(()))
 }
 
 pub(crate) fn corrected_path(project_folder: &Path, original: &Path) -> Result<PathBuf, String> {
@@ -378,6 +375,37 @@ pub(crate) fn restore_original(original: &Path, backup: &Path) -> Result<(), Str
 mod validation_tests {
     use super::*;
 
+    #[test]
+    fn superseded_render_stops_before_encoding_a_png() {
+        let folder = tempfile::tempdir().unwrap();
+        let target_path = folder.path().join("target.png");
+        let reference_path = folder.path().join("reference.png");
+        let output = folder.path().join("corrected.png");
+        RgbaImage::from_pixel(200, 200, Rgba([80, 100, 120, 255])).save(&target_path).unwrap();
+        RgbaImage::from_pixel(200, 200, Rgba([90, 110, 130, 255])).save(&reference_path).unwrap();
+        let face = |opening: f32| {
+            let mut points = vec![crate::ipc_contract::ViewerFacePoint { x: 0.5, y: 0.5, z: 0.0 }; 468];
+            for (a, b, top, bottom, center) in [(33, 133, 159, 145, 0.3), (362, 263, 386, 374, 0.7)] {
+                points[a].x = center - 0.05;
+                points[b].x = center + 0.05;
+                points[top].x = center;
+                points[bottom].x = center;
+                points[top].y = 0.5 - opening * 0.05;
+                points[bottom].y = 0.5 + opening * 0.05;
+            }
+            Face(points)
+        };
+        let stages = std::sync::Mutex::new(Vec::new());
+        let result = render_with_checkpoint(&target_path, &reference_path, &face(0.06), &face(0.2), &output, |stage| {
+            stages.lock().unwrap().push(stage);
+            if stage == RenderStage::Encode { Err("A correção foi cancelada.".into()) } else { Ok(()) }
+        });
+        assert_eq!(result.unwrap_err(), "A correção foi cancelada.");
+        assert_eq!(*stages.lock().unwrap(), [RenderStage::Decode, RenderStage::Composite, RenderStage::Encode]);
+        assert!(!output.exists());
+        assert!(!output.with_extension("tmp").exists());
+    }
+
     fn eyes(widths: [f32; 2], openings: [f32; 2]) -> [Eye; 2] {
         std::array::from_fn(|index| Eye {
             center: V2 { x: 0.0, y: 0.0 },
@@ -498,6 +526,101 @@ mod validation_tests {
 #[cfg(test)]
 mod qa_tests {
     use super::*;
+
+    #[cfg(windows)]
+    fn process_cpu_time() -> std::time::Duration {
+        #[repr(C)]
+        #[derive(Default)]
+        struct FileTime { low: u32, high: u32 }
+        #[link(name = "kernel32")]
+        unsafe extern "system" {
+            fn GetCurrentProcess() -> *mut std::ffi::c_void;
+            fn GetProcessTimes(process: *mut std::ffi::c_void, created: *mut FileTime,
+                exited: *mut FileTime, kernel: *mut FileTime, user: *mut FileTime) -> i32;
+        }
+        let (mut created, mut exited, mut kernel, mut user) = (FileTime::default(), FileTime::default(), FileTime::default(), FileTime::default());
+        let ok = unsafe { GetProcessTimes(GetCurrentProcess(), &mut created, &mut exited, &mut kernel, &mut user) };
+        assert_ne!(ok, 0);
+        let ticks = |time: FileTime| (u64::from(time.high) << 32) | u64::from(time.low);
+        std::time::Duration::from_nanos((ticks(kernel) + ticks(user)) * 100)
+    }
+
+    #[test]
+    #[ignore = "requires the ignored 24 MP real-photo QA fixtures"]
+    #[cfg(windows)]
+    fn benchmark_serial_native_render_with_supersession_checkpoints() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../.scratch/face-detection-debug-20260923");
+        let results: serde_json::Value = serde_json::from_slice(&std::fs::read(root.join("render-pair-results.json")).unwrap()).unwrap();
+        let target: Face = serde_json::from_value(results[0]["faces"][0].clone()).unwrap();
+        let reference: Face = serde_json::from_value(results[1]["faces"][0].clone()).unwrap();
+        let target_path = root.join("inputs/failing.jpg");
+        let reference_path = root.join("inputs/reference.jpg");
+        let temporary = tempfile::tempdir_in(root.join("render")).unwrap();
+        let source_hashes = (source_digest(&target_path).unwrap(), source_digest(&reference_path).unwrap());
+        let measure = |label: &str, run: &dyn Fn() -> (Vec<u8>, PathBuf)| {
+            let wall = std::time::Instant::now();
+            let cpu = process_cpu_time();
+            let (preview, output) = run();
+            let elapsed = wall.elapsed();
+            let cpu = process_cpu_time() - cpu;
+            let full_hash = Sha256::digest(std::fs::read(output).unwrap());
+            let preview_hash = Sha256::digest(preview);
+            println!("{label} wall_ms={} cpu_ms={} png_sha256={:x} preview_sha256={:x}",
+                elapsed.as_millis(), cpu.as_millis(), full_hash, preview_hash);
+            (full_hash.to_vec(), preview_hash.to_vec())
+        };
+        let single_hashes = measure("single_pair", &|| {
+            let output = temporary.path().join("single.png");
+            let before = source_digest(&target_path).unwrap();
+            let preview = render_with_checkpoint(&target_path, &reference_path, &target, &reference, &output, |_| Ok(())).unwrap();
+            assert_eq!(source_digest(&target_path).unwrap(), before);
+            (preview, output)
+        });
+        // This controls native processing work, not concurrent Tauri command or window latency.
+        let before_hashes = measure("three_requests_uncancelled_serial", &|| {
+            let mut result = None;
+            for index in 0..3 {
+                let output = temporary.path().join(format!("before-{index}.png"));
+                let before = source_digest(&target_path).unwrap();
+                let preview = render_with_checkpoint(&target_path, &reference_path, &target, &reference, &output, |_| Ok(())).unwrap();
+                assert_eq!(source_digest(&target_path).unwrap(), before);
+                result = Some((preview, output));
+            }
+            result.unwrap()
+        });
+        let after_hashes = measure("three_requests_checkpointed_serial", &|| {
+            let stages = std::sync::Mutex::new(Vec::new());
+            let obsolete = temporary.path().join("obsolete.png");
+            let _obsolete_original_digest = source_digest(&target_path).unwrap();
+            assert_eq!(render_with_checkpoint(&target_path, &reference_path, &target, &reference, &obsolete, |stage| {
+                stages.lock().unwrap().push(stage);
+                if stage == RenderStage::Encode { Err("superseded".into()) } else { Ok(()) }
+            }).unwrap_err(), "superseded");
+            assert!(!obsolete.exists());
+            // The next queued request is invalidated before decoding.
+            assert_eq!(render_with_checkpoint(&target_path, &reference_path, &target, &reference, &obsolete, |stage| {
+                stages.lock().unwrap().push(stage);
+                Err("superseded".into())
+            }).unwrap_err(), "superseded");
+            let output = temporary.path().join("after.png");
+            let before = source_digest(&target_path).unwrap();
+            let preview = render_with_checkpoint(&target_path, &reference_path, &target, &reference, &output, |stage| {
+                stages.lock().unwrap().push(stage);
+                Ok(())
+            }).unwrap();
+            assert_eq!(source_digest(&target_path).unwrap(), before);
+            let stages = stages.into_inner().unwrap();
+            println!("burst_after decode={} composite={} encode_reached={} png_written=1",
+                stages.iter().filter(|&&stage| stage == RenderStage::Decode).count(),
+                stages.iter().filter(|&&stage| stage == RenderStage::Composite).count(),
+                stages.iter().filter(|&&stage| stage == RenderStage::Encode).count());
+            (preview, output)
+        });
+        assert_eq!(single_hashes, before_hashes);
+        assert_eq!(single_hashes, after_hashes);
+        assert_eq!(source_digest(&target_path).unwrap(), source_hashes.0);
+        assert_eq!(source_digest(&reference_path).unwrap(), source_hashes.1);
+    }
 
     #[test]
     #[ignore = "requires the ignored 24 MP real-photo QA fixtures"]

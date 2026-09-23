@@ -31,6 +31,8 @@ As ações de correção são uma extensão da ferramenta **Abrir olhos**, no ca
 
 **Usar esta foto** ao escolher a referência e **Trocar referência** após essa escolha ocupam o mesmo ponto flutuante no centro inferior da metade esquerda, a 16 px da borda, com o círculo translúcido de ferramenta de imagem e sem rodapé. Selecionar um rosto no destino e um na referência prepara a correção automaticamente, sem botão **Ver correção**. Cada novo par completo dispara uma preparação; uma falha não provoca tentativas infinitas. Resultados de uma seleção anterior não podem substituir a seleção atual, reaparecer após cancelar ou ser salvos por engano. Com o resultado pronto, a cápsula oferece **Antes e depois** e **Salvar correção**. Antes e depois alterna somente a foto de destino entre original e resultado, sem alterar a referência, o enquadramento, o Projeto ou a correção preparada. A alternância tem estado acessível, tooltip e indicação neutra no próprio botão, sem texto sobre as fotos; trocar a referência ou preparar outro resultado encerra a comparação anterior.
 
+Clicar novamente em um rosto já selecionado conserva a preparação pendente ou a prévia válida para o mesmo par e as mesmas versões das fotos. Após falha na preparação, o mesmo clique permite uma nova tentativa, sem repetição automática. Uma falha ao salvar não descarta a prévia válida nem inicia outra preparação.
+
 **Salvar correção** abre o diálogo compartilhado **Substituir foto original?**, identificando o nome do arquivo sem sinais decorativos como « » e explicando que o original será substituído pela versão corrigida. As ações são **Cancelar** e **Substituir original**, com foco inicial seguro em Cancelar. Cancelar preserva a prévia para conferência. A substituição exige confirmação explícita mesmo se a pessoa estiver olhando o original em Antes e depois. Até essa confirmação, analisar, selecionar, comparar e fechar não alteram o arquivo original.
 
 Após confirmar, a correção substitui o conteúdo do arquivo original, preservando seu caminho e formato. Essa decisão substitui a política anterior de manter uma cópia corrigida como novo vínculo. A gravação deve evitar deixar um arquivo incompleto em caso de falha e não pode sobrescrever silenciosamente uma foto alterada externamente desde a preparação. As prévias e os vínculos do Projeto precisam refletir o novo conteúdo; reabrir ou exportar deve usar a foto corrigida. O salvamento da correção não substitui o salvamento do arquivo do Projeto. Enquanto o diálogo está aberto, teclado e ponteiro pertencem à confirmação; Esc cancela somente o diálogo.
@@ -99,6 +101,12 @@ de novo. A retenção respeita a identidade da foto e da sessão: navegar ou sal
 uma nova versão não pode reapresentar conteúdo antigo como se fosse o atual.
 Somente o modo ativo recebe foco e ações; a confirmação de salvamento continua
 sendo exclusiva quando aberta.
+
+## Responsabilidades da implementação
+
+A sessão da janela, sua apresentação, navegação, invalidação de pedidos e restauração do foco pertencem à aplicação. O editor fornece as entradas do Painel e da Lâmina, a demanda de prévias e o caminho existente de mutação do Projeto. A janela filha recebe a apresentação e devolve ações correlacionadas com a sessão.
+
+A superfície compartilhada da foto decide identidade, prontidão, retenção temporária e descarte, além do encaixe, limite de zoom e deslocamento. O modo normal conserva sua política de não ampliar uma foto pequena no encaixe; as metades da correção conservam a ampliação até o espaço útil. Zoom em torno do ponteiro e enquadramento de rosto permanecem nas interações de seus respectivos modos. A escolha dos rostos, a comparação e o salvamento permanecem na correção; o agendamento e cancelamento de preparações pertencem ao Host.
 
 ## Aceitação
 

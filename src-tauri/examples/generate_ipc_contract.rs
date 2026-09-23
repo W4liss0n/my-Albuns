@@ -12,7 +12,8 @@ use myalbuns_desktop_lib::ipc_contract::{
     ProjectDialogActionEvent, ProjectDialogPresentation, ProjectDialogState,
     ProjectRecoveryDecision, SaveAsProjectCommandError, SaveAsProjectOutcome, SaveAsProjectResult,
     SaveProjectCommandError, SaveProjectOutcome, SaveProjectResult, SettingsPreferenceChange,
-    ViewerAction, ViewerPresentation, ViewerPreviewState, WorkspacePanelKind,
+    PreparedEyeCorrection, ViewerAction, ViewerCorrectionAction, ViewerCorrectionActionKind,
+    ViewerCorrectionPhase, ViewerFace, ViewerFacePoint, ViewerPresentation, ViewerPreviewState, WorkspacePanelKind,
     WorkspacePanelPreference, WorkspacePanelPreferences, WorkspacePreferenceChange,
     WorkspacePreferences,
 };
@@ -29,6 +30,12 @@ fn main() {
     ViewerPreviewState::export_all(&config).expect("viewer state bindings");
     ViewerPresentation::export_all(&config).expect("viewer presentation bindings");
     ViewerAction::export_all(&config).expect("viewer action bindings");
+    ViewerCorrectionAction::export_all(&config).expect("viewer correction action bindings");
+    ViewerCorrectionActionKind::export_all(&config).expect("viewer correction action kind bindings");
+    ViewerCorrectionPhase::export_all(&config).expect("viewer correction phase bindings");
+    ViewerFace::export_all(&config).expect("viewer face bindings");
+    ViewerFacePoint::export_all(&config).expect("viewer face point bindings");
+    PreparedEyeCorrection::export_all(&config).expect("prepared correction bindings");
     myalbuns_desktop_lib::ipc_contract::GenerationView::export_all(&config)
         .expect("generation view bindings");
     myalbuns_desktop_lib::ipc_contract::GenerationProgress::export_all(&config)

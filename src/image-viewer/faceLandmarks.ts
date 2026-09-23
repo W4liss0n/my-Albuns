@@ -1,5 +1,7 @@
-export interface FacePoint { x: number; y: number; z: number }
-export type Face = FacePoint[];
+import type { ViewerFace } from "../contracts/generated/ViewerFace";
+import type { ViewerFacePoint } from "../contracts/generated/ViewerFacePoint";
+export type FacePoint = ViewerFacePoint;
+export type Face = ViewerFace;
 
 let worker: Worker | null = null;
 let serial = 0;

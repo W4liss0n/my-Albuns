@@ -4,6 +4,7 @@ import type { ViewerCorrectionAction, ViewerPresentation } from "../application/
 import { EyeCorrectionView } from "./EyeCorrectionView";
 import { ImageToolButton } from "../ui/ImageToolButton";
 import { ConfirmationDialog, DialogFocusScope } from "../ui";
+import { boundPhotoPan, clampPhotoZoom, fitPhoto, photoIdentity, usePhotoContinuity } from "./photoSurface";
 import "./ImageViewer.css";
 
 interface Props {
@@ -14,9 +15,6 @@ interface Props {
   onVisibleNameChange?(sessionId: string, name: string): void;
 }
 
-const MIN_ZOOM = 1;
-const MAX_ZOOM = 8;
-
 export function ImageViewer(props: Props) {
   return <ImageViewerSession key={props.presentation.sessionId} {...props} />;
 }
@@ -26,11 +24,9 @@ function ImageViewerSession({ presentation, onNavigate, onClose, onCorrection, o
   const wasCorrecting = useRef(Boolean(presentation.correction));
   const viewportRef = useRef<HTMLDivElement>(null);
   const { mediaId, name, url, state, canPrevious, canNext } = presentation;
-  const imageKey = `${presentation.sessionId}:${mediaId}:${url ?? ""}`;
-  const [loaded, setLoaded] = useState<{ key: string; sessionId: string; url: string; name: string; width: number; height: number } | null>(null);
-  const activeImageKey = useRef(imageKey);
-  activeImageKey.current = imageKey;
-  const [failedKey, setFailedKey] = useState<string | null>(null);
+  const imageKey = photoIdentity(presentation.sessionId, mediaId, url);
+  const photo = usePhotoContinuity<{ width: number; height: number }>({ key: imageKey, sessionId: presentation.sessionId, url, name, state });
+  const loaded = photo.visible;
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [viewport, setViewport] = useState({ width: 0, height: 0, fitWidth: 0, fitHeight: 0 });
@@ -41,23 +37,20 @@ function ImageViewerSession({ presentation, onNavigate, onClose, onCorrection, o
   const saveIssued = useRef<string | null>(null);
   const wasConfirming = useRef(false);
   const drag = useRef<{ x: number; y: number; panX: number; panY: number; pointerId: number } | null>(null);
-  const ready = loaded?.key === imageKey && failedKey !== imageKey;
-  const imagePending = !ready && failedKey !== imageKey && (state === "loading" || state === "ready");
-  const retained = !ready && (state === "ready" || state === "loading") && failedKey !== imageKey && loaded?.sessionId === presentation.sessionId ? loaded : null;
+  const ready = photo.ready;
+  const imagePending = photo.pending;
+  const retained = photo.retained;
   const correcting = Boolean(presentation.correction && onCorrection);
   const targetKey = imageKey;
   const markTargetSettled = useCallback(() => setSettledTarget(targetKey), [targetKey]);
   const retainPaintedImage = correcting && ready && paintedNormalImage.current === imageKey && settledTarget !== targetKey;
   useEffect(() => { if (!correcting && ready) paintedNormalImage.current = imageKey; }, [correcting, ready, imageKey]);
   useLayoutEffect(() => {
-    if (loaded?.key !== imageKey && state !== "ready" && state !== "loading") setLoaded(null);
-  }, [loaded?.key, imageKey, state]);
-  useLayoutEffect(() => {
     if (!correcting && onVisibleNameChange) {
-      const visibleName = retained?.name ?? (ready || state !== "ready" || failedKey === imageKey ? name : null);
+      const visibleName = retained?.name ?? (ready || state !== "ready" || photo.failed ? name : null);
       if (visibleName) onVisibleNameChange(presentation.sessionId, visibleName);
     }
-  }, [correcting, onVisibleNameChange, retained?.name, ready, state, failedKey, imageKey, name, presentation.sessionId]);
+  }, [correcting, onVisibleNameChange, retained?.name, ready, state, photo.failed, imageKey, name, presentation.sessionId]);
   useLayoutEffect(() => { if (!correcting) setSettledTarget(null); }, [correcting]);
   const correctionKey = `${presentation.sessionId}:${mediaId}:${presentation.correction?.referenceMediaId ?? ""}:${presentation.correction?.resultUrl ?? ""}`;
   const confirmationOpen = confirming === correctionKey && presentation.correction?.phase === "preview";
@@ -111,19 +104,15 @@ function ImageViewerSession({ presentation, onNavigate, onClose, onCorrection, o
     return () => observer.disconnect();
   }, [Boolean(presentation.correction)]);
 
-  const fittedScale = ready && viewport.fitWidth && viewport.fitHeight
-    ? Math.min(1, viewport.fitWidth / loaded.width, viewport.fitHeight / loaded.height) : 0;
-  const fittedWidth = ready ? loaded.width * fittedScale : 0;
-  const fittedHeight = ready ? loaded.height * fittedScale : 0;
-  const retainedScale = retained && viewport.fitWidth && viewport.fitHeight
-    ? Math.min(1, viewport.fitWidth / retained.width, viewport.fitHeight / retained.height) : 0;
+  const fitted = ready ? fitPhoto(loaded!.payload, { width: viewport.fitWidth, height: viewport.fitHeight }, 0, false) : { width: 0, height: 0 };
+  const fittedWidth = fitted.width;
+  const fittedHeight = fitted.height;
+  const retainedFitted = retained ? fitPhoto(retained.payload, { width: viewport.fitWidth, height: viewport.fitHeight }, 0, false) : { width: 0, height: 0 };
   function boundedPan(next: { x: number; y: number }, nextZoom: number) {
-    const maxX = Math.max(0, (fittedWidth * nextZoom - viewport.width) / 2);
-    const maxY = Math.max(0, (fittedHeight * nextZoom - viewport.height) / 2);
-    return { x: Math.max(-maxX, Math.min(maxX, next.x)), y: Math.max(-maxY, Math.min(maxY, next.y)) };
+    return boundPhotoPan(next, nextZoom, fitted, viewport);
   }
   function changeZoom(nextZoom: number, clientX?: number, clientY?: number) {
-    const value = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, nextZoom));
+    const value = clampPhotoZoom(nextZoom);
     const rect = viewportRef.current?.getBoundingClientRect();
     const anchorX = rect && clientX !== undefined ? clientX - rect.left - rect.width / 2 : 0;
     const anchorY = rect && clientY !== undefined ? clientY - rect.top - rect.height / 2 : 0;
@@ -152,7 +141,7 @@ function ImageViewerSession({ presentation, onNavigate, onClose, onCorrection, o
   const message = state === "absent" ? "Imagem não encontrada. Localize o arquivo pelo Painel de imagens."
     : state === "unavailable" ? "Imagem indisponível. Tente novamente pelo Painel de imagens."
     : state === "cache_unavailable" || state === "cache_paused" ? "Prévia temporariamente indisponível."
-    : failedKey === imageKey ? "Não foi possível exibir a prévia desta imagem."
+    : photo.failed ? "Não foi possível exibir a prévia desta imagem."
     : "Carregando imagem…";
 
   return <section ref={viewerRef} aria-label="Visualizador de imagens" className="image-viewer">
@@ -164,11 +153,11 @@ function ImageViewerSession({ presentation, onNavigate, onClose, onCorrection, o
         onPointerUp={(event) => { if (drag.current?.pointerId === event.pointerId) { drag.current = null; event.currentTarget.releasePointerCapture(event.pointerId); } }}
         onPointerCancel={() => { drag.current = null; }}>
         {retained && <img alt={retained.name} aria-hidden="true" className="image-viewer__image image-viewer__image--retained" draggable={false} key={retained.key} src={retained.url}
-          style={{ width: retained.width * retainedScale, height: retained.height * retainedScale, transform: `translate(-50%, -50%) translate(${pan.x}px, ${pan.y}px) scale(${zoom})` }} />}
+          style={{ width: retainedFitted.width, height: retainedFitted.height, transform: `translate(-50%, -50%) translate(${pan.x}px, ${pan.y}px) scale(${zoom})` }} />}
         {url && <img alt={name} aria-hidden={Boolean(retained)} className="image-viewer__image" draggable={false} key={imageKey} src={url}
           style={{ width: fittedWidth, height: fittedHeight, opacity: ready ? 1 : 0, transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})` }}
-          onLoad={(event) => { if (activeImageKey.current !== imageKey) return; setLoaded({ key: imageKey, sessionId: presentation.sessionId, url, name, width: event.currentTarget.naturalWidth, height: event.currentTarget.naturalHeight }); setFailedKey(null); }}
-          onError={() => { if (activeImageKey.current === imageKey) { setFailedKey(imageKey); setLoaded(null); } }} />}
+          onLoad={(event) => photo.markReady(imageKey, { width: event.currentTarget.naturalWidth, height: event.currentTarget.naturalHeight })}
+          onError={() => photo.markFailed(imageKey)} />}
         {!correcting && !ready && !retained && <p aria-live="polite" className="image-viewer__message" role="status">{message}</p>}
         {!correcting && ready && state !== "ready" && <p className="image-viewer__stale" role="status">Prévia anterior · imagem indisponível</p>}
         {!correcting && <ImageToolButton label="Imagem anterior" icon={ChevronLeft} glyph="navigation" className="image-viewer__nav--previous" disabled={!canPrevious} onClick={() => onNavigate(-1)} />}

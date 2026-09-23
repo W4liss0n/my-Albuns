@@ -21,7 +21,8 @@ import {
 } from "../application/physicalMeasurements";
 import { sheetStructureAvailability } from "../application/sheetStructure";
 import type { ProjectDialogPort } from "../application/projectDialogPort";
-import type { ImageViewerWindowPort, ViewerPresentation } from "../application/imageViewerWindow";
+import type { ImageViewerWindowPort } from "../application/imageViewerWindow";
+import { useImageViewerSession } from "../application/useImageViewerSession";
 import type { GraphicsDiagnostic } from "../application/graphics";
 import { mergeMediaPreviewDemands, renderableMediaPreviewUrls } from "../application/mediaPreviews";
 import type { DisplayUnit, EditorProjection } from "../domain/project";
@@ -39,7 +40,7 @@ import {
   type InspectorContext,
 } from "./InspectorPanel";
 import { MediaPanel, type MediaPanelHandle } from "./MediaPanel";
-import { adjacentViewerDemand, sheetViewerMediaIds, viewerPreviewState } from "./imageViewerModel";
+import { adjacentViewerDemand, sheetViewerMediaIds } from "../application/imageViewerModel";
 import { ownsEditingKeys } from "./keyboardEventOwnership";
 import { createProjectApplicationMenus } from "./projectApplicationMenus";
 import { useProjectLauncher } from "./useProjectLauncher";
@@ -145,29 +146,10 @@ export function ProjectWorkspace({
     workspacePreferencesPort,
   );
   const projectId = projection.state.projectId;
-  const [viewer, setViewer] = useState<{
-    sessionId: string;
-    projectId: string;
-    source: "panel" | "sheet";
-    mediaId: string;
-    mediaIds: readonly string[];
-    restoreFocus: HTMLElement | null;
-    correction?: { phase: "browse" | "select" | "processing" | "preview" | "applying"; referenceIds: readonly string[]; referenceMediaId: string; token?: string; resultUrl?: string; error?: string };
-  } | null>(null);
-  const viewerStateRef = useRef(viewer);
-  viewerStateRef.current = viewer;
-  const correctionRequest = useRef(0);
-  const correctionCancellation = useRef<Promise<void>>(Promise.resolve());
-  const openedViewerSession = useRef<string | null>(null);
-  const viewerRevision = useRef(0);
-  const viewerPendingRef = useRef(false);
   const spaceCandidate = useRef<{ source: "panel" | "sheet"; mediaId: string; mediaIds: readonly string[]; focus: HTMLElement | null; cancelled: boolean } | null>(null);
   useEffect(() => {
-    correctionRequest.current++;
     setMediaSelectionRequest(null);
     setMediaDrag(null);
-    setViewer(null);
-    viewerPendingRef.current = false;
     spaceCandidate.current = null;
   }, [projectId]);
   useEffect(() => {
@@ -211,6 +193,12 @@ export function ProjectWorkspace({
     () => renderableMediaPreviewUrls(mediaPreviews),
     [mediaPreviews],
   );
+  const viewerSession = useImageViewerSession({ projectId, media: projection.state.album.media,
+    previews: mediaPreviews, previewUrls: mediaPreviewUrls, files: mediaFiles,
+    port: imageViewerWindowPort, mutation: runProjectMutation, onProjectionChange });
+  const viewer = viewerSession.viewer;
+  const viewerActive = viewerSession.active;
+  const viewerPendingRef = viewerSession.pending;
   const missingMediaIds = useMemo(() => new Set(
     projection.state.album.media.filter((media) =>
       (mediaFiles?.[media.id]?.state ?? mediaPreviews[media.id]?.state) === "absent"
@@ -417,178 +405,13 @@ export function ProjectWorkspace({
     viewer?.projectId === projectId;
   const selectedPhotoFrame = controller.selectedFrames.length === 1 && controller.selectedFrames[0].photo
     ? controller.selectedFrames[0] : null;
-  const viewerActive = viewer?.projectId === projectId ? viewer : null;
   const openViewer = (source: "panel" | "sheet", mediaId: string, mediaIds: readonly string[], focus: HTMLElement | null) => {
     if (!imageViewerWindowPort || commandsBlocked || mediaDrag || !mediaIds.includes(mediaId)) return;
     setFrameContextMenu(null);
     setSheetContextMenu(null);
-    viewerPendingRef.current = true;
-    setViewer({ sessionId: crypto.randomUUID(), projectId, source, mediaId, mediaIds: [...mediaIds], restoreFocus: focus });
+    viewerSession.open(source, mediaId, mediaIds, focus);
   };
-  const viewerPresentation = useMemo<ViewerPresentation | null>(() => {
-    if (!viewerActive) return null;
-    const position = viewerActive.mediaIds.indexOf(viewerActive.mediaId);
-    const media = projection.state.album.media.find((item) => item.id === viewerActive.mediaId);
-    const preview = mediaPreviews[viewerActive.mediaId];
-    return {
-      sessionId: viewerActive.sessionId, revision: ++viewerRevision.current,
-      mediaId: viewerActive.mediaId, name: media?.name ?? "Imagem",
-      url: mediaPreviewUrls[viewerActive.mediaId] ?? null,
-      state: viewerPreviewState(mediaFiles?.[viewerActive.mediaId], preview),
-      canPrevious: position > 0, canNext: position >= 0 && position < viewerActive.mediaIds.length - 1,
-      correction: viewerActive.correction ? (() => {
-        const referenceId = viewerActive.correction!.referenceMediaId;
-        const refIndex = viewerActive.correction!.referenceIds.indexOf(referenceId);
-        const reference = projection.state.album.media.find((item) => item.id === referenceId);
-        return {
-          phase: viewerActive.correction!.phase,
-          referenceMediaId: referenceId, referenceName: reference?.name ?? "Imagem",
-          referenceUrl: mediaPreviewUrls[referenceId] ?? null,
-          referenceState: viewerPreviewState(mediaFiles?.[referenceId], mediaPreviews[referenceId]),
-          canPreviousReference: refIndex > 0,
-          canNextReference: refIndex < viewerActive.correction!.referenceIds.length - 1,
-          resultUrl: viewerActive.correction!.resultUrl ?? null,
-          error: viewerActive.correction!.error ?? null,
-        };
-      })() : undefined,
-    };
-  }, [viewerActive, projection.state.album.media, mediaPreviews, mediaPreviewUrls, mediaFiles]);
   useEffect(() => {
-    if (!imageViewerWindowPort) return;
-    if (!viewerPresentation) {
-      const session = openedViewerSession.current;
-      openedViewerSession.current = null;
-      if (session) void imageViewerWindowPort.close(session).catch(() => undefined);
-      return;
-    }
-    if (openedViewerSession.current !== viewerPresentation.sessionId) {
-      const previousSession = openedViewerSession.current;
-      openedViewerSession.current = viewerPresentation.sessionId;
-      void (async () => {
-        if (previousSession) await imageViewerWindowPort.close(previousSession);
-        await imageViewerWindowPort.open(viewerPresentation);
-      })().catch(() => { viewerPendingRef.current = false; setViewer((current) => {
-        if (current?.sessionId !== viewerPresentation.sessionId) return current;
-        requestAnimationFrame(() => (current.restoreFocus?.isConnected ? current.restoreFocus : document.querySelector<HTMLElement>(current.source === "panel" ? "#media-panel" : ".canvas-host canvas"))?.focus({ preventScroll: true }));
-        return null;
-      }); });
-    } else {
-      void imageViewerWindowPort.update(viewerPresentation).catch(() => undefined);
-    }
-  }, [imageViewerWindowPort, viewerPresentation]);
-  useEffect(() => {
-    if (!imageViewerWindowPort) return;
-    let active = true;
-    let stopNavigate: (() => void) | undefined;
-    let stopClosed: (() => void) | undefined;
-    void imageViewerWindowPort.onNavigate(({ sessionId, offset }) => {
-      if (!active || (offset !== -1 && offset !== 1)) return;
-      const correction = viewerStateRef.current?.correction;
-      if (correction?.phase === "applying" && viewerStateRef.current?.sessionId === sessionId) return;
-      if (correction && viewerStateRef.current?.sessionId === sessionId) {
-        correctionRequest.current++;
-        correctionCancellation.current = imageViewerWindowPort.cancelCorrection?.().catch(() => undefined) ?? Promise.resolve();
-      }
-      setViewer((current) => {
-        if (!current || current.sessionId !== sessionId) return current;
-        if (current.correction) {
-          const index = current.correction.referenceIds.indexOf(current.correction.referenceMediaId);
-          const referenceMediaId = current.correction.referenceIds[index + offset];
-          return referenceMediaId ? { ...current, correction: { phase: "browse", referenceIds: current.correction.referenceIds, referenceMediaId } } : current;
-        }
-        const index = current.mediaIds.indexOf(current.mediaId);
-        const mediaId = current.mediaIds[index + offset];
-        return mediaId ? { ...current, mediaId } : current;
-      });
-    }).then((stop) => { if (active) stopNavigate = stop; else stop(); });
-    void imageViewerWindowPort.onClosed((sessionId) => {
-      if (!active) return;
-      correctionRequest.current++;
-      setViewer((current) => {
-        if (current?.sessionId !== sessionId) return current;
-        viewerPendingRef.current = false;
-        requestAnimationFrame(() => (current.restoreFocus?.isConnected ? current.restoreFocus : document.querySelector<HTMLElement>(current.source === "panel" ? "#media-panel" : ".canvas-host canvas"))?.focus({ preventScroll: true }));
-        return null;
-      });
-    }).then((stop) => { if (active) stopClosed = stop; else stop(); });
-    return () => { active = false; stopNavigate?.(); stopClosed?.(); };
-  }, [imageViewerWindowPort]);
-  useEffect(() => {
-    if (!imageViewerWindowPort?.onCorrection) return;
-    let active = true;
-    let stop: (() => void) | undefined;
-    void imageViewerWindowPort.onCorrection((action) => {
-      if (!active) return;
-      const current = viewerStateRef.current;
-      if (!current || current.sessionId !== action.sessionId || current.correction?.phase === "applying") return;
-      if (action.kind === "start") {
-        correctionRequest.current++;
-        const referenceIds = projection.state.album.media
-          .filter((media) => media.kind === "photo" && media.id !== current.mediaId)
-          .map((media) => media.id);
-        setViewer((value) => value?.sessionId === action.sessionId
-          ? { ...value, correction: { phase: "browse", referenceIds, referenceMediaId: referenceIds[0] ?? "", error: referenceIds.length ? undefined : "Adicione outra foto ao projeto para usar como referência." } }
-          : value);
-        return;
-      }
-      const correction = current.correction;
-      if (!correction) return;
-      if (action.kind === "cancel") {
-        correctionRequest.current++;
-        correctionCancellation.current = imageViewerWindowPort.cancelCorrection?.().catch(() => undefined) ?? Promise.resolve();
-        setViewer((value) => value?.sessionId === action.sessionId ? { ...value, correction: undefined } : value);
-      } else if (action.kind === "browse") {
-        correctionRequest.current++;
-        correctionCancellation.current = imageViewerWindowPort.cancelCorrection?.().catch(() => undefined) ?? Promise.resolve();
-        setViewer((value) => value?.sessionId === action.sessionId && value.correction
-          ? { ...value, correction: { phase: "browse", referenceIds: value.correction.referenceIds, referenceMediaId: value.correction.referenceMediaId } } : value);
-      } else if (action.kind === "select") {
-        correctionRequest.current++;
-        setViewer((value) => value?.sessionId === action.sessionId && value.correction
-          ? { ...value, correction: { ...value.correction, phase: "select", error: undefined } } : value);
-      } else if (action.kind === "preview" && action.targetFace && action.referenceFace
-        && action.referenceMediaId === correction.referenceMediaId && imageViewerWindowPort.prepareCorrection) {
-        const request = ++correctionRequest.current;
-        setViewer((value) => value?.sessionId === action.sessionId && value.correction
-          ? { ...value, correction: { ...value.correction, phase: "processing", error: undefined } } : value);
-        void correctionCancellation.current.then(() => {
-          if (correctionRequest.current !== request) return null;
-          return imageViewerWindowPort.prepareCorrection!({
-            sessionId: action.sessionId, targetMediaId: current.mediaId,
-            referenceMediaId: correction.referenceMediaId,
-            targetFace: action.targetFace!, referenceFace: action.referenceFace!,
-          });
-        }).then((prepared) => {
-          if (!prepared || correctionRequest.current !== request) return;
-          const { token, url } = prepared;
-          setViewer((value) => value?.sessionId === action.sessionId
-            && value.mediaId === current.mediaId
-            && value.correction?.referenceMediaId === correction.referenceMediaId
-            && value.correction.phase === "processing"
-            ? { ...value, correction: { ...value.correction, phase: "preview", token, resultUrl: url } } : value);
-        }).catch((error) => {
-          if (correctionRequest.current !== request) return;
-          setViewer((value) => value?.sessionId === action.sessionId && value.mediaId === current.mediaId
-            && value.correction?.referenceMediaId === correction.referenceMediaId && value.correction?.phase === "processing"
-            ? { ...value, correction: { ...value.correction, phase: "select", error: error instanceof Error ? error.message : "Não foi possível corrigir os olhos." } } : value);
-        });
-      } else if (action.kind === "apply" && correction.phase === "preview" && correction.token && imageViewerWindowPort.applyCorrection) {
-        const token = correction.token;
-        setViewer((value) => value?.sessionId === action.sessionId && value.correction
-          ? { ...value, correction: { ...value.correction, phase: "applying", error: undefined } } : value);
-        void runProjectMutation.run(() => imageViewerWindowPort.applyCorrection!(action.sessionId, token)).then((outcome) => {
-          if (outcome.status === "completed") {
-            onProjectionChange(outcome.projection);
-            setViewer((value) => value?.sessionId === action.sessionId ? { ...value, correction: undefined } : value);
-          } else if (outcome.status === "failed") {
-            setViewer((value) => value?.sessionId === action.sessionId && value.correction
-              ? { ...value, correction: { ...value.correction, phase: "preview", error: outcome.error instanceof Error ? outcome.error.message : "Não foi possível salvar a correção." } } : value);
-          }
-        });
-      }
-    }).then((value) => { if (active) stop = value; else value(); });
-    return () => { active = false; stop?.(); };
-  }, [imageViewerWindowPort, projection.state.album.media, runProjectMutation, onProjectionChange]);  useEffect(() => {
     const keyDown = (event: globalThis.KeyboardEvent) => {
       if (viewerActive) return;
       if (event.code !== "Space") {

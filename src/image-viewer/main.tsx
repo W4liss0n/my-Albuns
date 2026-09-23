@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import ReactDOM from "react-dom/client";
 import { ImageViewer } from "../components/ImageViewer";
 import type { ViewerPresentation } from "../application/imageViewerWindow";
+import type { ViewerCorrectionPhase } from "../contracts/generated/ViewerCorrectionPhase";
 import { observeViewerPresentation } from "./viewerObservation";
 import { installDesktopWebViewPolicy } from "../platform/desktopWebViewPolicy";
 import { tauriWindowControls } from "../platform/tauriWindowControls";
@@ -24,7 +25,14 @@ const qaReferences = qaMultipleFaces
   ? ["IMG_6252.JPG", "IMG_6276.JPG", "IMG_6300.JPG"].map((name) => ({ name, url: `/.scratch/face-detection-debug-20260923/inputs/${name}` }))
   : [{ name: "Referência.jpg", url: qaReference }, { name: "Outra referência.jpg", url: "/.scratch/face-detection-debug-20260923/inputs/reference.jpg" }];
 const referenceIndex = (correction: ViewerPresentation["correction"]) => Number(correction?.referenceMediaId?.split("-")[1] ?? 0);
-const previewCorrection = (phase: string, version = 0, index = 0) => ({
+const previewPhase = (value: string | null): ViewerCorrectionPhase | null => {
+  switch (value) {
+    case "browse": case "select": case "processing": case "preview": case "applying": return value;
+    default: return null;
+  }
+};
+const initialPreviewPhase = preview?.startsWith("correction-") ? previewPhase(preview.slice("correction-".length)) : null;
+const previewCorrection = (phase: ViewerCorrectionPhase, version = 0, index = 0): NonNullable<ViewerPresentation["correction"]> => ({
   phase, referenceMediaId: `reference-${index}`, referenceName: qa ? qaReferences[index].name : "Referência.jpg",
   referenceUrl: qa ? qaReferences[index].url : sizedPreview(portraitPreview, 800, 1200),
   referenceState: "ready" as const, canPreviousReference: phase === "browse" && index > 0, canNextReference: phase === "browse" && index < qaReferences.length - 1,
@@ -46,7 +54,7 @@ function ViewerWindow() {
     sessionId: "preview", revision: 0, mediaId: "preview", name: qaMultipleFaces ? "IMG_6246.JPG" : qa ? "Nikki — olhos fechados.jpg" : preview === "long" ? "Serra ao amanhecer com todos os detalhes de uma longa viagem de família.jpg" : "Serra ao amanhecer.jpg",
     url: preview === "missing" ? null : qa ? qaTarget : sizedPreview(landscapePreview, 1200, 800),
     state: preview === "missing" ? "absent" : "ready", canPrevious: true, canNext: true,
-    correction: preview?.startsWith("correction-") ? previewCorrection(preview.slice("correction-".length)) : undefined,
+    correction: initialPreviewPhase ? previewCorrection(initialPreviewPhase) : undefined,
   } : null);
   const [error, setError] = useState<string | null>(null);
   useEffect(() => {

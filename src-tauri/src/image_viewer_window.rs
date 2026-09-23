@@ -1,4 +1,5 @@
-use std::{path::PathBuf, sync::Mutex};
+use std::{path::PathBuf, sync::{Arc, Mutex}};
+use tokio::sync::{watch, Semaphore};
 
 use tauri::{AppHandle, Emitter, Manager, State, WebviewWindow, WindowEvent};
 
@@ -10,7 +11,7 @@ use crate::{
     image_processing::ImageProcessingBatch,
     project_host::ProjectHost,
     media_runtime::MediaResolver,
-    ipc_contract::{ViewerAction, ViewerPresentation},
+    ipc_contract::{ViewerAction, ViewerCorrectionAction, ViewerPresentation},
     native_dialog_window,
     product_runtime::PROJECT_WINDOW_LABEL,
 };
@@ -274,6 +275,7 @@ pub(crate) fn close_image_viewer(
 
 #[derive(Clone)]
 struct PendingEyes {
+    key: CorrectionKey,
     session_id: String,
     media_id: String,
     token: String,
@@ -283,41 +285,123 @@ struct PendingEyes {
     original_digest: [u8; 32],
 }
 
-#[derive(Default)]
-struct CorrectionState { generation: u64, pending: Option<PendingEyes>, applying: bool }
+#[derive(Clone, Eq, PartialEq)]
+struct CorrectionKey {
+    session_id: String,
+    target_media_id: String,
+    reference_media_id: String,
+    target_version: (u64, std::time::SystemTime),
+    reference_version: (u64, std::time::SystemTime),
+    faces: Vec<u8>,
+}
 
-#[derive(Default)]
-pub(crate) struct CorrectionStore(Mutex<CorrectionState>);
+impl CorrectionKey {
+    fn new(session_id: &str, target_media_id: &str, reference_media_id: &str,
+        target_path: &std::path::Path, reference_path: &std::path::Path,
+        target_face: &Face, reference_face: &Face) -> Result<Self, String> {
+        let version = |path: &std::path::Path| {
+            let metadata = std::fs::metadata(path).map_err(|_| "Não foi possível conferir uma das fotos.")?;
+            Ok::<_, String>((metadata.len(), metadata.modified().map_err(|_| "Não foi possível conferir uma das fotos.")?))
+        };
+        Ok(Self {
+            session_id: session_id.into(), target_media_id: target_media_id.into(), reference_media_id: reference_media_id.into(),
+            target_version: version(target_path)?, reference_version: version(reference_path)?,
+            faces: serde_json::to_vec(&(target_face, reference_face)).map_err(|_| "Não foi possível conferir os rostos selecionados.")?,
+        })
+    }
+}
+
+enum PreparationAdmission {
+    Ready(PreparedEyes),
+    Join(watch::Receiver<Option<Result<PreparedEyes, String>>>),
+    Start(u64),
+}
+
+struct CorrectionState {
+    generation: u64,
+    pending: Option<PendingEyes>,
+    active: Option<(CorrectionKey, watch::Sender<Option<Result<PreparedEyes, String>>>)>,
+    applying: bool,
+}
+
+impl Default for CorrectionState {
+    fn default() -> Self { Self { generation: 0, pending: None, active: None, applying: false } }
+}
+
+pub(crate) struct CorrectionStore {
+    state: Mutex<CorrectionState>,
+    generation: watch::Sender<u64>,
+    worker: Arc<Semaphore>,
+}
+
+impl Default for CorrectionStore {
+    fn default() -> Self {
+        let (generation, _) = watch::channel(0);
+        Self { state: Mutex::new(CorrectionState::default()), generation, worker: Arc::new(Semaphore::new(1)) }
+    }
+}
 
 impl CorrectionStore {
-    fn clear(&self, previews: &CachePreviewRegistry) -> Option<u64> {
-        let mut state = self.0.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
-        if state.applying { return None; }
+    fn advance_generation(&self, state: &mut CorrectionState) -> u64 {
         state.generation = state.generation.wrapping_add(1);
+        state.active = None;
+        self.generation.send_replace(state.generation);
+        state.generation
+    }
+
+    fn invalidate_locked(&self, state: &mut CorrectionState, previews: &CachePreviewRegistry) -> u64 {
+        let generation = self.advance_generation(state);
         if let Some(pending) = state.pending.take() {
             previews.revoke_viewer_preview(&pending.url);
             let _ = std::fs::remove_file(pending.path);
         }
-        Some(state.generation)
+        generation
     }
 
-    fn begin(&self, previews: &CachePreviewRegistry) -> Result<u64, String> {
-        self.clear(previews).ok_or_else(|| "A correção está sendo aplicada.".into())
+    fn clear(&self, previews: &CachePreviewRegistry) -> Option<u64> {
+        let mut state = self.state.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+        if state.applying { return None; }
+        Some(self.invalidate_locked(&mut state, previews))
+    }
+
+    fn admit(&self, key: CorrectionKey, previews: &CachePreviewRegistry) -> Result<PreparationAdmission, String> {
+        let mut state = self.state.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+        if state.applying { return Err("A correção está sendo aplicada.".into()); }
+        if let Some(pending) = &state.pending && pending.key == key {
+            return Ok(PreparationAdmission::Ready(PreparedEyes { token: pending.token.clone(), url: pending.url.clone() }));
+        }
+        if let Some((active, signal)) = &state.active && *active == key {
+            return Ok(PreparationAdmission::Join(signal.subscribe()));
+        }
+        let generation = self.invalidate_locked(&mut state, previews);
+        let (signal, _) = watch::channel(None);
+        state.active = Some((key, signal));
+        Ok(PreparationAdmission::Start(generation))
+    }
+
+    fn publish_preparation(&self, generation: u64, result: Result<PreparedEyes, String>) -> bool {
+        let mut state = self.state.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+        if state.generation == generation {
+            if let Some((_, signal)) = state.active.take() { signal.send_replace(Some(result)); }
+            true
+        } else {
+            false
+        }
     }
 
     fn accept(&self, generation: u64, pending: PendingEyes) -> bool {
-        let mut state = self.0.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+        let mut state = self.state.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
         if state.generation != generation { return false; }
         state.pending = Some(pending);
         true
     }
 
     fn is_applying(&self) -> bool {
-        self.0.lock().unwrap_or_else(std::sync::PoisonError::into_inner).applying
+        self.state.lock().unwrap_or_else(std::sync::PoisonError::into_inner).applying
     }
 
     fn claim_for_apply(&self, token: &str, session_id: &str) -> Option<PendingEyes> {
-        let mut state = self.0.lock().ok()?;
+        let mut state = self.state.lock().ok()?;
         if state.applying { return None; }
         let pending = state.pending.as_ref().filter(|pending|
             pending.token == token && pending.session_id == session_id
@@ -327,14 +411,29 @@ impl CorrectionStore {
     }
 
     fn release_apply(&self) {
-        self.0.lock().unwrap_or_else(std::sync::PoisonError::into_inner).applying = false;
+        self.state.lock().unwrap_or_else(std::sync::PoisonError::into_inner).applying = false;
     }
 
     fn finish(&self) {
-        let mut state = self.0.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
-        state.generation = state.generation.wrapping_add(1);
+        let mut state = self.state.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+        self.advance_generation(&mut state);
         state.pending = None;
         state.applying = false;
+    }
+
+    fn is_current(&self, generation: u64) -> bool {
+        self.state.lock().unwrap_or_else(std::sync::PoisonError::into_inner).generation == generation
+    }
+
+    async fn acquire_current(&self, generation: u64) -> Result<tokio::sync::OwnedSemaphorePermit, String> {
+        let mut changed = self.generation.subscribe();
+        if *changed.borrow_and_update() != generation { return Err("A correção foi cancelada.".into()); }
+        let permit = tokio::select! {
+            permit = self.worker.clone().acquire_owned() => permit.map_err(|_| "A correção foi interrompida.".to_string())?,
+            _ = changed.changed() => return Err("A correção foi cancelada.".into()),
+        };
+        if !self.is_current(generation) { return Err("A correção foi cancelada.".into()); }
+        Ok(permit)
     }
 }
 
@@ -361,17 +460,36 @@ pub(crate) async fn prepare_eye_correction(
     let reference = catalog.bindings.iter().find(|binding| binding.media_id == reference_media_id && binding.kind == myalbuns_core::MediaKind::Photo)
         .ok_or("A foto de referência não pertence ao projeto.")?;
     if target.media_id == reference.media_id { return Err("Escolha outra foto como referência.".into()); }
-    let output = eye_correction::corrected_path(&host.project_directory()?, &target.logical_path)?;
     let target_path = target.logical_path.clone();
     let reference_path = reference.logical_path.clone();
-    let generation = corrections.begin(&previews)?;
+    let key = CorrectionKey::new(&session_id, &target_media_id, &reference_media_id,
+        &target_path, &reference_path, &target_face, &reference_face)?;
+    let output = eye_correction::corrected_path(&host.project_directory()?, &target.logical_path)?;
+    let generation = match corrections.admit(key.clone(), &previews)? {
+        PreparationAdmission::Ready(result) => return Ok(result),
+        PreparationAdmission::Join(mut signal) => loop {
+            if let Some(result) = signal.borrow_and_update().clone() { return result; }
+            signal.changed().await.map_err(|_| "A correção foi cancelada.".to_string())?;
+        },
+        PreparationAdmission::Start(generation) => generation,
+    };
+    let result: Result<PreparedEyes, String> = async {
+    let permit = corrections.acquire_current(generation).await?;
+    let current = corrections.generation.subscribe();
     let output_for_render = output.clone();
     let rendered = tauri::async_runtime::spawn_blocking(move || {
+        let checkpoint = |_: eye_correction::RenderStage| {
+            if *current.borrow() == generation { Ok(()) }
+            else { Err("A correção foi cancelada.".into()) }
+        };
+        checkpoint(eye_correction::RenderStage::Decode)?;
         let before = eye_correction::source_digest(&target_path)?;
-        let bytes = eye_correction::render(&target_path, &reference_path, &target_face, &reference_face, &output_for_render)?;
+        let bytes = eye_correction::render_with_checkpoint(&target_path, &reference_path, &target_face, &reference_face, &output_for_render, checkpoint)?;
+        if *current.borrow() != generation { return Err("A correção foi cancelada.".into()); }
         if eye_correction::source_digest(&target_path)? != before {
             return Err("A foto original mudou durante a preparação. Feche a correção e use Abrir olhos novamente.".into());
         }
+        drop(permit);
         Ok((bytes, before))
     }).await.map_err(|_| "A correção foi interrompida.".to_string());
     let (bytes, original_digest) = match rendered {
@@ -381,7 +499,7 @@ pub(crate) async fn prepare_eye_correction(
     };
     let url = previews.publish_viewer_preview(bytes);
     let token = uuid::Uuid::new_v4().to_string();
-    let pending = PendingEyes { session_id, media_id: target_media_id, token: token.clone(), path: output.clone(), url: url.clone(),
+    let pending = PendingEyes { key, session_id, media_id: target_media_id, token: token.clone(), path: output.clone(), url: url.clone(),
         original_path: target.logical_path.clone(), original_digest };
     if !corrections.accept(generation, pending) {
         previews.revoke_viewer_preview(&url);
@@ -389,6 +507,9 @@ pub(crate) async fn prepare_eye_correction(
         return Err("A correção foi cancelada.".into());
     }
     Ok(PreparedEyes { token, url })
+    }.await;
+    if corrections.publish_preparation(generation, result.clone()) { result }
+    else { Err("A correção foi cancelada.".into()) }
 }
 
 #[tauri::command]
@@ -567,6 +688,63 @@ pub(crate) fn retire_for_editor_recovery(app: &AppHandle) -> Result<(), String> 
 mod tests {
     use super::*;
 
+    fn key(reference_media_id: &str) -> CorrectionKey {
+        CorrectionKey {
+            session_id: "session".into(), target_media_id: "target".into(), reference_media_id: reference_media_id.into(),
+            target_version: (1, std::time::UNIX_EPOCH), reference_version: (1, std::time::UNIX_EPOCH), faces: vec![1],
+        }
+    }
+
+    #[tokio::test]
+    async fn repeated_pair_joins_one_job_and_superseded_waiters_leave_the_queue() {
+        let previews = CachePreviewRegistry::new(LABEL);
+        let corrections = Arc::new(CorrectionStore::default());
+        let first = match corrections.admit(key("a"), &previews).unwrap() { PreparationAdmission::Start(value) => value, _ => panic!("expected first job") };
+        let held = corrections.acquire_current(first).await.unwrap();
+        assert!(matches!(corrections.admit(key("a"), &previews).unwrap(), PreparationAdmission::Join(_)));
+        let obsolete = match corrections.admit(key("b"), &previews).unwrap() { PreparationAdmission::Start(value) => value, _ => panic!("expected second job") };
+        let waiting = {
+            let corrections = corrections.clone();
+            tokio::spawn(async move { corrections.acquire_current(obsolete).await.map(|_| ()) })
+        };
+        tokio::task::yield_now().await;
+        let latest = match corrections.admit(key("c"), &previews).unwrap() { PreparationAdmission::Start(value) => value, _ => panic!("expected latest job") };
+        assert_eq!(waiting.await.unwrap().unwrap_err(), "A correção foi cancelada.");
+        drop(held);
+        let permit = corrections.acquire_current(latest).await.unwrap();
+        corrections.publish_preparation(latest, Ok(PreparedEyes { token: "latest".into(), url: "preview".into() }));
+        drop(permit);
+    }
+
+    #[tokio::test]
+    async fn failed_pair_notifies_joiners_and_can_be_retried() {
+        let previews = CachePreviewRegistry::new(LABEL);
+        let corrections = CorrectionStore::default();
+        let generation = match corrections.admit(key("a"), &previews).unwrap() { PreparationAdmission::Start(value) => value, _ => panic!("expected job") };
+        let mut joined = match corrections.admit(key("a"), &previews).unwrap() { PreparationAdmission::Join(value) => value, _ => panic!("expected join") };
+        corrections.publish_preparation(generation, Err("Falha de teste".into()));
+        joined.changed().await.unwrap();
+        assert_eq!(joined.borrow().as_ref().unwrap().as_ref().unwrap_err(), "Falha de teste");
+        assert!(matches!(corrections.admit(key("a"), &previews).unwrap(), PreparationAdmission::Start(_)));
+    }
+
+    #[tokio::test]
+    async fn cancellation_releases_queued_pair_without_waiting_for_the_active_worker() {
+        let previews = CachePreviewRegistry::new(LABEL);
+        let corrections = Arc::new(CorrectionStore::default());
+        let first = match corrections.admit(key("a"), &previews).unwrap() { PreparationAdmission::Start(value) => value, _ => panic!("expected job") };
+        let held = corrections.acquire_current(first).await.unwrap();
+        let next = match corrections.admit(key("b"), &previews).unwrap() { PreparationAdmission::Start(value) => value, _ => panic!("expected next job") };
+        let waiting = {
+            let corrections = corrections.clone();
+            tokio::spawn(async move { corrections.acquire_current(next).await.map(|_| ()) })
+        };
+        tokio::task::yield_now().await;
+        corrections.clear(&previews).unwrap();
+        assert_eq!(waiting.await.unwrap().unwrap_err(), "A correção foi cancelada.");
+        drop(held);
+    }
+
     #[test]
     fn applying_correction_keeps_prepared_candidate_until_mutation_finishes() {
         let path = std::env::temp_dir().join(format!("myalbuns-eye-{}.png", uuid::Uuid::new_v4()));
@@ -575,12 +753,15 @@ mod tests {
         let url = previews.publish_viewer_preview(vec![1, 2, 3]);
         let corrections = CorrectionStore::default();
         assert!(corrections.accept(0, PendingEyes {
+            key: key("reference"),
             session_id: "session".into(), media_id: "target".into(),
             token: "token".into(), path: path.clone(), url,
             original_path: path.with_extension("jpg"), original_digest: [0; 32],
         }));
+        assert!(matches!(corrections.admit(key("reference"), &previews).unwrap(), PreparationAdmission::Ready(_)));
         assert!(corrections.claim_for_apply("token", "session").is_some());
         assert!(corrections.clear(&previews).is_none());
+        assert!(corrections.admit(key("reference"), &previews).is_err());
         assert!(path.exists(), "cancellation must not unlink a derivative during commit");
         assert!(corrections.is_applying());
         // A failed commit after viewer retirement releases ownership, then discards the orphan.
@@ -618,24 +799,14 @@ mod tests {
 
 
 
-#[derive(Clone, Debug, serde::Deserialize, serde::Serialize)]
-#[serde(rename_all = "camelCase")]
-pub(crate) struct CorrectionAction {
-    session_id: String,
-    kind: String,
-    reference_media_id: Option<String>,
-    target_face: Option<Face>,
-    reference_face: Option<Face>,
-}
-
 #[tauri::command]
 pub(crate) fn act_image_viewer_correction(
     app: AppHandle,
     window: WebviewWindow,
-    action: CorrectionAction,
+    action: ViewerCorrectionAction,
     store: State<'_, ViewerStore>,
 ) -> Result<(), String> {
-    if window.label() != LABEL || !matches!(action.kind.as_str(), "start" | "browse" | "select" | "preview" | "apply" | "cancel") {
+    if window.label() != LABEL {
         return Err("Ação do visualizador inválida.".into());
     }
     if store.current()?.as_ref().is_none_or(|current| current.session_id != action.session_id) {

@@ -145,3 +145,49 @@ o ensaio de apresentação, em `preview-browser-timings.json` no mesmo diretóri
 o perfil realmente usado, inclua o pacote que instancia operações genéricas
 e diferencie tempo de processamento de latência percebida na janela. Uma
 medição rápida em release não basta para declarar responsiva a versão local.
+
+## Pedidos superados na preparação
+
+Em 23/09/2026, a preparação passou a admitir um único trabalho ativo por Host,
+coalescer pedidos do mesmo par e versão e invalidar esperas de pares superados.
+O trabalho já iniciado consulta a geração antes da leitura, da composição e da
+codificação do PNG. Essas consultas não interrompem uma etapa que já começou;
+em especial, uma codificação em andamento ainda termina antes de liberar o
+worker. O original continua protegido por hash na preparação e na aplicação.
+
+O ensaio abaixo usa as mesmas cópias de 4.000 × 6.000 pixels e os mesmos pontos
+do teste anterior, no perfil `dev` de `myalbuns-desktop`, com compilação fora
+do cronômetro. A comparação de três pedidos executa o **compositor nativo em
+série**: de um lado, três preparações completas; do outro, um pedido interrompido
+antes da codificação, um pedido dispensado antes da leitura e o pedido atual
+completo. Mede tempo de parede e CPU do processo na fronteira de preparação,
+incluindo hash do original. É uma simulação controlada da supersessão, não uma
+medição dos comandos Tauri concorrentes, da detecção facial nem do clique até a
+prévia aparecer na janela.
+
+| Cenário controlado | Parede | CPU do processo | PNGs completos |
+| --- | ---: | ---: | ---: |
+| Um par, sem supersessão | 2.309 ms | 3.015 ms | 1 |
+| Três pedidos sem interrupção, em série | 7.070 ms | 9.421 ms | 3 |
+| Três pedidos com checkpoints, em série | 2.575 ms | 3.875 ms | 1 |
+
+No último caso, dois pedidos chegaram à etapa de leitura, dois à composição e
+apenas o atual concluiu o PNG. As saídas completas e as prévias dos cenários
+têm hashes SHA-256 idênticos, respectivamente
+`9c75ba9f58442e277d88cae3e2059663cad09b073eafb29f395a23767cd59a44`
+e `b78b0ccae09c3916971faeaca9d40ae9cc5af89b738e7dc6249d8cc4c78e113d`.
+Os hashes das duas cópias de entrada também permaneceram iguais. A variação do
+tempo de um pedido em relação à mediana anterior de 1.624 ms confirma que não
+se deve juntar rodadas de condições distintas numa estimativa de ganho.
+
+O teste ignorado reproduz essa fronteira sem alterar as fotos de entrada; cria
+as saídas em uma pasta temporária dentro de `.scratch/.../render` e a remove
+ao terminar:
+
+```powershell
+& ./scripts/Invoke-LocalCargo.ps1 -CargoArguments @('test','-p','myalbuns-desktop','--lib','benchmark_serial_native_render_with_supersession_checkpoints','--','--ignored','--nocapture')
+```
+
+Ainda falta uma medição ponta a ponta na janela nativa com projeto real. O
+`preview-latency.mjs` existente mede somente a apresentação de uma URL de QA
+no Edge, sem preparação no Host; seus números não preenchem essa lacuna.

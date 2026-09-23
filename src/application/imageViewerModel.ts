@@ -1,5 +1,5 @@
 import type { ComposedSheet } from "../domain/project";
-import type { MediaFileInfo, MediaPreview } from "../application/projectPorts";
+import type { MediaFileInfo, MediaPreview } from "./projectPorts";
 import type { ViewerPreviewState } from "../contracts/generated/ViewerPreviewState";
 
 export function viewerPreviewState(original: MediaFileInfo | undefined, preview: MediaPreview | undefined): ViewerPreviewState {
