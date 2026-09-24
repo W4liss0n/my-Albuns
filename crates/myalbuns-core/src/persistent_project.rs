@@ -1249,7 +1249,7 @@ impl ProjectCore {
         })?;
         Ok(EditableProject {
             core: self.clone(),
-            session: PersistentProjectSession::from_persisted(revision, false),
+            session: PersistentProjectSession::from_persisted(revision),
             store,
             identity_lease,
             identity_authority,
@@ -1329,10 +1329,7 @@ impl ProjectCore {
         let identity_authority = ProjectIdentityAuthority::authorized(identity_lease.project_id());
         Ok(EditableProject {
             core: self.clone(),
-            session: PersistentProjectSession::from_persisted(
-                opened.revision,
-                opened.requires_schema_upgrade,
-            ),
+            session: PersistentProjectSession::from_persisted(opened.revision),
             store: opened.store,
             identity_lease,
             identity_authority,
@@ -1594,7 +1591,7 @@ impl ProjectCore {
         })?;
         Ok(EditableProject {
             core: self.clone(),
-            session: PersistentProjectSession::from_persisted(revision, false),
+            session: PersistentProjectSession::from_persisted(revision),
             store,
             identity_lease,
             identity_authority,
@@ -1646,7 +1643,7 @@ fn promote_external_copy(
     drop(source_identity_guard);
     Ok(EditableProject {
         core: core.clone(),
-        session: PersistentProjectSession::from_persisted(revision, opened.requires_schema_upgrade),
+        session: PersistentProjectSession::from_persisted(revision),
         store: opened.store,
         identity_lease,
         identity_authority,

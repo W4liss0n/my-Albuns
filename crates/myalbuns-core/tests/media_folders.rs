@@ -405,31 +405,10 @@ fn save_as_and_external_copy_preserve_folders_and_keep_edits_independent() {
 }
 
 #[test]
-fn v11_migration_is_read_only_until_save_and_matches_v12_golden() {
+fn closed_schema_rejects_invalid_organization_without_writing() {
     let root = tempfile::tempdir().unwrap();
-    let path = root.path().join("Legado.myalbuns");
-    let bytes = include_bytes!("fixtures/project_document_v11_migration_expected.myalbuns");
-    fs::write(&path, bytes).unwrap();
-    let mut project = core(root.path())
-        .open_editable(OpenProjectRequest::new(location(&path)))
-        .unwrap();
-    assert!(project.project().media_folders().is_empty());
-    assert!(!project.has_unsaved_changes());
-    assert_eq!(fs::read(&path).unwrap(), bytes);
-    project.save(project.revision()).unwrap();
-    assert_eq!(
-        fs::read(&path).unwrap(),
-        include_bytes!("fixtures/project_document_v12_migration_expected.myalbuns")
-    );
-}
-
-#[test]
-fn v12_closed_schema_rejects_invalid_organization_without_writing() {
-    let root = tempfile::tempdir().unwrap();
-    let mut valid: Value = serde_json::from_slice(include_bytes!(
-        "fixtures/project_document_v12_photo_migration_expected.myalbuns"
-    ))
-    .unwrap();
+    let mut valid: Value =
+        serde_json::from_slice(include_bytes!("fixtures/project_file_v1/photo.myalbuns")).unwrap();
     let media = valid["project"]["media"]
         .as_array()
         .unwrap()
@@ -438,7 +417,7 @@ fn v12_closed_schema_rejects_invalid_organization_without_writing() {
         .unwrap()["id"]
         .clone();
     let folder = json!({"id":"ab000000-0000-4000-8000-000000000001","name":"Turma A","kind":"photo","mediaIds":[media]});
-    valid["mediaFolders"] = json!([folder]);
+    valid["project"]["mediaFolders"] = json!([folder]);
     let valid_path = root.path().join("Válido.myalbuns");
     fs::write(&valid_path, serde_json::to_vec(&valid).unwrap()).unwrap();
     core(root.path())
@@ -455,11 +434,11 @@ fn v12_closed_schema_rejects_invalid_organization_without_writing() {
         ("mediaIds", json!(["ab000000-0000-4000-8000-000000000002"])),
     ] {
         let mut case = valid.clone();
-        case["mediaFolders"][0][key] = value;
+        case["project"]["mediaFolders"][0][key] = value;
         cases.push(case);
     }
     let mut duplicate = valid.clone();
-    duplicate["mediaFolders"]
+    duplicate["project"]["mediaFolders"]
         .as_array_mut()
         .unwrap()
         .push(folder.clone());
@@ -468,14 +447,11 @@ fn v12_closed_schema_rejects_invalid_organization_without_writing() {
     let mut second = folder;
     second["id"] = json!("ab000000-0000-4000-8000-000000000003");
     second["name"] = json!("Turma B");
-    repeated_member["mediaFolders"]
+    repeated_member["project"]["mediaFolders"]
         .as_array_mut()
         .unwrap()
         .push(second);
     cases.push(repeated_member);
-    let mut missing = valid.clone();
-    missing.as_object_mut().unwrap().remove("mediaFolders");
-    cases.push(missing);
     for (i, case) in cases.into_iter().enumerate() {
         let path = root.path().join(format!("Inválido-{i}.myalbuns"));
         let bytes = serde_json::to_vec(&case).unwrap();

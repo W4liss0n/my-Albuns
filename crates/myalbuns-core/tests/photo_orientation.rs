@@ -438,172 +438,6 @@ fn fine_angle_rejects_invalid_ranges_and_selections_without_changing_history() {
 }
 
 #[test]
-fn v4_angle_migration_preserves_orientation_and_adds_only_neutral_angle_on_save() {
-    let root = tempfile::tempdir().unwrap();
-    let path = root.path().join("Legado.myalbuns");
-    let input = include_bytes!("fixtures/project_document_v4_angle_migration_input.myalbuns");
-    let expected: serde_json::Value = serde_json::from_slice(include_bytes!(
-        "fixtures/project_document_v12_angle_migration_expected.myalbuns"
-    ))
-    .unwrap();
-    fs::write(&path, input).unwrap();
-    let mut project = core(root.path())
-        .open_editable(OpenProjectRequest::new(location(&path)))
-        .unwrap();
-    let before = project.projection();
-    let transform = &before.state.album.sheets[0].frames[0]
-        .photo
-        .as_ref()
-        .unwrap()
-        .transform;
-    assert_eq!(
-        (
-            transform.quarter_turns,
-            transform.mirror_x,
-            transform.fine_rotation_degrees
-        ),
-        (3, true, 0.0)
-    );
-    assert_eq!(
-        (transform.pan_x, transform.pan_y, transform.user_zoom),
-        (0.25, -0.5, 1.75)
-    );
-    assert!(!project.has_unsaved_changes());
-    assert!(!before.state.can_undo);
-    assert_eq!(fs::read(&path).unwrap(), input);
-    project.save(9).unwrap();
-    assert_eq!(
-        serde_json::from_slice::<serde_json::Value>(&fs::read(&path).unwrap()).unwrap(),
-        expected
-    );
-    assert_eq!(project.projection(), before);
-}
-
-#[test]
-fn v5_requires_an_integer_angle_in_range_and_keeps_legacy_dtos_closed() {
-    use myalbuns_core::{DocumentFailure, LoadProjectError, LoadProjectRequest};
-    let valid: serde_json::Value = serde_json::from_slice(include_bytes!(
-        "fixtures/project_document_v5_angle_migration_expected.myalbuns"
-    ))
-    .unwrap();
-    let transform = "/project/sheets/0/frames/0/photo/transform";
-    let mut cases = Vec::new();
-    for angle in [
-        serde_json::json!(-451),
-        serde_json::json!(451),
-        serde_json::json!(12.5),
-        serde_json::json!("125"),
-        serde_json::Value::Null,
-    ] {
-        let mut invalid = valid.clone();
-        invalid.pointer_mut(transform).unwrap()["angleTenths"] = angle;
-        cases.push(invalid);
-    }
-    let mut missing = valid.clone();
-    missing
-        .pointer_mut(transform)
-        .unwrap()
-        .as_object_mut()
-        .unwrap()
-        .remove("angleTenths");
-    cases.push(missing);
-    let mut unknown = valid.clone();
-    unknown.pointer_mut(transform).unwrap()["angleDegrees"] = serde_json::json!(0);
-    cases.push(unknown);
-    let mut legacy = valid.clone();
-    legacy["schemaVersion"] = serde_json::json!(4);
-    cases.push(legacy);
-    let root = tempfile::tempdir().unwrap();
-    for (index, value) in cases.into_iter().enumerate() {
-        let path = root.path().join(format!("Invalid-{index}.myalbuns"));
-        let bytes = serde_json::to_vec(&value).unwrap();
-        fs::write(&path, &bytes).unwrap();
-        assert!(matches!(
-            core(root.path()).load_persisted_revision(LoadProjectRequest::new(location(&path))),
-            Err(LoadProjectError::Document(
-                DocumentFailure::InvalidProjectDocument
-            ))
-        ));
-        assert_eq!(fs::read(path).unwrap(), bytes);
-    }
-}
-
-#[test]
-fn v5_migration_preserves_photo_adjustments_and_v6_requires_a_boolean_effect() {
-    use myalbuns_core::{DocumentFailure, LoadProjectError, LoadProjectRequest};
-    let root = tempfile::tempdir().unwrap();
-    let path = root.path().join("Efeito.myalbuns");
-    let input = include_bytes!("fixtures/project_document_v5_effect_migration_input.myalbuns");
-    let expected: serde_json::Value = serde_json::from_slice(include_bytes!(
-        "fixtures/project_document_v12_effect_migration_expected.myalbuns"
-    ))
-    .unwrap();
-    fs::write(&path, input).unwrap();
-    let mut project = core(root.path())
-        .open_editable(OpenProjectRequest::new(location(&path)))
-        .unwrap();
-    let before = project.projection();
-    let photo = before.state.album.sheets[0].frames[0]
-        .photo
-        .as_ref()
-        .unwrap();
-    assert!(!photo.transform.black_and_white);
-    assert_eq!(photo.transform.fine_rotation_degrees, -12.3);
-    assert!(!before.state.can_undo);
-    assert!(!project.has_unsaved_changes());
-    assert_eq!(fs::read(&path).unwrap(), input);
-    project.save(9).unwrap();
-    assert_eq!(
-        serde_json::from_slice::<serde_json::Value>(&fs::read(&path).unwrap()).unwrap(),
-        expected
-    );
-    assert_eq!(project.projection(), before);
-    drop(project);
-    // Exercise the historical v6 contract independently from the latest writer.
-    let expected: serde_json::Value = serde_json::from_slice(include_bytes!(
-        "fixtures/project_document_v6_effect_migration_expected.myalbuns"
-    ))
-    .unwrap();
-    let transform = "/project/sheets/0/frames/0/photo/transform";
-    let mut cases = Vec::new();
-    for value in [
-        serde_json::json!(1),
-        serde_json::json!("true"),
-        serde_json::Value::Null,
-    ] {
-        let mut invalid = expected.clone();
-        invalid.pointer_mut(transform).unwrap()["blackAndWhite"] = value;
-        cases.push(invalid);
-    }
-    let mut missing = expected.clone();
-    missing
-        .pointer_mut(transform)
-        .unwrap()
-        .as_object_mut()
-        .unwrap()
-        .remove("blackAndWhite");
-    cases.push(missing);
-    let mut legacy = expected.clone();
-    legacy["schemaVersion"] = serde_json::json!(5);
-    cases.push(legacy);
-    let mut unknown = expected.clone();
-    unknown.pointer_mut(transform).unwrap()["saturation"] = serde_json::json!(0);
-    cases.push(unknown);
-    for (index, value) in cases.into_iter().enumerate() {
-        let path = root.path().join(format!("Invalid-effect-{index}.myalbuns"));
-        let bytes = serde_json::to_vec(&value).unwrap();
-        fs::write(&path, &bytes).unwrap();
-        assert!(matches!(
-            core(root.path()).load_persisted_revision(LoadProjectRequest::new(location(&path))),
-            Err(LoadProjectError::Document(
-                DocumentFailure::InvalidProjectDocument
-            ))
-        ));
-        assert_eq!(fs::read(path).unwrap(), bytes);
-    }
-}
-
-#[test]
 fn fine_angles_fill_every_frame_corner_at_pan_limits_with_any_rotation_and_mirror() {
     use myalbuns_core::{
         FrameGeometryEdit, FrameGeometryGesture, FrameGeometryTarget, FrameResizeHandle,
@@ -843,7 +677,7 @@ fn photo_adjustments_survive_pan_zoom_save_reopen_and_export_without_writing_ori
     project.save(project.revision()).unwrap();
     let bytes = fs::read(root.path().join("Orientação.myalbuns")).unwrap();
     let dto: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
-    assert_eq!(dto["schemaVersion"], 12);
+    assert_eq!(dto["schemaVersion"], 1);
     assert_eq!(
         dto["project"]["sheets"][0]["frames"][0]["photo"]["transform"]["blackAndWhite"],
         true
@@ -974,99 +808,103 @@ fn mixed_values_take_one_absolute_orientation_and_invalid_selections_are_atomic(
 }
 
 #[test]
-fn v3_migrates_only_in_memory_and_explicit_save_matches_the_v12_golden_file() {
-    let root = tempfile::tempdir().unwrap();
-    let path = root.path().join("Legado.myalbuns");
-    let input = include_bytes!("fixtures/project_document_v3_photo_migration_input.myalbuns");
-    let expected: serde_json::Value = serde_json::from_slice(include_bytes!(
-        "fixtures/project_document_v12_photo_migration_expected.myalbuns"
-    ))
-    .unwrap();
-    fs::write(&path, input).unwrap();
-    let mut project = core(root.path())
-        .open_editable(OpenProjectRequest::new(location(&path)))
-        .unwrap();
-    assert_eq!(fs::read(&path).unwrap(), input);
-    assert_eq!(project.revision(), 9);
-    assert!(!project.has_unsaved_changes());
-    let before = project.projection();
-    assert_eq!(
-        before.state.album.sheets[0].frames[0]
-            .photo
-            .as_ref()
-            .unwrap()
-            .transform
-            .quarter_turns,
-        0
-    );
-    assert!(!before.state.can_undo);
-    project.save(9).unwrap();
-    assert_eq!(
-        serde_json::from_slice::<serde_json::Value>(&fs::read(&path).unwrap()).unwrap(),
-        expected
-    );
-    assert_eq!(project.projection(), before);
-}
-
-#[test]
-fn v4_rejects_unknown_missing_invalid_orientation_and_future_schemas_without_writing() {
+fn photo_adjustments_are_closed_and_valid_and_rejections_do_not_write() {
     use myalbuns_core::{DocumentFailure, LoadProjectError, LoadProjectRequest};
     let valid: serde_json::Value = serde_json::from_slice(include_bytes!(
-        "fixtures/project_document_v4_photo_migration_expected.myalbuns"
+        "fixtures/project_file_v1/photo_effect.myalbuns"
     ))
     .unwrap();
     let transform = "/project/sheets/0/frames/0/photo/transform";
-    let mut cases = Vec::new();
-    for value in [
-        serde_json::json!(-1),
-        serde_json::json!(4),
-        serde_json::json!(1.5),
-        serde_json::json!("1"),
-        serde_json::Value::Null,
-    ] {
-        let mut invalid = valid.clone();
-        invalid.pointer_mut(transform).unwrap()["quarterTurns"] = value;
-        cases.push(invalid);
-    }
-    for field in ["quarterTurns", "mirrorX"] {
-        let mut invalid = valid.clone();
-        invalid
+    let root = tempfile::tempdir().unwrap();
+    let write = |name: String, value: &serde_json::Value| {
+        let path = root.path().join(name);
+        let bytes = serde_json::to_vec(value).unwrap();
+        fs::write(&path, &bytes).unwrap();
+        (path, bytes)
+    };
+
+    // A missing adjustment keeps its neutral value.
+    for field in ["quarterTurns", "mirrorX", "angleTenths", "blackAndWhite"] {
+        let mut neutral = valid.clone();
+        neutral
             .pointer_mut(transform)
             .unwrap()
             .as_object_mut()
             .unwrap()
             .remove(field);
-        cases.push(invalid);
+        // Each file repeats the same Identity, so each gets its own registry.
+        let registry = tempfile::tempdir().unwrap();
+        let (path, _) = write(format!("neutral-{field}.myalbuns"), &neutral);
+        core(registry.path())
+            .load_persisted_revision(LoadProjectRequest::new(location(&path)))
+            .unwrap();
     }
-    let mut unknown = valid.clone();
-    unknown.pointer_mut(transform).unwrap()["angle"] = serde_json::json!(90);
-    cases.push(unknown);
-    let mut invalid_mirror = valid.clone();
-    invalid_mirror.pointer_mut(transform).unwrap()["mirrorX"] = serde_json::json!(1);
-    cases.push(invalid_mirror);
-    let root = tempfile::tempdir().unwrap();
+
+    let mut cases = Vec::new();
+    for (field, values) in [
+        (
+            "quarterTurns",
+            vec![
+                serde_json::json!(-1),
+                serde_json::json!(4),
+                serde_json::json!(1.5),
+                serde_json::json!("1"),
+                serde_json::Value::Null,
+            ],
+        ),
+        (
+            "mirrorX",
+            vec![serde_json::json!(1), serde_json::Value::Null],
+        ),
+        (
+            "angleTenths",
+            vec![
+                serde_json::json!(-451),
+                serde_json::json!(451),
+                serde_json::json!(12.5),
+                serde_json::json!("125"),
+                serde_json::Value::Null,
+            ],
+        ),
+        (
+            "blackAndWhite",
+            vec![
+                serde_json::json!(1),
+                serde_json::json!("true"),
+                serde_json::Value::Null,
+            ],
+        ),
+        ("angleDegrees", vec![serde_json::json!(0)]),
+        ("saturation", vec![serde_json::json!(0)]),
+    ] {
+        for value in values {
+            let mut invalid = valid.clone();
+            invalid.pointer_mut(transform).unwrap()[field] = value;
+            cases.push(invalid);
+        }
+    }
     for (index, invalid) in cases.iter().enumerate() {
-        let path = root.path().join(format!("invalid-{index}.myalbuns"));
-        let bytes = serde_json::to_vec(invalid).unwrap();
-        fs::write(&path, &bytes).unwrap();
-        assert!(matches!(
-            core(root.path()).load_persisted_revision(LoadProjectRequest::new(location(&path))),
-            Err(LoadProjectError::Document(
-                DocumentFailure::InvalidProjectDocument
-            ))
-        ));
+        let (path, bytes) = write(format!("invalid-{index}.myalbuns"), invalid);
+        assert!(
+            matches!(
+                core(root.path()).load_persisted_revision(LoadProjectRequest::new(location(&path))),
+                Err(LoadProjectError::Document(
+                    DocumentFailure::InvalidProjectDocument
+                ))
+            ),
+            "case {index}"
+        );
         assert_eq!(fs::read(path).unwrap(), bytes);
     }
+
     let mut future = valid.clone();
-    future["schemaVersion"] = serde_json::json!(13);
-    let path = root.path().join("future.myalbuns");
-    let bytes = serde_json::to_vec(&future).unwrap();
-    fs::write(&path, &bytes).unwrap();
+    future["schemaVersion"] = serde_json::json!(2);
+    let (path, bytes) = write("future.myalbuns".into(), &future);
     assert_eq!(
         core(root.path())
             .load_persisted_revision(LoadProjectRequest::new(location(&path)))
             .unwrap_err(),
-        LoadProjectError::Document(DocumentFailure::UnsupportedFutureSchema { version: 13 })
+        LoadProjectError::Document(DocumentFailure::UnsupportedFutureSchema { version: 2 })
     );
     assert_eq!(fs::read(path).unwrap(), bytes);
 }

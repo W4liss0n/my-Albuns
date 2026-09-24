@@ -159,8 +159,7 @@ fn a_populated_model_is_copied_as_a_whole_without_history_or_another_identity_re
         .with_identity_storage_roots(root.path().join("leases"), root.path().join("identities"));
     let model_path = root.path().join("Modelo.myalbuns");
     std::fs::copy(
-        Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("tests/fixtures/project_document_v11_photo_migration_expected.myalbuns"),
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/project_file_v1/photo.myalbuns"),
         &model_path,
     )
     .unwrap();

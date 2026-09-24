@@ -553,7 +553,7 @@ mod tests {
                 .expect("the checkpoint serializes");
             let document: serde_json::Value =
                 serde_json::from_slice(&bytes).expect("the checkpoint is valid JSON");
-            assert_eq!(document["creativeState"]["project"]["document"]["dpi"], 420);
+            assert_eq!(document["creativeState"]["project"]["album"]["dpi"], 420);
         });
     }
 

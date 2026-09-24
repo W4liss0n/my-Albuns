@@ -28,6 +28,11 @@ impl LayoutFavoriteId {
     pub fn is_valid(self) -> bool {
         super::identity::is_valid(self.0)
     }
+
+    /// Accepts only the canonical UUID v4 form a Layout identity requires.
+    pub(crate) fn from_uuid(id: Uuid) -> Option<Self> {
+        super::identity::is_valid(id).then_some(Self(id))
+    }
 }
 
 impl std::fmt::Display for LayoutFavoriteId {

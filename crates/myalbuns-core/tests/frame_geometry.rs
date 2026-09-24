@@ -892,7 +892,14 @@ fn project_with_rectangles(
     let mut payload: serde_json::Value = serde_json::from_slice(&fs::read(&path).unwrap()).unwrap();
     for (index, [x, y, width, height]) in rectangles.iter().enumerate() {
         let frame = &mut payload["project"]["sheets"][sheet_index]["frames"][index];
-        frame["rect"] = serde_json::json!({ "x": x, "y": y, "width": width, "height": height });
+        for (key, value) in [
+            ("xUm", x),
+            ("yUm", y),
+            ("widthUm", width),
+            ("heightUm", height),
+        ] {
+            frame[key] = serde_json::json!(value);
+        }
         if index % 2 == 1 {
             frame["photo"] = serde_json::Value::Null;
         }
@@ -1213,8 +1220,8 @@ fn a_small_persisted_placeholder_can_move_and_grow_without_being_enlarged_implic
     let path = root.path().join("Frame.myalbuns");
     let mut payload: serde_json::Value = serde_json::from_slice(&fs::read(&path).unwrap()).unwrap();
     let frame = &mut payload["project"]["sheets"][0]["frames"][0];
-    frame["rect"]["width"] = 4_000.into();
-    frame["rect"]["height"] = 8_000.into();
+    frame["widthUm"] = 4_000.into();
+    frame["heightUm"] = 8_000.into();
     frame["photo"] = serde_json::Value::Null;
     fs::write(&path, serde_json::to_vec_pretty(&payload).unwrap()).unwrap();
     let core = ProjectCore::new()

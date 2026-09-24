@@ -84,50 +84,6 @@ fn local_background_color_is_one_undoable_edit_and_restores_live_album_defaults(
 }
 
 #[test]
-fn v10_migrates_without_local_visuals_and_explicit_save_matches_the_v12_fixtures() {
-    let fixtures = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures");
-    for name in [
-        "migration",
-        "photo_migration",
-        "angle_migration",
-        "effect_migration",
-    ] {
-        let root = tempfile::tempdir().unwrap();
-        let input =
-            std::fs::read(fixtures.join(format!("project_document_v10_{name}_expected.myalbuns")))
-                .unwrap();
-        let path = root.path().join("Legado.myalbuns");
-        std::fs::write(&path, &input).unwrap();
-        let core = ProjectCore::new().with_identity_storage_roots(
-            root.path().join("leases"),
-            root.path().join("identities"),
-        );
-        let mut project = core
-            .open_editable(OpenProjectRequest::new(location(&path)))
-            .unwrap();
-        assert!(
-            project
-                .project()
-                .sheets()
-                .iter()
-                .all(|sheet| sheet.visuals().is_default())
-        );
-        assert!(!project.has_unsaved_changes());
-        assert!(!project.projection().state.can_undo);
-        assert_eq!(std::fs::read(&path).unwrap(), input);
-        let before = project.projection();
-        project.save(project.revision()).unwrap();
-        assert_eq!(project.projection(), before);
-        let output = std::fs::read(&path).unwrap();
-        let expected = fixtures.join(format!("project_document_v12_{name}_expected.myalbuns"));
-        if std::env::var_os("MYALBUNS_UPDATE_PROJECT_V12_FIXTURES").is_some() {
-            std::fs::write(&expected, &output).unwrap();
-        }
-        assert_eq!(output, std::fs::read(expected).unwrap());
-    }
-}
-
-#[test]
 fn removing_a_local_application_keeps_media_and_the_other_side_then_restores_current_defaults() {
     let root = tempfile::tempdir().unwrap();
     let path = root.path().join("Remover aplicação.myalbuns");
@@ -792,15 +748,16 @@ fn decorative_drop_preview_uses_sheet_zones_and_single_page_scope_without_histor
 fn public_decorative_projections_match_the_visual_corpus() {
     let root = tempfile::tempdir().unwrap();
     let path = root.path().join("Decorativos.myalbuns");
-    let mut input: serde_json::Value = serde_json::from_slice(include_bytes!(
-        "fixtures/project_document_v10_photo_migration_expected.myalbuns"
-    ))
-    .unwrap();
+    let mut input: serde_json::Value =
+        serde_json::from_slice(include_bytes!("fixtures/project_file_v1/photo.myalbuns")).unwrap();
     for (suffix, name) in [(20, "Textura.png"), (30, "Overlay.png")] {
-        input["project"]["media"].as_array_mut().unwrap().push(serde_json::json!({
-            "id": format!("00000000-0000-4000-8000-{suffix:012}"), "kind": "decorative",
-            "path": { "encoding": "windowsUtf16", "units": format!("C:\\Fotos\\{name}").encode_utf16().collect::<Vec<_>>() }
-        }));
+        input["project"]["media"]
+            .as_array_mut()
+            .unwrap()
+            .push(serde_json::json!({
+                "id": format!("00000000-0000-4000-8000-{suffix:012}"), "kind": "decorative",
+                "path": format!("C:\\Fotos\\{name}")
+            }));
     }
     std::fs::write(&path, serde_json::to_vec(&input).unwrap()).unwrap();
     let mut project = ProjectCore::new()

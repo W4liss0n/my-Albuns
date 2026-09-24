@@ -85,7 +85,14 @@ fn composed(root: &Path, rectangles: &[[i64; 4]], observe: bool) -> EditableProj
             .iter_mut()
             .zip(rectangles)
         {
-            frame["rect"] = serde_json::json!({ "x": x, "y": y, "width": width, "height": height });
+            for (key, value) in [
+                ("xUm", x),
+                ("yUm", y),
+                ("widthUm", width),
+                ("heightUm", height),
+            ] {
+                frame[key] = serde_json::json!(value);
+            }
             frame["photo"]["transform"]["panX"] = 0.5.into();
             frame["photo"]["transform"]["panY"] = (-0.25).into();
             frame["photo"]["transform"]["userZoom"] = 2.into();
@@ -382,11 +389,9 @@ fn persisted_last_layout_with_odd_reference_width_keeps_its_center_crossing() {
     let mut payload: serde_json::Value = serde_json::from_slice(&fs::read(&path).unwrap()).unwrap();
     payload["project"]["sheets"][1]["lastLayout"] = serde_json::json!({
         "origin": "custom",
-        "definition": {
-            "surface": { "type": "doubleSheet", "widthUm": 5, "heightUm": 3 },
-            "scope": "sheet",
-            "positions": [{ "x": 2, "y": 0, "width": 1, "height": 3 }]
-        }
+        "scope": "sheet",
+        "surface": { "kind": "doubleSheet", "widthUm": 5, "heightUm": 3 },
+        "positions": [{ "xUm": 2, "yUm": 0, "widthUm": 1, "heightUm": 3 }]
     });
     fs::write(&path, serde_json::to_vec(&payload).unwrap()).unwrap();
     let mut project = core(root.path())

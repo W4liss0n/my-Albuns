@@ -4,24 +4,17 @@ use std::fs;
 
 use myalbuns_core::{
     DocumentFailure, LoadProjectError, MediaId, MediaKind, OpenProjectRequest, ProjectCore,
-    ProjectIntent, ProjectLocation, RelinkMedia, RenderSnapshotRef, SaveProjectOutcome,
+    ProjectIntent, ProjectLocation, RelinkMedia, RenderSnapshotRef,
 };
 use myalbuns_paths::OperationPathContext;
 
-const PROJECT_V1_MIGRATION_INPUT: &[u8] =
-    include_bytes!("fixtures/project_document_v1_migration_input.myalbuns");
-const PROJECT_V2_MIGRATION_EXPECTED: &[u8] =
-    include_bytes!("fixtures/project_document_v2_migration_expected.myalbuns");
-const CURRENT_MIGRATION_EXPECTED: &[u8] =
-    include_bytes!("fixtures/project_document_v12_migration_expected.myalbuns");
-
-const PROJECT_WITH_PHOTO_AND_DECORATIVE_V2: &str = r##"{
+const PROJECT_WITH_PHOTO_AND_DECORATIVE: &str = r##"{
   "documentType": "myalbuns.project",
-  "schemaVersion": 2,
+  "schemaVersion": 1,
   "projectId": "550e8400-e29b-41d4-a716-446655440000",
   "revision": 0,
   "project": {
-    "document": {
+    "album": {
       "displayUnit": "mm",
       "sheetWidthUm": 600000,
       "sheetHeightUm": 300000,
@@ -29,20 +22,20 @@ const PROJECT_WITH_PHOTO_AND_DECORATIVE_V2: &str = r##"{
       "bleedUm": 3000,
       "safetyUm": 3000
     },
+    "layoutSettings": {
+      "permission": "pagesAndSheet",
+      "marginUm": 15000,
+      "gapUm": 5000,
+      "minimumSideUm": 20000
+    },
     "visualDefaults": {
       "background": {
-        "scope": "bothSides",
-        "both": {
-          "kind": "media",
-          "mediaId": "00000000-0000-4000-8000-000000000011"
-        }
+        "sides": "both",
+        "both": { "kind": "media", "mediaId": "00000000-0000-4000-8000-000000000011" }
       },
       "overlay": {
-        "scope": "bothSides",
-        "both": {
-          "kind": "media",
-          "mediaId": "00000000-0000-4000-8000-000000000011"
-        }
+        "sides": "both",
+        "both": { "kind": "media", "mediaId": "00000000-0000-4000-8000-000000000011" }
       },
       "frameBorder": { "kind": "none" }
     },
@@ -50,45 +43,32 @@ const PROJECT_WITH_PHOTO_AND_DECORATIVE_V2: &str = r##"{
       {
         "id": "00000000-0000-4000-8000-000000000010",
         "kind": "photo",
-        "path": {
-          "encoding": "windowsUtf16",
-          "units": [67, 58, 92, 70, 111, 116, 111, 115, 92, 70, 111, 116, 111, 46, 106, 112, 103]
-        }
+        "path": "C:\\Fotos\\Foto.jpg"
       },
       {
         "id": "00000000-0000-4000-8000-000000000011",
         "kind": "decorative",
-        "path": {
-          "encoding": "windowsUtf16",
-          "units": [67, 58, 92, 70, 111, 116, 111, 115, 92, 79, 118, 101, 114, 108, 97, 121, 46, 112, 110, 103]
-        }
+        "path": "C:\\Fotos\\Overlay.png"
       }
     ],
     "sheets": [
-      {
-        "id": "00000000-0000-4000-8000-000000000001",
-        "activeSides": "both"
-      },
-      {
-        "id": "00000000-0000-4000-8000-000000000002",
-        "activeSides": "both"
-      }
+      { "id": "00000000-0000-4000-8000-000000000001", "activeSides": "both" },
+      { "id": "00000000-0000-4000-8000-000000000002", "activeSides": "both" }
     ]
   }
 }"##;
 
 #[test]
-fn v2_persists_photo_and_decorative_as_media_refs_without_observed_state() {
-    let root = tempfile::tempdir().expect("temporary v2 Project");
+fn photo_and_decorative_persist_as_media_refs_without_observed_state() {
+    let root = tempfile::tempdir().expect("temporary Project");
     let project_path = root.path().join("Projeto tracer.myalbuns");
-    fs::write(&project_path, PROJECT_WITH_PHOTO_AND_DECORATIVE_V2)
-        .expect("the v2 fixture is written");
+    fs::write(&project_path, PROJECT_WITH_PHOTO_AND_DECORATIVE).expect("the fixture is written");
 
     let loaded = ProjectCore::new()
         .load_persisted_revision(myalbuns_core::LoadProjectRequest::new(location(
             &project_path,
         )))
-        .expect("the v2 Project loads read-only");
+        .expect("the Project loads read-only");
 
     let media = loaded.project().media();
     assert_eq!(media.len(), 2);
@@ -110,13 +90,12 @@ fn v2_persists_photo_and_decorative_as_media_refs_without_observed_state() {
 }
 
 #[test]
-fn v2_allows_one_photo_and_one_decorative_to_reference_the_same_native_path() {
+fn one_photo_and_one_decorative_may_reference_the_same_native_path() {
     let root = tempfile::tempdir().expect("temporary cross-tab Project");
     let project_path = root.path().join("Projeto midia entre abas.myalbuns");
-    let photo_path =
-        "[67, 58, 92, 70, 111, 116, 111, 115, 92, 70, 111, 116, 111, 46, 106, 112, 103]";
-    let overlay_path = "[67, 58, 92, 70, 111, 116, 111, 115, 92, 79, 118, 101, 114, 108, 97, 121, 46, 112, 110, 103]";
-    let project = PROJECT_WITH_PHOTO_AND_DECORATIVE_V2.replacen(overlay_path, photo_path, 1);
+    let photo_path = r#""C:\\Fotos\\Foto.jpg""#;
+    let overlay_path = r#""C:\\Fotos\\Overlay.png""#;
+    let project = PROJECT_WITH_PHOTO_AND_DECORATIVE.replacen(overlay_path, photo_path, 1);
     fs::write(&project_path, project).expect("the cross-tab fixture is written");
 
     let loaded = ProjectCore::new()
@@ -135,12 +114,12 @@ fn v2_allows_one_photo_and_one_decorative_to_reference_the_same_native_path() {
 }
 
 #[test]
-fn v2_rejects_a_photo_as_background_or_overlay() {
+fn a_photo_is_rejected_as_background_or_overlay() {
     let root = tempfile::tempdir().expect("temporary visual-role Project");
     let project_path = root.path().join("Projeto foto como padrao.myalbuns");
     let photo_id = "00000000-0000-4000-8000-000000000010";
     let decorative_id = "00000000-0000-4000-8000-000000000011";
-    let project = PROJECT_WITH_PHOTO_AND_DECORATIVE_V2.replacen(decorative_id, photo_id, 2);
+    let project = PROJECT_WITH_PHOTO_AND_DECORATIVE.replacen(decorative_id, photo_id, 2);
     fs::write(&project_path, project).expect("the invalid role fixture is written");
 
     assert_eq!(
@@ -154,15 +133,14 @@ fn v2_rejects_a_photo_as_background_or_overlay() {
 }
 
 #[test]
-fn an_authorized_editable_v2_project_promotes_to_v12_and_keeps_opaque_identity_authority() {
-    let root = tempfile::tempdir().expect("temporary editable v2 Project");
+fn an_authorized_editable_project_saves_media_refs_and_keeps_opaque_identity_authority() {
+    let root = tempfile::tempdir().expect("temporary editable Project");
     let project_path = root.path().join("Projeto tracer.myalbuns");
-    fs::write(&project_path, PROJECT_WITH_PHOTO_AND_DECORATIVE_V2)
-        .expect("the v2 fixture is written");
+    fs::write(&project_path, PROJECT_WITH_PHOTO_AND_DECORATIVE).expect("the fixture is written");
     let mut project = ProjectCore::new()
         .with_identity_storage_roots(root.path().join("leases"), root.path().join("identities"))
         .open_editable(OpenProjectRequest::new(location(&project_path)))
-        .expect("the v2 Project is positively authorized");
+        .expect("the Project is positively authorized");
 
     assert_eq!(
         project.identity_authority().project_id(),
@@ -174,15 +152,15 @@ fn an_authorized_editable_v2_project_promotes_to_v12_and_keeps_opaque_identity_a
     assert_eq!(projected_media[1].kind, MediaKind::Decorative);
     let changed = project
         .apply(ProjectIntent::SetDpi { dpi: 240 })
-        .expect("a creative change advances the v2 Project");
+        .expect("a creative change advances the Project");
     project
         .save(changed.state.revision)
-        .expect("the v2 revision is saved");
+        .expect("the revision is saved");
 
     let persisted: serde_json::Value =
-        serde_json::from_slice(&fs::read(&project_path).expect("the saved v2 Project is readable"))
-            .expect("the saved v2 Project remains JSON");
-    assert_eq!(persisted["schemaVersion"], 12);
+        serde_json::from_slice(&fs::read(&project_path).expect("the saved Project is readable"))
+            .expect("the saved Project remains JSON");
+    assert_eq!(persisted["schemaVersion"], 1);
     assert_eq!(persisted["project"]["media"][0]["kind"], "photo");
     assert_eq!(persisted["project"]["media"][1]["kind"], "decorative");
 }
@@ -191,12 +169,11 @@ fn an_authorized_editable_v2_project_promotes_to_v12_and_keeps_opaque_identity_a
 fn public_relink_command_updates_only_the_selected_occurrence_and_participates_in_history() {
     let root = tempfile::tempdir().expect("temporary relink Project");
     let project_path = root.path().join("Projeto religado.myalbuns");
-    fs::write(&project_path, PROJECT_WITH_PHOTO_AND_DECORATIVE_V2)
-        .expect("the v2 fixture is written");
+    fs::write(&project_path, PROJECT_WITH_PHOTO_AND_DECORATIVE).expect("the fixture is written");
     let mut project = ProjectCore::new()
         .with_identity_storage_roots(root.path().join("leases"), root.path().join("identities"))
         .open_editable(OpenProjectRequest::new(location(&project_path)))
-        .expect("the v2 Project is positively authorized");
+        .expect("the Project is positively authorized");
     let selected_id: MediaId = "00000000-0000-4000-8000-000000000010"
         .parse()
         .expect("the selected occurrence has a canonical identity");
@@ -232,14 +209,13 @@ fn public_relink_command_updates_only_the_selected_occurrence_and_participates_i
 
 #[test]
 fn frozen_rendering_borrows_one_resolved_plan_for_canvas_and_export() {
-    let root = tempfile::tempdir().expect("temporary frozen v2 Project");
+    let root = tempfile::tempdir().expect("temporary frozen Project");
     let project_path = root.path().join("Projeto congelado.myalbuns");
-    fs::write(&project_path, PROJECT_WITH_PHOTO_AND_DECORATIVE_V2)
-        .expect("the v2 fixture is written");
+    fs::write(&project_path, PROJECT_WITH_PHOTO_AND_DECORATIVE).expect("the fixture is written");
     let project = ProjectCore::new()
         .with_identity_storage_roots(root.path().join("leases"), root.path().join("identities"))
         .open_editable(OpenProjectRequest::new(location(&project_path)))
-        .expect("the v2 Project is positively authorized");
+        .expect("the Project is positively authorized");
     let selected_sheet_id = "00000000-0000-4000-8000-000000000002".to_owned();
 
     let frozen = project.freeze_rendering();
@@ -288,90 +264,6 @@ fn frozen_rendering_borrows_one_resolved_plan_for_canvas_and_export() {
             std::path::Path::new(r"C:\Fotos\Overlay.png"),
         ),],
         "the unreferenced Foto is not frozen for this output unit",
-    );
-}
-
-#[test]
-fn v1_migrates_only_in_memory_and_read_only_loading_preserves_the_source_bytes() {
-    let root = tempfile::tempdir().expect("temporary v1 migration Project");
-    let project_path = root.path().join("Projeto legado.myalbuns");
-    fs::write(&project_path, PROJECT_V1_MIGRATION_INPUT).expect("the v1 fixture is written");
-
-    let loaded = ProjectCore::new()
-        .load_persisted_revision(myalbuns_core::LoadProjectRequest::new(location(
-            &project_path,
-        )))
-        .expect("the v1 Project migrates in memory for read-only use");
-
-    assert_eq!(loaded.revision(), 7);
-    assert_eq!(loaded.project().media()[0].kind(), MediaKind::Decorative);
-    assert_eq!(
-        fs::read(&project_path).expect("the v1 source remains readable"),
-        PROJECT_V1_MIGRATION_INPUT,
-        "read-only migration must preserve the source byte for byte"
-    );
-}
-
-#[test]
-fn the_v1_to_v2_golden_step_remains_exact_and_publicly_readable() {
-    let v1 =
-        std::str::from_utf8(PROJECT_V1_MIGRATION_INPUT).expect("the normative v1 fixture is UTF-8");
-    let expected_v2 = v1.replacen("\"schemaVersion\": 1", "\"schemaVersion\": 2", 1);
-    assert_eq!(
-        PROJECT_V2_MIGRATION_EXPECTED,
-        expected_v2.as_bytes(),
-        "the accepted v1 -> v2 step changes only schemaVersion"
-    );
-
-    let root = tempfile::tempdir().expect("temporary v2 golden Project");
-    let project_path = root.path().join("Projeto legado v2.myalbuns");
-    fs::write(&project_path, PROJECT_V2_MIGRATION_EXPECTED)
-        .expect("the normative v2 result is written");
-    let loaded = ProjectCore::new()
-        .load_persisted_revision(myalbuns_core::LoadProjectRequest::new(location(
-            &project_path,
-        )))
-        .expect("the preserved v2 result participates in the current public chain");
-
-    assert_eq!(loaded.revision(), 7);
-    assert_eq!(loaded.project().media()[0].kind(), MediaKind::Decorative);
-    assert!(
-        loaded
-            .project()
-            .sheets()
-            .iter()
-            .all(|sheet| sheet.frames().is_empty())
-    );
-}
-
-#[test]
-fn explicit_save_promotes_an_open_v1_project_to_the_versioned_v11_golden_result() {
-    let root = tempfile::tempdir().expect("temporary editable migration Project");
-    let project_path = root.path().join("Projeto legado.myalbuns");
-    fs::write(&project_path, PROJECT_V1_MIGRATION_INPUT).expect("the v1 fixture is written");
-    let mut project = ProjectCore::new()
-        .with_identity_storage_roots(root.path().join("leases"), root.path().join("identities"))
-        .open_editable(OpenProjectRequest::new(location(&project_path)))
-        .expect("the v1 Project migrates in memory before the editable Session opens");
-
-    assert_eq!(project.revision(), 7);
-    assert_eq!(project.saved_revision(), 7);
-    assert!(!project.has_unsaved_changes());
-    assert_eq!(
-        fs::read(&project_path).expect("the unopened migration remains v1"),
-        PROJECT_V1_MIGRATION_INPUT
-    );
-
-    assert_eq!(
-        project
-            .save(7)
-            .expect("explicit Save publishes the current schema without a creative revision"),
-        SaveProjectOutcome::Saved { revision: 7 }
-    );
-    assert!(!project.has_unsaved_changes());
-    assert_eq!(
-        fs::read(&project_path).expect("the migrated Project is readable"),
-        CURRENT_MIGRATION_EXPECTED
     );
 }
 

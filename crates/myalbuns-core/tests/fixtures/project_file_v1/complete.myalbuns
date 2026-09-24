@@ -1,0 +1,205 @@
+{
+  "documentType": "myalbuns.project",
+  "schemaVersion": 1,
+  "projectId": "550e8400-e29b-41d4-a716-446655440000",
+  "revision": 26,
+  "project": {
+    "album": {
+      "displayUnit": "mm",
+      "sheetWidthUm": 600000,
+      "sheetHeightUm": 300000,
+      "dpi": 300,
+      "bleedUm": 3000,
+      "safetyUm": 3000
+    },
+    "layoutSettings": {
+      "permission": "pagesOnly",
+      "marginUm": 19000,
+      "gapUm": 6000,
+      "minimumSideUm": 25000
+    },
+    "visualDefaults": {
+      "background": {
+        "sides": "both",
+        "both": {
+          "kind": "media",
+          "mediaId": "00000000-0000-4000-8000-000000000020"
+        }
+      },
+      "overlay": {
+        "sides": "both",
+        "both": {
+          "kind": "none"
+        }
+      },
+      "frameBorder": {
+        "kind": "solid",
+        "rgb": "#204060",
+        "widthUm": 1500
+      }
+    },
+    "media": [
+      {
+        "id": "00000000-0000-4000-8000-000000000010",
+        "kind": "photo",
+        "path": "C:\\Fotos\\Cerimônia\\Noivos.jpg"
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000000020",
+        "kind": "decorative",
+        "path": "\\\\servidor\\Texturas\\papel.png"
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000000021",
+        "kind": "decorative",
+        "path": {
+          "windowsUtf16": [
+            67,
+            58,
+            92,
+            99,
+            97,
+            112,
+            97,
+            55296,
+            46,
+            112,
+            110,
+            103
+          ]
+        }
+      }
+    ],
+    "mediaFolders": [
+      {
+        "id": "0e9d582d-e6c1-4c80-931d-f39f855e316e",
+        "kind": "photo",
+        "name": "Cerimônia",
+        "mediaIds": [
+          "00000000-0000-4000-8000-000000000010"
+        ]
+      },
+      {
+        "id": "94fa8c60-d538-4d56-80fc-d6557907fc2b",
+        "kind": "decorative",
+        "name": "Texturas"
+      }
+    ],
+    "favoriteLayouts": [
+      {
+        "id": "9970c009-8b6e-4961-971c-fbb89c3f4679",
+        "order": 0,
+        "layout": {
+          "origin": "automatic",
+          "scope": "page",
+          "surface": {
+            "kind": "doubleSheet",
+            "widthUm": 600000,
+            "heightUm": 300000
+          },
+          "positions": [
+            {
+              "xUm": 19000,
+              "yUm": 62667,
+              "widthUm": 262000,
+              "heightUm": 174666
+            },
+            {
+              "xUm": 362667,
+              "yUm": 19000,
+              "widthUm": 174666,
+              "heightUm": 262000
+            }
+          ]
+        }
+      }
+    ],
+    "sheets": [
+      {
+        "id": "00000000-0000-4000-8000-000000000001",
+        "activeSides": "both",
+        "layoutLocked": true,
+        "lastLayout": {
+          "origin": "automatic",
+          "scope": "page",
+          "surface": {
+            "kind": "doubleSheet",
+            "widthUm": 600000,
+            "heightUm": 300000
+          },
+          "positions": [
+            {
+              "xUm": 19000,
+              "yUm": 62667,
+              "widthUm": 262000,
+              "heightUm": 174666
+            },
+            {
+              "xUm": 362667,
+              "yUm": 19000,
+              "widthUm": 174666,
+              "heightUm": 262000
+            }
+          ]
+        },
+        "visuals": {
+          "background": {
+            "sides": "perSide",
+            "left": {
+              "content": {
+                "kind": "color",
+                "rgb": "#E7D6C4"
+              }
+            }
+          },
+          "overlay": {
+            "sides": "perSide",
+            "right": {
+              "content": {
+                "kind": "media",
+                "mediaId": "00000000-0000-4000-8000-000000000020"
+              }
+            }
+          }
+        },
+        "frames": [
+          {
+            "id": "00000000-0000-4000-8000-000000000101",
+            "xUm": 19000,
+            "yUm": 62667,
+            "widthUm": 262000,
+            "heightUm": 174666,
+            "style": {
+              "borderRgb": "#205070",
+              "borderWidthUm": 2000,
+              "opacityPercent": 65
+            },
+            "photo": {
+              "mediaId": "00000000-0000-4000-8000-000000000010",
+              "transform": {
+                "panX": 0.29,
+                "panY": -0.48,
+                "userZoom": 2.05,
+                "quarterTurns": 3,
+                "mirrorX": true,
+                "angleTenths": 123,
+                "blackAndWhite": true
+              }
+            }
+          },
+          {
+            "id": "00000000-0000-4000-8000-000000000102",
+            "xUm": 362667,
+            "yUm": 19000,
+            "widthUm": 174666,
+            "heightUm": 262000
+          }
+        ]
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000000002",
+        "activeSides": "both"
+      }
+    ]
+  }
+}

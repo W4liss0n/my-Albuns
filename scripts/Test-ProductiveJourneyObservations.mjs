@@ -557,7 +557,7 @@ test("proves the selected non-initial sheet from distinguishable JPEG dimensions
     ],
     visualDefaults: {
       background: {
-        scope: "bothSides",
+        sides: "both",
         both: { kind: "color", rgb: "#204060" },
       },
     },
@@ -607,7 +607,7 @@ test("proves the selected non-initial sheet from distinguishable JPEG dimensions
         ...input,
         visualDefaults: {
           background: {
-            scope: "bothSides",
+            sides: "both",
             both: { kind: "color", rgb: "#FFFFFF" },
           },
         },

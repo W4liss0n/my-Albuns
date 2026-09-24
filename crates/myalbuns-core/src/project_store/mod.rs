@@ -1,7 +1,7 @@
 mod editable_store;
 mod identity_lease;
 mod identity_registry;
-mod versioned_codec;
+mod project_file;
 mod windows_publish;
 
 use sha2::{Digest, Sha256};
@@ -103,11 +103,6 @@ pub(crate) struct LoadedStoredRevision {
     pub(crate) resolved_object: ResolvedObject,
 }
 
-pub(crate) struct DecodedStoredRevision {
-    pub(crate) revision: ProjectRevision,
-    pub(crate) requires_schema_upgrade: bool,
-}
-
 #[derive(Debug)]
 pub(crate) enum DecodeFailure {
     Path(PathFailure),
@@ -125,8 +120,8 @@ pub(crate) fn read(location: &ProjectLocation) -> Result<LoadedStoredRevision, D
         .map_err(|error| DecodeFailure::Path(map_path_failure(error)))?;
     let physical_identity = resolved.physical_identity();
     let source = resolved.read_to_string().map_err(map_read_error)?;
-    versioned_codec::decode(source.as_bytes()).map(|decoded| LoadedStoredRevision {
-        revision: decoded.revision,
+    project_file::decode(source.as_bytes()).map(|revision| LoadedStoredRevision {
+        revision,
         content_sha256: format!("{:x}", Sha256::digest(source.as_bytes())),
         physical_identity,
         project_path: location.project_path.clone(),
@@ -136,19 +131,11 @@ pub(crate) fn read(location: &ProjectLocation) -> Result<LoadedStoredRevision, D
 }
 
 pub(crate) fn decode(bytes: &[u8]) -> Result<ProjectRevision, DecodeFailure> {
-    decode_with_metadata(bytes).map(|decoded| decoded.revision)
-}
-
-pub(crate) fn decode_with_metadata(bytes: &[u8]) -> Result<DecodedStoredRevision, DecodeFailure> {
-    versioned_codec::decode(bytes).map(|decoded| DecodedStoredRevision {
-        revision: decoded.revision,
-        requires_schema_upgrade: decoded.source_schema_version
-            < versioned_codec::SCHEMA_VERSION_V12,
-    })
+    project_file::decode(bytes)
 }
 
 pub(crate) fn encode(revision: &ProjectRevision) -> Result<Vec<u8>, DecodeFailure> {
-    versioned_codec::encode(revision)
+    project_file::encode(revision)
 }
 
 pub(crate) fn map_path_failure(error: ResolveError) -> PathFailure {

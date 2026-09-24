@@ -1321,7 +1321,7 @@ mod tests {
             let checkpoint: serde_json::Value =
                 serde_json::from_slice(&bytes).expect("the Host checkpoint is valid JSON");
             assert_eq!(
-                checkpoint["creativeState"]["project"]["document"]["dpi"],
+                checkpoint["creativeState"]["project"]["album"]["dpi"],
                 180
             );
 

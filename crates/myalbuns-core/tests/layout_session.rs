@@ -620,7 +620,7 @@ fn expanded_preview_creates_inherited_placeholders_only_when_confirmed_by_the_lo
 }
 
 #[test]
-fn saving_a_locked_layout_uses_current_schema_and_migrates_v8_without_inventing_a_lock() {
+fn saving_a_locked_layout_persists_the_lock_and_an_absent_lock_means_unlocked() {
     use myalbuns_core::OpenProjectRequest;
     let directory = tempfile::tempdir().unwrap();
     let root = directory.path();
@@ -646,7 +646,7 @@ fn saving_a_locked_layout_uses_current_schema_and_migrates_v8_without_inventing_
     let path = root.join("Layouts.myalbuns");
     let mut saved: serde_json::Value =
         serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap();
-    assert_eq!(saved["schemaVersion"], 12);
+    assert_eq!(saved["schemaVersion"], 1);
     assert_eq!(saved["project"]["sheets"][0]["layoutLocked"], true);
     let core = ProjectCore::new()
         .with_identity_storage_roots(root.join("leases"), root.join("identities"));
@@ -659,36 +659,16 @@ fn saving_a_locked_layout_uses_current_schema_and_migrates_v8_without_inventing_
         sheet.as_object_mut().unwrap().remove("layoutLocked");
     }
     std::fs::write(&path, serde_json::to_vec(&saved).unwrap()).unwrap();
-    assert!(
-        core.open_editable(OpenProjectRequest::new(location(&path)))
-            .is_err(),
-        "the current schema cannot silently default a missing lock"
-    );
-    saved["project"]
-        .as_object_mut()
-        .unwrap()
-        .remove("favoriteLayouts");
-    saved.as_object_mut().unwrap().remove("sheetVisuals");
-    saved.as_object_mut().unwrap().remove("mediaFolders");
-    saved["schemaVersion"] = 8.into();
-    let legacy = serde_json::to_vec(&saved).unwrap();
-    std::fs::write(&path, &legacy).unwrap();
-    let mut migrated = core
+    let unlocked = core
         .open_editable(OpenProjectRequest::new(location(&path)))
         .unwrap();
     assert!(
-        migrated
+        unlocked
             .project()
             .sheets()
             .iter()
             .all(|sheet| !sheet.layout_locked())
     );
-    assert_eq!(std::fs::read(&path).unwrap(), legacy);
-    migrated.save(migrated.revision()).unwrap();
-    let upgraded: serde_json::Value =
-        serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap();
-    assert_eq!(upgraded["schemaVersion"], 12);
-    assert_eq!(upgraded["project"]["sheets"][0]["layoutLocked"], false);
 }
 
 #[test]
@@ -991,11 +971,11 @@ fn saving_and_reopening_preserves_last_layout_and_generation_settings() {
     assert!(query.listing.candidates[0].is_last_applied);
     let bytes = std::fs::read(root.join("Layouts.myalbuns")).unwrap();
     let persisted: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
-    assert_eq!(persisted["schemaVersion"], 12);
+    assert_eq!(persisted["schemaVersion"], 1);
 }
 
 #[test]
-fn current_schema_requires_complete_layout_payloads_and_rejects_corrupt_geometry() {
+fn stored_layouts_require_complete_payloads_and_reject_corrupt_geometry() {
     use myalbuns_core::{DocumentFailure, LoadProjectError, LoadProjectRequest};
     let directory = tempfile::tempdir().unwrap();
     let root = directory.path();
@@ -1019,24 +999,16 @@ fn current_schema_requires_complete_layout_payloads_and_rejects_corrupt_geometry
     drop(project);
     let valid: serde_json::Value =
         serde_json::from_slice(&std::fs::read(root.join("Layouts.myalbuns")).unwrap()).unwrap();
-    let mut missing = valid.clone();
-    missing["project"]["sheets"][0]
-        .as_object_mut()
-        .unwrap()
-        .remove("lastLayout");
     let mut negative = valid.clone();
     negative["project"]["layoutSettings"]["gapUm"] = serde_json::json!(-1);
     let mut unknown = valid.clone();
     unknown["project"]["layoutSettings"]["weight"] = serde_json::json!(0.5);
     let mut empty = valid.clone();
-    empty["project"]["sheets"][0]["lastLayout"]["definition"]["positions"] = serde_json::json!([]);
+    empty["project"]["sheets"][0]["lastLayout"]["positions"] = serde_json::json!([]);
     let mut geometry = valid.clone();
-    geometry["project"]["sheets"][0]["lastLayout"]["definition"]["positions"][0]["width"] =
+    geometry["project"]["sheets"][0]["lastLayout"]["positions"][0]["widthUm"] =
         serde_json::json!(9007199254740991i64);
-    for (i, invalid) in [missing, negative, unknown, empty, geometry]
-        .into_iter()
-        .enumerate()
-    {
+    for (i, invalid) in [negative, unknown, empty, geometry].into_iter().enumerate() {
         let path = root.join(format!("invalid-{i}.myalbuns"));
         let bytes = serde_json::to_vec(&invalid).unwrap();
         std::fs::write(&path, &bytes).unwrap();

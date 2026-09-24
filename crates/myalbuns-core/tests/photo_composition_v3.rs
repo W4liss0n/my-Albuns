@@ -237,7 +237,7 @@ fn imported_photo_adds_one_filled_frame_and_persists_only_the_external_link() {
     let persisted_bytes = fs::read(&project_path).expect("the v3 Project is readable");
     let persisted: serde_json::Value =
         serde_json::from_slice(&persisted_bytes).expect("the v3 Project is JSON");
-    assert_eq!(persisted["schemaVersion"], 12);
+    assert_eq!(persisted["schemaVersion"], 1);
     assert_eq!(persisted["project"]["media"][0]["kind"], "photo");
     assert_eq!(
         persisted["project"]["sheets"][0]["frames"]
@@ -587,10 +587,10 @@ fn double_click_orders_placeholders_by_left_then_top_and_selection_is_not_histor
             .iter_mut()
             .zip([(200_000, 20_000), (100_000, 90_000), (100_000, 20_000)])
     {
-        frame["rect"]["x"] = x.into();
-        frame["rect"]["y"] = y.into();
-        frame["rect"]["width"] = 80_000.into();
-        frame["rect"]["height"] = 60_000.into();
+        frame["xUm"] = x.into();
+        frame["yUm"] = y.into();
+        frame["widthUm"] = 80_000.into();
+        frame["heightUm"] = 60_000.into();
         frame["photo"] = serde_json::Value::Null;
     }
     fs::write(&project_path, serde_json::to_vec_pretty(&value).unwrap()).unwrap();

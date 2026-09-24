@@ -1,10 +1,10 @@
 {
   "documentType": "myalbuns.project",
-  "schemaVersion": 8,
+  "schemaVersion": 1,
   "projectId": "550e8400-e29b-41d4-a716-446655440000",
   "revision": 9,
   "project": {
-    "document": {
+    "album": {
       "displayUnit": "mm",
       "sheetWidthUm": 600000,
       "sheetHeightUm": 300000,
@@ -12,54 +12,35 @@
       "bleedUm": 3000,
       "safetyUm": 3000
     },
-    "visualDefaults": {
-      "background": {
-        "scope": "bothSides",
-        "both": {
-          "kind": "color",
-          "rgb": "#FFFFFF"
-        }
-      },
-      "overlay": {
-        "scope": "bothSides",
-        "both": null
-      },
-      "frameBorder": {
-        "kind": "none"
-      }
-    },
     "layoutSettings": {
       "permission": "pagesAndSheet",
       "marginUm": 15000,
       "gapUm": 5000,
       "minimumSideUm": 20000
     },
+    "visualDefaults": {
+      "background": {
+        "sides": "both",
+        "both": {
+          "kind": "color",
+          "rgb": "#FFFFFF"
+        }
+      },
+      "overlay": {
+        "sides": "both",
+        "both": {
+          "kind": "none"
+        }
+      },
+      "frameBorder": {
+        "kind": "none"
+      }
+    },
     "media": [
       {
         "id": "00000000-0000-4000-8000-000000000010",
         "kind": "photo",
-        "path": {
-          "encoding": "windowsUtf16",
-          "units": [
-            67,
-            58,
-            92,
-            70,
-            111,
-            116,
-            111,
-            115,
-            92,
-            70,
-            111,
-            116,
-            111,
-            46,
-            106,
-            112,
-            103
-          ]
-        }
+        "path": "C:\\Fotos\\Foto.jpg"
       }
     ],
     "sheets": [
@@ -69,12 +50,10 @@
         "frames": [
           {
             "id": "00000000-0000-4000-8000-000000000101",
-            "rect": {
-              "x": 30000,
-              "y": 40000,
-              "width": 150000,
-              "height": 100000
-            },
+            "xUm": 30000,
+            "yUm": 40000,
+            "widthUm": 150000,
+            "heightUm": 100000,
             "photo": {
               "mediaId": "00000000-0000-4000-8000-000000000010",
               "transform": {
@@ -83,35 +62,22 @@
                 "userZoom": 1.75,
                 "quarterTurns": 3,
                 "mirrorX": true,
-                "angleTenths": 0,
-                "blackAndWhite": false
+                "angleTenths": -123
               }
-            },
-            "style": {
-              "kind": "album"
             }
           },
           {
             "id": "00000000-0000-4000-8000-000000000102",
-            "rect": {
-              "x": 320000,
-              "y": 60000,
-              "width": 100000,
-              "height": 150000
-            },
-            "photo": null,
-            "style": {
-              "kind": "album"
-            }
+            "xUm": 320000,
+            "yUm": 60000,
+            "widthUm": 100000,
+            "heightUm": 150000
           }
-        ],
-        "lastLayout": null
+        ]
       },
       {
         "id": "00000000-0000-4000-8000-000000000002",
-        "activeSides": "both",
-        "frames": [],
-        "lastLayout": null
+        "activeSides": "both"
       }
     ]
   }

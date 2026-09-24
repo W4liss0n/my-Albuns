@@ -38,7 +38,7 @@ fn copying_preserves_frame_style_while_swapping_content_leaves_it_with_each_fram
     let path = root.path().join("Conteudo.myalbuns");
     std::fs::write(
         &path,
-        include_bytes!("fixtures/project_document_v6_photo_migration_expected.myalbuns"),
+        include_bytes!("fixtures/project_file_v1/photo.myalbuns"),
     )
     .unwrap();
     let mut context = OperationPathContext::new();
@@ -205,51 +205,58 @@ fn style_commands_validate_atomically_and_only_semantic_changes_consume_history(
 }
 
 #[test]
-fn v7_requires_a_closed_valid_style_and_legacy_versions_reject_it_without_writing() {
+fn a_custom_frame_style_must_be_closed_and_valid_and_rejections_do_not_write() {
     use myalbuns_core::{DocumentFailure, LoadProjectError, LoadProjectRequest};
-    let valid: serde_json::Value = serde_json::from_slice(include_bytes!(
-        "fixtures/project_document_v7_photo_migration_expected.myalbuns"
-    ))
-    .unwrap();
-    let mut cases = Vec::new();
-    for style in [
-        serde_json::json!({"kind":"unknown"}),
-        serde_json::json!({"kind":"album","opacityPercent":100}),
-        serde_json::json!({"kind":"custom","border":{"rgb":"#FFFFFF","widthUm":0}}),
-        serde_json::json!({"kind":"custom","border":{"rgb":"#FFFFFF","widthUm":0},"opacityPercent":101}),
-        serde_json::json!({"kind":"custom","border":{"rgb":"#FFFFFF","widthUm":0},"opacityPercent":0.5}),
-        serde_json::json!({"kind":"custom","border":{"rgb":"bad","widthUm":0},"opacityPercent":50}),
-        serde_json::json!({"kind":"custom","border":{"rgb":"#FFFFFF","widthUm":-1},"opacityPercent":50}),
-        serde_json::json!({"kind":"custom","border":{"rgb":"#FFFFFF","widthUm":9007199254740992u64},"opacityPercent":50}),
-        serde_json::json!({"kind":"custom","border":{"rgb":"#FFFFFF","widthUm":0,"extra":true},"opacityPercent":50}),
-        serde_json::Value::Null,
-    ] {
-        let mut invalid = valid.clone();
-        invalid["project"]["sheets"][0]["frames"][0]["style"] = style;
-        cases.push(invalid);
-    }
-    let mut missing = valid.clone();
-    missing["project"]["sheets"][0]["frames"][0]
-        .as_object_mut()
-        .unwrap()
-        .remove("style");
-    cases.push(missing);
-    let mut legacy = valid;
-    legacy["schemaVersion"] = serde_json::json!(6);
-    cases.push(legacy);
-    let root = tempfile::tempdir().unwrap();
-    for (index, value) in cases.into_iter().enumerate() {
-        let path = root.path().join(format!("Invalid-{index}.myalbuns"));
-        let bytes = serde_json::to_vec(&value).unwrap();
+    let valid: serde_json::Value =
+        serde_json::from_slice(include_bytes!("fixtures/project_file_v1/photo.myalbuns")).unwrap();
+    let style = |value: serde_json::Value| {
+        let mut document = valid.clone();
+        document["project"]["sheets"][0]["frames"][0]["style"] = value;
+        document
+    };
+    let load = |root: &std::path::Path, name: &str, value: &serde_json::Value| {
+        let path = root.join(name);
+        let bytes = serde_json::to_vec(value).unwrap();
         std::fs::write(&path, &bytes).unwrap();
         let mut context = OperationPathContext::new();
         context.capture(&path).unwrap();
         let result = ProjectCore::new()
-            .with_identity_storage_roots(root.path().join("leases"), root.path().join("identities"))
+            .with_identity_storage_roots(
+                root.join(format!("{name}-leases")),
+                root.join(format!("{name}-identities")),
+            )
             .load_persisted_revision(LoadProjectRequest::new(ProjectLocation::new(
                 path.clone(),
                 context.freeze(),
             )));
+        assert_eq!(std::fs::read(path).unwrap(), bytes);
+        result
+    };
+    let root = tempfile::tempdir().unwrap();
+    // An absent or null style follows the Album.
+    for (index, value) in [
+        style(serde_json::Value::Null),
+        style(serde_json::json!({"borderRgb":"#FFFFFF","borderWidthUm":0,"opacityPercent":50})),
+    ]
+    .iter()
+    .enumerate()
+    {
+        load(root.path(), &format!("Valid-{index}.myalbuns"), value).unwrap();
+    }
+    for (index, value) in [
+        serde_json::json!({"kind":"album"}),
+        serde_json::json!({"borderRgb":"#FFFFFF","borderWidthUm":0}),
+        serde_json::json!({"borderRgb":"#FFFFFF","borderWidthUm":0,"opacityPercent":101}),
+        serde_json::json!({"borderRgb":"#FFFFFF","borderWidthUm":0,"opacityPercent":0.5}),
+        serde_json::json!({"borderRgb":"bad","borderWidthUm":0,"opacityPercent":50}),
+        serde_json::json!({"borderRgb":"#FFFFFF","borderWidthUm":-1,"opacityPercent":50}),
+        serde_json::json!({"borderRgb":"#FFFFFF","borderWidthUm":9007199254740992u64,"opacityPercent":50}),
+        serde_json::json!({"borderRgb":"#FFFFFF","borderWidthUm":0,"opacityPercent":50,"extra":true}),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let result = load(root.path(), &format!("Invalid-{index}.myalbuns"), &style(value));
         assert!(
             matches!(
                 result,
@@ -259,7 +266,6 @@ fn v7_requires_a_closed_valid_style_and_legacy_versions_reject_it_without_writin
             ),
             "case {index}: {result:?}"
         );
-        assert_eq!(std::fs::read(path).unwrap(), bytes);
     }
 }
 
@@ -352,12 +358,10 @@ fn saving_and_reopening_preserves_custom_frame_style_in_the_current_schema() {
     let path = project.project_path().to_path_buf();
     let document: serde_json::Value =
         serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap();
-    assert_eq!(document["schemaVersion"], 12);
+    assert_eq!(document["schemaVersion"], 1);
     assert_eq!(
         document["project"]["sheets"][0]["frames"][0]["style"],
-        serde_json::json!({
-            "kind": "custom", "border": { "rgb": "#000000", "widthUm": 0 }, "opacityPercent": 0
-        })
+        serde_json::json!({ "borderRgb": "#000000", "borderWidthUm": 0, "opacityPercent": 0 })
     );
     drop(project);
     let mut context = OperationPathContext::new();
@@ -460,7 +464,7 @@ fn a_thick_inward_border_saturates_without_overlapping_its_own_paint() {
     let path = root.path().join("Borda.myalbuns");
     std::fs::write(
         &path,
-        include_bytes!("fixtures/project_document_v6_photo_migration_expected.myalbuns"),
+        include_bytes!("fixtures/project_file_v1/photo.myalbuns"),
     )
     .unwrap();
     let mut context = OperationPathContext::new();
@@ -518,7 +522,7 @@ fn public_frame_style_projections_match_the_visual_corpus() {
     let path = root.path().join("Estilo.myalbuns");
     std::fs::write(
         &path,
-        include_bytes!("fixtures/project_document_v6_photo_migration_expected.myalbuns"),
+        include_bytes!("fixtures/project_file_v1/photo.myalbuns"),
     )
     .unwrap();
     let mut context = OperationPathContext::new();

@@ -273,8 +273,14 @@ fn headless_stack_corpus_matches_core_commands() {
     .into_iter()
     .enumerate()
     {
-        payload["project"]["sheets"][0]["frames"][index]["rect"] =
-            serde_json::json!({ "x": x, "y": y, "width": width, "height": height });
+        for (key, value) in [
+            ("xUm", x),
+            ("yUm", y),
+            ("widthUm", width),
+            ("heightUm", height),
+        ] {
+            payload["project"]["sheets"][0]["frames"][index][key] = serde_json::json!(value);
+        }
     }
     payload["project"]["sheets"][0]["frames"][1]["photo"] = serde_json::Value::Null;
     fs::write(&path, serde_json::to_vec(&payload).unwrap()).unwrap();

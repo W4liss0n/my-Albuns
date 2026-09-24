@@ -337,14 +337,11 @@ mod tests {
             ],
         );
 
-        let session = PersistentProjectSession::from_persisted(
-            ProjectRevision::new(
-                Uuid::parse_str("550e8400-e29b-41d4-a716-446655440000").expect("project id"),
-                0,
-                project,
-            ),
-            false,
-        );
+        let session = PersistentProjectSession::from_persisted(ProjectRevision::new(
+            Uuid::parse_str("550e8400-e29b-41d4-a716-446655440000").expect("project id"),
+            0,
+            project,
+        ));
         let projection = editor_projection(&session, true, "Projeto", &HashMap::new());
         let value = serde_json::to_value(&projection).expect("projection serializes");
 

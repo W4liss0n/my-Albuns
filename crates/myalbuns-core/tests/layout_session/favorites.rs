@@ -252,21 +252,15 @@ fn favorite_copies_survive_save_reopen_save_as_and_external_copy_and_remain_proj
 }
 
 #[test]
-fn current_schema_rejects_incomplete_or_corrupt_favorites_without_rewriting_the_source() {
+fn incomplete_or_corrupt_favorites_are_rejected_without_rewriting_the_source() {
     let root = tempfile::tempdir().unwrap();
     let (mut project, sheet) = prepare(root.path(), 2);
     toggle(&mut project, &sheet, |_| true);
     project.save(project.revision()).unwrap();
     let valid: Value = serde_json::from_slice(&fs::read(project.project_path()).unwrap()).unwrap();
-    assert_eq!(valid["schemaVersion"], 12);
+    assert_eq!(valid["schemaVersion"], 1);
     let original = valid["project"]["favoriteLayouts"][0].clone();
     let mut cases = Vec::new();
-    let mut missing = valid.clone();
-    missing["project"]
-        .as_object_mut()
-        .unwrap()
-        .remove("favoriteLayouts");
-    cases.push(missing);
     for (field, value) in [
         ("id", json!("not-a-uuid")),
         ("id", json!("550E8400-E29B-41D4-A716-446655440000")),
@@ -294,7 +288,7 @@ fn current_schema_rejects_incomplete_or_corrupt_favorites_without_rewriting_the_
         .push(second);
     cases.push(duplicate_geometry);
     let mut bad_geometry = valid.clone();
-    bad_geometry["project"]["favoriteLayouts"][0]["layout"]["definition"]["positions"] = json!([]);
+    bad_geometry["project"]["favoriteLayouts"][0]["layout"]["positions"] = json!([]);
     cases.push(bad_geometry);
     let mut unknown_nested = valid.clone();
     unknown_nested["project"]["favoriteLayouts"][0]["layout"]["name"] = json!("extra");
@@ -317,25 +311,6 @@ fn current_schema_rejects_incomplete_or_corrupt_favorites_without_rewriting_the_
         );
         assert_eq!(fs::read(path).unwrap(), bytes);
     }
-}
-
-#[test]
-fn v9_opens_with_no_favorites_and_upgrades_only_on_explicit_save() {
-    let root = tempfile::tempdir().unwrap();
-    let path = root.path().join("Legado.myalbuns");
-    let bytes = include_bytes!("../fixtures/project_document_v9_migration_expected.myalbuns");
-    fs::write(&path, bytes).unwrap();
-    let core = ProjectCore::new()
-        .with_identity_storage_roots(root.path().join("leases"), root.path().join("identities"));
-    let mut project = core
-        .open_editable(OpenProjectRequest::new(location(&path)))
-        .unwrap();
-    assert!(project.project().favorite_layouts().is_empty());
-    assert_eq!(fs::read(&path).unwrap(), bytes);
-    project.save(project.revision()).unwrap();
-    let saved: Value = serde_json::from_slice(&fs::read(&path).unwrap()).unwrap();
-    assert_eq!(saved["schemaVersion"], 12);
-    assert_eq!(saved["project"]["favoriteLayouts"], json!([]));
 }
 
 #[test]

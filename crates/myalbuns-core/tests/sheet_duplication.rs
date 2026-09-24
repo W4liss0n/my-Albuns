@@ -104,14 +104,15 @@ fn duplication_preserves_complete_composition_layout_and_media_and_emits_the_vis
     let core = ProjectCore::new()
         .with_identity_storage_roots(root.path().join("leases"), root.path().join("identities"));
     // A persisted input with stable media identity also exercises unavailable originals.
-    let mut input: serde_json::Value = serde_json::from_slice(include_bytes!(
-        "fixtures/project_document_v11_photo_migration_expected.myalbuns"
-    ))
-    .unwrap();
-    input["project"]["media"].as_array_mut().unwrap().push(serde_json::json!({
-        "id":"00000000-0000-4000-8000-000000000020", "kind":"decorative",
-        "path":{"encoding":"windowsUtf16","units":"C:\\Fotos\\Overlay.png".encode_utf16().collect::<Vec<_>>()}
-    }));
+    let mut input: serde_json::Value =
+        serde_json::from_slice(include_bytes!("fixtures/project_file_v1/photo.myalbuns")).unwrap();
+    input["project"]["media"]
+        .as_array_mut()
+        .unwrap()
+        .push(serde_json::json!({
+            "id":"00000000-0000-4000-8000-000000000020", "kind":"decorative",
+            "path":"C:\\Fotos\\Overlay.png"
+        }));
     std::fs::write(&path, serde_json::to_vec(&input).unwrap()).unwrap();
     let mut project = core
         .open_editable(OpenProjectRequest::new(location(&path)))

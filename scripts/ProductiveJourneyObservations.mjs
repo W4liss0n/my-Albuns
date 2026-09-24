@@ -274,7 +274,7 @@ export function assertDistinguishableSheetExport({
   }
   const background = visualDefaults?.background;
   if (
-    background?.scope !== "bothSides" ||
+    background?.sides !== "both" ||
     background.both?.kind !== "color" ||
     background.both.rgb !== expectedBackgroundRgb
   ) {

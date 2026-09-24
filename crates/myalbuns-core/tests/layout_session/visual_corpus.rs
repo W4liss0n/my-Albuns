@@ -6,22 +6,28 @@ use serde_json::{Value, json};
 use std::{collections::BTreeMap, fs, path::Path};
 
 pub(super) fn fixture_project(root: &Path, count: usize) -> EditableProject {
-    let mut document: Value = serde_json::from_str(include_str!(
-        "../fixtures/project_document_v6_photo_migration_expected.myalbuns"
-    ))
-    .unwrap();
+    let mut document: Value =
+        serde_json::from_str(include_str!("../fixtures/project_file_v1/photo.myalbuns")).unwrap();
     let source = document["project"]["sheets"][0]["frames"][0].clone();
     document["project"]["sheets"][0]["frames"] = json!(
         (0..count)
             .map(|i| {
                 let mut frame = source.clone();
                 frame["id"] = json!(format!("00000000-0000-4000-8000-{:012}", 101 + i));
-                frame["rect"] = json!(match i % 4 {
-                    0 => json!({"x":30000,"y":40000,"width":100000,"height":150000}),
-                    1 => json!({"x":320000,"y":60000,"width":150000,"height":100000}),
-                    2 => json!({"x":360000,"y":170000,"width":90000,"height":90000}),
-                    _ => json!({"x":180000,"y":170000,"width":150000,"height":100000}),
-                });
+                let [x, y, width, height] = match i % 4 {
+                    0 => [30000, 40000, 100000, 150000],
+                    1 => [320000, 60000, 150000, 100000],
+                    2 => [360000, 170000, 90000, 90000],
+                    _ => [180000, 170000, 150000, 100000],
+                };
+                for (key, value) in [
+                    ("xUm", x),
+                    ("yUm", y),
+                    ("widthUm", width),
+                    ("heightUm", height),
+                ] {
+                    frame[key] = json!(value);
+                }
                 if i % 2 == 1 {
                     frame["photo"] = Value::Null;
                 }

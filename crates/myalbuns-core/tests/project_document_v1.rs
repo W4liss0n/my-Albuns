@@ -23,7 +23,7 @@ const NEUTRAL_PROJECT_V1: &str = r##"{
   "projectId": "550e8400-e29b-41d4-a716-446655440000",
   "revision": 0,
   "project": {
-    "document": {
+    "album": {
       "displayUnit": "mm",
       "sheetWidthUm": 600000,
       "sheetHeightUm": 300000,
@@ -31,15 +31,30 @@ const NEUTRAL_PROJECT_V1: &str = r##"{
       "bleedUm": 3000,
       "safetyUm": 3000
     },
+    "layoutSettings": {
+      "permission": "pagesAndSheet",
+      "marginUm": 15000,
+      "gapUm": 5000,
+      "minimumSideUm": 20000
+    },
     "visualDefaults": {
       "background": {
-        "scope": "bothSides",
-        "both": { "kind": "color", "rgb": "#FFFFFF" }
+        "sides": "both",
+        "both": {
+          "kind": "color",
+          "rgb": "#FFFFFF"
+        }
       },
-      "overlay": { "scope": "bothSides", "both": null },
-      "frameBorder": { "kind": "none" }
+      "overlay": {
+        "sides": "both",
+        "both": {
+          "kind": "none"
+        }
+      },
+      "frameBorder": {
+        "kind": "none"
+      }
     },
-    "media": [],
     "sheets": [
       {
         "id": "00000000-0000-4000-8000-000000000001",
@@ -59,7 +74,7 @@ const PER_SIDE_PROJECT_V1: &str = r##"{
   "projectId": "550e8400-e29b-41d4-a716-446655440000",
   "revision": 37,
   "project": {
-    "document": {
+    "album": {
       "displayUnit": "mm",
       "sheetWidthUm": 600000,
       "sheetHeightUm": 300000,
@@ -67,9 +82,15 @@ const PER_SIDE_PROJECT_V1: &str = r##"{
       "bleedUm": 3000,
       "safetyUm": 3000
     },
+    "layoutSettings": {
+      "permission": "pagesAndSheet",
+      "marginUm": 15000,
+      "gapUm": 5000,
+      "minimumSideUm": 20000
+    },
     "visualDefaults": {
       "background": {
-        "scope": "perSide",
+        "sides": "perSide",
         "left": {
           "kind": "media",
           "mediaId": "00000000-0000-4000-8000-000000000010"
@@ -80,55 +101,46 @@ const PER_SIDE_PROJECT_V1: &str = r##"{
         }
       },
       "overlay": {
-        "scope": "perSide",
-        "left": null,
+        "sides": "perSide",
+        "left": {
+          "kind": "none"
+        },
         "right": {
           "kind": "media",
           "mediaId": "00000000-0000-4000-8000-000000000011"
         }
       },
-      "frameBorder": { "kind": "none" }
+      "frameBorder": {
+        "kind": "none"
+      }
     },
     "media": [
       {
         "id": "00000000-0000-4000-8000-000000000010",
         "kind": "decorative",
         "path": {
-          "encoding": "windowsUtf16",
-          "units": [67, 58, 92, 70, 111, 116, 111, 115, 92, 99, 97, 112, 97, 55296, 46, 112, 110, 103]
+          "windowsUtf16": [67, 58, 92, 70, 111, 116, 111, 115, 92, 99, 97, 112, 97, 55296, 46, 112, 110, 103]
         }
       },
       {
         "id": "00000000-0000-4000-8000-000000000011",
         "kind": "decorative",
-        "path": {
-          "encoding": "windowsUtf16",
-          "units": [92, 92, 115, 101, 114, 118, 105, 100, 111, 114, 92, 65, 108, 98, 117, 110, 115, 92, 111, 118, 101, 114, 108, 97, 121, 46, 112, 110, 103]
-        }
+        "path": "\\\\servidor\\Albuns\\overlay.png"
       },
       {
         "id": "00000000-0000-4000-8000-000000000012",
         "kind": "decorative",
-        "path": {
-          "encoding": "windowsUtf16",
-          "units": [90, 58, 92, 100, 101, 99, 111, 114, 97, 116, 105, 118, 111, 115, 92, 109, 97, 112, 101, 97, 100, 111, 46, 112, 110, 103]
-        }
+        "path": "Z:\\decorativos\\mapeado.png"
       },
       {
         "id": "00000000-0000-4000-8000-000000000013",
         "kind": "decorative",
-        "path": {
-          "encoding": "windowsUtf16",
-          "units": [92, 92, 63, 92, 67, 58, 92, 70, 111, 116, 111, 115, 92, 118, 101, 114, 98, 97, 116, 105, 109, 46, 112, 110, 103]
-        }
+        "path": "\\\\?\\C:\\Fotos\\verbatim.png"
       },
       {
         "id": "00000000-0000-4000-8000-000000000014",
         "kind": "decorative",
-        "path": {
-          "encoding": "windowsUtf16",
-          "units": [92, 92, 63, 92, 85, 78, 67, 92, 115, 101, 114, 118, 105, 100, 111, 114, 92, 65, 108, 98, 117, 110, 115, 92, 118, 101, 114, 98, 97, 116, 105, 109, 46, 112, 110, 103]
-        }
+        "path": "\\\\?\\UNC\\servidor\\Albuns\\verbatim.png"
       }
     ],
     "sheets": [
@@ -358,8 +370,8 @@ fn classifies_document_type_and_schema_failures_with_public_typed_errors() {
 fn rejects_unknown_and_duplicate_fields_as_a_closed_v1_document() {
     let unknown_field = replace_literal_once(
         NEUTRAL_PROJECT_V1,
-        "  \"project\": {\n    \"document\": {",
-        "  \"project\": {\n    \"unexpected\": true,\n    \"document\": {",
+        "  \"project\": {\n    \"album\": {",
+        "  \"project\": {\n    \"unexpected\": true,\n    \"album\": {",
     );
     let duplicate_field = replace_literal_once(
         NEUTRAL_PROJECT_V1,
@@ -384,7 +396,7 @@ fn rejects_missing_wrong_typed_and_duplicated_fields_at_every_document_layer() {
     let cases = [
         (
             "campo obrigatório ausente",
-            replace_literal_once(NEUTRAL_PROJECT_V1, "    \"media\": [],\n", ""),
+            replace_literal_once(NEUTRAL_PROJECT_V1, "      \"displayUnit\": \"mm\",\n", ""),
         ),
         (
             "tipo primitivo incorreto",
@@ -431,13 +443,13 @@ fn rejects_noncanonical_identities_and_fields_from_the_wrong_union_branch() {
     );
     let opposite_union_field = replace_literal_once(
         PER_SIDE_PROJECT_V1,
-        "\"scope\": \"perSide\",\n        \"left\": {",
-        "\"scope\": \"perSide\",\n        \"both\": { \"kind\": \"color\", \"rgb\": \"#FFFFFF\" },\n        \"left\": {",
+        "\"background\": {\n        \"sides\": \"perSide\",\n        \"left\": {",
+        "\"background\": {\n        \"sides\": \"perSide\",\n        \"both\": { \"kind\": \"color\", \"rgb\": \"#FFFFFF\" },\n        \"left\": {",
     );
     let unsupported_media_kind = replace_literal_once(
         PER_SIDE_PROJECT_V1,
         "\"id\": \"00000000-0000-4000-8000-000000000010\",\n        \"kind\": \"decorative\"",
-        "\"id\": \"00000000-0000-4000-8000-000000000010\",\n        \"kind\": \"photo\"",
+        "\"id\": \"00000000-0000-4000-8000-000000000010\",\n        \"kind\": \"video\"",
     );
 
     for (case, bytes) in [
@@ -535,8 +547,8 @@ fn separates_malformed_primitives_from_invalid_project_state() {
 fn rejects_broken_references_duplicate_identities_and_invalid_sheet_roles() {
     let missing_media = replace_literal_once(
         PER_SIDE_PROJECT_V1,
-        "\"left\": null,\n        \"right\": {\n          \"kind\": \"media\",\n          \"mediaId\": \"00000000-0000-4000-8000-000000000011\"",
-        "\"left\": null,\n        \"right\": {\n          \"kind\": \"media\",\n          \"mediaId\": \"00000000-0000-4000-8000-000000000099\"",
+        "\"left\": {\n          \"kind\": \"none\"\n        },\n        \"right\": {\n          \"kind\": \"media\",\n          \"mediaId\": \"00000000-0000-4000-8000-000000000011\"",
+        "\"left\": {\n          \"kind\": \"none\"\n        },\n        \"right\": {\n          \"kind\": \"media\",\n          \"mediaId\": \"00000000-0000-4000-8000-000000000099\"",
     );
     let duplicate_media_id = replace_literal_once(
         PER_SIDE_PROJECT_V1,
@@ -566,8 +578,8 @@ fn rejects_broken_references_duplicate_identities_and_invalid_sheet_roles() {
 fn rejects_duplicate_paths_and_the_remaining_invalid_album_shapes() {
     let duplicate_path = replace_literal_once(
         PER_SIDE_PROJECT_V1,
-        "[92, 92, 115, 101, 114, 118, 105, 100, 111, 114, 92, 65, 108, 98, 117, 110, 115, 92, 111, 118, 101, 114, 108, 97, 121, 46, 112, 110, 103]",
-        "[67, 58, 92, 70, 111, 116, 111, 115, 92, 99, 97, 112, 97, 55296, 46, 112, 110, 103]",
+        "\"path\": \"Z:\\\\decorativos\\\\mapeado.png\"",
+        "\"path\": \"\\\\\\\\servidor\\\\Albuns\\\\overlay.png\"",
     );
     let one_sheet = replace_literal_once(
         NEUTRAL_PROJECT_V1,
@@ -609,8 +621,8 @@ fn rejects_duplicate_paths_and_the_remaining_invalid_album_shapes() {
 fn accepts_a_valid_solid_frame_border_and_rejects_zero_width() {
     let valid = replace_literal_once(
         NEUTRAL_PROJECT_V1,
-        "{ \"kind\": \"none\" }",
-        "{ \"kind\": \"solid\", \"rgb\": \"#AABBCC\", \"widthUm\": 1000 }",
+        "\"frameBorder\": {\n        \"kind\": \"none\"\n      }",
+        "\"frameBorder\": { \"kind\": \"solid\", \"rgb\": \"#AABBCC\", \"widthUm\": 1000 }",
     );
     let loaded = load_bytes(&valid).expect("a canonical positive solid border is valid");
     match loaded.project().visual_defaults().frame_border() {
@@ -634,32 +646,32 @@ fn accepts_a_valid_solid_frame_border_and_rejects_zero_width() {
 fn classifies_invalid_native_path_shape_and_syntax() {
     let unknown_encoding = replace_literal_once(
         PER_SIDE_PROJECT_V1,
-        "\"encoding\": \"windowsUtf16\",\n          \"units\": [67",
-        "\"encoding\": \"utf8\",\n          \"units\": [67",
+        "\"windowsUtf16\": [67",
+        "\"utf8\": [67",
     );
     let relative_path = replace_literal_once(
         PER_SIDE_PROJECT_V1,
-        "[67, 58, 92, 70, 111, 116, 111, 115, 92, 99, 97, 112, 97, 55296, 46, 112, 110, 103]",
-        "[114, 101, 108, 97, 116, 105, 118, 111, 46, 112, 110, 103]",
+        "\"path\": \"Z:\\\\decorativos\\\\mapeado.png\"",
+        "\"path\": \"relativo.png\"",
     );
     let extra_path_field = replace_literal_once(
         PER_SIDE_PROJECT_V1,
-        "\"encoding\": \"windowsUtf16\",\n          \"units\": [67",
-        "\"encoding\": \"windowsUtf16\",\n          \"extra\": true,\n          \"units\": [67",
+        "\"windowsUtf16\": [67, 58, 92, 70, 111, 116, 111, 115, 92, 99, 97, 112, 97, 55296, 46, 112, 110, 103]",
+        "\"windowsUtf16\": [67, 58, 92, 70, 111, 116, 111, 115, 92, 99, 97, 112, 97, 55296, 46, 112, 110, 103], \"extra\": true",
     );
     let unit_out_of_range = replace_literal_once(PER_SIDE_PROJECT_V1, "55296", "65536");
+    // Code units are kept only for a name that is not text; text must be text.
+    let text_as_units = replace_literal_once(PER_SIDE_PROJECT_V1, "55296", "65");
 
-    assert_eq!(
-        load_error(&unknown_encoding, "encoding desconhecido"),
-        LoadProjectError::Document(DocumentFailure::InvalidProjectDocument)
-    );
     assert_eq!(
         load_error(&relative_path, "pathname relativo"),
         LoadProjectError::Path(myalbuns_core::PathFailure::InvalidPath)
     );
     for (case, bytes) in [
+        ("encoding desconhecido", unknown_encoding),
         ("campo extra no pathname", extra_path_field),
         ("unidade UTF-16 fora do intervalo", unit_out_of_range),
+        ("texto gravado como unidades", text_as_units),
     ] {
         assert_eq!(
             load_error(&bytes, case),

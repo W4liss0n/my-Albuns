@@ -1277,12 +1277,11 @@ try {
     Object.keys(savedPhoto).sort().join(",") === "id,kind,path" &&
     savedFrames.length === 1 &&
     savedFrames[0].photo?.mediaId === savedPhoto.id &&
-    Object.keys(savedFrames[0].photo.transform).sort().join(",") ===
-      "angleTenths,blackAndWhite,mirrorX,panX,panY,quarterTurns,userZoom";
+    Object.keys(savedFrames[0].photo).join(",") === "mediaId";
   if (
-    savedDocument.schemaVersion !== 12 ||
+    savedDocument.schemaVersion !== 1 ||
     savedDocument.revision !== 3 ||
-    savedDocument.project.document.dpi !== 300 ||
+    savedDocument.project.album.dpi !== 300 ||
     !persistedPhotoLinkOnly
   ) {
     throw new Error(
@@ -1477,12 +1476,12 @@ try {
           checkpoint.creativeState?.projectId === originalProjectId &&
           checkpoint.creativeState?.documentType === "myalbuns.project" &&
           checkpoint.creativeState?.revision === 4 &&
-          checkpoint.creativeState?.project?.document?.dpi === 360 &&
+          checkpoint.creativeState?.project?.album?.dpi === 360 &&
           envelopeKeys ===
             "baseRevision,creativeState,projectId,schemaVersion" &&
           baseKeys === "projectId,revision" &&
           creativeKeys ===
-            "documentType,mediaFolders,project,projectId,revision,schemaVersion,sheetVisuals"
+            "documentType,project,projectId,revision,schemaVersion"
           ? checkpoint
           : undefined;
       } catch {
@@ -1886,7 +1885,7 @@ try {
         return checkpoint.projectId === originalProjectId &&
           checkpoint.baseRevision?.revision === 3 &&
           checkpoint.creativeState?.revision === 6 &&
-          checkpoint.creativeState?.project?.document?.dpi === 360
+          checkpoint.creativeState?.project?.album?.dpi === 360
           ? checkpoint
           : undefined;
       } catch {
@@ -2000,9 +1999,9 @@ try {
   const expectedSavedAsProject = JSON.parse(
     JSON.stringify(savedDocument.project),
   );
-  expectedSavedAsProject.document.dpi = 360;
+  expectedSavedAsProject.album.dpi = 360;
   const savedAsContentPreserved =
-    savedAsDocument.schemaVersion === 12 &&
+    savedAsDocument.schemaVersion === 1 &&
     savedAsDocument.projectId !== originalProjectId &&
     savedAsDocument.revision === 6 &&
     JSON.stringify(savedAsDocument.project) ===
@@ -2350,7 +2349,7 @@ try {
   if (
     independentlySavedOriginalDocument.projectId !== originalProjectId ||
     independentlySavedOriginalDocument.revision !== 4 ||
-    independentlySavedOriginalDocument.project.document.dpi !== 320 ||
+    independentlySavedOriginalDocument.project.album.dpi !== 320 ||
     !readFileSync(saveAsPath).equals(copiedBytesBeforeOriginalSave)
   ) {
     throw new Error(
@@ -2400,7 +2399,7 @@ try {
   const isolatedIndependentSaves =
     independentlySavedCopyDocument.projectId === copiedProjectId &&
     independentlySavedCopyDocument.revision === 7 &&
-    independentlySavedCopyDocument.project.document.dpi === 420 &&
+    independentlySavedCopyDocument.project.album.dpi === 420 &&
     readFileSync(projectPath).equals(independentlySavedOriginal);
   if (!isolatedIndependentSaves) {
     throw new Error(
@@ -2568,7 +2567,7 @@ try {
   });
   const dimensions = jpegDimensions(exported);
   const sheetEvidence = assertDistinguishableSheetExport({
-    document: savedDocument.project.document,
+    document: savedDocument.project.album,
     sheets: savedDocument.project.sheets,
     visualDefaults: savedDocument.project.visualDefaults,
     expectedBackgroundRgb: personalizedBackgroundRgb,
@@ -2611,8 +2610,12 @@ try {
     panX: 0, panY: 0, userZoom: 1, quarterTurns: 0,
     mirrorX: false, angleTenths: 0, blackAndWhite: false,
   };
+  const fidelityTransform = {
+    ...neutralTransform,
+    ...(fidelityFrame.photo.transform ?? {}),
+  };
   if (Object.entries(neutralTransform).some(
-    ([key, value]) => fidelityFrame.photo.transform[key] !== value,
+    ([key, value]) => fidelityTransform[key] !== value,
   )) {
     throw new Error("The fidelity fixture must keep the Original centered in its Frame");
   }
@@ -2658,9 +2661,14 @@ try {
       `,
       args: [
         { "element-6066-11e4-a52e-4f735466cecf": canvas },
-        savedDocument.project.document,
+        savedDocument.project.album,
         sheetEvidence.selectedSheetId,
-        fidelityFrame.rect,
+        {
+          x: fidelityFrame.xUm,
+          y: fidelityFrame.yUm,
+          width: fidelityFrame.widthUm,
+          height: fidelityFrame.heightUm,
+        },
       ],
     },
   );
@@ -3947,7 +3955,7 @@ try {
       ...sheetEvidence,
       exportedDpi: 360,
       savedRevision: savedDocument.revision,
-      savedDpi: savedDocument.project.document.dpi,
+      savedDpi: savedDocument.project.album.dpi,
       schemaVersion: savedDocument.schemaVersion,
       photoFrameCount: savedFrames.length,
       persistedPhotoLinkOnly,
@@ -3959,7 +3967,7 @@ try {
         schemaVersion: recoveryCheckpoint.schemaVersion,
         baseSavedRevision: recoveryCheckpoint.baseRevision.revision,
         creativeRevision: recoveryCheckpoint.creativeState.revision,
-        recoveredDpi: recoveryCheckpoint.creativeState.project.document.dpi,
+        recoveredDpi: recoveryCheckpoint.creativeState.project.album.dpi,
         promptChoices: recoveryChoices,
         presentation: {
           ...recoveryPresentation,
@@ -4014,9 +4022,9 @@ try {
         isolatedIndependentSaves,
         originalSavedRevision: independentlySavedOriginalDocument.revision,
         originalSavedDpi:
-          independentlySavedOriginalDocument.project.document.dpi,
+          independentlySavedOriginalDocument.project.album.dpi,
         copySavedRevision: independentlySavedCopyDocument.revision,
-        copySavedDpi: independentlySavedCopyDocument.project.document.dpi,
+        copySavedDpi: independentlySavedCopyDocument.project.album.dpi,
         previousRecoveryFinished: recoveryFinished,
         cacheStagedEmpty: Boolean(emptyCacheStage),
         localAuthorityTransitioned,

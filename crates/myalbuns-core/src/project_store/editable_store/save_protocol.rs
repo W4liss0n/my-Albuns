@@ -6,7 +6,7 @@ use crate::{
     project_store::{
         IdentityTargetBinder, PathFailure, PendingProjectIdentityLease, ProjectIdentityLease,
         ProjectLocation, decode, encode, map_path_failure,
-        versioned_codec::rewrite_project_id,
+        project_file::rewrite_project_id,
         windows_publish::{replace_existing, write_synced_new},
     },
 };
