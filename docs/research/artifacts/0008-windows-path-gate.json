@@ -1,7 +1,7 @@
 {
     "schemaVersion":  2,
-    "collectedAtUtc":  "2026-08-22T20:17:08.7504398Z",
-    "gitCommit":  "c40b645951a48f62ffe0ef92aaff83c5dcd2321c",
+    "collectedAtUtc":  "2026-09-24T01:18:09.8903287Z",
+    "gitCommit":  "5894180cd9b31b04c2a854c2c643f45ef2916602",
     "sourceInputsDirty":  false,
     "platform":  {
                      "operatingSystem":  "Microsoft Windows NT 10.0.26200.0",
@@ -12,27 +12,27 @@
                    {
                        "name":  "path-contract",
                        "passed":  true,
-                       "elapsedMs":  1146
+                       "elapsedMs":  1019
                    },
                    {
                        "name":  "path-policy",
                        "passed":  true,
-                       "elapsedMs":  873
+                       "elapsedMs":  768
                    },
                    {
                        "name":  "real-mapped-unc",
                        "passed":  true,
-                       "elapsedMs":  986
+                       "elapsedMs":  1423
                    },
                    {
                        "name":  "imaging-protocol",
                        "passed":  true,
-                       "elapsedMs":  8022
+                       "elapsedMs":  961
                    },
                    {
                        "name":  "imaging-sidecar-build",
                        "passed":  true,
-                       "elapsedMs":  16494
+                       "elapsedMs":  3573
                    },
                    {
                        "name":  "sidecar-protocol-preflight",
@@ -42,27 +42,32 @@
                    {
                        "name":  "desktop-host-build",
                        "passed":  true,
-                       "elapsedMs":  93977
+                       "elapsedMs":  85655
                    },
                    {
                        "name":  "path-io-thread",
                        "passed":  true,
-                       "elapsedMs":  2766
+                       "elapsedMs":  15330
                    },
                    {
                        "name":  "real-sidecar-frozen-plan",
                        "passed":  true,
-                       "elapsedMs":  24336
+                       "elapsedMs":  4098
+                   },
+                   {
+                       "name":  "real-project-create-reopen-export",
+                       "passed":  true,
+                       "elapsedMs":  4466
                    },
                    {
                        "name":  "desktop-long-path-manifest",
                        "passed":  true,
-                       "elapsedMs":  33
+                       "elapsedMs":  39
                    },
                    {
                        "name":  "sidecar-long-path-manifest",
                        "passed":  true,
-                       "elapsedMs":  20
+                       "elapsedMs":  19
                    }
                ],
     "evidence":  {
@@ -70,7 +75,7 @@
                                    "bindingReusedAfterRemapWithinAttempt":  true,
                                    "cacheUnderLocalAppData":  true,
                                    "explicitRetryRecaptured":  true,
-                                   "firstPlanSha256":  "2f44c1df3db87f0781ef8faa9ba72d9f7d8cc5ba2dc4ab94e64b188cab124f11",
+                                   "firstPlanSha256":  "bf116e6eb56b58b211f4e6d66f914a95c45bc11f2584b0e0b3c7bb2ab3c1e7ec",
                                    "identityFailure":  "indeterminate",
                                    "lockReleasedAfterOwnerDrop":  true,
                                    "mappedAndLocalIdentity":  "same",
@@ -81,7 +86,7 @@
                                    "planRoundTripLossless":  true,
                                    "plansDistinct":  true,
                                    "readOnlyBatchAllowedWhileLocked":  true,
-                                   "retryPlanSha256":  "45d3db365ba841d8364acfbaa4748b80602c43a98be26fec5f0b17467977c07d",
+                                   "retryPlanSha256":  "8e5d71d874ff3ba3c7654a283482760f517ffba28cf1c4e9f196da1dde205856",
                                    "stagingInsideDestination":  true,
                                    "unavailableBinding":  "unavailable",
                                    "uncExportPublished":  true,
@@ -92,13 +97,88 @@
                                      "mappingRemovedBeforeDispatch":  true,
                                      "outputPublishedOnUnc":  true,
                                      "outputSha256":  "22a3fe4bafca28f4ba336a6c44758f937d1c288db70795bcaeb210fb3b42b5d4",
-                                     "processorPid":  36664,
+                                     "processorPid":  43936,
                                      "processorUsedFrozenOperationalPath":  true,
-                                     "rootBindingPlanSha256":  "c7a9830b848460d0e4ba47cf27837cd014c155bb529928ed76da6ffd619ef3cd",
+                                     "rootBindingPlanSha256":  "9e8216818a372ac2ef75f805cf0e9cb78aee1b39bd65e04bbb5c1328620655a3",
                                      "stagingRemoved":  true,
                                      "unavailableAttemptStartedProcessor":  false,
                                      "unavailableBindingFailedAtPrepare":  true
                                  },
+                     "projects":  {
+                                      "value":  [
+                                                    {
+                                                        "case":  "local",
+                                                        "created":  true,
+                                                        "exported":  true,
+                                                        "originalUnchanged":  true,
+                                                        "projectUnchangedByExport":  true,
+                                                        "reopened":  true,
+                                                        "stagingRemoved":  true
+                                                    },
+                                                    {
+                                                        "case":  "unc",
+                                                        "created":  true,
+                                                        "exported":  true,
+                                                        "originalUnchanged":  true,
+                                                        "projectUnchangedByExport":  true,
+                                                        "reopened":  true,
+                                                        "stagingRemoved":  true
+                                                    },
+                                                    {
+                                                        "case":  "mapped",
+                                                        "created":  true,
+                                                        "exported":  true,
+                                                        "originalUnchanged":  true,
+                                                        "projectUnchangedByExport":  true,
+                                                        "reopened":  true,
+                                                        "stagingRemoved":  true
+                                                    },
+                                                    {
+                                                        "case":  "verbatim-disk",
+                                                        "created":  true,
+                                                        "exported":  true,
+                                                        "originalUnchanged":  true,
+                                                        "projectUnchangedByExport":  true,
+                                                        "reopened":  true,
+                                                        "stagingRemoved":  true
+                                                    },
+                                                    {
+                                                        "case":  "verbatim-unc",
+                                                        "created":  true,
+                                                        "exported":  true,
+                                                        "originalUnchanged":  true,
+                                                        "projectUnchangedByExport":  true,
+                                                        "reopened":  true,
+                                                        "stagingRemoved":  true
+                                                    },
+                                                    {
+                                                        "case":  "long-local",
+                                                        "created":  true,
+                                                        "exported":  true,
+                                                        "originalUnchanged":  true,
+                                                        "projectUnchangedByExport":  true,
+                                                        "reopened":  true,
+                                                        "stagingRemoved":  true
+                                                    },
+                                                    {
+                                                        "case":  "long-unc",
+                                                        "created":  true,
+                                                        "exported":  true,
+                                                        "originalUnchanged":  true,
+                                                        "projectUnchangedByExport":  true,
+                                                        "reopened":  true,
+                                                        "stagingRemoved":  true
+                                                    }
+                                                ],
+                                      "Count":  7
+                                  },
+                     "permissions":  {
+                                         "creationDenied":  true,
+                                         "explicitRetryExported":  true,
+                                         "exportDenied":  true,
+                                         "openingDenied":  true,
+                                         "projectUnchanged":  true
+                                     },
                      "libraryBoundaries":  {
                                                "directories":  {
                                                                    "responsibility":  "known_folder_discovery",

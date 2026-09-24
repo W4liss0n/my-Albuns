@@ -3,7 +3,7 @@ status: current
 document: technical-research
 ticket: 01-plataforma-e-arquitetura
 date: 2026-07-31
-updated: 2026-08-12
+updated: 2026-09-23
 ---
 
 # Caminhos Windows, identidade física e UNC
@@ -35,7 +35,7 @@ participantes recebem somente o plano congelado. Raiz não capturada produz
 `UnboundRoot`, e outra tentativa precisa criar explicitamente outro contexto.
 
 Os caminhos do plano usam representação nativa opaca. No Windows, a
-serialização do protocolo 17 transporta unidades UTF-16, inclusive uma
+serialização do protocolo 27 transporta unidades UTF-16, inclusive uma
 sequência com surrogate não pareado exercitada pelo teste de round-trip.
 
 Objetos existentes são abertos por handle. A resolução confirma o tipo esperado
@@ -55,6 +55,10 @@ O JSON é a única fonte do `gitCommit`, dos PIDs, dos hashes e dos tempos daque
 rodada. A coleta descrita na primeira versão desta pesquisa foi substituída por
 essa rodada posterior; elas não são apresentadas como a mesma execução.
 
+A rodada atual foi repetida em 2026-09-23 no protocolo 27, com a árvore de
+fontes limpa. A anterior, de 2026-08-22, usava o protocolo 17 e ainda não
+incluía as jornadas de Projetos reais.
+
 O campo `sourceInputsDirty` usa a mesma regra do gate de recuperação: inspeciona
 todo arquivo rastreado e todo arquivo novo não ignorado pelo Git, excluindo
 somente a própria evidência gerada. Isso inclui entradas da raiz, configurações
@@ -67,9 +71,9 @@ O runner cria duas raízes descartáveis no volume local e as expõe por SMB rea
 através do compartilhamento administrativo loopback `C$`. Uma letra livre é
 mapeada para a primeira raiz e depois remapeada para a segunda. O cenário
 compila desktop e Processador em targets isolados, confirma previamente que
-ambos usam o protocolo 17 e extrai seus manifests.
+ambos usam o protocolo 27 e extrai seus manifests.
 
-Os 11 checks passaram:
+Os 12 checks passaram:
 
 1. contrato de resolução e identidade;
 2. política de `AppPaths`, Cache, staging e formas de caminho;
@@ -80,8 +84,10 @@ Os 11 checks passaram:
 7. build do host desktop;
 8. captura fora da thread chamadora;
 9. Exportação real pelo Processador com plano UNC congelado;
-10. manifesto de caminhos longos do desktop;
-11. manifesto de caminhos longos do Processador.
+10. criação, reabertura e Exportação de Projetos reais pelos mesmos
+    bootstrap, Host e `ExportPipeline` da aplicação, além da negação de acesso;
+11. manifesto de caminhos longos do desktop;
+12. manifesto de caminhos longos do Processador.
 
 ## Resultados
 
@@ -98,6 +104,17 @@ consumiu o caminho operacional congelado, publicou a saída no UNC e removeu o
 staging. Em seguida, a raiz operacional foi temporariamente retirada do ar: a
 tentativa falhou em `Prepare`, não iniciou o Processador e não publicou arquivo.
 Somente após restauração e nova captura explícita a Exportação foi publicada.
+
+### Projetos reais
+
+Um Projeto foi criado, reaberto e exportado em sete formas de caminho: disco
+local, UNC, unidade mapeada, verbatim de disco, verbatim UNC e caminhos longos
+local e UNC. Em todas, o Original e o arquivo de Projeto ficaram inalterados
+pela Exportação e o staging foi removido.
+
+Com escrita ou leitura negada por ACL local, a criação, a abertura e a
+Exportação falharam como acesso negado, sem alterar o Projeto. Depois de
+restaurado o acesso, uma nova tentativa explícita exportou normalmente.
 
 ### Identidade e bloqueio
 
@@ -153,5 +170,5 @@ powershell -NoProfile -ExecutionPolicy Bypass `
   -OutputPath docs\research\artifacts\0008-windows-path-gate.json
 ```
 
-O runner substitui o artefato somente depois que os 11 checks e as relações de
+O runner substitui o artefato somente depois que os 12 checks e as relações de
 evidência passam.
