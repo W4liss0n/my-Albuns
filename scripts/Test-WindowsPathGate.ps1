@@ -254,10 +254,13 @@ try {
         },
         [ordered]@{
             name = 'real-project-create-reopen-export'
+            # Name the path journeys explicitly: the module also holds manual
+            # QA tests that need their own external fixtures.
             arguments = @(
-                'test', '-p', 'myalbuns-desktop', '--lib',
-                'project_bootstrap::host::tests::windows_paths::',
-                '--', '--ignored', '--test-threads=1', '--nocapture'
+                'test', '-p', 'myalbuns-desktop', '--lib', '--',
+                'project_bootstrap::host::tests::windows_paths::create_reopen_and_export_across_native_windows_paths',
+                'project_bootstrap::host::tests::windows_paths::denied_creation_opening_and_export_preserve_files_and_allow_explicit_retry',
+                '--exact', '--ignored', '--test-threads=1', '--nocapture'
             )
         }
     )
