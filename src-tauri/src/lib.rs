@@ -20,6 +20,7 @@ mod export_attempts;
 mod export_commands;
 mod export_media;
 mod export_pipeline;
+mod eye_correction;
 mod generation_operation;
 mod generation_runner;
 mod generation_window;
@@ -28,7 +29,6 @@ mod global_runtime;
 mod graphics_launch_gate;
 mod image_processing;
 mod image_viewer_window;
-mod eye_correction;
 mod image_work_admission;
 mod imaging_processor;
 #[cfg(test)]
@@ -423,7 +423,11 @@ mod tests {
         let project = allowed_commands(&project);
         assert!(viewer.contains("act_image_viewer_correction"));
         assert!(!project.contains("act_image_viewer_correction"));
-        for command in ["prepare_eye_correction", "cancel_eye_correction", "apply_eye_correction"] {
+        for command in [
+            "prepare_eye_correction",
+            "cancel_eye_correction",
+            "apply_eye_correction",
+        ] {
             assert!(project.contains(command));
             assert!(!viewer.contains(command));
         }

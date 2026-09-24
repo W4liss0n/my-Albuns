@@ -7,13 +7,13 @@ use myalbuns_desktop_lib::ipc_contract::{
     ImportMediaResult, LinkedMediaChanged, MediaFileCatalog, MediaPanelSettings,
     MediaPanelTabSettings, MediaPreferenceKind, MediaPreview, MediaPreviewCommandError,
     MediaPreviewDemand, MediaPreviewState, MediaSortDirection, MediaUsageFilter,
-    OpeningExternalCopyDecision, PointerDragThreshold, ProjectCloseChoice,
+    OpeningExternalCopyDecision, PointerDragThreshold, PreparedEyeCorrection, ProjectCloseChoice,
     ProjectCloseRequestOutcome, ProjectCloseResolution, ProjectDialogAction,
     ProjectDialogActionEvent, ProjectDialogPresentation, ProjectDialogState,
     ProjectRecoveryDecision, SaveAsProjectCommandError, SaveAsProjectOutcome, SaveAsProjectResult,
     SaveProjectCommandError, SaveProjectOutcome, SaveProjectResult, SettingsPreferenceChange,
-    PreparedEyeCorrection, ViewerAction, ViewerCorrectionAction, ViewerCorrectionActionKind,
-    ViewerCorrectionPhase, ViewerFace, ViewerFacePoint, ViewerPresentation, ViewerPreviewState, WorkspacePanelKind,
+    ViewerAction, ViewerCorrectionAction, ViewerCorrectionActionKind, ViewerCorrectionPhase,
+    ViewerFace, ViewerFacePoint, ViewerPresentation, ViewerPreviewState, WorkspacePanelKind,
     WorkspacePanelPreference, WorkspacePanelPreferences, WorkspacePreferenceChange,
     WorkspacePreferences,
 };
@@ -31,7 +31,8 @@ fn main() {
     ViewerPresentation::export_all(&config).expect("viewer presentation bindings");
     ViewerAction::export_all(&config).expect("viewer action bindings");
     ViewerCorrectionAction::export_all(&config).expect("viewer correction action bindings");
-    ViewerCorrectionActionKind::export_all(&config).expect("viewer correction action kind bindings");
+    ViewerCorrectionActionKind::export_all(&config)
+        .expect("viewer correction action kind bindings");
     ViewerCorrectionPhase::export_all(&config).expect("viewer correction phase bindings");
     ViewerFace::export_all(&config).expect("viewer face bindings");
     ViewerFacePoint::export_all(&config).expect("viewer face point bindings");

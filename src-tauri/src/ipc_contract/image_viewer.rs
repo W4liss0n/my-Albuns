@@ -126,12 +126,22 @@ mod tests {
         assert_eq!(decoded.kind, ViewerCorrectionActionKind::Preview);
         assert_eq!(serde_json::to_value(decoded).unwrap(), action);
         for phase in ["browse", "select", "processing", "preview", "applying"] {
-            let decoded: ViewerCorrectionPhase = serde_json::from_str(&format!("\"{phase}\"")).unwrap();
-            assert_eq!(serde_json::to_string(&decoded).unwrap(), format!("\"{phase}\""));
+            let decoded: ViewerCorrectionPhase =
+                serde_json::from_str(&format!("\"{phase}\"")).unwrap();
+            assert_eq!(
+                serde_json::to_string(&decoded).unwrap(),
+                format!("\"{phase}\"")
+            );
         }
         assert!(serde_json::from_str::<ViewerCorrectionPhase>("\"unknown\"").is_err());
         assert!(serde_json::from_str::<ViewerCorrectionActionKind>("\"unknown\"").is_err());
-        assert_eq!(serde_json::to_value(PreparedEyeCorrection { token: "token".into(), url: "opaque".into() }).unwrap(),
-            serde_json::json!({"token":"token","url":"opaque"}));
+        assert_eq!(
+            serde_json::to_value(PreparedEyeCorrection {
+                token: "token".into(),
+                url: "opaque".into()
+            })
+            .unwrap(),
+            serde_json::json!({"token":"token","url":"opaque"})
+        );
     }
 }

@@ -97,20 +97,24 @@ impl CachePreviewRegistry {
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
             .previews_by_token
-            .insert(token.clone(), Arc::new(PreparedCachePreview {
-                format: ImageFormat::Png,
-                bytes,
-            }));
+            .insert(
+                token.clone(),
+                Arc::new(PreparedCachePreview {
+                    format: ImageFormat::Png,
+                    bytes,
+                }),
+            );
         opaque_image_url(CACHE_MEDIA_PROTOCOL_SCHEME, &token)
     }
 
     pub(crate) fn revoke_viewer_preview(&self, url: &str) {
-        let mut publication = self.publication
+        let mut publication = self
+            .publication
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
-        publication.previews_by_token.retain(|token, _| {
-            opaque_image_url(CACHE_MEDIA_PROTOCOL_SCHEME, token) != url
-        });
+        publication
+            .previews_by_token
+            .retain(|token, _| opaque_image_url(CACHE_MEDIA_PROTOCOL_SCHEME, token) != url);
     }
     pub(crate) fn is_published_url(&self, url: &str) -> bool {
         self.publication
