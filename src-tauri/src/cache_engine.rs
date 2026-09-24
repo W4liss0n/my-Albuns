@@ -44,7 +44,7 @@ use crate::{
     media_runtime::{MediaBinding, MediaObservation, MediaResolver, MediaRuntimeUpdate},
 };
 
-const CACHE_METADATA_SCHEMA_VERSION: u32 = 6;
+const CACHE_METADATA_SCHEMA_VERSION: u32 = 1;
 
 #[cfg(test)]
 thread_local! {
@@ -68,7 +68,6 @@ struct CacheMetadataEntry {
     media_id: String,
     source_binding_sha256: String,
     generation_id: String,
-    artifact_name: String,
     width_px: u32,
     height_px: u32,
     preview_bytes: u64,
@@ -1942,7 +1941,8 @@ fn cache_metadata_entry(
     source: &CacheMediaSource,
     artifact: &CacheArtifact,
 ) -> Result<CacheMetadataEntry, CacheFailure> {
-    let artifact_path = cache_paths
+    // The artifact name is derived from these fields and is never stored.
+    cache_paths
         .preview_file(&artifact.media_id, &artifact.generation_id, artifact.format)
         .map_err(|error| {
             CacheFailure::new(
@@ -1950,21 +1950,10 @@ fn cache_metadata_entry(
                 format!("O caminho do artefato de Cache é inválido: {error}"),
             )
         })?;
-    let artifact_name = artifact_path
-        .file_name()
-        .and_then(|value| value.to_str())
-        .ok_or_else(|| {
-            CacheFailure::new(
-                CacheFailureStage::PublishIndex,
-                "O nome do artefato de Cache é inválido.",
-            )
-        })?
-        .to_owned();
     Ok(CacheMetadataEntry {
         media_id: artifact.media_id.clone(),
         source_binding_sha256: CacheSourceBinding::for_path(source.source_path()).sha256,
         generation_id: artifact.generation_id.clone(),
-        artifact_name,
         width_px: artifact.width_px,
         height_px: artifact.height_px,
         preview_bytes: artifact.preview_bytes,
@@ -2006,7 +1995,7 @@ fn publish_metadata(
     INDEX_IO.set((INDEX_IO.get().0, INDEX_IO.get().1 + 1));
     let metadata_path = cache_paths.metadata_file();
     let temporary_path = cache_paths.metadata_temporary_file(std::process::id());
-    let metadata_bytes = serde_json::to_vec_pretty(metadata).map_err(|error| {
+    let metadata_bytes = serde_json::to_vec(metadata).map_err(|error| {
         CacheFailure::new(
             CacheFailureStage::PublishIndex,
             format!("Não foi possível serializar o índice: {error}"),
@@ -2166,14 +2155,7 @@ fn metadata_is_current(
             && entry.reusable().is_ok()
             && cache_paths
                 .preview_file(&entry.media_id, &entry.generation_id, entry.format)
-                .ok()
-                .and_then(|path| {
-                    path.file_name()
-                        .and_then(|name| name.to_str())
-                        .map(str::to_owned)
-                })
-                .as_deref()
-                == Some(entry.artifact_name.as_str())
+                .is_ok()
     })
 }
 
@@ -5002,7 +4984,7 @@ mod tests {
                 .expect("the disposable index is readable");
             let metadata: serde_json::Value = serde_json::from_slice(&metadata_bytes)
                 .expect("the disposable index is valid JSON");
-            assert_eq!(metadata["schemaVersion"], 6);
+            assert_eq!(metadata["schemaVersion"], 1);
             assert_eq!(
                 metadata["representationVersion"],
                 myalbuns_imaging_protocol::CACHE_REPRESENTATION_VERSION

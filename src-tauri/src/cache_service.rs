@@ -266,6 +266,7 @@ impl CacheService {
     pub(crate) fn run_scheduled_cleanup(
         &self,
     ) -> Result<CacheScheduledCleanupOutcome, CacheServiceError> {
+        self.prune_empty_closed_namespaces()?;
         if !self.clear_is_scheduled()? {
             return Ok(CacheScheduledCleanupOutcome::NotScheduled);
         }
@@ -273,6 +274,36 @@ impl CacheService {
             Some(_) => Ok(CacheScheduledCleanupOutcome::Cleared),
             None => Ok(CacheScheduledCleanupOutcome::Deferred),
         }
+    }
+
+    /// Removes namespaces of closed Projects that hold no file at all. A
+    /// Project opened without previews leaves one behind; open Projects keep
+    /// theirs because each removal reserves its namespace first.
+    fn prune_empty_closed_namespaces(&self) -> Result<usize, CacheServiceError> {
+        let _maintenance = match self.maintenance.try_acquire() {
+            Ok(grant) => grant,
+            Err(NamedMutexError::Conflict) => return Ok(0),
+            Err(NamedMutexError::Unavailable(reason)) => {
+                return Err(CacheServiceError::Reservation(reason));
+            }
+        };
+        let mut removed = 0;
+        for paths in self.list_namespaces()? {
+            let CacheNamespaceRemovalReservation::Reserved(namespace) =
+                self.reserve_namespace_for_removal(&paths)?
+            else {
+                continue;
+            };
+            if namespace.usage.bytes() == 0
+                && self
+                    .app_paths
+                    .clear_project_cache(namespace.usage.paths())
+                    .map_err(|error| CacheServiceError::Storage(error.to_string()))?
+            {
+                removed += 1;
+            }
+        }
+        Ok(removed)
     }
 
     fn try_clear_all(&self) -> Result<Option<CacheFreeResult>, CacheServiceError> {
@@ -850,6 +881,60 @@ mod tests {
     }
 
     #[test]
+    fn startup_prunes_only_empty_namespaces_of_closed_projects() {
+        let root = tempfile::tempdir().expect("temporary Cache service fixture");
+        let app_paths =
+            AppPaths::from_roots(&root.path().join("roaming"), &root.path().join("local"));
+        std::fs::create_dir_all(root.path().join("roaming")).expect("the roaming root exists");
+        std::fs::create_dir_all(root.path().join("local")).expect("the local root exists");
+        let core = ProjectCore::new().with_identity_storage_roots(
+            root.path().join("leases"),
+            root.path().join("identities"),
+        );
+        let service = CacheService::new(app_paths.clone());
+        let open = create_project(&core, root.path().join("open.myalbuns"));
+        let empty = create_project(&core, root.path().join("empty.myalbuns"));
+        let filled = create_project(&core, root.path().join("filled.myalbuns"));
+        let open_owner = service
+            .reserve_namespace(open.identity_authority())
+            .expect("the open Host reserves its Cache");
+        let empty_owner = service
+            .reserve_namespace(empty.identity_authority())
+            .expect("a Host that produced no preview reserves its Cache");
+        let filled_owner = service
+            .reserve_namespace(filled.identity_authority())
+            .expect("a Host with previews reserves its Cache");
+        let open_paths = open_owner.namespace().paths().clone();
+        let empty_paths = empty_owner.namespace().paths().clone();
+        let filled_paths = filled_owner.namespace().paths().clone();
+        std::fs::write(
+            filled_paths.media_directory().join("preview.bin"),
+            [1_u8; 8],
+        )
+        .expect("the closed Project keeps a preview");
+        drop(empty_owner);
+        drop(filled_owner);
+
+        assert_eq!(
+            service
+                .run_scheduled_cleanup()
+                .expect("the startup cleanup runs"),
+            CacheScheduledCleanupOutcome::NotScheduled
+        );
+
+        assert!(
+            !empty_paths.root().exists(),
+            "the empty closed namespace is removed"
+        );
+        assert!(
+            open_paths.root().exists(),
+            "an open Project keeps its namespace"
+        );
+        assert!(filled_paths.media_directory().join("preview.bin").exists());
+        drop(open_owner);
+    }
+
+    #[test]
     fn measures_and_frees_only_namespaces_without_an_active_owner() {
         let root = tempfile::tempdir().expect("temporary Cache service fixture");
         let app_paths =
@@ -1221,7 +1306,7 @@ mod tests {
             .expect("the original authority reserves Cache");
         let original_cache = original_owner.namespace().paths().clone();
         let valid_cache_metadata = serde_json::to_vec_pretty(&serde_json::json!({
-            "schemaVersion": 6,
+            "schemaVersion": 1,
             "representationVersion": CACHE_REPRESENTATION_VERSION,
             "projectId": original_id.hyphenated().to_string(),
             "lastUsedUnixMs": 1,

@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{IMAGING_PROTOCOL_VERSION, is_safe_identifier};
 
-pub const CACHE_REPRESENTATION_VERSION: u32 = 2;
+pub const CACHE_REPRESENTATION_VERSION: u32 = 1;
 pub const CACHE_MAX_EDGE_PX: u32 = 1_600;
 pub const CACHE_MAX_DECODED_PIXELS: u64 = 134_217_728;
 pub const CACHE_MAX_DECODER_ALLOC_BYTES: u64 = 512 * 1024 * 1024;
