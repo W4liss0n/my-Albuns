@@ -158,12 +158,12 @@ impl IdentityPresentation for NativeIdentityPresentation<'_> {
 
     fn replace_webview(
         &self,
-        previous: Uuid,
-        next: &ProjectIdentityAuthority,
+        _previous: Uuid,
+        _next: &ProjectIdentityAuthority,
     ) -> Result<Self::Webview, ()> {
         let app = self.window.app_handle();
         app.state::<ProjectWebviewAuthority>()
-            .stage(app, previous, next)
+            .stage(app)
             .map_err(|error| {
                 tracing::error!(target: "myalbuns.desktop", error = %error,
                 event = "project_save_as_webview_stage_failed");

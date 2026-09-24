@@ -1890,6 +1890,18 @@ async fn initialize_global_runtime(
             event = "scheduled_cache_cleanup_deferred",
         );
     }
+    let profile_paths = state.recent_preview_paths.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let removed =
+            crate::project_webview_authority::prune_retired_webview_profiles(&profile_paths);
+        if removed > 0 {
+            tracing::info!(
+                target: "myalbuns.desktop",
+                removed,
+                event = "retired_webview_profiles_pruned",
+            );
+        }
+    });
     initialize_global_window(app, state, window, policy_readiness).await;
 }
 

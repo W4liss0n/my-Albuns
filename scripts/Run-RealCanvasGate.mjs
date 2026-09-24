@@ -1,5 +1,4 @@
 import { spawn, spawnSync } from "node:child_process";
-import { createHash } from "node:crypto";
 import {
   existsSync,
   readFileSync,
@@ -83,16 +82,16 @@ const processDataRoot = path.resolve(
 if (!process.env.MYALBUNS_PROCESS_GATE_DATA_ROOT) {
   throw new Error("MYALBUNS_PROCESS_GATE_DATA_ROOT is required");
 }
-const projectNamespace = `project-${createHash("sha256")
-  .update(projectDocument.projectId, "utf8")
-  .digest("hex")}`;
+// The gate starts from an empty data root, so its only Project Host takes the
+// first WebView2 profile slot.
+const projectWebviewSlot = "project-1";
 const webviewDataDirectory = path.join(
   processDataRoot,
   "Local",
   "MyAlbuns2",
   "State",
   "WebView2",
-  projectNamespace,
+  projectWebviewSlot,
 );
 const desktopLogDirectory = path.join(
   processDataRoot,

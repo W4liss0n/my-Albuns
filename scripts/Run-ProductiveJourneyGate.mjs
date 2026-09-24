@@ -857,6 +857,13 @@ async function dragSheetInGrid(driver, sourceSheetId, targetSheetId, label) {
 function isHost(instance) {
   return instance.commandLine.includes("--myalbuns-project-host");
 }
+// Project Hosts take the first free WebView2 profile slot. This gate starts
+// from an empty data root, so the first open Host uses slot 1 and the Save As
+// replacement WebView takes slot 2 while slot 1 is still held.
+function projectWebviewSlot(index) {
+  return `project-${index}`;
+}
+
 function projectDataNamespace(projectId) {
   return `project-${createHash("sha256").update(projectId).digest("hex")}`;
 }
@@ -1298,7 +1305,7 @@ try {
     "MyAlbuns2",
     "State",
     "WebView2",
-    projectDataNamespace(savedDocument.projectId),
+    projectWebviewSlot(1),
   );
   if (
     webViewProcessesForDataDirectory(projectWebViewDataDirectory).length === 0
@@ -1904,10 +1911,10 @@ try {
   );
   const originalWebviewDataDirectory = path.join(
     webviewStateRoot,
-    originalNamespace,
+    projectWebviewSlot(1),
   );
   await waitFor(
-    "original identity WebView2 data directory",
+    "original Host WebView2 profile slot",
     () => existsSync(originalWebviewDataDirectory),
     timeoutMilliseconds,
   );
@@ -2017,12 +2024,12 @@ try {
   const copiedNamespace = projectDataNamespace(copiedProjectId);
   const copiedWebviewDataDirectory = path.join(
     webviewStateRoot,
-    copiedNamespace,
+    projectWebviewSlot(2),
   );
   const originalCacheDirectory = path.join(cacheRoot, originalNamespace);
   const copiedCacheDirectory = path.join(cacheRoot, copiedNamespace);
   await waitFor(
-    "copied identity WebView2 data directory",
+    "Save As replacement WebView2 profile slot",
     () => existsSync(copiedWebviewDataDirectory),
     timeoutMilliseconds,
   );

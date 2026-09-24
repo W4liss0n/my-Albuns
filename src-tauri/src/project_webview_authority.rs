@@ -8,30 +8,110 @@ use std::{
     time::Duration,
 };
 
-use myalbuns_core::ProjectIdentityAuthority;
-use myalbuns_paths::{AppPaths, project_data_namespace};
+use myalbuns_paths::AppPaths;
 use tauri::{Manager, PhysicalPosition, PhysicalSize, WebviewUrl, webview::WebviewBuilder};
 use uuid::Uuid;
 
-use crate::{desktop_webview_policy, product_runtime::PROJECT_WINDOW_LABEL};
+use crate::{
+    desktop_webview_policy,
+    named_mutex::{NamedMutex, NamedMutexError, NamedMutexGrant},
+    product_runtime::PROJECT_WINDOW_LABEL,
+};
 
 const PREFLIGHT_TIMEOUT: Duration = Duration::from_secs(15);
+/// Upper bound on Project WebView profiles held at once, across processes.
+const MAX_PROJECT_WEBVIEW_SLOTS: u32 = 64;
+const PROJECT_SLOT_PREFIX: &str = "project-";
+
+/// A reusable WebView2 profile for one Project Host. Profiles hold only
+/// browser caches, so a Host takes the first free slot instead of a profile
+/// per Project Identity: the number of profiles stays bounded by the Hosts
+/// open at once, and two processes never share a profile.
+struct WebviewSlot {
+    namespace: String,
+    _reservation: NamedMutexGrant,
+}
+
+impl WebviewSlot {
+    fn acquire(app_paths: &AppPaths) -> io::Result<Self> {
+        for index in 1..=MAX_PROJECT_WEBVIEW_SLOTS {
+            let slot = NamedMutex::scoped(
+                app_paths,
+                "ProjectWebviewSlot",
+                &index.to_string(),
+                "project-webview-slot",
+            );
+            match slot.try_acquire() {
+                Ok(reservation) => {
+                    return Ok(Self {
+                        namespace: format!("{PROJECT_SLOT_PREFIX}{index}"),
+                        _reservation: reservation,
+                    });
+                }
+                Err(NamedMutexError::Conflict) => continue,
+                Err(NamedMutexError::Unavailable(reason)) => return Err(io::Error::other(reason)),
+            }
+        }
+        Err(io::Error::other("todos os perfis do WebView estão em uso"))
+    }
+}
+
+/// Removes WebView2 profiles that the current layout never uses: one profile
+/// per Project Identity and prototype profiles from development builds. Only
+/// plain directories directly under `State/WebView2` are touched; a profile
+/// still held by a running WebView fails to delete and is left in place.
+pub(crate) fn prune_retired_webview_profiles(app_paths: &AppPaths) -> usize {
+    let Ok(root) = app_paths.webview_data_directory("global").map(|path| {
+        path.parent()
+            .map(std::path::Path::to_path_buf)
+            .unwrap_or(path)
+    }) else {
+        return 0;
+    };
+    let Ok(entries) = std::fs::read_dir(&root) else {
+        return 0;
+    };
+    let mut removed = 0;
+    for entry in entries.flatten() {
+        let name = entry.file_name();
+        let Some(name) = name.to_str() else { continue };
+        let plain_directory = entry.file_type().is_ok_and(|kind| kind.is_dir());
+        if !plain_directory || is_current_profile(name) {
+            continue;
+        }
+        if std::fs::remove_dir_all(entry.path()).is_ok() {
+            removed += 1;
+        }
+    }
+    removed
+}
+
+fn is_current_profile(name: &str) -> bool {
+    matches!(
+        name,
+        crate::global_runtime::GLOBAL_WEBVIEW_NAMESPACE
+            | crate::native_dialog_window::PROGRESS_WEBVIEW_NAMESPACE
+    ) || name
+        .strip_prefix(PROJECT_SLOT_PREFIX)
+        .and_then(|index| index.parse::<u32>().ok())
+        .is_some_and(|index| (1..=MAX_PROJECT_WEBVIEW_SLOTS).contains(&index))
+}
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum ProjectWebviewStartupTerminal {
     SaveAsStateIndeterminate,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub(crate) struct ProjectWebviewAuthority {
     app_paths: AppPaths,
-    current_namespace: Arc<Mutex<String>>,
+    current: Arc<Mutex<WebviewSlot>>,
     transitioning: Arc<AtomicBool>,
 }
 
 pub(crate) struct StagedProjectWebview {
     owner: ProjectWebviewAuthority,
-    next_namespace: String,
+    next: WebviewSlot,
     previous_data_directory: PathBuf,
     next_data_directory: PathBuf,
     next_browser_arguments: Option<String>,
@@ -51,12 +131,13 @@ impl Drop for ProjectWebviewRecoveryReservation {
 }
 
 impl ProjectWebviewAuthority {
-    pub(crate) fn new(app_paths: AppPaths, project_id: &str) -> Self {
-        Self {
+    pub(crate) fn new(app_paths: AppPaths) -> io::Result<Self> {
+        let slot = WebviewSlot::acquire(&app_paths)?;
+        Ok(Self {
             app_paths,
-            current_namespace: Arc::new(Mutex::new(project_data_namespace(project_id))),
+            current: Arc::new(Mutex::new(slot)),
             transitioning: Arc::new(AtomicBool::new(false)),
-        }
+        })
     }
 
     pub(crate) fn is_transitioning(&self) -> bool {
@@ -71,18 +152,22 @@ impl ProjectWebviewAuthority {
     }
 
     pub(crate) fn current_namespace(&self) -> String {
-        self.current_namespace
+        self.current
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .namespace
             .clone()
     }
 
-    pub(crate) fn stage(
-        &self,
-        app: &tauri::AppHandle,
-        previous_project_id: Uuid,
-        authority: &ProjectIdentityAuthority,
-    ) -> io::Result<StagedProjectWebview> {
+    pub(crate) fn current_data_directory(&self) -> io::Result<PathBuf> {
+        self.app_paths
+            .webview_data_directory(&self.current_namespace())
+            .map_err(io::Error::other)
+    }
+
+    /// Prepares a fresh WebView for a new Identity in another free slot. The
+    /// replacement still reloads the Project UI under the new authority.
+    pub(crate) fn stage(&self, app: &tauri::AppHandle) -> io::Result<StagedProjectWebview> {
         if self
             .transitioning
             .compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)
@@ -92,45 +177,19 @@ impl ProjectWebviewAuthority {
                 "uma transição de autoridade do WebView já está em andamento",
             ));
         }
-        let staged = self.stage_inner(app, previous_project_id, authority);
+        let staged = self.stage_inner(app);
         if staged.is_err() {
             self.transitioning.store(false, Ordering::Release);
         }
         staged
     }
 
-    fn stage_inner(
-        &self,
-        app: &tauri::AppHandle,
-        previous_project_id: Uuid,
-        authority: &ProjectIdentityAuthority,
-    ) -> io::Result<StagedProjectWebview> {
-        let previous_namespace =
-            project_data_namespace(&previous_project_id.hyphenated().to_string());
-        let current = self
-            .current_namespace
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .clone();
-        if current != previous_namespace {
-            return Err(io::Error::other(
-                "a autoridade corrente do WebView não corresponde à Sessão anterior",
-            ));
-        }
-        let next_namespace =
-            project_data_namespace(&authority.project_id().hyphenated().to_string());
-        if next_namespace == previous_namespace {
-            return Err(io::Error::other(
-                "a nova Identidade não produziu um namespace WebView independente",
-            ));
-        }
-        let previous_data_directory = self
-            .app_paths
-            .webview_data_directory(&previous_namespace)
-            .map_err(io::Error::other)?;
+    fn stage_inner(&self, app: &tauri::AppHandle) -> io::Result<StagedProjectWebview> {
+        let previous_data_directory = self.current_data_directory()?;
+        let next = WebviewSlot::acquire(&self.app_paths)?;
         let next_data_directory = self
             .app_paths
-            .webview_data_directory(&next_namespace)
+            .webview_data_directory(&next.namespace)
             .map_err(io::Error::other)?;
         #[cfg(debug_assertions)]
         let next_browser_arguments = desktop_webview_policy::replacement_webview_debug_arguments(
@@ -148,7 +207,7 @@ impl ProjectWebviewAuthority {
         }
         Ok(StagedProjectWebview {
             owner: self.clone(),
-            next_namespace,
+            next,
             previous_data_directory,
             next_data_directory,
             next_browser_arguments,
@@ -206,18 +265,14 @@ impl CommittedProjectWebview {
         result
     }
 
+    /// Adopts the new slot; the previous one is released for another Host.
     pub(crate) fn finalize(self) {
-        *self
-            .staged
-            .owner
-            .current_namespace
+        let StagedProjectWebview { owner, next, .. } = self.staged;
+        *owner
+            .current
             .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner) =
-            self.staged.next_namespace.clone();
-        self.staged
-            .owner
-            .transitioning
-            .store(false, Ordering::Release);
+            .unwrap_or_else(std::sync::PoisonError::into_inner) = next;
+        owner.transitioning.store(false, Ordering::Release);
     }
 }
 
@@ -336,29 +391,76 @@ fn add_ready_webview(
 
 #[cfg(test)]
 mod tests {
-    use super::{ProjectWebviewAuthority, ProjectWebviewStartupTerminal, project_webview_url};
-    use myalbuns_paths::{AppPaths, project_data_namespace};
+    use super::{
+        ProjectWebviewAuthority, ProjectWebviewStartupTerminal, project_webview_url,
+        prune_retired_webview_profiles,
+    };
+    use myalbuns_paths::AppPaths;
     use tauri::WebviewUrl;
 
-    #[test]
-    fn tracked_namespace_is_an_opaque_project_key() {
-        let root = tempfile::tempdir().expect("temporary WebView authority fixture");
-        let paths = AppPaths::from_roots(&root.path().join("roaming"), &root.path().join("local"));
-        let project_id = "4b594571-6b51-4cad-a37c-8fd8cedb7dd2";
-        let authority = ProjectWebviewAuthority::new(paths, project_id);
+    fn paths(root: &std::path::Path) -> AppPaths {
+        AppPaths::from_roots(&root.join("roaming"), &root.join("local"))
+    }
 
+    #[test]
+    fn hosts_take_distinct_slots_and_a_released_slot_is_reused() {
+        let root = tempfile::tempdir().expect("temporary WebView authority fixture");
+        let first = ProjectWebviewAuthority::new(paths(root.path())).unwrap();
+        let second = ProjectWebviewAuthority::new(paths(root.path())).unwrap();
+        assert_eq!(first.current_namespace(), "project-1");
+        assert_eq!(second.current_namespace(), "project-2");
+        drop(first);
+        let third = ProjectWebviewAuthority::new(paths(root.path())).unwrap();
+        assert_eq!(third.current_namespace(), "project-1");
+        drop(second);
+    }
+
+    #[test]
+    fn retired_profiles_are_pruned_and_current_ones_are_kept() {
+        let root = tempfile::tempdir().unwrap();
+        let paths = paths(root.path());
+        let profiles = paths
+            .webview_data_directory("global")
+            .unwrap()
+            .parent()
+            .unwrap()
+            .to_path_buf();
+        for name in [
+            "global",
+            "global-progress",
+            "project-1",
+            "project-64",
+            "project-65",
+            "project-0c200b7131342e81a0c080b00dcb6a9335f8ac2d8c2997fb85aec1d742f20e9a",
+            "topology-multiwindow",
+        ] {
+            std::fs::create_dir_all(profiles.join(name).join("EBWebView")).unwrap();
+        }
+        std::fs::write(profiles.join("notes.txt"), b"not a profile").unwrap();
+
+        assert_eq!(prune_retired_webview_profiles(&paths), 3);
+        let mut remaining = std::fs::read_dir(&profiles)
+            .unwrap()
+            .map(|entry| entry.unwrap().file_name().into_string().unwrap())
+            .collect::<Vec<_>>();
+        remaining.sort();
         assert_eq!(
-            authority.current_namespace(),
-            project_data_namespace(project_id)
+            remaining,
+            [
+                "global",
+                "global-progress",
+                "notes.txt",
+                "project-1",
+                "project-64"
+            ]
         );
-        assert!(!authority.current_namespace().contains(project_id));
     }
 
     #[test]
     fn recovery_reserves_the_same_transition_until_its_owner_is_dropped() {
         let root = tempfile::tempdir().unwrap();
         let paths = AppPaths::from_roots(&root.path().join("roaming"), &root.path().join("local"));
-        let authority = ProjectWebviewAuthority::new(paths, "recovery-test");
+        let authority = ProjectWebviewAuthority::new(paths).unwrap();
         let reservation = authority.try_reserve_recovery().unwrap();
         assert!(authority.is_transitioning());
         assert!(authority.clone().try_reserve_recovery().is_none());

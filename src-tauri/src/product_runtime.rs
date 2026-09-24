@@ -7,7 +7,7 @@ use std::{
 
 use myalbuns_core::{EditableProject, MediaKind, PhotoSourceMetadata, project_name_from_path};
 use myalbuns_logging::{ProcessRole, safe_log_identifier};
-use myalbuns_paths::{AppPaths, project_data_namespace};
+use myalbuns_paths::AppPaths;
 use tauri::{Emitter, Manager, WebviewWindowBuilder};
 
 use crate::{
@@ -119,7 +119,7 @@ pub(crate) fn run(
     let media_protocol_registry = cache_previews.clone();
     let setup_paths = app_paths.clone();
     let initial_identity = projection_identity(&project_host)?;
-    let webview_authority = ProjectWebviewAuthority::new(app_paths.clone(), &initial_identity.0);
+    let webview_authority = ProjectWebviewAuthority::new(app_paths.clone())?;
     let startup_handshake =
         ProjectStartupHandshake::new(PendingHostTerminal::new(request), initial_identity);
     let mut context = tauri::generate_context!();
@@ -474,8 +474,9 @@ fn setup_host(
             None,
         )
     } else {
-        let webview_namespace = project_data_namespace(&projection.state.project_id);
-        let webview_data_directory = app_paths.webview_data_directory(&webview_namespace)?;
+        let webview_data_directory = app
+            .state::<ProjectWebviewAuthority>()
+            .current_data_directory()?;
         let project_config = app
             .config()
             .app

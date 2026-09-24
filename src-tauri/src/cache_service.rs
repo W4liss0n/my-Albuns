@@ -266,19 +266,22 @@ impl CacheService {
     pub(crate) fn run_scheduled_cleanup(
         &self,
     ) -> Result<CacheScheduledCleanupOutcome, CacheServiceError> {
+        let outcome = if !self.clear_is_scheduled()? {
+            CacheScheduledCleanupOutcome::NotScheduled
+        } else if self.try_clear_all()?.is_some() {
+            CacheScheduledCleanupOutcome::Cleared
+        } else {
+            CacheScheduledCleanupOutcome::Deferred
+        };
         self.prune_empty_closed_namespaces()?;
-        if !self.clear_is_scheduled()? {
-            return Ok(CacheScheduledCleanupOutcome::NotScheduled);
-        }
-        match self.try_clear_all()? {
-            Some(_) => Ok(CacheScheduledCleanupOutcome::Cleared),
-            None => Ok(CacheScheduledCleanupOutcome::Deferred),
-        }
+        Ok(outcome)
     }
 
     /// Removes namespaces of closed Projects that hold no file at all. A
     /// Project opened without previews leaves one behind; open Projects keep
-    /// theirs because each removal reserves its namespace first.
+    /// theirs because each removal reserves its namespace first. It never
+    /// waits for a Cache writer: a namespace with a writer claim is not empty,
+    /// and the held reservation keeps any Host from starting a new writer.
     fn prune_empty_closed_namespaces(&self) -> Result<usize, CacheServiceError> {
         let _maintenance = match self.maintenance.try_acquire() {
             Ok(grant) => grant,
@@ -289,15 +292,20 @@ impl CacheService {
         };
         let mut removed = 0;
         for paths in self.list_namespaces()? {
-            let CacheNamespaceRemovalReservation::Reserved(namespace) =
-                self.reserve_namespace_for_removal(&paths)?
-            else {
-                continue;
+            let _reservation = match namespace_mutex(&self.app_paths, &paths).try_acquire() {
+                Ok(reservation) => reservation,
+                Err(NamedMutexError::Conflict) => continue,
+                Err(NamedMutexError::Unavailable(reason)) => {
+                    return Err(CacheServiceError::Reservation(reason));
+                }
             };
-            if namespace.usage.bytes() == 0
+            let empty = self
+                .inspect_namespace(&paths)?
+                .is_some_and(|usage| usage.bytes() == 0);
+            if empty
                 && self
                     .app_paths
-                    .clear_project_cache(namespace.usage.paths())
+                    .clear_project_cache(&paths)
                     .map_err(|error| CacheServiceError::Storage(error.to_string()))?
             {
                 removed += 1;
