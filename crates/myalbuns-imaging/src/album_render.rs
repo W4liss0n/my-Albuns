@@ -1,7 +1,7 @@
 use crate::{
     format_output::{PdfOutput, write_png},
     jpeg_output::write_verified_quality,
-    render::{RenderFailure, composition_workers, render_unit},
+    render::{LayerSources, RenderFailure, composition_workers, render_unit},
     source::{MAX_DECODED_SOURCE_PIXELS_TOTAL, OpenRenderSource, capture_render_source},
 };
 use image::RgbaImage;
@@ -12,7 +12,7 @@ use myalbuns_imaging_protocol::{
 };
 use myalbuns_paths::ExpectedObject;
 use std::{
-    collections::{HashMap, HashSet},
+    collections::{HashMap, VecDeque},
     sync::{
         Mutex, PoisonError,
         atomic::{AtomicUsize, Ordering},
@@ -83,8 +83,31 @@ pub(crate) fn render_retaining(
         .map(|output| output.units.len())
         .sum::<usize>() as u32;
     let mut done = 0;
-    let mut decoded = DecodedSources::new(composition_workers());
+    let mut units = Vec::with_capacity(request.outputs.len());
     for output in &request.outputs {
+        let mut output_units = Vec::with_capacity(output.units.len());
+        for selected in &output.units {
+            let mut unit = request
+                .snapshot
+                .output_unit(&selected.sheet_id)
+                .map_err(|error| error.to_string())?;
+            translate_viewport(&mut unit, &selected.viewport);
+            output_units.push(unit);
+        }
+        units.push(output_units);
+    }
+    let timeline = units
+        .iter()
+        .flatten()
+        .flat_map(|unit| unit.sheet.referenced_media_ids())
+        .collect();
+    let mut decoded = DecodedSources::new(
+        &captured,
+        timeline,
+        composition_workers(),
+        MAX_DECODED_SOURCE_PIXELS_TOTAL,
+    )?;
+    for (output, output_units) in request.outputs.iter().zip(&units) {
         let path = request
             .root_bindings
             .resolve(output.prepared_path.as_path())
@@ -103,16 +126,9 @@ pub(crate) fn render_retaining(
         };
         let mut receipt = None;
         let mut dimensions = (0, 0);
-        for selected in &output.units {
-            let mut unit = request
-                .snapshot
-                .output_unit(&selected.sheet_id)
-                .map_err(|error| error.to_string())?;
-            let required: HashSet<_> = unit.sheet.referenced_media_ids().collect();
-            let sources = decoded.prepare(&captured, &required)?;
-            translate_viewport(&mut unit, &selected.viewport);
+        for (selected, unit) in output.units.iter().zip(output_units) {
             progress(ImagingProgressStage::Composing, done, total)?;
-            let image = render_unit(&unit, request.snapshot.dpi, sources, &mut |_, _, _| {
+            let image = render_unit(unit, request.snapshot.dpi, &mut decoded, &mut |_, _, _| {
                 progress(ImagingProgressStage::Composing, done, total)
             })?;
             dimensions = (image.width(), image.height());
@@ -157,64 +173,151 @@ pub(crate) fn render_retaining(
     })
 }
 
-/// Decoded Originals retained between consecutive units. Page exports and
-/// Decoratives repeated on neighbouring Sheets reuse the same raster instead
-/// of decoding the Original again. Only the current unit's sources are kept,
-/// so the retained set honours the same pixel ceiling as a single unit.
-struct DecodedSources {
+/// Decoded Originals for every media layer of the request, in paint order.
+/// Each raster is decoded before its first layer and dropped after its last,
+/// so Page exports and Decoratives repeated on neighbouring Sheets decode the
+/// Original once. The rasters held at any moment stay within `budget` pixels:
+/// upcoming sources are decoded ahead, in parallel, only while they fit, and
+/// under pressure the raster needed furthest ahead is dropped and decoded
+/// again later. A Sheet therefore has no limit on the combined size of its
+/// sources; only each single source must fit the budget.
+struct DecodedSources<'a> {
+    captured: &'a HashMap<MediaId, OpenRenderSource>,
+    timeline: Vec<MediaId>,
+    position: usize,
+    uses: HashMap<MediaId, VecDeque<usize>>,
+    pixels: HashMap<MediaId, u64>,
     rasters: HashMap<MediaId, RgbaImage>,
+    resident: u64,
+    budget: u64,
     workers: usize,
 }
 
-impl DecodedSources {
-    fn new(workers: usize) -> Self {
-        Self {
-            rasters: HashMap::new(),
-            workers: workers.max(1),
+impl<'a> DecodedSources<'a> {
+    fn new(
+        captured: &'a HashMap<MediaId, OpenRenderSource>,
+        timeline: Vec<MediaId>,
+        workers: usize,
+        budget: u64,
+    ) -> Result<Self, RenderFailure> {
+        let mut uses = HashMap::<MediaId, VecDeque<usize>>::new();
+        for (position, id) in timeline.iter().enumerate() {
+            uses.entry(*id).or_default().push_back(position);
         }
-    }
-
-    fn prepare(
-        &mut self,
-        captured: &HashMap<MediaId, OpenRenderSource>,
-        required: &HashSet<MediaId>,
-    ) -> Result<&HashMap<MediaId, RgbaImage>, RenderFailure> {
-        let mut ordered = required.iter().copied().collect::<Vec<_>>();
+        let mut ordered = uses.keys().copied().collect::<Vec<_>>();
         ordered.sort_by_key(ToString::to_string);
-        let mut pixels = 0_u64;
-        for id in &ordered {
-            pixels += captured[id]
-                .pixel_count()
-                .map_err(|failure| failure.message)?;
-            if pixels > MAX_DECODED_SOURCE_PIXELS_TOTAL {
+        let mut pixels = HashMap::with_capacity(ordered.len());
+        for id in ordered {
+            let source = captured
+                .get(&id)
+                .ok_or_else(|| format!("a fonte da mídia {id} não foi capturada"))?;
+            let count = source.pixel_count().map_err(|failure| failure.message)?;
+            if count > budget {
                 return Err(RenderFailure::typed(
                     ImagingFailureCode::ResourceLimitExceeded,
                     Some(id.to_string()),
                     None,
-                    "As fontes de uma unidade excedem o limite de memória.",
+                    "Uma fonte excede o limite de memória.",
                 ));
             }
+            pixels.insert(id, count);
         }
-        self.rasters.retain(|id, _| required.contains(id));
-        let missing = ordered
-            .into_iter()
-            .filter(|id| !self.rasters.contains_key(id))
-            .collect::<Vec<_>>();
+        Ok(Self {
+            captured,
+            timeline,
+            position: 0,
+            uses,
+            pixels,
+            rasters: HashMap::new(),
+            resident: 0,
+            budget,
+            workers: workers.max(1),
+        })
+    }
+
+    fn expect_current(&self, media_id: MediaId) -> Result<(), RenderFailure> {
+        if self.timeline.get(self.position) != Some(&media_id) {
+            return Err("a ordem das fontes divergiu da composição"
+                .to_string()
+                .into());
+        }
+        Ok(())
+    }
+
+    fn next_use(&self, media_id: &MediaId) -> usize {
+        self.uses
+            .get(media_id)
+            .and_then(|uses| uses.front().copied())
+            .unwrap_or(usize::MAX)
+    }
+
+    fn load(&mut self, media_id: MediaId) -> Result<(), RenderFailure> {
+        let needed = self.pixels[&media_id];
+        while self.resident + needed > self.budget {
+            let victim = self
+                .rasters
+                .keys()
+                .copied()
+                .max_by_key(|id| (self.next_use(id), id.to_string()))
+                .expect("a resident raster exists while the budget is exceeded");
+            self.rasters.remove(&victim);
+            self.resident -= self.pixels[&victim];
+        }
+        // Decode ahead, in paint order, the upcoming sources that still fit.
+        let mut batch = vec![media_id];
+        let mut planned = self.resident + needed;
+        for id in &self.timeline[self.position + 1..] {
+            if self.rasters.contains_key(id) || batch.contains(id) {
+                continue;
+            }
+            let pixels = self.pixels[id];
+            if planned + pixels > self.budget {
+                break;
+            }
+            planned += pixels;
+            batch.push(*id);
+        }
         // Isolated progressive decoders own a separate worker budget and stay
-        // sequential. In-process decoders run in parallel: with the retained
-        // rasters they stay within the unit's pixel ceiling, below the peak
-        // later reached while composing the Sheet.
-        let (isolated, in_process): (Vec<_>, Vec<_>) = missing
-            .into_iter()
-            .partition(|id| captured[id].decodes_in_isolated_worker());
+        // sequential; in-process decoders run in parallel.
+        let (isolated, in_process): (Vec<_>, Vec<_>) = batch
+            .iter()
+            .copied()
+            .partition(|id| self.captured[id].decodes_in_isolated_worker());
+        let mut decoded = decode_parallel(self.captured, &in_process, self.workers);
         for id in isolated {
-            let raster = decode(captured, id)?;
-            self.rasters.insert(id, raster);
+            decoded.push((id, decode(self.captured, id)));
         }
-        for (id, raster) in decode_parallel(captured, &in_process, self.workers) {
+        // Report the failure of the earliest layer.
+        decoded.sort_by_key(|(id, _)| batch.iter().position(|queued| queued == id));
+        for (id, raster) in decoded {
             self.rasters.insert(id, raster?);
+            self.resident += self.pixels[&id];
         }
-        Ok(&self.rasters)
+        Ok(())
+    }
+}
+
+impl LayerSources for DecodedSources<'_> {
+    fn acquire(&mut self, media_id: MediaId) -> Result<&RgbaImage, RenderFailure> {
+        self.expect_current(media_id)?;
+        if !self.rasters.contains_key(&media_id) {
+            self.load(media_id)?;
+        }
+        Ok(&self.rasters[&media_id])
+    }
+
+    fn release(&mut self, media_id: MediaId) -> Result<(), RenderFailure> {
+        self.expect_current(media_id)?;
+        let uses = self
+            .uses
+            .get_mut(&media_id)
+            .expect("every layer in the timeline has a use");
+        uses.pop_front();
+        if uses.is_empty() && self.rasters.remove(&media_id).is_some() {
+            self.resident -= self.pixels[&media_id];
+        }
+        self.position += 1;
+        Ok(())
     }
 }
 
@@ -255,10 +358,7 @@ fn decode_parallel(
             });
         }
     });
-    let mut results = results.into_inner().unwrap_or_else(PoisonError::into_inner);
-    // Report the first failure in media order, as sequential decoding did.
-    results.sort_by_key(|(id, _)| id.to_string());
-    results
+    results.into_inner().unwrap_or_else(PoisonError::into_inner)
 }
 
 /// Translate the already-composed physical geometry. Clipping occurs while rasterizing
@@ -416,6 +516,11 @@ mod recovery_tests {
 mod source_retention_tests {
     use super::*;
     use image::{ImageFormat, Rgb, RgbImage};
+    use myalbuns_core::{
+        CreateAuthorization, CreateProjectRequest, DisplayUnit, EndSheetFormat, ImportPhoto,
+        InitialProject, InitialProjectConfiguration, PhotoPlacementMode, PhotoSourceMetadata,
+        ProjectCore, ProjectIntent, ProjectLocation,
+    };
     use myalbuns_paths::OperationPathContext;
 
     const IDS: [&str; 3] = [
@@ -424,87 +529,203 @@ mod source_retention_tests {
         "8f6d3a53-5a6f-4b11-9d1e-6a0d2f5c7b03",
     ];
 
-    fn captured(root: &std::path::Path) -> HashMap<MediaId, OpenRenderSource> {
+    fn photo(index: usize) -> RgbImage {
+        RgbImage::from_fn(40 + index as u32, 30, |x, y| {
+            Rgb([(x * 5) as u8, (y * 7) as u8, index as u8 * 60])
+        })
+    }
+
+    fn capture(paths: &[(MediaId, std::path::PathBuf)]) -> HashMap<MediaId, OpenRenderSource> {
         let mut context = OperationPathContext::new();
+        for (_, path) in paths {
+            context.capture(path).unwrap();
+        }
+        let plan = context.freeze();
+        paths
+            .iter()
+            .map(|(id, path)| {
+                let resolved = plan
+                    .resolve_existing(path, ExpectedObject::RegularFile)
+                    .unwrap();
+                (*id, capture_render_source(&resolved).unwrap())
+            })
+            .collect()
+    }
+
+    fn captured(root: &std::path::Path) -> HashMap<MediaId, OpenRenderSource> {
         let paths = IDS
             .iter()
             .enumerate()
-            .map(|(index, _)| {
+            .map(|(index, id)| {
                 let path = root.join(format!("photo-{index}.jpg"));
-                RgbImage::from_fn(40 + index as u32, 30, |x, y| {
-                    Rgb([x as u8, y as u8, index as u8 * 60])
-                })
-                .save_with_format(&path, ImageFormat::Jpeg)
-                .unwrap();
-                context.capture(&path).unwrap();
-                path
+                photo(index)
+                    .save_with_format(&path, ImageFormat::Jpeg)
+                    .unwrap();
+                (id.parse().unwrap(), path)
             })
             .collect::<Vec<_>>();
-        let plan = context.freeze();
-        IDS.iter()
-            .zip(paths)
-            .map(|(id, path)| {
-                let resolved = plan
-                    .resolve_existing(&path, ExpectedObject::RegularFile)
-                    .unwrap();
-                (
-                    id.parse().unwrap(),
-                    capture_render_source(&resolved).unwrap(),
-                )
-            })
-            .collect()
+        capture(&paths)
     }
 
     fn failed<T>(failure: RenderFailure) -> T {
         panic!("{}", failure.message)
     }
 
-    fn ids(indices: &[usize]) -> HashSet<MediaId> {
+    fn timeline(indices: &[usize]) -> Vec<MediaId> {
         indices
             .iter()
             .map(|index| IDS[*index].parse().unwrap())
             .collect()
     }
 
+    /// Paints every layer of `timeline` and returns the largest number of
+    /// decoded pixels held at once.
+    fn walk(sources: &mut DecodedSources<'_>, timeline: &[MediaId]) -> u64 {
+        let mut peak = 0;
+        for id in timeline {
+            sources.acquire(*id).unwrap_or_else(failed);
+            peak = peak.max(sources.resident);
+            sources.release(*id).unwrap_or_else(failed);
+        }
+        assert!(sources.rasters.is_empty());
+        assert_eq!(sources.resident, 0);
+        peak
+    }
+
     #[test]
-    fn consecutive_units_decode_each_retained_original_once() {
+    fn consecutive_units_decode_each_original_once_while_it_fits() {
         let root = tempfile::tempdir().unwrap();
         let captured = captured(root.path());
+        // Both pages of a Page export use the same Sheet sources; the next
+        // Sheet shares one Original.
+        let layers = timeline(&[0, 1, 0, 1, 1, 2]);
         // One worker keeps decoding on this thread, where the counter lives.
-        let mut decoded = DecodedSources::new(1);
+        let mut sources =
+            DecodedSources::new(&captured, layers.clone(), 1, u64::MAX).unwrap_or_else(failed);
         let before = crate::source::jpeg_decode_count();
-        // Both pages of a Page export require the same Sheet sources.
-        for _ in 0..2 {
-            let sources = decoded
-                .prepare(&captured, &ids(&[0, 1]))
-                .unwrap_or_else(failed);
-            assert_eq!(sources.len(), 2);
-        }
-        assert_eq!(crate::source::jpeg_decode_count() - before, 2);
-        // A neighbour sharing one Original decodes only the new one and
-        // releases the source it no longer references.
-        let sources = decoded
-            .prepare(&captured, &ids(&[1, 2]))
-            .unwrap_or_else(failed);
-        assert_eq!(
-            sources.keys().copied().collect::<HashSet<_>>(),
-            ids(&[1, 2])
-        );
+        walk(&mut sources, &layers);
         assert_eq!(crate::source::jpeg_decode_count() - before, 3);
+    }
+
+    #[test]
+    fn a_budget_below_the_unit_streams_sources_and_never_exceeds_it() {
+        let root = tempfile::tempdir().unwrap();
+        let captured = captured(root.path());
+        let largest = captured
+            .values()
+            .map(|source| source.pixel_count().unwrap())
+            .max()
+            .unwrap();
+        // Only one source fits at a time; the first returns after the others.
+        let layers = timeline(&[0, 1, 2, 0]);
+        let mut sources =
+            DecodedSources::new(&captured, layers.clone(), 1, largest).unwrap_or_else(failed);
+        let before = crate::source::jpeg_decode_count();
+        let peak = walk(&mut sources, &layers);
+        assert!(peak <= largest);
+        assert_eq!(crate::source::jpeg_decode_count() - before, 4);
+    }
+
+    #[test]
+    fn a_single_source_above_the_budget_is_rejected_before_decoding() {
+        let root = tempfile::tempdir().unwrap();
+        let captured = captured(root.path());
+        let before = crate::source::jpeg_decode_count();
+        let Err(failure) = DecodedSources::new(&captured, timeline(&[0, 2]), 1, 40 * 30) else {
+            panic!("the 42x30 source exceeds a 40x30 budget");
+        };
+        assert_eq!(
+            failure.failure.code,
+            ImagingFailureCode::ResourceLimitExceeded
+        );
+        assert_eq!(failure.failure.media_id.as_deref(), Some(IDS[2]));
+        assert_eq!(crate::source::jpeg_decode_count(), before);
     }
 
     #[test]
     fn parallel_decoding_returns_the_same_rasters() {
         let root = tempfile::tempdir().unwrap();
         let captured = captured(root.path());
-        let serial = DecodedSources::new(1)
-            .prepare(&captured, &ids(&[0, 1, 2]))
-            .unwrap_or_else(failed)
-            .clone();
-        let mut parallel = DecodedSources::new(3);
-        let parallel = parallel
-            .prepare(&captured, &ids(&[0, 1, 2]))
-            .unwrap_or_else(failed);
-        assert_eq!(*parallel, serial);
+        let layers = timeline(&[0, 1, 2]);
+        let rasters = |workers| {
+            let mut sources = DecodedSources::new(&captured, layers.clone(), workers, u64::MAX)
+                .unwrap_or_else(failed);
+            layers
+                .iter()
+                .map(|id| {
+                    let raster = sources.acquire(*id).unwrap_or_else(failed).clone();
+                    sources.release(*id).unwrap_or_else(failed);
+                    raster
+                })
+                .collect::<Vec<_>>()
+        };
+        assert!(rasters(1) == rasters(3));
+    }
+
+    #[test]
+    fn a_sheet_larger_than_the_budget_composes_the_same_pixels() {
+        let root = tempfile::tempdir().unwrap();
+        let path = root.path().join("Orcamento.myalbuns");
+        let mut context = OperationPathContext::new();
+        context.capture(&path).unwrap();
+        let mut project = ProjectCore::new()
+            .with_identity_storage_roots(root.path().join("leases"), root.path().join("identities"))
+            .create_editable(CreateProjectRequest::new(
+                ProjectLocation::new(path, context.freeze()),
+                InitialProject::configured(InitialProjectConfiguration::new(
+                    DisplayUnit::Mm,
+                    60_000,
+                    30_000,
+                    150,
+                    0,
+                    0,
+                    2,
+                    EndSheetFormat::Double,
+                    EndSheetFormat::Double,
+                )),
+                CreateAuthorization::CreateOnly,
+            ))
+            .unwrap();
+        let sheet_id = project.projection().state.album.sheets[0].id.clone();
+        let mut paths = Vec::new();
+        for index in 0..4 {
+            let path = root.path().join(format!("frame-{index}.png"));
+            let raster = photo(index);
+            raster.save_with_format(&path, ImageFormat::Png).unwrap();
+            let imported = project
+                .import_photo(ImportPhoto::new(
+                    path.clone(),
+                    PhotoSourceMetadata::new(
+                        raster.width(),
+                        raster.height(),
+                        ["#111111", "#888888", "#EEEEEE"].map(String::from),
+                    )
+                    .unwrap(),
+                ))
+                .unwrap();
+            project
+                .apply(ProjectIntent::AddPhoto {
+                    sheet_id: sheet_id.clone(),
+                    media_id: imported.media_id,
+                    mode: PhotoPlacementMode::Edit,
+                })
+                .unwrap();
+            paths.push((imported.media_id, path));
+        }
+        let captured = capture(&paths);
+        let unit = project.render_snapshot().output_unit(&sheet_id).unwrap();
+        let layers = unit.sheet.referenced_media_ids().collect::<Vec<_>>();
+        assert_eq!(layers.len(), 4);
+        let largest = captured
+            .values()
+            .map(|source| source.pixel_count().unwrap())
+            .max()
+            .unwrap();
+        let render = |budget| {
+            let mut sources =
+                DecodedSources::new(&captured, layers.clone(), 2, budget).unwrap_or_else(failed);
+            render_unit(&unit, 150, &mut sources, &mut |_, _, _| Ok(())).unwrap_or_else(failed)
+        };
+        assert!(render(largest) == render(u64::MAX));
     }
 }

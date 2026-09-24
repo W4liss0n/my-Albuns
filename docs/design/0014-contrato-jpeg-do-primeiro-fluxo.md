@@ -2,7 +2,7 @@
 status: accepted
 document: design
 date: 2026-08-03
-updated: 2026-09-05
+updated: 2026-09-23
 ---
 
 # Contrato JPEG do primeiro fluxo
@@ -84,9 +84,11 @@ MAX_OUTPUT_PIXELS = 134_217_728
 MAX_DECODED_SOURCE_PIXELS_TOTAL = 134_217_728
 ```
 
-O segundo valor soma todas as fontes únicas referenciadas pela unidade, já considerando suas dimensões orientadas. Cada grupo corresponde a no máximo `512 MiB` de RGBA8; juntos, limitam os dois buffers principais a aproximadamente `1 GiB`. A implementação não pode ler o arquivo inteiro em um buffer sem limite antes desse preflight, e toda alocação posterior continua verificada e falível. Exceder um teto, detectar overflow ou não conseguir reservar memória produz `ResourceLimitExceeded`, nunca panic nem queda deliberadamente aceita do Processador.
+O segundo valor limita cada fonte isolada, já considerando suas dimensões orientadas, e os rasters decodificados mantidos ao mesmo tempo durante a tentativa. Cada grupo corresponde a no máximo `512 MiB` de RGBA8; juntos, limitam os dois buffers principais a aproximadamente `1 GiB`. A implementação não pode ler o arquivo inteiro em um buffer sem limite antes desse preflight, e toda alocação posterior continua verificada e falível. Exceder um teto, detectar overflow ou não conseguir reservar memória produz `ResourceLimitExceeded`, nunca panic nem queda deliberadamente aceita do Processador.
 
-Esse guardrail cobre uma Lâmina de `60 × 30 cm` em `300` e `600 DPI`, além de quatro fontes de `24 MP` do corpus real medido. Na mesma dimensão, `1.200 DPI` excede o teto da saída; o maior DPI aceito por este corte é `693`. O Projeto e seu DPI continuam válidos e podem ser salvos e reabertos: somente a tentativa JPEG incompatível falha de forma clara. O número é uma proteção transitória da implementação monolítica, não uma meta final de desempenho ou limite definitivo do produto.
+A composição pinta as camadas em ordem, e cada camada usa no máximo uma fonte. Por isso a soma das fontes de uma Lâmina não é limitada: o Processador decodifica cada fonte antes da primeira camada que a usa e a descarta depois da última, considerando todas as unidades da tentativa. Fontes seguintes são decodificadas antes, em paralelo, somente enquanto cabem no teto; se faltar espaço, descarta o raster que será usado mais tarde e o decodifica de novo quando voltar a ser necessário. Uma fonte isolada acima do teto é recusada antes de qualquer decodificação. As fontes continuam em resolução integral, e os pixels exportados não dependem do teto. Decisão aceita em 2026-09-23.
+
+Esse guardrail cobre uma Lâmina de `60 × 30 cm` em `300` e `600 DPI`, com qualquer quantidade de fontes de `24 MP`. No corpus real, uma Lâmina com dez fontes de `24 MP` foi exportada com pico de cerca de 800 MB no Processador, o mesmo de uma Lâmina com cinco. Na mesma dimensão, `1.200 DPI` excede o teto da saída; o maior DPI aceito por este corte é `693`. O Projeto e seu DPI continuam válidos e podem ser salvos e reabertos: somente a tentativa JPEG incompatível falha de forma clara. O número é uma proteção transitória da implementação monolítica, não uma meta final de desempenho ou limite definitivo do produto.
 
 ## Fontes e política de cor
 
@@ -184,7 +186,7 @@ Nenhuma tentativa altera Projeto, Revisão, Histórico ou Cache. Falha ou cancel
 | ICC não permitido, malformado ou contraditório | `UnsupportedColorProfile` |
 | arquivo permitido que não pode ser decodificado | `DecodeFailed` |
 | composição inválida ou alfa residual | `CompositionFailed` |
-| saída, soma das fontes, aritmética ou reserva de memória excede o guardrail | `ResourceLimitExceeded` |
+| saída, fonte isolada, aritmética ou reserva de memória excede o guardrail | `ResourceLimitExceeded` |
 | falha do encoder ou da sincronização da preparação | `EncodeFailed` |
 | JPEG preparado truncado ou divergente do contrato | `VerificationFailed` |
 | cancelamento observado antes da publicação | `Cancelled` |
@@ -235,7 +237,7 @@ Casos de round-trip atravessam host e Processador com caminhos locais, UNC, mape
 
 ### Casos negativos
 
-Testes recusam antes da publicação: eixo zero, maior que `65.535` ou com overflow; saída acima de `MAX_OUTPUT_PIXELS`; soma das fontes acima de `MAX_DECODED_SOURCE_PIXELS_TOTAL`; reserva de memória recusada; fonte extra, duplicada ou ausente; TIFF; APNG; perfil não permitido; CMYK/YCCK; alfa residual; JPEG truncado; marcador, DPI, dimensão, ICC ou bytes posteriores ao EOI divergentes.
+Testes recusam antes da publicação: eixo zero, maior que `65.535` ou com overflow; saída acima de `MAX_OUTPUT_PIXELS`; fonte isolada acima de `MAX_DECODED_SOURCE_PIXELS_TOTAL`; reserva de memória recusada; fonte extra, duplicada ou ausente; TIFF; APNG; perfil não permitido; CMYK/YCCK; alfa residual; JPEG truncado; marcador, DPI, dimensão, ICC ou bytes posteriores ao EOI divergentes.
 
 Não se usa screenshot do Canvas como golden de pixels, JPEG grande versionado no repositório, hash comprimido permanente ou tamanho do arquivo como oráculo de qualidade.
 

@@ -125,9 +125,17 @@ continuar lenta depois destas mudanças.
 
 ## Limite encontrado
 
-Seis fotos de 24 MP na mesma lâmina somam 144 milhões de pixels e excedem o
-teto de 134.217.728 pixels por unidade de Exportação. A Exportação falha com
-`resourceLimitExceeded`. Essa limitação já existia e não foi alterada.
+Seis fotos de 24 MP na mesma lâmina somam 144 milhões de pixels e excediam o
+teto de 134.217.728 pixels por unidade de Exportação. A Exportação falhava com
+`resourceLimitExceeded` antes de compor.
+
+Resolvido no mesmo dia: o teto passou a valer para cada fonte isolada e para os
+rasters mantidos ao mesmo tempo, e não mais para a soma da lâmina. As fontes são
+decodificadas perto da camada que as usa e descartadas depois do último uso,
+conforme o [contrato do primeiro fluxo JPEG](../design/0014-contrato-jpeg-do-primeiro-fluxo.md#guardrail-provisório-de-recursos).
+Lâminas com 6 e 10 fotos de 24 MP passaram a exportar, inclusive por página, e
+o pico de memória do Processador ficou em cerca de 800 MB com 5 ou com 10
+fotos. As lâminas que já cabiam no teto mantiveram bytes e tempos.
 
 ## Método
 

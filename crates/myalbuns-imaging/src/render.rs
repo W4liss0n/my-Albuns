@@ -67,10 +67,29 @@ pub(crate) fn composition_workers() -> usize {
         .clamp(1, MAX_COMPOSITION_WORKERS)
 }
 
+/// Supplies the decoded Originals of a unit one media layer at a time, in the
+/// order of `ComposedSheet::referenced_media_ids`. A provider may decode a
+/// source just before its layer and drop it after its last use.
+pub(crate) trait LayerSources {
+    fn acquire(&mut self, media_id: MediaId) -> Result<&RgbaImage, RenderFailure>;
+    fn release(&mut self, media_id: MediaId) -> Result<(), RenderFailure>;
+}
+
+impl LayerSources for HashMap<MediaId, RgbaImage> {
+    fn acquire(&mut self, media_id: MediaId) -> Result<&RgbaImage, RenderFailure> {
+        self.get(&media_id)
+            .ok_or_else(|| format!("a fonte da mídia {media_id} não foi carregada").into())
+    }
+
+    fn release(&mut self, _: MediaId) -> Result<(), RenderFailure> {
+        Ok(())
+    }
+}
+
 pub(crate) fn render_unit(
     unit: &myalbuns_core::ComposedOutputUnit,
     dpi: u32,
-    sources: &HashMap<MediaId, RgbaImage>,
+    sources: &mut dyn LayerSources,
     progress: &mut dyn FnMut(ImagingProgressStage, u32, u32) -> Result<(), String>,
 ) -> Result<RgbaImage, RenderFailure> {
     render_unit_with_workers(unit, dpi, sources, progress, composition_workers())
@@ -82,7 +101,7 @@ pub(crate) fn render_unit(
 fn render_unit_with_workers(
     unit: &myalbuns_core::ComposedOutputUnit,
     dpi: u32,
-    sources: &HashMap<MediaId, RgbaImage>,
+    sources: &mut dyn LayerSources,
     progress: &mut dyn FnMut(ImagingProgressStage, u32, u32) -> Result<(), String>,
     workers: usize,
 ) -> Result<RgbaImage, RenderFailure> {
@@ -102,9 +121,7 @@ fn render_unit_with_workers(
                 clip_rect,
                 ..
             } => {
-                let source = sources
-                    .get(media_id)
-                    .ok_or_else(|| format!("a fonte do Background {media_id} não foi carregada"))?;
+                let source = sources.acquire(*media_id)?;
                 draw_stretched_media(
                     &mut image,
                     draw_rect,
@@ -113,6 +130,7 @@ fn render_unit_with_workers(
                     source,
                     workers,
                 )?;
+                sources.release(*media_id)?;
             }
         }
     }
@@ -122,14 +140,22 @@ fn render_unit_with_workers(
     let composition_units = frame_count.max(1);
     progress(ImagingProgressStage::Composing, 0, composition_units)?;
     for (index, frame) in sheet.frames.iter().enumerate() {
+        let media_id = frame.photo.as_ref().map(|photo| photo.media_id);
+        let source = match media_id {
+            Some(media_id) => Some(sources.acquire(media_id)?),
+            None => None,
+        };
         draw_frame(
             &mut image,
             frame,
             pixels_per_micrometer,
             raster,
-            sources,
+            source,
             workers,
         )?;
+        if let Some(media_id) = media_id {
+            sources.release(media_id)?;
+        }
         progress(
             ImagingProgressStage::Composing,
             u32::try_from(index + 1).map_err(|_| "a Lâmina contém Frames demais".to_string())?,
@@ -140,12 +166,7 @@ fn render_unit_with_workers(
         progress(ImagingProgressStage::Composing, 1, composition_units)?;
     }
     for overlay in &sheet.overlays {
-        let source = sources.get(&overlay.media_id).ok_or_else(|| {
-            format!(
-                "a fonte do Decorativo {} não foi carregada",
-                overlay.media_id
-            )
-        })?;
+        let source = sources.acquire(overlay.media_id)?;
         draw_stretched_media(
             &mut image,
             &overlay.draw_rect,
@@ -154,6 +175,7 @@ fn render_unit_with_workers(
             source,
             workers,
         )?;
+        sources.release(overlay.media_id)?;
     }
 
     Ok(image)
@@ -269,7 +291,7 @@ fn draw_frame(
     frame: &ComposedFrame,
     pixels_per_micrometer: f64,
     raster: RasterPlan,
-    sources: &HashMap<MediaId, RgbaImage>,
+    source: Option<&RgbaImage>,
     workers: usize,
 ) -> Result<(), RenderFailure> {
     if frame.opacity_byte == 0 {
@@ -300,8 +322,7 @@ fn draw_frame(
     let in_border = |x: u32, spans: &[(u32, u32)]| spans.iter().any(|&(l, r)| x >= l && x < r);
 
     if let Some(photo) = &frame.photo {
-        let source = sources
-            .get(&photo.media_id)
+        let source = source
             .ok_or_else(|| format!("a fonte da mídia {} não foi carregada", photo.media_id))?;
         let draw_left = to_pixels_precise(photo.draw_rect.x, pixels_per_micrometer);
         let draw_top = to_pixels_precise(photo.draw_rect.y, pixels_per_micrometer);
@@ -656,8 +677,14 @@ mod tests {
             })
             .collect::<HashMap<_, _>>();
         let render = |workers| {
-            render_unit_with_workers(&unit, 300, &sources, &mut |_, _, _| Ok(()), workers)
-                .unwrap_or_else(|failure| panic!("{}", failure.message))
+            render_unit_with_workers(
+                &unit,
+                300,
+                &mut sources.clone(),
+                &mut |_, _, _| Ok(()),
+                workers,
+            )
+            .unwrap_or_else(|failure| panic!("{}", failure.message))
         };
         let serial = render(1);
         assert!(serial.width() as usize * serial.height() as usize > MIN_PARALLEL_PIXELS * 8);
