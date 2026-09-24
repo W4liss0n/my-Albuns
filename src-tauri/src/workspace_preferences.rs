@@ -15,7 +15,7 @@ use crate::{
     local_store_io::write_atomically,
 };
 
-const SCHEMA_VERSION: u16 = 2;
+const SCHEMA_VERSION: u16 = 1;
 const MIN_THUMBNAIL_SIZE: u16 = 58;
 const MAX_THUMBNAIL_SIZE: u16 = 132;
 const DEFAULT_THUMBNAIL_SIZE: u16 = 84;
@@ -49,15 +49,8 @@ struct WorkspacePreferencesEnvelope {
     inspector_sections: BTreeMap<String, bool>,
     #[serde(default)]
     media_thumbnail_size: Option<u16>,
-    #[serde(default, skip_serializing)]
-    media_thumbnail_sizes: Option<LegacyMediaThumbnailSizes>,
     #[serde(default)]
     workspace_panels: WorkspacePanelPreferences,
-}
-
-#[derive(Deserialize)]
-struct LegacyMediaThumbnailSizes {
-    photo: u16,
 }
 
 pub(crate) struct WorkspacePreferencesStore {
@@ -142,14 +135,10 @@ impl WorkspacePreferencesStore {
         let Ok(envelope) = serde_json::from_slice::<WorkspacePreferencesEnvelope>(&bytes) else {
             return default_preferences();
         };
-        let size = match (
-            envelope.schema_version,
-            envelope.media_thumbnail_size,
-            envelope.media_thumbnail_sizes,
-        ) {
-            (1, _, Some(legacy)) => legacy.photo,
-            (SCHEMA_VERSION, Some(size), _) => size,
-            _ => return default_preferences(),
+        // Local UI state has no migrations: another version starts from defaults.
+        let (SCHEMA_VERSION, Some(size)) = (envelope.schema_version, envelope.media_thumbnail_size)
+        else {
+            return default_preferences();
         };
         if envelope.inspector_sections.len() > MAX_INSPECTOR_SECTIONS
             || !envelope
@@ -185,7 +174,6 @@ impl WorkspacePreferencesStore {
             schema_version: SCHEMA_VERSION,
             inspector_sections: preferences.inspector_sections.clone(),
             media_thumbnail_size: Some(preferences.media_thumbnail_size),
-            media_thumbnail_sizes: None,
             workspace_panels: preferences.workspace_panels,
         })
         .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))?;
@@ -324,7 +312,7 @@ mod tests {
         fs::create_dir_all(file.parent().expect("State parent")).expect("State is writable");
         fs::write(
             &file,
-            br#"{"schemaVersion":99,"inspectorSections":{"album.design":true},"mediaThumbnailSizes":{"decorative":110,"photo":124}}"#,
+            br#"{"schemaVersion":99,"inspectorSections":{"album.design":true},"mediaThumbnailSize":124}"#,
         )
         .expect("future state fixture is writable");
 
@@ -332,28 +320,15 @@ mod tests {
     }
 
     #[test]
-    fn legacy_sizes_migrate_from_photos_without_rewriting_until_an_update() {
+    fn another_state_version_starts_from_defaults_without_rewriting() {
         let (_root, paths, store) = store();
         let file = paths.workspace_preferences_file();
         fs::create_dir_all(file.parent().expect("State parent")).expect("State is writable");
-        let legacy = br#"{"schemaVersion":1,"inspectorSections":{"album.design":true},"mediaThumbnailSizes":{"decorative":110,"photo":124},"workspacePanels":{"inspector":{"size":350,"visible":false},"media":null}}"#;
-        fs::write(&file, legacy).expect("legacy state fixture is writable");
+        let previous = br#"{"schemaVersion":2,"inspectorSections":{"album.design":true},"mediaThumbnailSize":124}"#;
+        fs::write(&file, previous).expect("previous state fixture is writable");
 
-        let loaded = store.load();
-        assert_eq!(loaded.media_thumbnail_size, 124);
-        assert_eq!(loaded.inspector_sections.get("album.design"), Some(&true));
-        assert_eq!(loaded.workspace_panels.inspector.unwrap().size, 350);
-        assert!(!loaded.workspace_panels.inspector.unwrap().visible);
-        assert_eq!(fs::read(&file).unwrap(), legacy);
-
-        let updated = store
-            .update(WorkspacePreferenceChange::MediaThumbnailSize { size: 110 })
-            .expect("the shared size persists");
-        let saved: serde_json::Value = serde_json::from_slice(&fs::read(&file).unwrap()).unwrap();
-        assert_eq!(saved["schemaVersion"], 2);
-        assert_eq!(saved["mediaThumbnailSize"], 110);
-        assert!(saved.get("mediaThumbnailSizes").is_none());
-        assert_eq!(WorkspacePreferencesStore::new(&paths).load(), updated);
+        assert_eq!(store.load(), default_preferences());
+        assert_eq!(fs::read(&file).unwrap(), previous);
     }
 
     #[test]
@@ -377,7 +352,7 @@ mod tests {
     }
 
     #[test]
-    fn absent_panel_state_remains_distinguishable_until_legacy_migration_publishes_it() {
+    fn absent_panel_state_remains_distinguishable_until_a_panel_changes() {
         let (_root, paths, store) = store();
 
         let initial = store.load();
@@ -389,7 +364,7 @@ mod tests {
                 panel: WorkspacePanelKind::Inspector,
                 size: 350,
             })
-            .expect("the migrated Inspector state persists");
+            .expect("the Inspector state persists");
         assert_eq!(
             inspector.workspace_panels.inspector,
             Some(WorkspacePanelPreference {

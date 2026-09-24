@@ -1,5 +1,5 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
-import { beforeEach, expect, test, vi } from "vitest";
+import { expect, test, vi } from "vitest";
 
 import {
   applyWorkspacePreferenceChange,
@@ -8,8 +8,6 @@ import {
   type WorkspacePreferencesPort,
 } from "../application/workspacePreferences";
 import { useWorkspacePreferences } from "./useWorkspacePreferences";
-
-beforeEach(() => localStorage.clear());
 
 test("keeps the non-desktop fallback authoritative for the lifetime of its workspace", async () => {
   const port = createFallbackWorkspacePreferencesPort();
@@ -206,93 +204,4 @@ test("accepts the latest authoritative response including another host's fields"
       }),
     ),
   );
-});
-
-test("migrates legacy per-WebView Inspector state once and retains it on write failure", async () => {
-  localStorage.setItem("myalbuns.inspector.album.design", "closed");
-  const persistedPort: WorkspacePreferencesPort = {
-    load: async () => createWorkspacePreferences(),
-    update: vi.fn(async (change) =>
-      applyWorkspacePreferenceChange(createWorkspacePreferences(), change),
-    ),
-  };
-
-  const migrated = renderHook(() => useWorkspacePreferences(persistedPort));
-  await waitFor(() =>
-    expect(migrated.result.current.preferences.inspectorSections).toEqual({
-      "album.design": false,
-    }),
-  );
-  await waitFor(() => expect(persistedPort.update).toHaveBeenCalledOnce());
-  expect(localStorage.getItem("myalbuns.inspector.album.design")).toBeNull();
-  migrated.unmount();
-
-  localStorage.setItem("myalbuns.inspector.sheet.design", "open");
-  const unavailablePort: WorkspacePreferencesPort = {
-    load: async () => createWorkspacePreferences(),
-    update: vi.fn(async () => {
-      throw new Error("State unavailable");
-    }),
-  };
-  const retained = renderHook(() => useWorkspacePreferences(unavailablePort));
-  await waitFor(() =>
-    expect(retained.result.current.preferences.inspectorSections).toEqual({
-      "sheet.design": true,
-    }),
-  );
-  expect(localStorage.getItem("myalbuns.inspector.sheet.design")).toBe("open");
-});
-
-test("migrates legacy panel geometry only when the StateStore has no authoritative value", async () => {
-  localStorage.setItem("myalbuns.workspace.inspector-width", "350");
-  localStorage.setItem("myalbuns.workspace.media-panel-height", "200");
-  let persisted = createWorkspacePreferences();
-  const update = vi.fn<WorkspacePreferencesPort["update"]>(async (change) => {
-    persisted = applyWorkspacePreferenceChange(persisted, change);
-    return persisted;
-  });
-  const migrationPort: WorkspacePreferencesPort = {
-    load: async () => persisted,
-    update,
-  };
-  const migrated = renderHook(() =>
-    useWorkspacePreferences(migrationPort),
-  );
-
-  await waitFor(() =>
-    expect(migrated.result.current.preferences.workspacePanels).toEqual({
-      inspector: { size: 350, visible: true },
-      media: { size: 200, visible: true },
-    }),
-  );
-  await waitFor(() => expect(update).toHaveBeenCalledTimes(2));
-  expect(localStorage.getItem("myalbuns.workspace.inspector-width")).toBeNull();
-  expect(
-    localStorage.getItem("myalbuns.workspace.media-panel-height"),
-  ).toBeNull();
-  migrated.unmount();
-
-  localStorage.setItem("myalbuns.workspace.inspector-width", "480");
-  localStorage.setItem("myalbuns.inspector.album.design", "closed");
-  const authoritative = createWorkspacePreferences({
-    inspectorSections: { "album.design": true },
-    workspacePanels: {
-      inspector: { size: 320, visible: true },
-      media: null,
-    },
-  });
-  const authoritativePort: WorkspacePreferencesPort = {
-    load: async () => authoritative,
-    update: vi.fn(),
-  };
-  const preserved = renderHook(() =>
-    useWorkspacePreferences(authoritativePort),
-  );
-  await waitFor(() =>
-    expect(preserved.result.current.preferences.workspacePanels.inspector).toEqual(
-      { size: 320, visible: true },
-    ),
-  );
-  expect(localStorage.getItem("myalbuns.workspace.inspector-width")).toBeNull();
-  expect(localStorage.getItem("myalbuns.inspector.album.design")).toBeNull();
 });
