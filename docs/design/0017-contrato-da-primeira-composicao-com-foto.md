@@ -2,7 +2,7 @@
 status: accepted
 document: design
 date: 2026-08-20
-updated: 2026-08-21
+updated: 2026-09-24
 ticket: 17-programa-09-primeira-composicao-com-foto
 ---
 
@@ -43,6 +43,8 @@ seleciona o respectivo cartão. Essa seleção transitória também não acresce
 Undo/Redo.
 
 ## Modelo persistente v3
+
+> **Histórico.** A versão de esquema e a migração descritas nesta seção foram descartadas na consolidação da primeira versão pública. O formato vigente está no [Contrato do Arquivo de Projeto](0051-contrato-do-arquivo-de-projeto.md).
 
 `schemaVersion: 3` é a versão deste primeiro recorte. A versão pública atual é a
 [v5, que inclui Giro, Espelhamento e Ângulo fino](0022-angulo-fino-da-foto-e-projeto-v5.md).

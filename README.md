@@ -49,18 +49,17 @@ Contratos detalhados por área. Os de interface descrevem superfícies e intera�
 - [0010 — Armazenamento local e Cache](docs/design/0010-armazenamento-local-e-cache.md) — organização de `%APPDATA%` e `%LOCALAPPDATA%`, metadados, invalidação e liberação de espaço.
 - [0011 — Resolução e política de caminhos](docs/design/0011-resolucao-e-politica-de-caminhos.md) — caminhos locais, UNC, unidades mapeadas, caminhos longos e vínculos temporários por tentativa.
 - [0012 — Propriedade de estado e módulos do núcleo](docs/design/0012-propriedade-de-estado-e-modulos-do-nucleo.md) — proprietários do estado criativo, composição, mídias, Cache, Exportação e exclusividade operacional.
-- [0013 — Contrato do Arquivo de Projeto v1](docs/design/0013-contrato-do-arquivo-de-projeto-v1.md) — envelope `.myalbuns`, DTO fechado, caminhos reversíveis, evolução e casos dourados.
+- [0051 — Contrato do Arquivo de Projeto](docs/design/0051-contrato-do-arquivo-de-projeto.md) — primeira versão pública do `.myalbuns`: estrutura, validação, caminhos, evolução e exemplos.
 - [0014 — Contrato JPEG do primeiro fluxo](docs/design/0014-contrato-jpeg-do-primeiro-fluxo.md) — composição, fontes aceitas, rasterização e publicação JPEG do primeiro corte produtivo.
 - [0015 — Contrato público de persistência do ProjectCore](docs/design/0015-contrato-publico-de-persistencia-do-project-core.md) — autoridade de Identidade, abertura, Salvamento atômico e `Salvar como`.
-- [0016 — Contrato do Arquivo de Projeto v2](docs/design/0016-contrato-do-arquivo-de-projeto-v2.md) — DTO fechado legado, `MediaRef` de Foto/Decorativo e etapa de migração v1 → v2.
-- [0017 — Contrato da primeira composição com Foto](docs/design/0017-contrato-da-primeira-composicao-com-foto.md) — esquema v3, Frames, enquadramento, resolução do alvo de soltura e autoridade do Original na Exportação.
+- [0017 — Contrato da primeira composição com Foto](docs/design/0017-contrato-da-primeira-composicao-com-foto.md) — Frames, enquadramento, resolução do alvo de soltura e autoridade do Original na Exportação.
 - [0019 — Contrato do Renderizador final](docs/design/0019-contrato-do-renderizador-final.md) — composição canônica, JPEG/PNG/PDF, captura estável dos Originais, Publicação e corpus dourado.
 - [0020 — Importação com decode único e lotes](docs/design/0020-importacao-com-decode-unico-e-lotes.md) — tentativa com caminhos congelados, adoção pelo Monitor, transações de Cache e capacidade de CPU/RAM.
 - [0032 — Revisão da admissão por memória](docs/design/0032-revisao-da-admissao-por-memoria.md) — redução até processamento individual sob pressão e resultado recuperável quando não há capacidade para continuar.
-- [0021 — Orientação de Fotos e Projeto v4](docs/design/0021-orientacao-de-fotos-e-projeto-v4.md) — Giro, Espelhamento, seleção múltipla e migração do arquivo persistente.
-- [0022 — Ângulo fino da Foto e Projeto v5](docs/design/0022-angulo-fino-da-foto-e-projeto-v5.md) — slider, entrada numérica, prévia, Histórico e migração do Ângulo.
+- [0021 — Orientação de Fotos e Projeto v4](docs/design/0021-orientacao-de-fotos-e-projeto-v4.md) — Giro, Espelhamento e seleção múltipla.
+- [0022 — Ângulo fino da Foto e Projeto v5](docs/design/0022-angulo-fino-da-foto-e-projeto-v5.md) — slider, entrada numérica, prévia e Histórico do Ângulo.
 - [0024 — Borda e Opacidade dos Frames e Projeto v7](docs/design/0024-borda-opacidade-dos-frames-e-projeto-v7.md) — estilo por Frame, herança, restauração e composição em grupo.
-- [0023 — Preto e branco da Foto e Projeto v6](docs/design/0023-preto-e-branco-da-foto-e-projeto-v6.md) — efeito por ocorrência, seleção mista, renderização e migração persistente.
+- [0023 — Preto e branco da Foto e Projeto v6](docs/design/0023-preto-e-branco-da-foto-e-projeto-v6.md) — efeito por ocorrência, seleção mista e renderização.
 
 ## Pesquisas
 

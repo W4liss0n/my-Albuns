@@ -2,11 +2,13 @@
 status: superseded
 document: design
 date: 2026-08-11
-updated: 2026-08-21
+updated: 2026-09-24
 ticket: 44-programa-03a-representacao-reduzida-e-pausa-causal-do-cache
 ---
 
 # Contrato do Arquivo de Projeto v2
+
+> **Substituído.** Este contrato descreve um formato de desenvolvimento que nunca chegou a usuários. O formato vigente está no [Contrato do Arquivo de Projeto](0051-contrato-do-arquivo-de-projeto.md).
 
 ## Objetivo
 

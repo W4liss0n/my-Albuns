@@ -1,11 +1,13 @@
 ---
-status: accepted
+status: superseded
 document: design
 date: 2026-08-03
-updated: 2026-09-09
+updated: 2026-09-24
 ---
 
 # Contrato do Arquivo de Projeto v1
+
+> **Substituído.** Este contrato descreve um formato de desenvolvimento que nunca chegou a usuários. O formato vigente está no [Contrato do Arquivo de Projeto](0051-contrato-do-arquivo-de-projeto.md).
 
 ## Objetivo
 

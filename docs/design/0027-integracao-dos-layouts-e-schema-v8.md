@@ -2,7 +2,7 @@
 status: accepted
 document: design
 date: 2026-09-09
-updated: 2026-09-11
+updated: 2026-09-24
 ticket: 28
 ---
 
@@ -74,6 +74,8 @@ snaps e consultas, sem modificar Frames atuais nem geometrias já registradas
 em Últimos Layouts, Favoritos ou no catálogo. O Salvamento continua manual.
 
 ## Formato persistido
+
+> **Histórico.** A versão de esquema e a migração descritas nesta seção foram descartadas na consolidação da primeira versão pública. O formato vigente está no [Contrato do Arquivo de Projeto](0051-contrato-do-arquivo-de-projeto.md).
 
 O [design 0028](0028-layout-travado-e-schema-v9.md) acrescenta o travamento
 persistido na v9; a v8 abaixo permanece como contrato histórico de leitura.

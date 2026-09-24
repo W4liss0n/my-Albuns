@@ -2,7 +2,7 @@
 status: accepted
 document: design
 date: 2026-08-03
-updated: 2026-08-10
+updated: 2026-09-24
 ---
 
 # Contrato público de persistência do ProjectCore
@@ -11,7 +11,7 @@ updated: 2026-08-10
 
 Definir a menor fronteira pública para criar, abrir, carregar, salvar e executar `Salvar como` sem expor formato, migração, bytes persistidos ou confirmação de Salvamento à interface. A mesma fronteira só autoriza Cache, Recuperação e WebView2 depois de resolver a Identidade contra a instância física e a evidência local. Apesar de a decisão ter começado como “contrato público do `ProjectStore`”, a fronteira externa continua sendo `ProjectCore`: `ProjectStore` e `ProjectIdentityRegistry` são subdivisões internas, concretas e testáveis por meio do comportamento observável do núcleo.
 
-Este contrato complementa [Armazenamento local e Cache](0010-armazenamento-local-e-cache.md), [Resolução e política de caminhos](0011-resolucao-e-politica-de-caminhos.md), [Propriedade de estado e módulos do núcleo](0012-propriedade-de-estado-e-modulos-do-nucleo.md), [Contrato do Arquivo de Projeto v1](0013-contrato-do-arquivo-de-projeto-v1.md), [Criação de Projeto](0003-criacao-de-projeto.md) e a sequência aprovada em [Provar o Salvamento atômico preservando a trava do Projeto](../research/fase-2-fluxo-persistente/issues/04-provar-o-salvamento-atomico-com-trava.md). Os nomes de tipos abaixo fixam responsabilidades e resultados; a implementação pode ajustar apenas detalhes idiomáticos que não alterem essas garantias.
+Este contrato complementa [Armazenamento local e Cache](0010-armazenamento-local-e-cache.md), [Resolução e política de caminhos](0011-resolucao-e-politica-de-caminhos.md), [Propriedade de estado e módulos do núcleo](0012-propriedade-de-estado-e-modulos-do-nucleo.md), [Contrato do Arquivo de Projeto](0051-contrato-do-arquivo-de-projeto.md), [Criação de Projeto](0003-criacao-de-projeto.md) e a sequência aprovada em [Provar o Salvamento atômico preservando a trava do Projeto](../research/fase-2-fluxo-persistente/issues/04-provar-o-salvamento-atomico-com-trava.md). Os nomes de tipos abaixo fixam responsabilidades e resultados; a implementação pode ajustar apenas detalhes idiomáticos que não alterem essas garantias.
 
 ## Modos de acesso e operações
 

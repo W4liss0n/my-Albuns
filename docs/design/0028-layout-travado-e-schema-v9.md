@@ -2,7 +2,7 @@
 status: accepted
 document: design
 date: 2026-09-09
-updated: 2026-09-10
+updated: 2026-09-24
 ticket: 26
 ---
 
@@ -90,6 +90,8 @@ travado isoladamente. O proprietário valida o resultado inteiro antes da
 confirmação, conforme o [design 0036](0036-mudanca-dimensional-segura.md).
 
 ## Persistência e Exportação
+
+> **Histórico.** A versão de esquema e a migração descritas nesta seção foram descartadas na consolidação da primeira versão pública. O formato vigente está no [Contrato do Arquivo de Projeto](0051-contrato-do-arquivo-de-projeto.md).
 
 O escritor passa a emitir `schemaVersion: 9`. Cada Lâmina exige o booleano
 `layoutLocked`; o campo ausente ou de tipo inválido é rejeitado. Um travamento

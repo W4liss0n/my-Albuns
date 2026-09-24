@@ -2,6 +2,7 @@
 status: accepted
 document: design
 date: 2026-09-15
+updated: 2026-09-24
 implementation-readiness: ready-for-agent
 ---
 
@@ -81,6 +82,8 @@ Itens ocultos saem da seleção. O filtro é transitório, sem Histórico nem
 Salvamento, e o planejamento de miniaturas considera a associação atualizada.
 
 ## Persistência
+
+> **Histórico.** A versão de esquema e a migração descritas nesta seção foram descartadas na consolidação da primeira versão pública. O formato vigente está no [Contrato do Arquivo de Projeto](0051-contrato-do-arquivo-de-projeto.md).
 
 O envelope v12 conserva os campos v11 e acrescenta `mediaFolders`, obrigatório
 inclusive vazio. Cada entrada fechada contém `id`, `kind`, `name` e `mediaIds`.

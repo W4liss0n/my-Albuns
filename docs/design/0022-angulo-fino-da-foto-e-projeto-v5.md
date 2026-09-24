@@ -2,6 +2,7 @@
 status: accepted
 document: design
 date: 2026-09-08
+updated: 2026-09-24
 ticket: 22
 ---
 
@@ -92,6 +93,8 @@ O pipeline atual continua consumindo o plano de composição comum ao Canvas,
 à miniatura e ao processador de Exportação.
 
 ## Arquivo v5
+
+> **Histórico.** A versão de esquema e a migração descritas nesta seção foram descartadas na consolidação da primeira versão pública. O formato vigente está no [Contrato do Arquivo de Projeto](0051-contrato-do-arquivo-de-projeto.md).
 
 A versão 5 acrescenta `angleTenths` obrigatório ao objeto `photo.transform`.
 Mantém os demais campos da versão 4. A cadeia de migração tipada

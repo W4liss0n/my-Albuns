@@ -2,6 +2,7 @@
 status: accepted
 document: design
 date: 2026-09-08
+updated: 2026-09-24
 ticket: 22
 ---
 
@@ -57,6 +58,8 @@ um pixel de saída para o Original. Pan permanece aplicado depois dessas operaç
 
 ## Formato público v4
 
+> **Histórico.** A versão de esquema e a migração descritas nesta seção foram descartadas na consolidação da primeira versão pública. O formato vigente está no [Contrato do Arquivo de Projeto](0051-contrato-do-arquivo-de-projeto.md).
+
 O ADR 0009 exige nova versão para novos campos persistentes. `schemaVersion: 4`
 mantém envelope, Identidade, Revisão, Lâminas, Frames e mídias da v3, acrescentando
 dois campos obrigatórios ao transform de cada Foto:
@@ -86,9 +89,8 @@ versões futuras são recusados sem alterar a origem.
 
 ## Exemplos e verificação
 
-- [Entrada v3 com Foto e placeholder](../../crates/myalbuns-core/tests/fixtures/project_document_v3_photo_migration_input.myalbuns).
-- [Resultado esperado da migração v3 → v4](../../crates/myalbuns-core/tests/fixtures/project_document_v4_photo_migration_expected.myalbuns).
-- [Resultado atual da cadeia iniciada em v1](../../crates/myalbuns-core/tests/fixtures/project_document_v4_migration_expected.myalbuns).
+- Os exemplos persistidos de Giro e Espelhamento estão em
+  [`project_file_v1/complete.myalbuns`](../../crates/myalbuns-core/tests/fixtures/project_file_v1/complete.myalbuns).
 - `photo_orientation.rs` verifica comandos públicos, seleção mista, casos inválidos,
   Histórico, preservação do Original, Salvamento, reabertura, snapshot de Exportação,
   migração e rejeição de documentos inválidos. Também produz e verifica o corpus

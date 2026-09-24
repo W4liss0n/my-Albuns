@@ -1,7 +1,7 @@
 ---
 status: accepted
 date: 2026-08-03
-updated: 2026-08-11
+updated: 2026-09-24
 ---
 
 # Adotar `.myalbuns` como arquivo JSON versionado de Projeto
@@ -10,22 +10,38 @@ O Arquivo de Projeto será um único documento JSON UTF-8 com extensão `.myalbu
 
 ## Decisão
 
-O primeiro contrato público começa em `schemaVersion: 1` e não promete compatibilidade com os schemas e extensões usados pelas fixtures dos spikes. O envelope identifica o tipo `myalbuns.project`, a Identidade do Projeto, a Revisão do Projeto confirmada e o payload persistente. Caminhos Windows usam exclusivamente o DTO reversível `windowsUtf16`; Nome, Localização, Histórico, estado transitório, Cache e Recuperação não são duplicados no conteúdo.
+O envelope identifica o tipo `myalbuns.project`, a versão do esquema, a Identidade do Projeto, a Revisão do Projeto confirmada e o conteúdo persistente. Nome, Localização, Histórico, estado transitório, Cache e Recuperação não são duplicados no conteúdo. O DTO do arquivo é fechado, recusa campos desconhecidos e é separado dos tipos de domínio e das representações de IPC. `ProjectStore` possui JSON, detecção de versão e escrita; `ProjectDomain` recebe somente o modelo já validado.
 
-Cada versão possui DTO fechado e rejeita campos desconhecidos. Versões públicas antigas suportadas são migradas sequencialmente apenas em memória; o arquivo só recebe o esquema atual em um Salvamento explícito. Versões futuras ou inválidas são recusadas sem modificar o arquivo. `ProjectStore` possui JSON, detecção, migração e escrita, enquanto `ProjectDomain` recebe somente o modelo atual já validado.
+A primeira versão pública é `schemaVersion: 1`, definida no [Contrato do Arquivo de Projeto](../design/0051-contrato-do-arquivo-de-projeto.md). Durante o desenvolvimento, cada recurso criou uma versão e uma migração, chegando a doze versões. Nenhuma chegou a usuários, então todas foram descartadas antes da publicação: a estrutura foi reorganizada e recomeçou em `1`, sem migrações. Arquivos dessas versões, assim como os `.myalbum` e o `schemaVersion: 3` dos spikes, não recebem importador.
 
-Enquanto `schemaVersion: 1` foi a única versão pública, a cadeia de migração era `migrations = []` e não existia exemplo de migração legítimo. A cadeia vazia registrava a ausência de transformação; ela não era um exemplo. Não se inventa `v0`, não se promove o `schemaVersion: 3` dos spikes e não se cria uma transformação fictícia apenas para exercitar infraestrutura.
+### Evolução depois da primeira distribuição
 
-O [Contrato do Arquivo de Projeto v2](../design/0016-contrato-do-arquivo-de-projeto-v2.md) é a primeira evolução pública. Ele inclui no mesmo conjunto normativo a transformação tipada e sequencial `v1 -> v2`, a entrada v1 e o resultado v2 esperado, a prova de abertura sem escrita e a promoção para v2 somente após `Salvar` explícito.
+Até a primeira distribuição pública, a v1 ainda pode ser ajustada no lugar, desde que contrato, exemplos e testes mudem juntos. A partir dela:
+
+- toda mudança no conteúdo persistido incrementa `schemaVersion`, para que uma instalação antiga recuse o arquivo novo como versão futura em vez de perder campos;
+- um campo novo e opcional, cujo valor padrão reproduz exatamente o comportamento anterior, não precisa de função de migração: o leitor aceita a versão anterior com o mesmo DTO, e o valor padrão é omitido na escrita;
+- uma mudança incompatível, como renomear, mover ou mudar o significado de um campo, recebe uma etapa de migração pura e tipada da versão anterior para a seguinte, com exemplo de entrada e resultado esperado;
+- a abertura migra apenas em memória, sem alterar a Revisão do Projeto nem criar Histórico; o arquivo só recebe a versão atual em um `Salvar` explícito;
+- versões futuras ou inválidas são recusadas sem modificar o arquivo.
+
+Não se cria versão fictícia nem migração apenas para exercitar infraestrutura.
 
 ## Alternativas consideradas
 
-ZIP, SQLite e formatos binários foram rejeitados porque as mídias permanecem externas e o primeiro fluxo não precisa de múltiplos artefatos internos, consultas parciais ou escrita incremental. Promover o `schemaVersion: 3` dos spikes também foi rejeitado: ele não contém caminhos nativos nem DPI e inclui campos derivados que não pertencem ao contrato público.
+SQLite foi reavaliado na consolidação e rejeitado:
+
+- Projetos podem estar em caminho UNC ou unidade mapeada ([ADR 0007](0007-tratar-caminhos-windows-e-identidade-fisica.md)), e o SQLite não garante travas confiáveis em sistemas de arquivos de rede;
+- os arquivos auxiliares `-wal` e `-shm` quebram o arquivo único, a detecção de Cópia externa ([ADR 0002](0002-identificar-copias-externas.md)) e o `Salvar como`;
+- o Projeto segue o modelo de documento com Salvamento explícito, sem consulta parcial nem escrita incremental que justifiquem um banco;
+- o arquivo deixaria de ser legível para diagnóstico.
+
+O tamanho do JSON não é o gargalo. Medido em 2026-09-24, um Projeto com 172 Fotos e 30 Lâminas ocupa cerca de 190 KB no formato v1 indentado (417 KB no formato de desenvolvimento, que gravava cada caminho como uma lista de unidades UTF-16) e é interpretado em cerca de 1,4 ms; um álbum de 800 Fotos fica perto de 1 MB. O tempo de abertura está nas prévias e no Cache.
+
+ZIP e formatos binários, como MessagePack ou CBOR, foram rejeitados: as mídias permanecem externas, não há múltiplos artefatos internos, e o ganho de alguns milissegundos não compensa a perda de diagnóstico.
 
 ## Consequências
 
-- Acrescentar ou alterar campos persistidos exige uma nova Versão do esquema do Projeto e uma migração explícita quando houver compatibilidade.
-- Uma nova versão pública não está completa sem os exemplos versionados válidos, inválidos e de migração correspondentes; a v2 conserva os exemplos v1 e acrescenta o par dourado `v1 -> v2`.
+- Uma nova versão pública não está completa sem exemplos válidos e inválidos e, quando houver migração, o par de entrada e resultado esperado.
 - A extensão ajuda o Windows a encaminhar o arquivo, mas a identificação interna continua obrigatória e autoritativa.
-- O escritor pode produzir JSON determinístico e legível; leitores não dependem de espaços, quebras de linha ou ordem de propriedades.
-- A implementação deve manter DTOs persistentes separados dos tipos de domínio e das representações de IPC.
+- O escritor produz JSON determinístico e legível, e abrir e salvar sem editar reproduz o arquivo; leitores não dependem de espaços, quebras de linha ou ordem de propriedades.
+- Caminhos são gravados como texto quando formam UTF-16 válido e como unidades exatas apenas quando não formam, preservando a reversibilidade exigida pelo [ADR 0007](0007-tratar-caminhos-windows-e-identidade-fisica.md).

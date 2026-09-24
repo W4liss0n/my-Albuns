@@ -1,7 +1,7 @@
 ---
 status: accepted
 document: design
-updated: 2026-09-23
+updated: 2026-09-24
 ---
 
 # Armazenamento local e Cache
@@ -46,11 +46,16 @@ A propriedade lógica dos stores e do `CacheEngine` segue [Propriedade de estado
 │   ├── ProjectIdentities\
 │   │   └── {project-key}.json
 │   ├── ProjectIdentityLeases\
+│   ├── BatchParticipants\
 │   ├── WebView2\
-│   │   └── {project-key}\
+│   │   ├── global\
+│   │   ├── global-progress\
+│   │   └── project-{1..64}\
 │   ├── recent-projects.json
+│   ├── workspace-preferences.json
 │   └── photoshop.json
 └── Logs\
+    └── myalbuns-{processo}.{data}.jsonl
 ```
 
 As duas raízes são obtidas pelas pastas conhecidas do Windows e nunca pelo diretório corrente do processo. `%APPDATA%` contém preferências e conteúdo global criado pelo usuário. `%LOCALAPPDATA%` contém dados ligados à máquina, diagnóstico, Recuperação e conteúdo reconstruível.
@@ -75,13 +80,20 @@ Eles podem reutilizar primitivas internas para criar temporário irmão, descarr
 
 Alterações globais usam schema e substituição atômica. Janelas ou sessões consultam a revisão vigente ao abrir, receber foco ou solicitar atualização manual. Como as Janelas pertencem a hosts de Projeto distintos, um broadcast imediato exigiria coordenação entre processos; ele não é requisito do MVP e só será acrescentado diante de necessidade observada.
 
-`StateStore` mantém em `State` informações locais independentes, que não fazem sentido fora desta máquina: Projetos recentes, a instalação escolhida do Photoshop e as preferências de interface que dependem da tela.
+`StateStore` mantém em `State` informações locais independentes, que não fazem sentido fora desta máquina: Projetos recentes, a instalação escolhida do Photoshop e, em `workspace-preferences.json`, as preferências de interface que dependem da tela. `BatchParticipants` registra os processos que participam de um Modo de lote exclusivo.
 
 `ProjectIdentityRegistry` é um store concreto distinto dentro da mesma raiz. Sua falha não pode ser tratada como perda de uma preferência: o registro participa da autorização de Identidade antes de montar qualquer estado local de Projeto. Projetos recentes podem ser limitados, reordenados ou removidos sem apagar essa evidência.
 
-Os dados internos do WebView2 ficam em `State\WebView2\{project-key}`. Cada
-host de Projeto deriva uma chave opaca própria da Identidade persistida; hosts
-distintos nunca compartilham o mesmo diretório de perfil do navegador.
+Os dados internos do WebView2 ficam em `State\WebView2`. A Janela inicial usa
+`global`, as janelas de progresso usam `global-progress` e cada host de Projeto
+ocupa o primeiro perfil livre entre `project-1` e `project-64`. Um mutex nomeado
+por perfil garante que hosts simultâneos nunca compartilhem o mesmo diretório;
+ao fechar o Projeto, o perfil fica livre para o próximo host. `Salvar como`
+recarrega a interface com a nova Identidade em outro perfil livre e libera o
+anterior. O perfil não guarda estado do Projeto: a interface recebe tudo do
+host. Por isso o número de perfis acompanha os Projetos abertos ao mesmo tempo,
+e não os Projetos já abertos na máquina. Na inicialização, a Janela inicial
+remove perfis de nomes que o aplicativo não usa mais.
 
 A divisão entre as duas raízes segue o que a preferência representa:
 
@@ -98,7 +110,7 @@ Geometria de painel carregada para uma tela menor chega errada e obriga o usuár
 
 Nenhuma dessas preferências altera o Projeto, participa de Undo/Redo ou exige Salvamento. Perdê-las é irrelevante: a próxima sessão começa nos padrões.
 
-`Logs` permanece local; sua retenção será definida quando houver dados reais de diagnóstico.
+`Logs` permanece local. Cada processo grava um arquivo JSON Lines por dia e conserva somente os sete arquivos mais recentes do seu tipo.
 
 ## Recuperação
 
@@ -138,7 +150,7 @@ Fechamento normal ou inesperado, remoção de Projetos recentes, `Liberar espaç
 
 ## Namespace do Projeto
 
-Cada pasta abaixo de `Cache` usa uma representação opaca e segura da Identidade persistente, indicada por `{project-key}`. A mesma chave identifica o checkpoint futuro em `Recovery` e o perfil do WebView2. Nome e caminho do arquivo não participam desse namespace.
+Cada pasta abaixo de `Cache` usa uma representação opaca e segura da Identidade persistente, indicada por `{project-key}`. A mesma chave identifica o checkpoint em `Recovery` e o registro em `State\ProjectIdentities`. Nome e caminho do arquivo não participam desse namespace.
 
 - mover ou renomear preserva a pasta;
 - `Salvar como` começa em uma pasta nova e vazia;
@@ -148,8 +160,7 @@ Cada pasta abaixo de `Cache` usa uma representação opaca e segura da Identidad
 A Identidade é o UUID v4 canônico, minúsculo e hifenizado definido pelo
 documento de Projeto. A implementação deriva `project-{sha256}` dos bytes
 UTF-8 dessa representação canônica e usa a mesma chave opaca para o registro
-local, Cache, Recuperação e WebView2. O valor original nunca vira componente
-de caminho.
+local, Cache e Recuperação. O valor original nunca vira componente de caminho.
 
 ## Conteúdo mínimo
 
@@ -203,17 +214,19 @@ do Cache. Essa escolha não altera o original nem permite que a Exportação use
 representação reduzida. Ambos os formatos carregam o perfil canônico
 `sRGB2014.icc`; a orientação EXIF/TIFF é aplicada exatamente uma vez.
 
-A representação versão `2` reduz o raster por média de área (filtro Box do
-crate `fast_image_resize`), com a mesma regra de dimensões da versão `1`:
-proporção preservada e maior lado de `1.600 px`. Pixels transparentes pesam
+A representação reduz o raster por média de área (filtro Box do crate
+`fast_image_resize`), com proporção preservada e maior lado de `1.600 px`. Pixels transparentes pesam
 pelo alfa, sem espalhar cor oculta. Em JPEG colorido não progressivo, a
 orientação EXIF é aplicada depois da redução, sobre os pixels já reduzidos;
 nos demais casos, continua aplicada na decodificação. O codificador JPEG, a
-qualidade `84`, a escolha de PNG e o perfil não mudaram. Na mesma máquina, a importação
-de 172 JPEGs levou de 10,1 a 11,9 s, contra 12,4 a 14,0 s na versão `1`.
-As prévias são visualmente equivalentes e têm contornos finos menos
-serrilhados. Trocar de versão invalida o índice e regenera uma vez as prévias
-existentes. Decisão aceita em 2026-09-23.
+qualidade `84`, a escolha de PNG e o perfil são os mesmos da redução usada
+antes. Na mesma máquina, a importação de 172 JPEGs levou de 10,1 a
+11,9 s, contra 12,4 a 14,0 s com a redução anterior, e as prévias têm contornos
+finos menos serrilhados. Decisão aceita em 2026-09-23.
+
+A primeira versão pública recomeça em `1` a versão da representação e o schema
+de `metadata.json`. Trocar qualquer uma delas invalida o índice e regenera uma
+vez as prévias existentes.
 
 O Processador aceita JPEG, PNG e TIFF de uma página e recusa TIFF multipágina.
 Antes de materializar o raster, impõe `134.217.728` pixels e `512 MiB` de
@@ -292,12 +305,13 @@ aparecem como avisos na janela.
 
 ## Metadados
 
-`metadata.json` é um índice descartável e versionado. Ele mantém somente o necessário para localizar e validar a representação:
+`metadata.json` é um índice descartável e versionado, gravado em JSON compacto. Ele mantém somente o necessário para localizar e validar a representação:
 
 - schema e versão da representação;
 - Identidade do Projeto e último uso;
-- `mediaId`, marca opaca SHA-256 do caminho lógico que originou a geração,
-  `generationId` e nome do artefato;
+- `mediaId`, marca opaca SHA-256 do caminho lógico que originou a geração e
+  `generationId`; o nome do artefato deriva desses campos e do formato e não é
+  gravado;
 - dimensões, formato, orientação EXIF e quantidade de páginas quando aplicável;
 - perfil de cor básico (`srgb` nesta política medida);
 - tamanho e datas do original;
@@ -359,6 +373,8 @@ Na importação de imagens novas, falta de espaço na prévia, no estágio tempo
 
 Configurações apresenta somente `Limpar cache`, para solicitar a limpeza completa. Ela executa imediatamente apenas quando não houver Projeto ou Processador ativo e depois de adquirir a concessão exclusiva única do `OperationGate`. Caso contrário, agenda automaticamente para a próxima inicialização, antes da abertura de Projetos. O usuário não escolhe o alcance nem o momento da limpeza. A concessão impede abertura, Processador ou Exportação concorrente e é liberada em sucesso, falha ou cancelamento. O MVP não pausa editores nem remove Cache ativo ao vivo. A manutenção de namespaces fechados acima permanece uma capacidade interna, não uma segunda opção na aba Desempenho.
 
+Na inicialização, depois de uma eventual limpeza agendada, o aplicativo remove os namespaces de Projetos fechados que não contêm nenhum arquivo, como os deixados por um Projeto aberto sem imagens. Cada remoção reserva o namespace antes de verificar que está vazio; um namespace com dono ativo ou com qualquer prévia é mantido.
+
 Nenhuma ação de Cache remove Projetos, itens do Painel, vínculos, Recuperação, Layouts, preferências, Exportações ou originais.
 
 Depois da confirmação, a limpeza acontece em segundo plano, sem diálogo de progresso nem cancelamento durante a execução. A pessoa não precisa acompanhar a remoção. As reservas e a espera pela conclusão antes de abrir Projetos continuam sendo responsabilidades internas do aplicativo. A preparação das imagens durante a abertura do Álbum mantém seu progresso determinado.
@@ -381,7 +397,9 @@ Depois da confirmação, a limpeza acontece em segundo plano, sem diálogo de pr
 | limpeza total com Projeto ativo | agendada para a próxima inicialização |
 | Exportação | usa snapshot validado e originais; Cache não é fonte final |
 | Projeto ou mídia em UNC | Cache continua sob a raiz local do aplicativo e a Identidade do Projeto |
+| namespace vazio de Projeto fechado | removido na próxima inicialização |
+| vários Projetos abertos ao mesmo tempo | cada host ocupa um perfil WebView2 próprio, liberado ao fechar |
 
 ## Decisões adiadas
 
-- retenção de Logs.
+- nome final das raízes do aplicativo, hoje `MyAlbuns2`.

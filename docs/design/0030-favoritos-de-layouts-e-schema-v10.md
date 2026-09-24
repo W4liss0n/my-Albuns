@@ -2,6 +2,7 @@
 status: accepted
 document: design
 date: 2026-09-09
+updated: 2026-09-24
 ticket: 29
 implementation-readiness: ready-for-agent
 ---
@@ -47,6 +48,8 @@ conserva essa mesma geometria e origem como Último Layout. Alterar parâmetros
 do Gerador também não modifica a definição já copiada.
 
 ## Arquivo v10
+
+> **Histórico.** A versão de esquema e a migração descritas nesta seção foram descartadas na consolidação da primeira versão pública. O formato vigente está no [Contrato do Arquivo de Projeto](0051-contrato-do-arquivo-de-projeto.md).
 
 O envelope v10 conserva documento, estilos, mídia, configurações de Layout e
 Lâminas do v9 e acrescenta `project.favoriteLayouts`. O vetor é obrigatório,

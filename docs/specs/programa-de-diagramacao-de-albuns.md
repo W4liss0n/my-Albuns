@@ -1230,7 +1230,7 @@ O [glossário do domínio](../../CONTEXT.md) é normativo somente para o signifi
 
 A organização reversível de dados locais e o contrato técnico do Cache estão em [Armazenamento local e Cache](../design/0010-armazenamento-local-e-cache.md). O módulo compartilhado, as formas aceitas e os bindings temporários de cada operação estão em [Resolução e política de caminhos](../design/0011-resolucao-e-politica-de-caminhos.md). A propriedade do estado e os módulos de trabalho estão em [Propriedade de estado e módulos do núcleo](../design/0012-propriedade-de-estado-e-modulos-do-nucleo.md). Composição canônica, JPEG, PNG, PDF, captura dos Originais, numeração e corpus dourado estão no [Contrato do Renderizador final](../design/0019-contrato-do-renderizador-final.md).
 
-O envelope `.myalbuns`, o DTO `windowsUtf16` e a política de evolução estão em [Contrato do Arquivo de Projeto v1](../design/0013-contrato-do-arquivo-de-projeto-v1.md). A autoridade de Identidade, o registro da última Localização, o Salvamento atômico e as transições públicas de `Salvar como` estão em [Contrato público de persistência do ProjectCore](../design/0015-contrato-publico-de-persistencia-do-project-core.md).
+O envelope `.myalbuns`, a estrutura persistida, a representação dos caminhos e a política de evolução estão em [Contrato do Arquivo de Projeto](../design/0051-contrato-do-arquivo-de-projeto.md). A autoridade de Identidade, o registro da última Localização, o Salvamento atômico e as transições públicas de `Salvar como` estão em [Contrato público de persistência do ProjectCore](../design/0015-contrato-publico-de-persistencia-do-project-core.md).
 
 A limpeza sem manifesto possui uma consequência aceita: um arquivo manual com Nome, extensão e índice indistinguíveis de uma Saída órfã pode ser removido depois da confirmação explícita de sobrescrita.
 
@@ -1256,4 +1256,4 @@ A arquitetura adotada reutiliza um núcleo Rust compartilhado atrás de uma pequ
 - Fotos e Decorativos possuem pastas independentes, planas, salvas no Projeto; cada mídia pertence a no máximo uma pasta.
 - Criar, renomear, excluir e mover a seleção são ações atômicas com Undo/Redo. Excluir pasta mantém as imagens em `Todas`; `Sem pasta` remove somente a associação.
 - O filtro de pasta cruza Busca, Filtro de uso e Ausentes, conserva a ordenação e permanece transitório. A organização não modifica arquivos originais nem a composição.
-- A interface, validação, migração v1–v11 e o envelope v12 seguem o [design 0035](../design/0035-pastas-de-organizacao-e-schema-v12.md).
+- A interface e a validação seguem o [design 0035](../design/0035-pastas-de-organizacao-e-schema-v12.md); a persistência segue o [Contrato do Arquivo de Projeto](../design/0051-contrato-do-arquivo-de-projeto.md).

@@ -2,6 +2,7 @@
 status: accepted
 document: design
 date: 2026-09-08
+updated: 2026-09-24
 ticket: 22
 ---
 
@@ -68,6 +69,8 @@ um campo obrigatório. Um processador anterior não pode aceitar o comando e
 ignorar silenciosamente o efeito.
 
 ## Arquivo v6
+
+> **Histórico.** A versão de esquema e a migração descritas nesta seção foram descartadas na consolidação da primeira versão pública. O formato vigente está no [Contrato do Arquivo de Projeto](0051-contrato-do-arquivo-de-projeto.md).
 
 O objeto `photo.transform` da versão 6 acrescenta o booleano obrigatório
 `blackAndWhite` aos campos da versão 5. A cadeia tipada

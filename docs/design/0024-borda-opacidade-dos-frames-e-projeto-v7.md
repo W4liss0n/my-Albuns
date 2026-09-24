@@ -2,6 +2,7 @@
 status: accepted
 document: design
 date: 2026-09-09
+updated: 2026-09-24
 ticket: 22
 ---
 
@@ -72,6 +73,8 @@ O amostrador atual continua em uso; o compositor completo Q32.32 permanece
 vinculado ao Programa 04.
 
 ## Persistência e compatibilidade
+
+> **Histórico.** A versão de esquema e a migração descritas nesta seção foram descartadas na consolidação da primeira versão pública. O formato vigente está no [Contrato do Arquivo de Projeto](0051-contrato-do-arquivo-de-projeto.md).
 
 O arquivo v7 acrescenta `style` obrigatório a cada Frame: `album`, ou `custom`
 com `border { rgb, widthUm }` e `opacityPercent`. A cadeia tipada v1–v7 mantém
