@@ -253,8 +253,7 @@ fn spawn_host(executable: &Path, launch_nonce: &str) -> Result<Child, BootstrapF
         .as_ref()
         .is_some_and(|authorization| authorization.authorize_spawned_host(&child).is_err())
     {
-        let _ = child.kill();
-        let _ = child.wait();
+        reap(&mut child);
         return Err(BootstrapFailure {
             kind: BootstrapFailureKind::HostUnavailable,
             stage: Some(super::FailureStage::Transport),
@@ -623,8 +622,41 @@ impl PendingChild {
 impl Drop for PendingChild {
     fn drop(&mut self) {
         if let Some(mut child) = self.0.take() {
-            let _ = child.kill();
-            let _ = child.wait();
+            reap(&mut child);
+        }
+    }
+}
+
+/// How long a killed Host may take to finish terminating. A process whose
+/// termination is held in the kernel (for instance by a filter driver) may
+/// never exit; the supervisor must not wait for it forever.
+const REAP_TIMEOUT: Duration = Duration::from_secs(10);
+const REAP_POLL_INTERVAL: Duration = Duration::from_millis(20);
+
+/// Terminates a Host and collects it, waiting at most `REAP_TIMEOUT`. A Host
+/// that does not exit in time is left to the operating system and logged.
+fn reap(child: &mut Child) {
+    let _ = child.kill();
+    if !wait_bounded(child, REAP_TIMEOUT) {
+        tracing::warn!(
+            target: "myalbuns.desktop",
+            event = "project_host_termination_unconfirmed",
+            host_pid = child.id(),
+            timeout_ms = REAP_TIMEOUT.as_millis() as u64,
+        );
+    }
+}
+
+/// Returns whether the process exited within `timeout`.
+fn wait_bounded(child: &mut Child, timeout: Duration) -> bool {
+    let deadline = std::time::Instant::now() + timeout;
+    loop {
+        match child.try_wait() {
+            Ok(Some(_)) => return true,
+            Ok(None) if std::time::Instant::now() < deadline => {
+                thread::sleep(REAP_POLL_INTERVAL);
+            }
+            Ok(None) | Err(_) => return false,
         }
     }
 }
@@ -755,11 +787,18 @@ mod tests {
 
     /// A host that starts at once and never answers. Killing PowerShell while
     /// it is still starting can leave it stuck in process termination, so the
-    /// timeout path uses a native executable instead.
+    /// timeout path uses a native executable instead. Each fixture waits on
+    /// its own signal: a second `waitfor` on a busy name exits at once.
     #[cfg(windows)]
     fn silent_host() -> Child {
+        static NEXT: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
+        let signal = format!(
+            "MyAlbunsSilentHost{}n{}",
+            std::process::id(),
+            NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+        );
         Command::new("waitfor.exe")
-            .args(["/t", "10", "MyAlbunsSilentHostFixture"])
+            .args(["/t", "10", &signal])
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::null())
@@ -1227,6 +1266,26 @@ mod tests {
 
         assert_eq!(error.kind, BootstrapFailureKind::CorrelationMismatch);
         assert!(!process_is_alive(spawned_pid));
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn waiting_for_a_host_is_bounded_and_reaping_collects_it() {
+        let mut host = silent_host();
+        let pid = host.id();
+        let started = std::time::Instant::now();
+        assert!(!wait_bounded(&mut host, Duration::from_millis(200)));
+        let waited = started.elapsed();
+        assert!(waited >= Duration::from_millis(200));
+        assert!(
+            waited < Duration::from_secs(5),
+            "the wait stopped at its bound"
+        );
+        assert!(process_is_alive(pid));
+
+        reap(&mut host);
+        assert!(!process_is_alive(pid));
+        assert!(matches!(host.try_wait(), Ok(Some(_))));
     }
 
     #[cfg(windows)]
