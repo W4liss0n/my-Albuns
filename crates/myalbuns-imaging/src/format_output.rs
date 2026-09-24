@@ -62,8 +62,8 @@ pub(crate) fn write_png(
         unit: png::Unit::Meter,
     });
     let mut encoder = png::Encoder::with_info(&mut writer, info).map_err(png_failed)?;
-    // Lossless either way: the default level took ~35x longer on a 25 MP
-    // Sheet for files ~15% smaller. The decode below still proves the pixels.
+    // Fast compression is still lossless; the Final Renderer contract records
+    // the measured time and size trade-off. The decode below proves the pixels.
     encoder.set_compression(png::Compression::Fast);
     let mut encoder = encoder.write_header().map_err(png_failed)?;
     encoder.write_image_data(&rgb).map_err(png_failed)?;
@@ -154,8 +154,8 @@ impl PdfOutput {
         height_um: i64,
     ) -> Result<(), JpegFailure> {
         let rgb = opaque_rgb_bytes(image)?;
-        // Lossless either way: level 1 took ~4x less time per 25 MP page for
-        // a stream ~12% larger. The inflate below still proves the raster.
+        // Level 1 is still lossless; the Final Renderer contract records the
+        // measured time and size trade-off. The inflate below proves the raster.
         let mut compressed =
             flate2::write::ZlibEncoder::new(Vec::new(), flate2::Compression::fast());
         compressed.write_all(&rgb).map_err(io_failed)?;

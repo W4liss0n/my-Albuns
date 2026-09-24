@@ -2,6 +2,7 @@
 status: current
 document: research
 date: 2026-09-23
+updated: 2026-09-24
 platform: windows-11-x64
 ---
 
@@ -15,19 +16,31 @@ commit `25d394a2`.
 
 ## Resultado final
 
-Na comparação final, a base e a versão final alternaram na mesma sessão,
-duas vezes cada formato e três vezes a importação:
+Na comparação final, a base e a versão atual alternaram na mesma sessão. A
+importação teve três rodadas; cada formato de Exportação teve três rodadas,
+com cinco fotos distribuídas por lâmina. A tabela mostra as faixas e, entre
+parênteses, as medianas:
 
-| Operação | Base | Final | Redução | Saída |
+| Operação | Base | Atual | Redução da mediana | Saída |
 | --- | ---: | ---: | ---: | --- |
 | Importar 172 JPEGs (total) | 16,6–19,1 s | 12,7–14,0 s | ~24% | Prévias versão `2` |
-| Exportar 6 lâminas em JPEG, por lâmina | 20,1–21,6 s | 8,4–9,2 s | ~58% | Bytes idênticos |
-| Exportar 6 lâminas em JPEG, por página | 29,1–30,4 s | 9,4–9,9 s | ~68% | Bytes idênticos |
-| Exportar 3 lâminas em PNG | 30,0–30,8 s | 4,9–5,4 s | ~83% | Pixels idênticos, +8% de bytes |
-| Exportar 3 lâminas em PDF | 26,9–28,2 s | 12,3–12,5 s | ~55% | Raster idêntico, +7% de bytes |
+| Exportar 6 lâminas em JPEG, por lâmina | 22,4–25,3 s (22,9) | 9,4–13,2 s (10,0) | ~56% | Bytes idênticos |
+| Exportar 6 lâminas em JPEG, por página | 33,0–43,1 s (33,8) | 10,0–12,7 s (10,6) | ~69% | Bytes idênticos |
+| Exportar 3 lâminas em PNG | 68,2–90,2 s (70,8) | 5,3–6,5 s (6,1) | ~91% | Pixels idênticos, +7% de bytes |
+| Exportar 3 lâminas em PDF | 48,0–52,5 s (50,6) | 21,4–23,6 s (23,2) | ~54% | Raster idêntico, +7% de bytes |
+
+A versão atual inclui a correção do limite de memória descrita em
+[Limite encontrado](#limite-encontrado); ela não mudou os tempos das lâminas
+que já cabiam no teto.
 
 A suíte Rust do projeto (`scripts/Test-Rust.ps1`) passou com 1.029 testes,
 inclusive os que exportam e importam pelo Processador real.
+
+A primeira versão desta pesquisa, de 2026-09-23, mediu a Exportação com as
+fotos de cada lâmina empilhadas na mesma posição, uma sobre a outra. As
+comparações de bytes continuavam válidas, mas os tempos absolutos não
+representavam uma diagramação real. Todas as medições de Exportação foram
+refeitas em 2026-09-24 com as fotos distribuídas.
 
 Esses números medem o Processador e o Host no perfil de desenvolvimento, sem
 WebView, diálogos ou apresentação na janela. Não representam uma promessa de
@@ -36,15 +49,16 @@ tempo para qualquer álbum ou máquina.
 ## Mudanças e efeito medido
 
 Cada linha compara a mudança com o estado imediatamente anterior, em rodadas
-alternadas na mesma sessão.
+alternadas na mesma sessão. As linhas de Exportação vêm das mesmas três
+rodadas da comparação final, com as fotos distribuídas.
 
 | Mudança | Antes | Depois | Saída |
 | --- | ---: | ---: | --- |
 | Lotes de importação distribuídos pelo tamanho dos Originais | 13,2–15,0 s | 11,1–13,2 s | Igual |
-| Composição da lâmina em faixas paralelas | 18,7–19,1 s (lâmina) / 27,1–27,7 s (página) | 13,5–14,2 s / 21,8 s | Bytes idênticos |
-| Reuso e decode paralelo dos Originais entre unidades | 13,4–16,5 s / 23,0–23,8 s | 8,1–10,3 s / 8,3–10,2 s | Bytes idênticos |
-| Compressão rápida sem perda em PNG | 28,7 s | 5,2 s | Pixels idênticos, +8% de bytes |
-| Compressão rápida sem perda em PDF | 16,8 s | 10,4 s | Raster idêntico, +7% de bytes |
+| Composição da lâmina em faixas paralelas | 22,4–25,3 s (lâmina) / 33,0–43,1 s (página) | 17,8–18,4 s / 24,6–28,5 s | Bytes idênticos |
+| Reuso e decode paralelo dos Originais entre unidades | 17,8–18,4 s / 24,6–28,5 s | 10,1–12,0 s / 9,8–12,1 s | Bytes idênticos |
+| Compressão rápida sem perda em PNG | 52,8–66,7 s | 5,2–7,2 s | Pixels idênticos, +7% de bytes |
+| Compressão rápida sem perda em PDF | 37,2–46,9 s | 20,1–25,3 s | Raster idêntico, +7% de bytes |
 | Original lido uma vez para hash e decode | 9,7–10,7 s nativos | 9,9–11,2 s nativos | Igual |
 | Confirmação final do Original por identidade, tamanho e datas | 9,2–12,8 s nativos | 9,1–11,1 s nativos | Igual |
 | Redução das prévias por média de área, orientação depois | 12,4–14,0 s | 10,1–11,9 s | Prévias versão `2` |
@@ -134,8 +148,8 @@ rasters mantidos ao mesmo tempo, e não mais para a soma da lâmina. As fontes s
 decodificadas perto da camada que as usa e descartadas depois do último uso,
 conforme o [contrato do primeiro fluxo JPEG](../design/0014-contrato-jpeg-do-primeiro-fluxo.md#guardrail-provisório-de-recursos).
 Lâminas com 6 e 10 fotos de 24 MP passaram a exportar, inclusive por página, e
-o pico de memória do Processador ficou em cerca de 800 MB com 5 ou com 10
-fotos. As lâminas que já cabiam no teto mantiveram bytes e tempos.
+o pico de memória do Processador ficou entre 774 e 838 MB com 5 ou com 10
+fotos distribuídas. As lâminas que já cabiam no teto mantiveram bytes e tempos.
 
 ## Método
 
@@ -148,9 +162,15 @@ fotos. As lâminas que já cabiam no teto mantiveram bytes e tempos.
   Processador real, 172 fotos em uma seleção, capacidade de 8 processos, em
   rodadas alternadas entre binários preservados antes e depois de cada mudança.
 - Exportação: projeto criado pelo `ProjectCore` com 5 fotos por lâmina de
-  600 × 300 mm a 300 DPI, enviado ao Processador real pelo protocolo de
-  `RenderAlbum`. Bytes de saída comparados por SHA-256; PNG comparado também
-  pelos pixels decodificados.
+  600 × 300 mm a 300 DPI, colocadas como na interface (`PhotoPlacementMode::Normal`),
+  em 5 posições distintas por lâmina. O pedido vai ao Processador real pelo
+  protocolo de `RenderAlbum`. Cada versão do Processador foi preservada como
+  binário e alternada com as demais nas mesmas rodadas. Bytes de saída
+  comparados por SHA-256; PNG comparado também pelos pixels decodificados e
+  PDF pelos rasters descomprimidos de cada página.
+- Pico de memória: maior working set do processo do Processador, amostrado a
+  cada 50 ms durante a exportação por página de 2 lâminas com 5 ou 10 fotos
+  de 24 MP distribuídas.
 - A máquina tinha outros programas ativos (navegador, catalogação de fotos,
   builds de outros agentes), com variação de até 2× entre sessões. Por isso
   cada comparação alternou as versões na mesma sessão; números de sessões
