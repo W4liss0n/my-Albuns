@@ -747,6 +747,12 @@ mod tests {
         }
     }
 
+    /// Upper bound for a PowerShell fixture that does answer. A cold PowerShell
+    /// start on a loaded machine can take several seconds; tests that assert
+    /// the timeout itself use their own short deadline with a silent fixture.
+    #[cfg(windows)]
+    const FIXTURE_TERMINAL_TIMEOUT: Duration = Duration::from_secs(30);
+
     #[cfg(windows)]
     fn powershell_host(script: &str) -> Child {
         Command::new("powershell.exe")
@@ -1002,7 +1008,7 @@ mod tests {
         );
         let spawned_pid = child.id();
 
-        let ready = supervise_child(child, request, Duration::from_secs(2))
+        let ready = supervise_child(child, request, FIXTURE_TERMINAL_TIMEOUT)
             .expect("the correlated terminal is accepted");
 
         let BootstrapOutcome::Ready(ready) = ready else {
@@ -1043,7 +1049,7 @@ mod tests {
         );
         let spawned_pid = child.id();
 
-        let outcome = supervise_child(child, request, Duration::from_secs(2))
+        let outcome = supervise_child(child, request, FIXTURE_TERMINAL_TIMEOUT)
             .expect("the correlated focus terminal is accepted");
 
         let BootstrapOutcome::FocusExisting {
@@ -1070,7 +1076,7 @@ mod tests {
         let request = fixture_request();
         let child = pending_external_copy_host();
         let spawned_pid = child.id();
-        let pending = match supervise_child(child, request, Duration::from_secs(2))
+        let pending = match supervise_child(child, request, FIXTURE_TERMINAL_TIMEOUT)
             .expect("the actionable terminal is accepted")
         {
             BootstrapOutcome::ExternalCopyNotWritable(pending) => pending,
@@ -1102,7 +1108,7 @@ mod tests {
         let request = fixture_request();
         let child = pending_external_copy_host();
         let spawned_pid = child.id();
-        let mut pending = match supervise_child(child, request, Duration::from_secs(2))
+        let mut pending = match supervise_child(child, request, FIXTURE_TERMINAL_TIMEOUT)
             .expect("the actionable terminal is accepted")
         {
             BootstrapOutcome::ExternalCopyNotWritable(pending) => pending,
@@ -1125,7 +1131,7 @@ mod tests {
         let expected_attempt_id = request.attempt_id.clone();
         let child = pending_recovery_host();
         let spawned_pid = child.id();
-        let pending = match supervise_child(child, request, Duration::from_secs(2))
+        let pending = match supervise_child(child, request, FIXTURE_TERMINAL_TIMEOUT)
             .expect("the correlated Recovery signal is accepted")
         {
             BootstrapOutcome::RecoveryAvailable(pending) => pending,
@@ -1152,7 +1158,7 @@ mod tests {
         let request = fixture_request();
         let child = pending_recovery_host();
         let deferred_pid = child.id();
-        let pending = match supervise_child(child, request, Duration::from_secs(2))
+        let pending = match supervise_child(child, request, FIXTURE_TERMINAL_TIMEOUT)
             .expect("the correlated Recovery signal is accepted")
         {
             BootstrapOutcome::RecoveryAvailable(pending) => pending,
@@ -1169,7 +1175,7 @@ mod tests {
         let request = fixture_request();
         let child = pending_recovery_host();
         let abandoned_pid = child.id();
-        let pending = match supervise_child(child, request, Duration::from_secs(2))
+        let pending = match supervise_child(child, request, FIXTURE_TERMINAL_TIMEOUT)
             .expect("the correlated Recovery signal is accepted")
         {
             BootstrapOutcome::RecoveryAvailable(pending) => pending,
@@ -1202,7 +1208,7 @@ mod tests {
         );
         let spawned_pid = child.id();
 
-        let error = supervise_child(child, request, Duration::from_secs(2))
+        let error = supervise_child(child, request, FIXTURE_TERMINAL_TIMEOUT)
             .expect_err("a mismatched nonce is rejected");
 
         assert_eq!(error.kind, BootstrapFailureKind::CorrelationMismatch);
@@ -1236,7 +1242,7 @@ mod tests {
             "#,
         );
         let invalid_pid = invalid_child.id();
-        let invalid = supervise_child(invalid_child, request, Duration::from_secs(2))
+        let invalid = supervise_child(invalid_child, request, FIXTURE_TERMINAL_TIMEOUT)
             .expect_err("invalid JSON is rejected");
         assert_eq!(invalid.kind, BootstrapFailureKind::InvalidTerminal);
         assert!(!process_is_alive(invalid_pid));
@@ -1265,7 +1271,7 @@ mod tests {
         );
         let spawned_pid = child.id();
 
-        let error = supervise_child(child, request, Duration::from_secs(2))
+        let error = supervise_child(child, request, FIXTURE_TERMINAL_TIMEOUT)
             .expect_err("a Failed terminal never releases its host");
 
         assert_eq!(error.kind, BootstrapFailureKind::HostFailed);
