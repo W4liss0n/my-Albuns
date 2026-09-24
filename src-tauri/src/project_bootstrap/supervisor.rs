@@ -753,6 +753,20 @@ mod tests {
     #[cfg(windows)]
     const FIXTURE_TERMINAL_TIMEOUT: Duration = Duration::from_secs(30);
 
+    /// A host that starts at once and never answers. Killing PowerShell while
+    /// it is still starting can leave it stuck in process termination, so the
+    /// timeout path uses a native executable instead.
+    #[cfg(windows)]
+    fn silent_host() -> Child {
+        Command::new("waitfor.exe")
+            .args(["/t", "10", "MyAlbunsSilentHostFixture"])
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::null())
+            .spawn()
+            .expect("the silent host fixture starts")
+    }
+
     #[cfg(windows)]
     fn powershell_host(script: &str) -> Child {
         Command::new("powershell.exe")
@@ -1219,12 +1233,7 @@ mod tests {
     #[test]
     fn timeout_and_invalid_json_kill_and_reap_the_spawned_process() {
         let request = fixture_request();
-        let timeout_child = powershell_host(
-            r#"
-            $null = [Console]::In.ReadLine()
-            Start-Sleep -Seconds 10
-            "#,
-        );
+        let timeout_child = silent_host();
         let timeout_pid = timeout_child.id();
 
         let timeout = supervise_child(timeout_child, request.clone(), Duration::from_millis(150))
