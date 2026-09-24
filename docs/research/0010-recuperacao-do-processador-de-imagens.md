@@ -3,7 +3,7 @@ status: current
 document: technical-research
 ticket: 01-plataforma-e-arquitetura
 date: 2026-07-29
-updated: 2026-08-12
+updated: 2026-09-23
 ---
 
 # Recuperação do Processador de Imagens
@@ -27,8 +27,13 @@ Os dados brutos da rodada mais recente estão em
 [0004-imaging-recovery.json](artifacts/0004-imaging-recovery.json). O JSON é a
 fonte canônica do commit, dos PIDs, dos hashes e dos tempos daquela execução. A
 primeira versão desta pesquisa descrevia uma prova de quatro grupos; essa prova
-foi substituída pelo gate posterior de 9 verificações e não representa a mesma
+foi substituída pelo gate posterior de 10 verificações e não representa a mesma
 execução do artefato atual.
+
+A rodada atual foi repetida em 2026-09-23 no protocolo v27, com WebView2
+153.0.4234.48 e `tauri-driver` 2.0.6. Todas as 10 verificações passaram com a
+árvore de fontes limpa. A rodada anterior, de 2026-08-22, usava o protocolo v17
+e ainda não incluía a exportação em lote.
 
 O campo `sourceInputsDirty` considera todo arquivo rastreado e também arquivos
 novos não rastreados que não estejam ignorados pelo Git, inclusive
@@ -48,7 +53,7 @@ A recuperação mantém responsabilidades separadas:
   integrada. O adaptador Tauri usado pela aplicação e o adaptador
   `std::process` exclusivo do teste compartilham codec, correlação,
   cancelamento, progresso e classificação da terminação;
-- no protocolo v17, o host conserva o handle da tentativa até confirmar o
+- no protocolo v27, o host conserva o handle da tentativa até confirmar o
   término após cancelamento ou atingir um limite explícito. Uma terminação não
   confirmada recebe classificação própria e coloca o Processador em
   quarentena;
@@ -78,17 +83,19 @@ SHA-256 são idênticos. A Exportação final continua usando `RenderSnapshot`,
 
 ## Método
 
-O comando `npm run test:imaging-recovery` executa 9 verificações:
+O comando `npm run test:imaging-recovery` executa 10 verificações:
 
 1. contrato serializado e códigos de falha do protocolo;
 2. descarte seletivo de temporários de Cache;
 3. build isolado do executável real do Processador;
-4. recuperação produtiva com queda durante Cache e Exportação;
-5. jornada Cache–Canvas–Exportação com Background e Overlay;
-6. cancelamento de uma demanda de Cache obsoleta;
-7. pausa causal do Cache durante uma Exportação;
-8. build real da aplicação Tauri para WebView2;
-9. direção do `AlbumCanvas`/Pixi produtivo por `tauri-driver`.
+4. exportação em lote de Projetos salvos, em todos os formatos, pelo
+   Processador real;
+5. recuperação produtiva com queda durante Cache e Exportação;
+6. jornada Cache–Canvas–Exportação com Background e Overlay;
+7. cancelamento de uma demanda de Cache obsoleta;
+8. pausa causal do Cache durante uma Exportação;
+9. build real da aplicação Tauri para WebView2;
+10. direção do `AlbumCanvas`/Pixi produtivo por `tauri-driver`.
 
 O build do Processador usa um target isolado por execução. Isso impede que um
 binário incremental obsoleto do Cargo seja confundido com o executável recém-
@@ -112,6 +119,7 @@ se houver sucesso na tentativa incompleta ou se os hashes protegidos mudarem.
 | Saída publicada anterior | SHA-256 preservado |
 | Revisão do Projeto | SHA-256 preservado |
 | Nova tentativa explícita | publicada por outro processo |
+| Exportação em lote | JPEG, PNG e PDF publicados pelo Processador real |
 | Demanda obsoleta | processo cancelado e coletado, sem índice |
 | Pausa causal | Cache bloqueado e Processador exclusivo |
 | Retomada após Exportação | nova geração publicada |
