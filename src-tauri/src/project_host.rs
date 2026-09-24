@@ -1320,10 +1320,7 @@ mod tests {
                 .expect("the Host checkpoint serializes");
             let checkpoint: serde_json::Value =
                 serde_json::from_slice(&bytes).expect("the Host checkpoint is valid JSON");
-            assert_eq!(
-                checkpoint["creativeState"]["project"]["album"]["dpi"],
-                180
-            );
+            assert_eq!(checkpoint["creativeState"]["project"]["album"]["dpi"], 180);
 
             fixture
                 .host
