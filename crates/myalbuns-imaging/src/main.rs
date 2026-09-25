@@ -76,7 +76,9 @@ fn main() -> ExitCode {
         protocol_version = IMAGING_PROTOCOL_VERSION,
         event = "imaging_process_started",
     );
-    let exit_code = if let Err(failure) = run(&app_paths) {
+    let result = run(&app_paths);
+    let (peak_working_set_bytes, peak_commit_bytes) = peak_memory().unwrap_or_default();
+    let exit_code = if let Err(failure) = result {
         let stage = failure
             .stage
             .map_or("imaging_process", ImagingFailureStage::as_str);
@@ -86,6 +88,8 @@ fn main() -> ExitCode {
             process_id = std::process::id(),
             protocol_version = IMAGING_PROTOCOL_VERSION,
             stage,
+            peak_working_set_bytes,
+            peak_commit_bytes,
             event = "imaging_process_failed",
         );
         eprintln!("o Processador de Imagens não concluiu a solicitação.");
@@ -98,6 +102,8 @@ fn main() -> ExitCode {
             process_role = process_role.as_str(),
             process_id = std::process::id(),
             protocol_version = IMAGING_PROTOCOL_VERSION,
+            peak_working_set_bytes,
+            peak_commit_bytes,
             event = "imaging_process_stopped",
             success = true,
         );
@@ -105,6 +111,34 @@ fn main() -> ExitCode {
     };
     drop(logging_guard);
     exit_code
+}
+
+/// Peak physical and committed memory of this process, logged when it stops
+/// so memory admission can be checked against real work.
+#[cfg(windows)]
+fn peak_memory() -> Option<(u64, u64)> {
+    use windows_sys::Win32::System::{
+        ProcessStatus::{K32GetProcessMemoryInfo, PROCESS_MEMORY_COUNTERS},
+        Threading::GetCurrentProcess,
+    };
+
+    let mut counters = PROCESS_MEMORY_COUNTERS {
+        cb: std::mem::size_of::<PROCESS_MEMORY_COUNTERS>() as u32,
+        ..unsafe { std::mem::zeroed() }
+    };
+    // SAFETY: the pseudo handle of the current process is always valid and the
+    // counters buffer has the size it declares.
+    let succeeded =
+        unsafe { K32GetProcessMemoryInfo(GetCurrentProcess(), &mut counters, counters.cb) };
+    (succeeded != 0).then_some((
+        counters.PeakWorkingSetSize as u64,
+        counters.PeakPagefileUsage as u64,
+    ))
+}
+
+#[cfg(not(windows))]
+fn peak_memory() -> Option<(u64, u64)> {
+    None
 }
 
 fn publish_processor_handshake() -> Result<(), String> {
