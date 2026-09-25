@@ -62,18 +62,19 @@ const projectMedia = projectDocument.project?.media;
 if (!Array.isArray(projectMedia) || projectMedia.length === 0) {
   throw new Error("The retained Tauri Project has no Original media paths");
 }
+// The Project File stores a path as text, or as its exact UTF-16 units only
+// when the name is not valid text.
 const originalMediaPaths = projectMedia.map((media) => {
   const nativePath = media?.path;
+  if (typeof nativePath === "string" && nativePath) return nativePath;
+  const units = nativePath?.windowsUtf16;
   if (
-    nativePath?.encoding !== "windowsUtf16" ||
-    !Array.isArray(nativePath.units) ||
-    nativePath.units.some(
-      (unit) => !Number.isInteger(unit) || unit < 0 || unit > 0xffff,
-    )
+    !Array.isArray(units) ||
+    units.some((unit) => !Number.isInteger(unit) || unit < 0 || unit > 0xffff)
   ) {
     throw new Error("The retained Tauri Project has an invalid Original media path");
   }
-  return String.fromCharCode(...nativePath.units);
+  return String.fromCharCode(...units);
 });
 const expectedPreviewCount = canvasEvidence.compositionMediaOrder.length;
 const processDataRoot = path.resolve(
