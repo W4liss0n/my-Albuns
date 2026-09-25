@@ -2,7 +2,7 @@ import { ColorPropertyControl } from "../ui/ColorPropertyControl";
 import { summarizeVisualSelection } from "../ui/visualSelection";
 import { FrameDefaultRangeControl } from "../components/FrameDefaultRangeControl";
 import { useState } from "react";
-import { Image as ImageIcon, X } from "lucide-react";
+import { X } from "lucide-react";
 
 import {
   changeFrameBorderColor as transitionFrameBorderColor,
@@ -39,11 +39,12 @@ interface PersonalizationStepProps {
 }
 
 export function PersonalizationStep({
+  leading,
   draft,
   onChange,
   onChooseDecorative,
   personalization,
-}: PersonalizationStepProps) {
+}: PersonalizationStepProps & { leading: React.ReactNode }) {
   const [focusedScope, setFocusedScope] = useState<
     NewProjectPersonalizationDraft["fixedScope"] | null
   >(null);
@@ -132,7 +133,8 @@ export function PersonalizationStep({
           />
         )}
       </NewProjectPreviewPanel>
-      <div className="new-project-visual-values">
+      <div className="new-project-visual-values new-project-panel">
+        <section className="new-project-group">{leading}</section>
         <p className="ui-section-eyebrow new-project-scope-label">
           {scopeLabel}
         </p>
@@ -163,12 +165,12 @@ export function PersonalizationStep({
               onCommit={(rgb) => onChange(setBackgroundColor(personalization, rgb))} />
           </div>
           <ActionButton
-            aria-label="Usar imagem… no fundo"
+            aria-label="Escolher imagem de fundo…"
             className="new-project-image-action"
+            density="compact"
             onClick={() => void chooseBackground()}
           >
-            <AppIcon icon={ImageIcon} size={14} />
-            Usar imagem…
+            Escolher imagem…
           </ActionButton>
           {selectedBackground?.kind === "image" ? (
             <p className="new-project-selection-name">
@@ -181,10 +183,11 @@ export function PersonalizationStep({
           <ActionButton
             aria-label="Escolher imagem… de sobreposição"
             title={overlayRead.kind === "mixed" ? "Valores diferentes" : undefined}
-            className="new-project-image-action new-project-image-action--dashed"
+            className="new-project-image-action"
+            density="compact"
             onClick={() => void chooseOverlay()}
           >
-            {overlayRead.kind === "mixed" ? <span aria-hidden="true" className="ui-mixed-swatch" /> : <AppIcon icon={ImageIcon} size={14} />}
+            {overlayRead.kind === "mixed" ? <span aria-hidden="true" className="ui-mixed-swatch" /> : null}
             Escolher imagem…
           </ActionButton>
           {overlayRead.kind === "mixed" ? (
@@ -212,7 +215,7 @@ export function PersonalizationStep({
           <p className="ui-section-eyebrow new-project-group-eyebrow">
             Todas as lâminas
           </p>
-          <h2>Quadros</h2>
+          <h2>Padrão dos quadros</h2>
           <FrameDefaultRangeControl
             kind="border"
             label="Espessura da borda padrão"

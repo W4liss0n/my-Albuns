@@ -312,6 +312,7 @@ fn problem(kind: BatchProblemKind, message: impl Into<String>) -> BatchProblem {
         kind,
         message: message.into(),
         media_id: None,
+        file_name: None,
     }
 }
 
@@ -416,13 +417,16 @@ fn inspect_and_plan(
             });
         let path = replacement.map_or(media.path(), |relink| relink.replacement.as_path());
         if !paths.covers(path) {
+            let file_name = path
+                .file_name()
+                .unwrap_or_default()
+                .to_string_lossy()
+                .into_owned();
             problems.push(BatchProblem {
                 kind: BatchProblemKind::Unavailable,
-                message: format!(
-                    "Imagem indisponível: {}",
-                    path.file_name().unwrap_or_default().to_string_lossy()
-                ),
+                message: format!("Imagem indisponível: {file_name}"),
                 media_id: Some(id),
+                file_name: Some(file_name),
             });
             continue;
         }
@@ -460,6 +464,7 @@ fn inspect_and_plan(
                     format!("Imagem indisponível: {file_name}")
                 },
                 media_id: Some(id),
+                file_name: Some(file_name.into_owned()),
             }),
         }
     }

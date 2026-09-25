@@ -73,3 +73,42 @@ test("reused dialog actions and window Close follow the latest owner atomically"
     ["project-close-2", "cancelProjectClose"],
   ]);
 });
+
+test("titles every export step with Exportar and never shows the brand in a dialog", () => {
+  const windowControls = { close: vi.fn(), fitContent: vi.fn(), minimize: vi.fn(), toggleMaximize: vi.fn() };
+  const { rerender } = render(
+    <ProjectDialogApplication
+      mode="preview"
+      state={{
+        kind: "exportConfiguration", busy: false, message: "",
+        sheets: [{ sheetId: "opening", number: 1, pageCount: 1 }],
+        options: { scope: "album", sheetIds: ["opening"], mode: "sheet", format: { kind: "png" }, destination: "C:/álbuns", conflictPolicy: "ask" },
+      }}
+      windowControls={windowControls}
+    />,
+  );
+  const header = screen.getByRole("banner", { name: "Barra da janela" });
+  expect(header).toHaveTextContent("Exportar");
+  expect(header.querySelector(".ui-brand")).toBeNull();
+
+  rerender(
+    <ProjectDialogApplication
+      mode="preview"
+      state={{ kind: "exportSuccess", message: "A exportação foi concluída com sucesso." }}
+      windowControls={windowControls}
+    />,
+  );
+  expect(screen.getByRole("banner", { name: "Barra da janela" })).toHaveTextContent("Exportar");
+  expect(screen.getByRole("banner", { name: "Barra da janela" }).querySelector(".ui-brand")).toBeNull();
+
+  rerender(
+    <ProjectDialogApplication
+      mode="preview"
+      state={{ busy: false, kind: "projectCloseConfirmation" }}
+      windowControls={windowControls}
+    />,
+  );
+  const closeHeader = screen.getByRole("banner", { name: "Barra da janela" });
+  expect(closeHeader.querySelector(".ui-brand")).toBeNull();
+  expect(closeHeader).not.toHaveTextContent("Exportar");
+});

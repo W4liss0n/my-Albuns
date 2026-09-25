@@ -1,8 +1,6 @@
 import { useId, type ReactNode, type Ref } from "react";
-import { CircleAlert, CircleHelp } from "lucide-react";
 
 import { ActionButton } from "./ActionButton";
-import { AppIcon } from "./AppIcon";
 import type { DialogAction } from "./DialogAction";
 import { DialogWindowFrame } from "./DialogWindowFrame";
 import "./ConfirmationDialog.css";
@@ -32,7 +30,6 @@ export function ConfirmationDialog({
   title,
   tone = "question",
 }: ConfirmationDialogProps) {
-  const icon = tone === "question" ? CircleHelp : CircleAlert;
   const titleId = useId();
 
   return (
@@ -75,15 +72,6 @@ export function ConfirmationDialog({
       titleId={titleId}
     >
       <div className="ui-standard-message" data-tone={tone}>
-        {tone !== "neutral" ? (
-          <span
-            aria-hidden="true"
-            className="ui-standard-message__icon"
-            data-tone={tone}
-          >
-            <AppIcon icon={icon} size={14} />
-          </span>
-        ) : null}
         <div className="ui-standard-message__content">
           <h2 className="ui-standard-message__title" id={titleId}>
             {title}

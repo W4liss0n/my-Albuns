@@ -12,6 +12,13 @@ test("export media recovery offers distinct actions without a Continue step", as
     { mediaId: "photo-2", fileName: "Rede.png", state: "unavailable" as const },
   ] };
   const view = render(<ProjectDialogView state={state} onAction={onAction} />);
+  // A single Project: each entry is titled by its file, with the Project on hover.
+  const [absent, unavailable] = screen.getAllByRole("listitem");
+  expect(within(absent).getByText("Foto.jpg")).toHaveAttribute("title", "Álbum");
+  expect(absent).toHaveTextContent("Arquivo ausente.");
+  expect(unavailable).toHaveTextContent("Rede.png");
+  expect(unavailable).toHaveTextContent("Arquivo indisponível.");
+  expect(screen.queryByText("Álbum")).not.toBeInTheDocument();
   expect(screen.queryByRole("button", { name: "Continuar exportação" })).not.toBeInTheDocument();
   await user.click(screen.getByRole("button", { name: "Localizar imagens…" }));
   await user.click(screen.getByRole("button", { name: "Tentar novamente" }));
@@ -313,9 +320,10 @@ test("shows rejected photo files in Problems and closes without a creative actio
     ],
   }} />);
   const dialog = screen.getByRole("dialog", { name: "Problemas no processamento" });
-  expect(within(dialog).getByRole("columnheader", { name: "Arquivo" })).toBeInTheDocument();
-  expect(within(dialog).getByRole("columnheader", { name: "Motivo" })).toBeInTheDocument();
-  expect(within(dialog).getByRole("row", { name: "quebrada.jpg JPEG corrompido" })).toBeInTheDocument();
+  const [first] = within(dialog).getAllByRole("listitem");
+  expect(first).toHaveTextContent("quebrada.jpg");
+  expect(first).toHaveTextContent("JPEG corrompido");
+  expect(within(dialog).queryByRole("table")).not.toBeInTheDocument();
   expect(within(dialog).getByText("2 imagens importadas. Confira os arquivos que não puderam ser processados por completo.")).toBeInTheDocument();
   expect(within(dialog).getByRole("button", { name: "Fechar" })).toHaveFocus();
   await user.keyboard("{Escape}");
@@ -332,20 +340,21 @@ test("shows a resource interruption once without presenting files as rejected", 
   const dialog = screen.getByRole("dialog", { name: "Importação interrompida" });
   expect(within(dialog).getByText(/2 imagens importadas/)).toBeInTheDocument();
   expect(within(dialog).getAllByText(/Não foi possível continuar o processamento/)).toHaveLength(1);
-  expect(within(dialog).queryByRole("table")).not.toBeInTheDocument();
+  expect(within(dialog).queryByRole("list")).not.toBeInTheDocument();
   expect(within(dialog).queryByText(/Confira os arquivos/)).not.toBeInTheDocument();
   await user.click(within(dialog).getByRole("button", { name: "Fechar" }));
   expect(onAction).toHaveBeenCalledExactlyOnceWith("dismissImageProcessingProblems");
 });
 
-test("export placeholders list the Project, exact position and Open Project action", async () => {
+test("export placeholders list each exact position with the Project on hover and the Open Project action", async () => {
   const user = userEvent.setup();
   const onAction = vi.fn();
   render(<ProjectDialogView onAction={onAction} state={{ kind: "exportProblems", projectName: "Álbum da turma",
     problems: [{ sheetId: "sheet-001", sheetNumber: 1, frameId: "frame-003", frameNumber: 3 }] }} />);
   const dialog = screen.getByRole("dialog", { name: "Problemas na exportação" });
-  expect(within(dialog).getByRole("columnheader", { name: "Projeto" })).toBeInTheDocument();
-  expect(within(dialog).getByRole("row", { name: "Álbum da turma Lâmina 01, posição 3: quadro vazio. Voltar ao álbum" })).toBeInTheDocument();
+  const [entry] = within(dialog).getAllByRole("listitem");
+  expect(within(entry).getByText("Lâmina 01, posição 3")).toHaveAttribute("title", "Álbum da turma");
+  expect(entry).toHaveTextContent("Quadro vazio.");
   await user.click(within(dialog).getByRole("button", { name: "Voltar ao álbum" }));
   expect(onAction).toHaveBeenCalledExactlyOnceWith("openExportProject");
 });
@@ -358,9 +367,11 @@ test("keeps the operation reason separate from genuine file problems", () => {
   }} />);
   const dialog = screen.getByRole("dialog", { name: "Importação interrompida" });
   expect(within(dialog).getAllByText(/Não foi possível continuar o processamento/)).toHaveLength(1);
-  expect(within(dialog).getByRole("table")).not.toHaveTextContent("memória");
-  expect(within(dialog).getAllByRole("row")).toHaveLength(2);
-  expect(within(dialog).getByRole("row", { name: "quebrada.jpg JPEG corrompido" })).toBeInTheDocument();
+  expect(within(dialog).getByRole("list")).not.toHaveTextContent("memória");
+  const entries = within(dialog).getAllByRole("listitem");
+  expect(entries).toHaveLength(1);
+  expect(entries[0]).toHaveTextContent("quebrada.jpg");
+  expect(entries[0]).toHaveTextContent("JPEG corrompido");
 });
 
 test("edge conversion uses the standard confirmation actions and names the discarded application", async () => {

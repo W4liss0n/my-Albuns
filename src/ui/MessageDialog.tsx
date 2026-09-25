@@ -1,8 +1,6 @@
 import { useId, type ReactNode, type Ref } from "react";
-import { CircleCheck, CircleX } from "lucide-react";
 
 import { ActionButton } from "./ActionButton";
-import { AppIcon } from "./AppIcon";
 import type { DialogAction } from "./DialogAction";
 import { DialogWindowFrame } from "./DialogWindowFrame";
 
@@ -27,7 +25,6 @@ export function MessageDialog({
   title,
   tone,
 }: MessageDialogProps) {
-  const icon = tone === "error" ? CircleX : CircleCheck;
   const titleId = useId();
   const actions =
     primaryAction || secondaryAction ? (
@@ -66,13 +63,6 @@ export function MessageDialog({
         data-tone={tone}
         role={tone === "error" ? "alert" : "status"}
       >
-        <span
-          aria-hidden="true"
-          className="ui-standard-message__icon"
-          data-tone={tone}
-        >
-          <AppIcon icon={icon} size={14} />
-        </span>
         <div className="ui-standard-message__content">
           <h2 className="ui-standard-message__title" id={titleId}>
             {title}

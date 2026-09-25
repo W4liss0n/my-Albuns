@@ -62,5 +62,10 @@ test("long-name preview covers dates, an unbroken name and a legacy card", () =>
   expect(projects[3].name).toBe("15 anos");
   expect(projects.map(({ lastOpenedAtMs }) =>
     recentProjectOpeningTime(lastOpenedAtMs, welcomeDatesNow)?.label ?? null,
-  )).toEqual(["18/09/2026", "Hoje", null, "Ontem"]);
+  )).toEqual([
+    "Aberto em 18/09/2026 às 09:15",
+    "Aberto hoje às 14:30",
+    null,
+    "Aberto ontem às 09:15",
+  ]);
 });

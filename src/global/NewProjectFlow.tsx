@@ -337,16 +337,16 @@ export function NewProjectFlow({
             Personalização
           </li>
         </ol>
-        <PresetControl
-          onApply={applyProjectPreset}
-          onSave={saveProjectPreset}
-          presets={presets}
-          selectedPresetId={selectedPresetId}
-        />
       </header>
 
       {step === "configuration" ? (
         <ConfigurationStep
+          leading={<PresetControl
+            onApply={applyProjectPreset}
+            onSave={saveProjectPreset}
+            presets={presets}
+            selectedPresetId={selectedPresetId}
+          />}
           attempted={validationAttempted}
           draft={draft}
           errors={validationErrors}
@@ -355,6 +355,12 @@ export function NewProjectFlow({
         />
       ) : (
         <PersonalizationStep
+          leading={<PresetControl
+            onApply={applyProjectPreset}
+            onSave={saveProjectPreset}
+            presets={presets}
+            selectedPresetId={selectedPresetId}
+          />}
           draft={draft}
           onChange={updatePersonalization}
           onChooseDecorative={chooseDecorative}
@@ -367,7 +373,6 @@ export function NewProjectFlow({
           <ActionButton
             disabled={isCreating}
             onClick={cancelFlow}
-            variant="quiet"
           >
             Cancelar
           </ActionButton>
@@ -459,12 +464,14 @@ function mergeLiveValidationErrors(
 }
 
 function ConfigurationStep({
+  leading,
   attempted,
   draft,
   errors,
   fieldRefs,
   onChange,
 }: {
+  leading: React.ReactNode;
   attempted: boolean;
   draft: NewProjectDimensionsDraft;
   errors: DimensionsErrors;
@@ -508,44 +515,62 @@ function ConfigurationStep({
     <div className="new-project-content new-project-dimensions">
       <FieldValidationTooltip tooltip={validationTooltip} />
       <DimensionsPreview draft={draft} />
-      <div className="new-project-dimensions-controls">
-        <ControlSection title="Unidade">
-          <UnitSelector
-            onChange={(displayUnit) =>
-              onChange(changeDisplayUnit(draft, displayUnit), [
-                "sheetWidth",
-                "sheetHeight",
-                "bleed",
-                "safety",
-              ])
-            }
-            value={draft.displayUnit}
-          />
-        </ControlSection>
+      <div className="new-project-dimensions-controls new-project-panel">
+        <section className="new-project-group">{leading}</section>
 
-        <ControlSection title="Tamanho da lâmina fechada">
-          <div className="new-project-size-fields">
+        <section className="new-project-group">
+          <h2>Documento</h2>
+          <div className="new-project-grid">
+            <div className="new-project-grid-field">
+              <span className="new-project-grid-label">Unidade</span>
+              <UnitSelector
+                onChange={(displayUnit) =>
+                  onChange(changeDisplayUnit(draft, displayUnit), [
+                    "sheetWidth", "sheetHeight", "bleed", "safety",
+                  ])
+                }
+                value={draft.displayUnit}
+              />
+            </div>
             <ValidatedTextField
+              appearance="integrated"
+              density="compact"
+              error={attempted ? errors.dpi?.[0] : undefined}
+              field="dpi"
+              inputMode="numeric"
+              label="Resolução"
+              onChange={(dpiText) => onChange({ ...draft, dpiText }, ["dpi"])}
+              ref={registerField("dpi")}
+              suffix="DPI"
+              validationTooltip={validationTooltip}
+              value={draft.dpiText}
+            />
+          </div>
+        </section>
+
+        <section className="new-project-group">
+          <h2>Dimensão da lâmina fechada</h2>
+          <div className="new-project-grid">
+            <ValidatedTextField
+              appearance="integrated"
+              density="compact"
               error={attempted ? errors.sheetWidth?.[0] : undefined}
               field="sheetWidth"
-              hideLabel
               inputMode="decimal"
-              label="Largura da lâmina fechada"
+              label="Largura"
               onChange={(text) => updatePhysical("closedSheetWidth", text)}
               ref={registerField("sheetWidth")}
               suffix={displayUnitLabel(draft.displayUnit)}
               validationTooltip={validationTooltip}
               value={draft.closedSheetWidth.text}
             />
-            <span aria-hidden="true" className="new-project-size-separator">
-              ×
-            </span>
             <ValidatedTextField
+              appearance="integrated"
+              density="compact"
               error={attempted ? errors.sheetHeight?.[0] : undefined}
               field="sheetHeight"
-              hideLabel
               inputMode="decimal"
-              label="Altura da lâmina fechada"
+              label="Altura"
               onChange={(text) => updatePhysical("sheetHeight", text)}
               ref={registerField("sheetHeight")}
               suffix={displayUnitLabel(draft.displayUnit)}
@@ -553,11 +578,14 @@ function ConfigurationStep({
               value={draft.sheetHeight.text}
             />
           </div>
-        </ControlSection>
+        </section>
 
-        <ControlSection title="Sangria e Área de segurança">
-          <div className="new-project-paired-fields">
+        <section className="new-project-group">
+          <h2>Áreas técnicas</h2>
+          <div className="new-project-grid">
             <ValidatedTextField
+              appearance="integrated"
+              density="compact"
               error={attempted ? errors.bleed?.[0] : undefined}
               field="bleed"
               inputMode="decimal"
@@ -569,6 +597,8 @@ function ConfigurationStep({
               value={draft.bleed.text}
             />
             <ValidatedTextField
+              appearance="integrated"
+              density="compact"
               error={attempted ? errors.safety?.[0] : undefined}
               field="safety"
               inputMode="decimal"
@@ -580,66 +610,37 @@ function ConfigurationStep({
               value={draft.safety.text}
             />
           </div>
-        </ControlSection>
+        </section>
 
-        <ControlSection className="new-project-sheet-count" title="Lâminas">
-          <ValidatedTextField
-            controls={
-              <span className="new-project-stepper-actions">
-                <button
-                  aria-label="Diminuir quantidade de lâminas"
-                  onClick={() => adjustSheetCount(-2)}
-                  type="button"
-                >
-                  <AppIcon icon={Minus} size={12} />
-                </button>
-                <button
-                  aria-label="Aumentar quantidade de lâminas"
-                  onClick={() => adjustSheetCount(2)}
-                  type="button"
-                >
-                  <AppIcon icon={Plus} size={12} />
-                </button>
-              </span>
-            }
-            error={attempted ? errors.sheetCount?.[0] : undefined}
-            field="sheetCount"
-            hideLabel
-            inputMode="numeric"
-            label="Quantidade de lâminas"
-            onChange={(sheetCountText) =>
-              onChange({ ...draft, sheetCountText }, ["sheetCount"])
-            }
-            ref={registerField("sheetCount")}
-            validationTooltip={validationTooltip}
-            value={draft.sheetCountText}
-          />
-        </ControlSection>
-
-        <ControlSection title="Resolução do projeto">
-          <ValidatedTextField
-            error={attempted ? errors.dpi?.[0] : undefined}
-            field="dpi"
-            hideLabel
-            inputMode="numeric"
-            label="DPI"
-            onChange={(dpiText) =>
-              onChange({ ...draft, dpiText }, ["dpi"])
-            }
-            ref={registerField("dpi")}
-            suffix="DPI"
-            validationTooltip={validationTooltip}
-            value={draft.dpiText}
-          />
-        </ControlSection>
-
-        <ControlSection title="Primeira e última lâmina">
-          <div className="new-project-paired-fields">
+        <section className="new-project-group">
+          <h2>Estrutura</h2>
+          <div className="new-project-grid">
+            <ValidatedTextField
+              appearance="integrated"
+              density="compact"
+              controls={
+                <span className="new-project-stepper-actions">
+                  <button aria-label="Diminuir quantidade de lâminas" onClick={() => adjustSheetCount(-2)} type="button">
+                    <AppIcon icon={Minus} size={12} />
+                  </button>
+                  <button aria-label="Aumentar quantidade de lâminas" onClick={() => adjustSheetCount(2)} type="button">
+                    <AppIcon icon={Plus} size={12} />
+                  </button>
+                </span>
+              }
+              error={attempted ? errors.sheetCount?.[0] : undefined}
+              field="sheetCount"
+              inputMode="numeric"
+              label="Lâminas"
+              onChange={(sheetCountText) => onChange({ ...draft, sheetCountText }, ["sheetCount"])}
+              ref={registerField("sheetCount")}
+              validationTooltip={validationTooltip}
+              value={draft.sheetCountText}
+            />
+            <span />
             <SelectField
               label="Primeira lâmina"
-              onChange={(firstSheet) =>
-                onChange({ ...draft, firstSheet }, [])
-              }
+              onChange={(firstSheet) => onChange({ ...draft, firstSheet }, [])}
               value={draft.firstSheet}
             />
             <SelectField
@@ -648,8 +649,7 @@ function ConfigurationStep({
               value={draft.lastSheet}
             />
           </div>
-        </ControlSection>
-
+        </section>
       </div>
     </div>
   );

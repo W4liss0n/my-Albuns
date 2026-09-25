@@ -33,13 +33,14 @@ export interface NewProjectDimensionsDraft {
   safety: PhysicalFieldDraft;
 }
 
+/** Visual order of the Configurações panel: focus and error summaries follow it. */
 export const DIMENSIONS_FIELD_ORDER: readonly ProjectConfigurationFieldName[] = [
+  "dpi",
   "sheetWidth",
   "sheetHeight",
   "bleed",
   "safety",
   "sheetCount",
-  "dpi",
 ];
 
 export function createDefaultDimensionsDraft(): NewProjectDimensionsDraft {

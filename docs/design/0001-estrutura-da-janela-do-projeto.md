@@ -1,7 +1,7 @@
 ---
 status: accepted
 document: design
-updated: 2026-09-11
+updated: 2026-09-24
 ---
 
 # Estrutura da Janela do Projeto
@@ -42,6 +42,13 @@ o redimensionamento automático acompanha novamente a janela ao restaurá-la.
 ## Diálogos pertencentes a uma janela
 
 Confirmações, avisos, seletores e progressos abrem em uma janela nativa separada com a janela solicitante como proprietária. A proprietária continua visível atrás do diálogo, mas fica desabilitada para mouse, teclado e comandos enquanto o diálogo estiver aberto. A relação nativa mantém o diálogo à frente sem recorrer a uma camada modal dentro da WebView. Fechar, cancelar ou concluir o diálogo reabilita a proprietária e devolve o foco a ela.
+
+A barra de um diálogo nunca repete a marca MyAlbuns. Quando o diálogo pertence
+a um fluxo com nome, a barra mostra esse nome (`Exportar`, `Exportação em lote`,
+`Gerar projetos em lote`); nos demais, como confirmações de exclusão ou de
+fechamento, a barra fica sem texto e o título do próprio diálogo identifica o
+assunto. A marca aparece somente nas janelas principais, a Tela de Boas-vindas
+e a Janela do Projeto. Decisão do autor de 24/09/2026.
 
 Cada diálogo conserva uma largura estável adequada ao seu tipo, mas sua altura acompanha o conteúdo efetivamente renderizado, sem reservar uma área vazia padrão. Mudanças de estado, mensagens ou detalhes recalculam essa altura; a janela é recentralizada depois do ajuste e, quando o conteúdo excede a área útil do monitor, fica limitada a ela em vez de ultrapassar a tela.
 

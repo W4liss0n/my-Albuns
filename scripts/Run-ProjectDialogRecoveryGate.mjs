@@ -120,7 +120,7 @@ try {
   else await click(owner, "Exportar");
   const dialog = await connect(generation ? ownerPort : dialogPort, generation ? "/generation.html" : "/project-dialog.html");
   const current = () => dialog.evaluate(`window.__TAURI_INTERNALS__.invoke('${generation ? "generation_progress" : "current_project_dialog_presentation"}')`);
-  if (generation) await waitUntil(() => dialog.evaluate("document.body.innerText.includes('Projeto modelo')"), "original generation dialog");
+  if (generation) await waitUntil(() => dialog.evaluate("document.body.innerText.includes('Verificar e gerar')"), "original generation dialog");
   else await waitUntil(async () => (await current())?.state.kind === (mode === "close" ? "projectCloseConfirmation" : "exportConfiguration"), "original dialog");
   const before = nativeOwnedWindowState(instance);
   assert.equal(before.owner.enabled, false);
@@ -183,7 +183,7 @@ try {
   if (generation) await owner.evaluate("window.__TAURI_INTERNALS__.invoke('open_project_generation')");
   else await click(owner, "Exportar");
   const replacement = await connect(generation ? ownerPort : dialogPort, generation ? "/generation.html" : "/project-dialog.html");
-  const expectedHeading = generation ? "Projeto modelo" : "Destino da exportação";
+  const expectedHeading = generation ? "Verificar e gerar" : "Destino";
   await waitUntil(() => replacement.evaluate(`document.body.innerText.includes(${JSON.stringify(expectedHeading)})`), "a new dialog can open");
   await waitUntil(() => nativeOwnedWindowState(instance).dialog?.visible, "the new dialog is visible to its user");
   await click(replacement, "Cancelar");

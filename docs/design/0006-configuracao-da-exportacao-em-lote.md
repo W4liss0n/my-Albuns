@@ -1,6 +1,7 @@
 ---
 status: accepted
 document: design
+updated: 2026-09-24
 ---
 
 # Configuração da Exportação em lote
@@ -13,11 +14,13 @@ A Exportação em lote começa em uma janela dedicada aberta pela Tela de Boas-v
 
 A janela contém:
 
-- `Pasta de origem`, onde os Projetos são descobertos recursivamente;
-- `Formato`, com JPEG, PNG ou PDF;
-- `Modo`, com `Por lâmina` ou `Por página`;
-- `Destino`, com o padrão próprio de cada Projeto ou uma raiz alternativa;
-- quantidade de Projetos encontrados na origem.
+- `Projetos`, a pasta de origem onde os Projetos são descobertos recursivamente;
+- `Formato`, com JPEG, PNG ou PDF, e a opção `Exportar como páginas simples`,
+  que escolhe o modo: desmarcada corresponde à saída por lâmina; marcada, à
+  saída por página;
+- `Destino`, com `Padrão de cada projeto` ou `Outra pasta` como raiz
+  alternativa;
+- quantidade de Projetos encontrados na origem, no rodapé.
 
 Origem e Destino aceitam os caminhos totalmente qualificados da [política de caminhos](0011-resolucao-e-politica-de-caminhos.md). Durante descoberta e pré-validação, o proprietário reutiliza um único `OperationPathContext`; depois de conhecer as raízes necessárias, congela-o em um `RootBindingPlan` usado por todos os processos no processamento serial. Contexto e plano são descartados em qualquer estado terminal. Retomar depois de reiniciar cria outra tentativa e captura bindings atuais.
 
@@ -25,20 +28,40 @@ Não existem `Intervalo de Lâminas` ou slider de Qualidade. Todo Projeto é exp
 
 ```text
 ┌──────────────────────────────────────────────────────────────────┐
-│  Exportação em lote                                              │
+│                       Exportação em lote                      ✕  │
 ├──────────────────────────────────────────────────────────────────┤
-│  Pasta de origem   [ caminho ]                       [ Escolher ] │
+│  Projetos                                                        │
+│  [ caminho ]                                      [ Escolher… ]  │
 │                                                                  │
-│  Formato           JPEG | PNG | PDF                              │
-│  Modo              Por lâmina | Por página                       │
-│  Destino           Padrão de cada Projeto | Raiz alternativa     │
-│                    [ caminho alternativo ]           [ Escolher ] │
+│  Formato                                                         │
+│  [ JPEG ▾ ]                    □ Exportar como páginas simples   │
 │                                                                  │
-│  42 Projetos encontrados                                         │
+│  Destino                                                         │
+│  ● Padrão de cada projeto                                        │
+│  ○ Outra pasta [ caminho alternativo ]            [ Escolher… ]  │
 ├──────────────────────────────────────────────────────────────────┤
-│                              Cancelar   Verificar e exportar      │
+│  42 projetos encontrados       Cancelar   Verificar e exportar   │
 └──────────────────────────────────────────────────────────────────┘
 ```
+
+### Refinamento de 24/09/2026
+
+Decisão do autor, validada em protótipo, para seguir o mesmo padrão da
+[Exportação normal](0004-exportacao-normal.md#refinamento-de-24092026):
+
+- a barra da janela mostra somente `Exportação em lote`, sem a marca, em todas
+  as fases da janela;
+- blocos com títulos curtos (`Projetos`, `Formato`, `Destino`) separados apenas
+  por espaço, controles de 31 pixels e rodapé em faixa de tom com a quantidade
+  de Projetos encontrados; somente `Verificar e exportar` é ação principal;
+- o modo usa o mesmo controle e o mesmo texto da Exportação normal,
+  `Exportar como páginas simples`, na linha do formato, encostado à direita e
+  alinhado com `Escolher…` e com a ação principal. O seletor `Por lâmina` /
+  `Por página` deixa de existir; a opção de lote e o contrato com o núcleo
+  continuam usando `sheet` e `page`;
+- `Outra pasta` tem o campo e `Escolher…` na mesma linha, como o intervalo da
+  Exportação normal; ambos ficam desabilitados, e vazios, enquanto
+  `Padrão de cada projeto` estiver selecionado.
 
 ## Verificação
 

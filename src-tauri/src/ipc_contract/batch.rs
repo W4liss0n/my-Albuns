@@ -35,6 +35,10 @@ pub struct BatchProblem {
     pub kind: BatchProblemKind,
     pub message: String,
     pub media_id: Option<String>,
+    /// File name of the affected image, so the interface can group problems of
+    /// the same kind. Checkpoints written before this field load as `None`.
+    #[serde(default)]
+    pub file_name: Option<String>,
 }
 
 #[derive(Clone, Debug, Serialize, TS)]
@@ -85,4 +89,19 @@ pub struct BatchRecoverySummary {
     pub source_folder: String,
     pub total: u32,
     pub remaining: u32,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{BatchProblem, BatchProblemKind};
+
+    #[test]
+    fn problems_saved_before_file_names_still_load() {
+        let problem: BatchProblem = serde_json::from_str(
+            r#"{"kind":"missingMedia","message":"Imagem ausente: 001.jpg","mediaId":"photo"}"#,
+        )
+        .expect("an older checkpoint problem loads");
+        assert!(matches!(problem.kind, BatchProblemKind::MissingMedia));
+        assert_eq!(problem.file_name, None);
+    }
 }

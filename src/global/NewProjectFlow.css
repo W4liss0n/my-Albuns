@@ -17,11 +17,10 @@
   display: grid;
   min-width: 0;
   align-items: center;
-  padding: 0 var(--ui-content-gutter);
+  padding: 0 var(--ui-space-5);
   border-bottom: 1px solid var(--ui-border);
   background: var(--ui-surface);
-  grid-template-columns: minmax(0, 1fr) var(--new-project-controls-width);
-  gap: var(--ui-space-5);
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .new-project-steps {
@@ -59,7 +58,7 @@
   height: 18px;
   border-radius: 50%;
   color: var(--ui-text-muted);
-  background: #e7e4dd;
+  background: var(--ui-border);
   font-family: var(--ui-font-mono);
   font-size: var(--ui-font-size-micro);
   place-items: center;
@@ -107,13 +106,79 @@
 .new-project-dimensions-controls {
   display: flex;
   flex-direction: column;
-  gap: var(--ui-space-4);
+}
+
+/* Both steps: "Modelo inicial" first, then groups named like the editor's
+   Informações do álbum, separated by space only. */
+.new-project-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-space-5);
+}
+
+/* Group titles use the editor's subsection title: 11 px, secondary gray. */
+.new-project-group > h2,
+.new-project-panel .new-project-preset-control > h2,
+.new-project-panel .new-project-value-group > h2 {
+  margin: 0 0 var(--ui-space-2);
+  color: var(--ui-text-secondary);
+  font-size: var(--ui-font-size-support);
+  font-weight: 650;
+}
+
+.new-project-grid {
+  display: grid;
+  align-items: end;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--ui-space-3);
+}
+
+.new-project-grid-field {
+  display: grid;
+  min-width: 0;
+  gap: var(--ui-space-1);
+}
+
+.new-project-grid-label {
+  color: var(--ui-text-muted);
+  font-size: var(--ui-font-size-caption);
+}
+
+.new-project-grid-field .new-project-unit-selector {
+  display: flex;
+  width: 100%;
+}
+
+.new-project-grid-field .new-project-unit-selector button {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Validation stays readable: the tooltip spans both columns and the right
+   column anchors it to its own edge. */
+.new-project-grid .ui-field-validation-auto-tooltip {
+  width: calc(200% + var(--ui-space-3));
+}
+
+.new-project-grid > .ui-text-field:nth-child(even) > .ui-field-validation-auto-tooltip {
+  --ui-tooltip-pointer-inline-start: auto;
+  --ui-tooltip-pointer-inline-end: 14px;
+
+  right: 0;
+  left: auto;
+}
+
+/* Sheet-count stepper: room for the number beside − and +. */
+.new-project-panel .ui-text-field__entry--controlled input {
+  padding-right: 57px;
+}
+
+.new-project-panel .new-project-stepper-actions {
+  top: 1px;
 }
 
 .new-project-value-group {
   min-width: 0;
-  padding: 0 0 14px;
-  border-bottom: 0;
 }
 
 .new-project-value-group + .new-project-value-group {
@@ -170,17 +235,7 @@
 .new-project-preset-control {
   display: grid;
   width: 100%;
-  align-items: center;
-  grid-template-columns: auto minmax(0, 1fr);
-  gap: var(--ui-space-2);
-  grid-column: 2;
-  justify-self: end;
-}
-
-.new-project-preset-control > h2 {
-  color: var(--ui-text-secondary);
-  font-weight: 500;
-  white-space: nowrap;
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .new-project-preset-select {
@@ -329,29 +384,224 @@
   background: var(--ui-surface-muted);
 }
 
-.new-project-size-fields {
+.new-project-field {
+  position: relative;
   display: grid;
-  width: 222px;
   min-width: 0;
-  align-items: center;
-  grid-template-columns: minmax(0, 98px) auto minmax(0, 98px);
-  gap: 8px;
+  color: var(--ui-text-secondary);
+  font-size: var(--ui-font-size-support);
+  gap: 5px;
 }
 
-.new-project-size-separator {
-  color: var(--ui-text-muted);
+.new-project-stepper-actions {
+  top: 1px;
+}
+
+.new-project-value-group {
+  min-width: 0;
+}
+
+.new-project-value-group + .new-project-value-group {
+  padding-top: 0;
+}
+
+.new-project-value-group h2 {
+  margin: 0 0 8px;
+  color: var(--ui-text);
   font-size: var(--ui-font-size-control);
+  font-weight: 650;
 }
 
-.new-project-paired-fields {
+.new-project-value-group dl,
+.new-project-value-group dd {
+  margin: 0;
+}
+
+.new-project-value-group dl {
   display: grid;
-  min-width: 0;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
 }
 
-.new-project-sheet-count {
-  width: 150px;
+.new-project-value-group dl > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.new-project-control-section {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--ui-space-2);
+}
+
+.new-project-control-section h2 {
+  margin: 0;
+  color: var(--ui-text-secondary);
+  font-size: var(--ui-font-size-label);
+  font-weight: 600;
+}
+
+.new-project-preset-row {
+  position: relative;
+  display: grid;
+  min-width: 0;
+  border: 1px solid var(--ui-border-strong);
+  border-radius: var(--ui-radius-small);
+  background: #fff;
+  grid-template-columns: minmax(0, 1fr) 33px;
+}
+
+.new-project-preset-control {
+  display: grid;
+  width: 100%;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.new-project-preset-select {
+  position: relative;
+  display: block;
+  min-width: 0;
+  height: var(--ui-control-height);
+}
+
+.new-project-preset-select > select {
+  appearance: none;
+  width: 100%;
+  min-width: 0;
+  height: 100%;
+  padding: 0 34px 0 10px;
+  border: 0;
+  outline: 0;
+  color: var(--ui-text);
+  background: transparent;
+  font-size: var(--ui-font-size-control);
+}
+
+.new-project-preset-select > select:focus,
+.new-project-preset-select > select:focus-visible {
+  outline: none;
+  box-shadow: none;
+}
+
+.new-project-preset-select > .ui-app-icon {
+  position: absolute;
+  top: 50%;
+  right: 10px;
+  color: var(--ui-text-muted);
+  pointer-events: none;
+  transform: translateY(-50%);
+}
+
+.new-project-save-preset > input,
+.new-project-field select {
+  width: 100%;
+  min-width: 0;
+  height: var(--ui-control-height);
+  padding: 0 9px;
+  border: 1px solid var(--ui-border-strong);
+  border-radius: var(--ui-radius-small);
+  color: var(--ui-text);
+  background: #fff;
+  font-size: var(--ui-font-size-control);
+}
+
+.new-project-preset-row > button {
+  display: grid;
+  width: 33px;
+  height: var(--ui-control-height);
+  padding: 0;
+  border: 0;
+  border-left: 1px solid var(--ui-border);
+  border-radius: 0;
+  color: var(--ui-text-secondary);
+  background: transparent;
+  place-items: center;
+}
+
+.new-project-preset-row > button:hover {
+  background: var(--ui-surface-muted);
+}
+
+.new-project-preset-row:focus-within {
+  background: var(--ui-surface-muted);
+}
+
+.new-project-preset-row > button:focus-visible {
+  outline: 0;
+  background: var(--ui-canvas);
+}
+
+.new-project-save-preset > input:focus-visible,
+.new-project-field select:focus-visible {
+  outline: 0;
+  background: var(--ui-surface-muted);
+}
+
+.new-project-save-preset {
+  position: absolute;
+  top: 38px;
+  right: 0;
+  z-index: 10;
+  display: flex;
+  width: 240px;
+  flex-direction: column;
+  padding: 11px;
+  gap: 9px;
+}
+
+.new-project-save-preset > strong {
+  color: var(--ui-text-secondary);
+  font-size: var(--ui-font-size-label);
+  font-weight: 600;
+}
+
+.new-project-save-preset > div {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--ui-space-2);
+}
+
+.new-project-save-preset .ui-action-button:disabled {
+  opacity: 0.55;
+}
+
+.new-project-unit-selector {
+  display: flex;
+  width: max-content;
+  padding: 2px;
+  border-radius: 6px;
+  background: #efece5;
+}
+
+.new-project-unit-selector button {
+  min-width: 46px;
+  height: 27px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 4px;
+  color: var(--ui-text-secondary);
+  background: transparent;
+  font-size: var(--ui-font-size-control);
+}
+
+.new-project-unit-selector button[aria-pressed="true"] {
+  color: var(--ui-text);
+  background: #fff;
+  box-shadow: 0 1px 2px rgb(60 54 44 / 16%);
+  font-weight: 600;
+}
+
+.new-project-unit-selector button:focus-visible {
+  outline: 0;
+}
+
+.new-project-unit-selector button:focus-visible:not([aria-pressed="true"]) {
+  background: var(--ui-canvas);
+}
+
+.new-project-unit-selector button[aria-pressed="true"]:focus-visible {
+  background: var(--ui-surface-muted);
 }
 
 .new-project-field {
@@ -429,14 +679,13 @@
   margin-top: 12px;
 }
 
-.new-project-scope-label {
-  margin-bottom: var(--ui-space-3);
+/* The scope label introduces the group right below it. */
+.new-project-panel > .new-project-scope-label {
+  margin-bottom: calc(-1 * var(--ui-space-3));
 }
 
 .new-project-visual-values {
-  display: grid;
   align-content: start;
-  gap: 0;
 }
 
 .new-project-color-swatches {
@@ -471,12 +720,8 @@
 .new-project-color-swatches .ui-color-property-trigger { margin: 0; box-shadow: none; }
 
 .new-project-image-action.ui-action-button {
-  width: 100%;
-}
-
-.new-project-image-action--dashed.ui-action-button {
-  min-height: 48px;
-  border-style: dashed;
+  align-self: flex-start;
+  margin-top: var(--ui-space-2);
 }
 
 .new-project-group-eyebrow {
@@ -506,9 +751,9 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: var(--ui-footer-padding);
+  padding: var(--ui-space-3) var(--ui-space-5);
   border-top: 1px solid var(--ui-border);
-  background: var(--ui-surface);
+  background: var(--ui-surface-muted);
   gap: 18px;
 }
 
@@ -525,8 +770,6 @@
 
   .new-project-header {
     padding: 0 10px;
-    grid-template-columns: auto minmax(170px, 1fr);
-    gap: 12px;
   }
 
   .new-project-steps {
@@ -538,14 +781,6 @@
   }
 
   .new-project-steps li + li::before {
-    display: none;
-  }
-
-  .new-project-preset-control {
-    grid-column: 2;
-  }
-
-  .new-project-preset-control > h2 {
     display: none;
   }
 
