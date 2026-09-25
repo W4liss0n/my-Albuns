@@ -1,3 +1,5 @@
+use std::collections::VecDeque;
+
 use crate::{
     model::{CoreError, ProjectIntent, RelinkMedia},
     project_document::{FrameClipboard, MAX_SAFE_INTEGER, ProjectDocument, ProjectRevision},
@@ -18,14 +20,35 @@ enum EditPublication {
     AlbumInformation,
 }
 
+/// Upper bound for the Project snapshots that Undo and Redo keep together.
+/// Each snapshot is the whole Project, so a long session would otherwise grow
+/// without limit. The oldest Undo steps go first; dropping them never changes
+/// the current Project or its saved state.
+const HISTORY_BUDGET_BYTES: usize = 128 * 1024 * 1024;
+
+#[derive(Clone, Debug)]
+struct HistoryEntry {
+    revision: ProjectRevision,
+    bytes: usize,
+}
+
+impl HistoryEntry {
+    fn new(revision: ProjectRevision) -> Self {
+        let bytes = revision.project.approximate_bytes();
+        Self { revision, bytes }
+    }
+}
+
 #[derive(Clone, Debug)]
 pub(crate) struct PersistentProjectSession {
     current: ProjectRevision,
     latest_revision: u64,
     saved_revision: u64,
     recovered_unsaved: bool,
-    undo: Vec<ProjectRevision>,
-    redo: Vec<ProjectRevision>,
+    undo: VecDeque<HistoryEntry>,
+    redo: Vec<HistoryEntry>,
+    history_bytes: usize,
+    history_budget: usize,
     frame_clipboard: Option<FrameClipboard>,
     prepared_layout_query: Option<PreparedLayoutQuery>,
     layout_catalog: crate::LayoutCatalogSnapshot,
@@ -49,8 +72,10 @@ impl PersistentProjectSession {
             latest_revision,
             saved_revision,
             recovered_unsaved: false,
-            undo: Vec::new(),
+            undo: VecDeque::new(),
             redo: Vec::new(),
+            history_bytes: 0,
+            history_budget: HISTORY_BUDGET_BYTES,
             frame_clipboard: None,
             prepared_layout_query: None,
             layout_catalog: crate::LayoutCatalogSnapshot::default(),
@@ -64,8 +89,10 @@ impl PersistentProjectSession {
             latest_revision,
             saved_revision,
             recovered_unsaved: true,
-            undo: Vec::new(),
+            undo: VecDeque::new(),
             redo: Vec::new(),
+            history_bytes: 0,
+            history_budget: HISTORY_BUDGET_BYTES,
             frame_clipboard: None,
             prepared_layout_query: None,
             layout_catalog: crate::LayoutCatalogSnapshot::default(),
@@ -629,11 +656,25 @@ impl PersistentProjectSession {
             .filter(|revision| *revision <= MAX_SAFE_INTEGER)
             .ok_or(CoreError::RevisionSpaceExhausted)?;
 
-        self.undo.push(self.current.clone());
         self.redo.clear();
+        self.history_bytes = self.undo.iter().map(|entry| entry.bytes).sum();
+        self.push_undo(HistoryEntry::new(self.current.clone()));
         self.current = ProjectRevision::new(self.current.project_id, next_revision, project);
         self.latest_revision = next_revision;
         Ok(())
+    }
+
+    fn push_undo(&mut self, entry: HistoryEntry) {
+        self.history_bytes += entry.bytes;
+        self.undo.push_back(entry);
+        // The latest step stays available even if it alone exceeds the budget.
+        while self.history_bytes > self.history_budget && self.undo.len() > 1 {
+            let oldest = self
+                .undo
+                .pop_front()
+                .expect("more than one Undo step remains");
+            self.history_bytes -= oldest.bytes;
+        }
     }
 
     pub(crate) fn validate_album_information(
@@ -649,16 +690,19 @@ impl PersistentProjectSession {
     }
 
     pub(crate) fn undo(&mut self) -> Option<()> {
-        let previous = self.undo.pop()?;
-        let current = std::mem::replace(&mut self.current, previous);
+        let previous = self.undo.pop_back()?;
+        self.history_bytes -= previous.bytes;
+        let current = HistoryEntry::new(std::mem::replace(&mut self.current, previous.revision));
+        self.history_bytes += current.bytes;
         self.redo.push(current);
         Some(())
     }
 
     pub(crate) fn redo(&mut self) -> Option<()> {
         let next = self.redo.pop()?;
-        let current = std::mem::replace(&mut self.current, next);
-        self.undo.push(current);
+        self.history_bytes -= next.bytes;
+        let current = HistoryEntry::new(std::mem::replace(&mut self.current, next.revision));
+        self.push_undo(current);
         Some(())
     }
 
@@ -678,8 +722,8 @@ impl PersistentProjectSession {
         }
         self.current.project_id = candidate.project_id;
         self.frame_clipboard = None;
-        for revision in self.undo.iter_mut().chain(self.redo.iter_mut()) {
-            revision.project_id = candidate.project_id;
+        for entry in self.undo.iter_mut().chain(self.redo.iter_mut()) {
+            entry.revision.project_id = candidate.project_id;
         }
         self.saved_revision = candidate.revision;
         self.recovered_unsaved = false;
@@ -692,4 +736,39 @@ fn parse_uuid(source: &str) -> Result<Uuid, ()> {
     (parsed.hyphenated().to_string() == source)
         .then_some(parsed)
         .ok_or(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn history_drops_the_oldest_undo_steps_beyond_its_budget() {
+        let revision = crate::project_store::decode(include_bytes!(
+            "../tests/fixtures/project_file_v1/base.myalbuns"
+        ))
+        .unwrap();
+        let saved_revision = revision.revision;
+        let mut session = PersistentProjectSession::from_persisted(revision);
+        session.history_budget = session.current.project.approximate_bytes() * 3;
+
+        for dpi in [240, 300, 240, 300, 240, 300] {
+            let project = session.current.project.with_dpi(dpi).unwrap();
+            session.publish_edit(project).unwrap();
+        }
+
+        assert_eq!(session.undo.len(), 3);
+        assert!(session.history_bytes <= session.history_budget);
+        assert_eq!(session.saved_revision, saved_revision);
+        let latest = session.current.clone();
+        for _ in 0..3 {
+            session.undo().unwrap();
+        }
+        assert!(session.undo().is_none(), "the dropped steps stay gone");
+        for _ in 0..3 {
+            session.redo().unwrap();
+        }
+        assert_eq!(session.current, latest);
+        assert!(session.history_bytes <= session.history_budget);
+    }
 }

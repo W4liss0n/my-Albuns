@@ -46,6 +46,67 @@ pub(crate) struct MediaBinding {
     pub(crate) logical_path: PathBuf,
 }
 
+/// Size and dates of every binding as its folder lists them. One listing per
+/// folder replaces opening each Original, so the Monitor can look often and
+/// run a full observation only when this hint changes. It is never evidence:
+/// only the full observation confirms a source.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub(crate) struct MediaListingHint(Vec<Option<ListedFile>>);
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+struct ListedFile {
+    bytes: u64,
+    created: Option<SystemTime>,
+    modified: Option<SystemTime>,
+}
+
+impl MediaListingHint {
+    pub(crate) fn read(bindings: &[MediaBinding]) -> Self {
+        let mut folders = HashMap::<&std::path::Path, Option<HashMap<String, ListedFile>>>::new();
+        Self(
+            bindings
+                .iter()
+                .map(|binding| {
+                    let path = binding.logical_path.as_path();
+                    let (folder, name) = (path.parent()?, path.file_name()?);
+                    folders
+                        .entry(folder)
+                        .or_insert_with(|| list_folder(folder))
+                        .as_ref()?
+                        .get(&listing_key(name))
+                        .copied()
+                })
+                .collect(),
+        )
+    }
+}
+
+fn list_folder(folder: &std::path::Path) -> Option<HashMap<String, ListedFile>> {
+    // On Windows the listing already carries each entry's size and dates.
+    let entries = std::fs::read_dir(folder).ok()?;
+    Some(
+        entries
+            .filter_map(|entry| {
+                let entry = entry.ok()?;
+                let metadata = entry.metadata().ok()?;
+                Some((
+                    listing_key(&entry.file_name()),
+                    ListedFile {
+                        bytes: metadata.len(),
+                        created: metadata.created().ok(),
+                        modified: metadata.modified().ok(),
+                    },
+                ))
+            })
+            .collect(),
+    )
+}
+
+/// Windows names compare without case.
+fn listing_key(name: &std::ffi::OsStr) -> String {
+    name.to_string_lossy().to_lowercase()
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum MediaAvailability {
     Candidate,
@@ -860,6 +921,15 @@ struct MediaMonitorTransition {
 }
 
 impl MediaMonitor {
+    /// A changed source needs two equal observations before it is confirmed.
+    pub(crate) fn has_pending_observation(&self) -> bool {
+        self.transition
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .pending
+            .is_some()
+    }
+
     pub(crate) fn prepare_retry_in_plan(
         &self,
         runtime: &MediaRuntime,
@@ -1153,6 +1223,40 @@ fn file_time_millis(time: std::io::Result<SystemTime>) -> Option<u64> {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn listing_hint_changes_only_when_a_listed_original_changes() {
+        let root = tempfile::tempdir().unwrap();
+        let photo = root.path().join("Foto.JPG");
+        let other = root.path().join("Outra.jpg");
+        std::fs::write(&photo, b"photo").unwrap();
+        std::fs::write(&other, b"other").unwrap();
+        let bindings = [
+            // Windows names compare without case.
+            super::MediaBinding {
+                media_id: "foto".into(),
+                kind: myalbuns_core::MediaKind::Photo,
+                logical_path: root.path().join("foto.jpg"),
+            },
+            super::MediaBinding {
+                media_id: "outra".into(),
+                kind: myalbuns_core::MediaKind::Photo,
+                logical_path: other.clone(),
+            },
+            super::MediaBinding {
+                media_id: "ausente".into(),
+                kind: myalbuns_core::MediaKind::Photo,
+                logical_path: root.path().join("ausente.jpg"),
+            },
+        ];
+
+        let first = super::MediaListingHint::read(&bindings);
+        assert_eq!(first, super::MediaListingHint::read(&bindings));
+        assert!(first.0[0].is_some() && first.0[1].is_some() && first.0[2].is_none());
+
+        std::fs::write(&photo, b"edited photo").unwrap();
+        assert_ne!(first, super::MediaListingHint::read(&bindings));
+    }
+
     #[test]
     fn prepared_retry_confirms_only_its_occurrence_after_image_inspection() {
         use myalbuns_paths::OperationPathContext;
