@@ -145,11 +145,35 @@ pub(crate) async fn acquire(
 }
 
 fn participants_ready(paths: &AppPaths) -> Result<bool, String> {
+    for id in live_participants(paths)?.0 {
+        if !participant_gate(paths, &id, "batch-participant-paused")
+            .is_owned()
+            .map_err(|error| format!("Não foi possível pausar um Álbum: {error:?}"))?
+        {
+            return Ok(false);
+        }
+    }
+    Ok(true)
+}
+
+/// Removes the registrations of Project Hosts that exited without closing,
+/// so the folder does not keep one file per process that ever crashed.
+pub(crate) fn prune_closed_participants(paths: &AppPaths) -> usize {
+    live_participants(paths).map_or(0, |(_, removed)| removed)
+}
+
+/// Lists live participants and removes the registrations whose process is
+/// gone. A live participant owns its mutex before publishing its unique UUID.
+fn live_participants(paths: &AppPaths) -> Result<(Vec<String>, usize), String> {
     let entries = match std::fs::read_dir(paths.state_dir().join("BatchParticipants")) {
         Ok(entries) => entries,
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(true),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+            return Ok((Vec::new(), 0));
+        }
         Err(error) => return Err(error.to_string()),
     };
+    let mut live = Vec::new();
+    let mut removed = 0;
     for entry in entries {
         let entry = entry.map_err(|error| error.to_string())?;
         let name = entry.file_name();
@@ -159,20 +183,13 @@ fn participants_ready(paths: &AppPaths) -> Result<bool, String> {
         let alive = participant_gate(paths, id, "batch-participant-alive")
             .is_owned()
             .map_err(|error| format!("Não foi possível verificar um Álbum aberto: {error:?}"))?;
-        if !alive {
-            // A live participant owns its mutex before publishing its unique UUID.
-            let _ = std::fs::remove_file(entry.path());
-            continue;
-        }
-        if alive
-            && !participant_gate(paths, id, "batch-participant-paused")
-                .is_owned()
-                .map_err(|error| format!("Não foi possível pausar um Álbum: {error:?}"))?
-        {
-            return Ok(false);
+        if alive {
+            live.push(id.to_owned());
+        } else if std::fs::remove_file(entry.path()).is_ok() {
+            removed += 1;
         }
     }
-    Ok(true)
+    Ok((live, removed))
 }
 
 #[cfg(test)]
@@ -205,5 +222,21 @@ mod tests {
             std::fs::write(stale_path, b"").unwrap();
             acquire(&paths, &cancel).await.unwrap();
         });
+    }
+
+    #[test]
+    fn startup_removes_only_registrations_of_exited_hosts() {
+        let root = tempfile::tempdir().unwrap();
+        let paths = AppPaths::from_roots(root.path(), root.path());
+        let live = Participant::register(&paths).unwrap();
+        let exited = Participant::register(&paths).unwrap();
+        let exited_path = exited.path.clone();
+        drop(exited);
+        std::fs::write(&exited_path, b"").unwrap();
+
+        assert_eq!(prune_closed_participants(&paths), 1);
+
+        assert!(!exited_path.exists());
+        assert!(live.path.exists());
     }
 }

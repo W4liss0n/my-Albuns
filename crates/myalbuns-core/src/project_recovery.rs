@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use serde_json::value::RawValue;
 use thiserror::Error;
 use uuid::Uuid;
 
@@ -42,12 +43,14 @@ impl RecoveryCheckpoint {
         self.base_saved_revision
     }
 
+    /// Checkpoints are rewritten after every action, so they are compact and
+    /// embed the encoded Project as is instead of parsing it again.
     pub fn to_bytes(&self) -> Result<Vec<u8>, RecoveryCheckpointError> {
-        let creative_state = serde_json::from_slice(
-            &project_store::encode(&self.creative_revision)
-                .map_err(|_| RecoveryCheckpointError::InvalidCheckpoint)?,
-        )
-        .map_err(|_| RecoveryCheckpointError::InvalidCheckpoint)?;
+        let creative_state = project_store::encode_compact(&self.creative_revision)
+            .ok()
+            .and_then(|bytes| String::from_utf8(bytes).ok())
+            .and_then(|text| RawValue::from_string(text).ok())
+            .ok_or(RecoveryCheckpointError::InvalidCheckpoint)?;
         let project_id = self.project_id.hyphenated().to_string();
         let envelope = RecoveryEnvelopeV1 {
             schema_version: RECOVERY_SCHEMA_VERSION,
@@ -58,10 +61,7 @@ impl RecoveryCheckpoint {
             },
             creative_state,
         };
-        let mut bytes = serde_json::to_vec_pretty(&envelope)
-            .map_err(|_| RecoveryCheckpointError::InvalidCheckpoint)?;
-        bytes.push(b'\n');
-        Ok(bytes)
+        serde_json::to_vec(&envelope).map_err(|_| RecoveryCheckpointError::InvalidCheckpoint)
     }
 
     pub fn from_bytes(bytes: &[u8]) -> Result<Self, RecoveryCheckpointError> {
@@ -76,9 +76,7 @@ impl RecoveryCheckpoint {
         if parse_canonical_uuid(&envelope.base_revision.project_id)? != project_id {
             return Err(RecoveryCheckpointError::InvalidCheckpoint);
         }
-        let creative_bytes = serde_json::to_vec(&envelope.creative_state)
-            .map_err(|_| RecoveryCheckpointError::InvalidCheckpoint)?;
-        let creative_revision = project_store::decode(&creative_bytes)
+        let creative_revision = project_store::decode(envelope.creative_state.get().as_bytes())
             .map_err(|_| RecoveryCheckpointError::InvalidCheckpoint)?;
         if creative_revision.project_id != project_id {
             return Err(RecoveryCheckpointError::InvalidCheckpoint);
@@ -105,7 +103,7 @@ struct RecoveryEnvelopeV1 {
     schema_version: u32,
     project_id: String,
     base_revision: RecoveryBaseRevisionV1,
-    creative_state: serde_json::Value,
+    creative_state: Box<RawValue>,
 }
 
 #[derive(Deserialize, Serialize)]

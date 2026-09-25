@@ -80,7 +80,7 @@ Eles podem reutilizar primitivas internas para criar temporário irmão, descarr
 
 Alterações globais usam schema e substituição atômica. Janelas ou sessões consultam a revisão vigente ao abrir, receber foco ou solicitar atualização manual. Como as Janelas pertencem a hosts de Projeto distintos, um broadcast imediato exigiria coordenação entre processos; ele não é requisito do MVP e só será acrescentado diante de necessidade observada.
 
-`StateStore` mantém em `State` informações locais independentes, que não fazem sentido fora desta máquina: Projetos recentes, a instalação escolhida do Photoshop e, em `workspace-preferences.json`, as preferências de interface que dependem da tela. `BatchParticipants` registra os processos que participam de um Modo de lote exclusivo.
+`StateStore` mantém em `State` informações locais independentes, que não fazem sentido fora desta máquina: Projetos recentes, a instalação escolhida do Photoshop e, em `workspace-preferences.json`, as preferências de interface que dependem da tela. `BatchParticipants` registra os processos que participam de um Modo de lote exclusivo; na inicialização, a Janela inicial remove os registros de processos que terminaram sem fechar o Projeto.
 
 `ProjectIdentityRegistry` é um store concreto distinto dentro da mesma raiz. Sua falha não pode ser tratada como perda de uma preferência: o registro participa da autorização de Identidade antes de montar qualquer estado local de Projeto. Projetos recentes podem ser limitados, reordenados ou removidos sem apagar essa evidência.
 
@@ -120,7 +120,7 @@ Nenhuma dessas preferências altera o Projeto, participa de Undo/Redo ou exige S
 - estado criativo consolidado ainda não salvo;
 - marcador da revisão persistida da qual ele deriva.
 
-O checkpoint não contém pixels, originais ou pilhas de Undo/Redo. Uma sessão recuperada abre marcada como alterada e com Histórico vazio; o Histórico da sessão normal continua existindo apenas enquanto ela permanece viva. `Salvar` ou descartar a recuperação remove o checkpoint correspondente.
+Como é regravado depois de cada ação, o checkpoint usa JSON compacto e incorpora o Projeto codificado sem interpretá-lo outra vez. Ele não contém pixels, originais ou pilhas de Undo/Redo. Uma sessão recuperada abre marcada como alterada e com Histórico vazio; o Histórico da sessão normal continua existindo apenas enquanto ela permanece viva. `Salvar` ou descartar a recuperação remove o checkpoint correspondente.
 
 Uma Cópia externa recebe nova Identidade antes de consultar Recuperação ou Cache. Se essa identidade não puder ser persistida, nenhuma pasta da identidade duplicada é montada.
 
@@ -146,7 +146,7 @@ O registro não serializa pathname como identidade física nem transforma uma ob
 
 Cada atualização grava o registro completo por substituição atômica. Falha antes da substituição conserva o registro anterior; falha que impeça comprovar o estado final não autoriza tratar o novo valor como vigente. A ordem das transições de Projeto, a classificação da abertura e o momento em que a autoridade pode ser emitida pertencem exclusivamente ao [contrato público de persistência](0015-contrato-publico-de-persistencia-do-project-core.md).
 
-Fechamento normal ou inesperado, remoção de Projetos recentes, `Liberar espaço` e `Limpar todo o Cache` não removem esses registros. A primeira versão não executa expiração automática. Ausência legítima significa primeira observação da Identidade nesta máquina; registro corrompido, inacessível ou incompatível falha de forma fechada e nunca é confundido com ausência.
+Fechamento normal ou inesperado, remoção de Projetos recentes, `Liberar espaço` e `Limpar todo o Cache` não removem esses registros. As travas em `State\ProjectIdentityLeases` são outra coisa: existem só para a exclusividade de uma Sessão viva. Na inicialização, a Janela inicial remove as travas que nenhuma Sessão mantém, sob o mesmo mutex que protege sua criação. A primeira versão não executa expiração automática. Ausência legítima significa primeira observação da Identidade nesta máquina; registro corrompido, inacessível ou incompatível falha de forma fechada e nunca é confundido com ausência.
 
 ## Namespace do Projeto
 

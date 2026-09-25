@@ -46,12 +46,22 @@ pub(super) fn decode(bytes: &[u8]) -> Result<ProjectRevision, DecodeFailure> {
 }
 
 pub(super) fn encode(revision: &ProjectRevision) -> Result<Vec<u8>, DecodeFailure> {
+    to_bytes(&validated_file(revision)?)
+}
+
+/// The same document without indentation, for internal copies that are
+/// rewritten after every action and never read by a person.
+pub(super) fn encode_compact(revision: &ProjectRevision) -> Result<Vec<u8>, DecodeFailure> {
+    serde_json::to_vec(&validated_file(revision)?).map_err(|_| invalid_document())
+}
+
+fn validated_file(revision: &ProjectRevision) -> Result<ProjectFile, DecodeFailure> {
     validate_project_state(&revision.project)
         .map_err(|_| document_failure(DocumentFailure::InvalidProjectState))?;
     if revision.revision > MAX_SAFE_INTEGER {
         return Err(invalid_document());
     }
-    to_bytes(&ProjectFile::from_domain(revision))
+    Ok(ProjectFile::from_domain(revision))
 }
 
 /// Gives a copy a new Identity while keeping every other byte of its content.

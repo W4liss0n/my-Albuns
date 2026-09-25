@@ -24,6 +24,11 @@ pub(crate) use identity_lease::{
     IdentityLeaseError, IdentityLeaseObservation, IdentityTargetBinder,
     PendingProjectIdentityLease, ProjectIdentityLease,
 };
+
+/// Removes identity lock files left by closed Projects.
+pub fn prune_inactive_identity_leases(root: &std::path::Path) -> usize {
+    identity_lease::prune_inactive_leases(root)
+}
 pub(crate) use identity_registry::{IdentityRegistryLookup, ProjectIdentityRegistry};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -136,6 +141,10 @@ pub(crate) fn decode(bytes: &[u8]) -> Result<ProjectRevision, DecodeFailure> {
 
 pub(crate) fn encode(revision: &ProjectRevision) -> Result<Vec<u8>, DecodeFailure> {
     project_file::encode(revision)
+}
+
+pub(crate) fn encode_compact(revision: &ProjectRevision) -> Result<Vec<u8>, DecodeFailure> {
+    project_file::encode_compact(revision)
 }
 
 pub(crate) fn map_path_failure(error: ResolveError) -> PathFailure {

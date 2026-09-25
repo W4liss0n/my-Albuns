@@ -18,9 +18,13 @@ use myalbuns_paths::{
 
 #[cfg(windows)]
 use windows_sys::Win32::{
-    Foundation::{CloseHandle, HANDLE, WAIT_ABANDONED, WAIT_OBJECT_0},
+    Foundation::{CloseHandle, HANDLE, WAIT_ABANDONED, WAIT_OBJECT_0, WAIT_TIMEOUT},
     System::Threading::{CreateMutexW, INFINITE, ReleaseMutex, WaitForSingleObject},
 };
+
+/// Version of the `.target` token. It is only read while its lease is held.
+#[cfg(windows)]
+const TARGET_VERSION: u32 = 1;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum IdentityLeaseError {
@@ -54,6 +58,15 @@ struct IdentityPublicationMutex {
 #[cfg(windows)]
 impl IdentityPublicationMutex {
     fn acquire(project_id: Uuid) -> Result<Self, IdentityLeaseError> {
+        Self::wait(project_id, INFINITE)?.ok_or(IdentityLeaseError::Unavailable)
+    }
+
+    /// Returns `None` while another process is publishing this Identity.
+    fn try_acquire(project_id: Uuid) -> Result<Option<Self>, IdentityLeaseError> {
+        Self::wait(project_id, 0)
+    }
+
+    fn wait(project_id: Uuid, timeout_ms: u32) -> Result<Option<Self>, IdentityLeaseError> {
         let name = format!(
             "Local\\MyAlbuns.ProjectIdentityPublication.{}",
             project_id.hyphenated()
@@ -65,14 +78,18 @@ impl IdentityPublicationMutex {
         if handle.is_null() {
             return Err(IdentityLeaseError::Unavailable);
         }
-        let wait = unsafe { WaitForSingleObject(handle, INFINITE) };
-        if wait != WAIT_OBJECT_0 && wait != WAIT_ABANDONED {
-            unsafe {
-                CloseHandle(handle);
-            }
-            return Err(IdentityLeaseError::Unavailable);
+        let wait = unsafe { WaitForSingleObject(handle, timeout_ms) };
+        if wait == WAIT_OBJECT_0 || wait == WAIT_ABANDONED {
+            return Ok(Some(Self { handle }));
         }
-        Ok(Self { handle })
+        unsafe {
+            CloseHandle(handle);
+        }
+        if wait == WAIT_TIMEOUT {
+            Ok(None)
+        } else {
+            Err(IdentityLeaseError::Unavailable)
+        }
     }
 }
 
@@ -190,7 +207,7 @@ impl ProjectIdentityLease {
         publish_target_atomically(
             &self.target_path,
             &ActiveIdentityTarget {
-                version: 2,
+                version: TARGET_VERSION,
                 physical_identity: identity.to_local_token(),
                 owner_process,
             },
@@ -233,7 +250,7 @@ impl ProjectIdentityLease {
                 };
                 let target: ActiveIdentityTarget =
                     serde_json::from_str(&source).map_err(|_| IdentityLeaseError::Unavailable)?;
-                if target.version != 2 {
+                if target.version != TARGET_VERSION {
                     return Err(IdentityLeaseError::Unavailable);
                 }
                 let active = PhysicalFileIdentity::from_local_token(&target.physical_identity)
@@ -327,6 +344,65 @@ fn publish_target_atomically(
     result
 }
 
+/// Removes the lock files of Identities that no Session holds. A closed
+/// Project leaves its `.lease` and `.target` behind, so without this the folder
+/// grows with every Project ever opened. Acquisition and observation take the
+/// publication mutex before touching these files, so an unlocked lease cannot
+/// gain an owner while it is removed under that mutex.
+#[cfg(windows)]
+pub(crate) fn prune_inactive_leases(root: &Path) -> usize {
+    let Ok(entries) = fs::read_dir(root) else {
+        return 0;
+    };
+    let identities = entries
+        .flatten()
+        .filter_map(|entry| {
+            let name = entry.file_name().into_string().ok()?;
+            let name = name.strip_prefix('.').unwrap_or(&name);
+            let candidate = name.get(..36)?;
+            let project_id = Uuid::parse_str(candidate).ok()?;
+            (project_id.hyphenated().to_string() == candidate).then_some(project_id)
+        })
+        .collect::<std::collections::BTreeSet<_>>();
+    let mut removed = 0;
+    for project_id in identities {
+        let Ok(Some(_publication_lock)) = IdentityPublicationMutex::try_acquire(project_id) else {
+            continue;
+        };
+        let lease = lease_path(root, project_id);
+        match ProjectFileLock::try_acquire(&lease) {
+            Ok(lock) => drop(lock),
+            Err(_) if !lease.exists() => {}
+            Err(_) => continue,
+        }
+        let temporary_prefix = format!(".{}.target.tmp-", project_id.hyphenated());
+        let temporaries = fs::read_dir(root)
+            .into_iter()
+            .flatten()
+            .flatten()
+            .map(|entry| entry.path())
+            .filter(|path| {
+                path.file_name()
+                    .and_then(|name| name.to_str())
+                    .is_some_and(|name| name.starts_with(&temporary_prefix))
+            });
+        for path in [target_path(root, project_id), lease]
+            .into_iter()
+            .chain(temporaries)
+        {
+            if fs::remove_file(&path).is_ok() {
+                removed += 1;
+            }
+        }
+    }
+    removed
+}
+
+#[cfg(not(windows))]
+pub(crate) fn prune_inactive_leases(_root: &Path) -> usize {
+    0
+}
+
 fn lease_path(root: &Path, project_id: Uuid) -> PathBuf {
     root.join(format!("{}.lease", project_id.hyphenated()))
 }
@@ -417,6 +493,58 @@ mod tests {
     };
 
     #[test]
+    fn startup_prunes_only_leases_that_no_session_holds() {
+        let root = tempfile::tempdir().expect("temporary lease root");
+        let source_path = root.path().join("Project.myalbuns");
+        std::fs::write(&source_path, b"project bytes").expect("the Project is writable");
+        let mut context = OperationPathContext::new();
+        context
+            .capture(&source_path)
+            .expect("the Project root binding is captured");
+        let identity = context
+            .freeze()
+            .resolve_existing(&source_path, ExpectedObject::RegularFile)
+            .expect("the Project is resolved")
+            .physical_identity()
+            .expect("the Project has physical identity evidence");
+        let publish = |project_id| {
+            let pending = ProjectIdentityLease::acquire(root.path(), project_id)
+                .expect("the Session acquires its lease");
+            pending
+                .bind_target(identity)
+                .expect("the Session binds its target");
+            pending.into_published().expect("the lease is published")
+        };
+        let active_id = uuid::Uuid::new_v4();
+        let closed_id = uuid::Uuid::new_v4();
+        let active = publish(active_id);
+        drop(publish(closed_id));
+        let closed_target = target_path(root.path(), closed_id);
+        assert!(
+            closed_target.exists(),
+            "a closed Session leaves its target behind"
+        );
+        let stale_temporary = root
+            .path()
+            .join(format!(".{}.target.tmp-0", closed_id.hyphenated()));
+        std::fs::write(&stale_temporary, b"{}")
+            .expect("an interrupted publication left a temporary");
+
+        assert_eq!(super::prune_inactive_leases(root.path()), 3);
+
+        assert!(!super::lease_path(root.path(), closed_id).exists());
+        assert!(!closed_target.exists());
+        assert!(!stale_temporary.exists());
+        assert!(super::lease_path(root.path(), active_id).exists());
+        assert_eq!(
+            ProjectIdentityLease::acquire(root.path(), active_id).map(|_| ()),
+            Err(IdentityLeaseError::Conflict),
+            "the active Session keeps exclusive ownership"
+        );
+        drop(active);
+    }
+
+    #[test]
     fn observation_waits_for_pending_publication_before_probing_the_lease() {
         let fixture = tempfile::tempdir().expect("temporary identity lease fixture");
         let root = fixture.path().join("leases");
@@ -479,7 +607,7 @@ mod tests {
         let target = target_path(&root, project_id);
         let publishing_target = target.clone();
         let active_target = super::ActiveIdentityTarget {
-            version: 2,
+            version: super::TARGET_VERSION,
             physical_identity: identity.to_local_token(),
             owner_process: ProcessInstanceId::current().expect("the process instance is captured"),
         };
@@ -554,7 +682,7 @@ mod tests {
             publish_target_atomically(
                 &target,
                 &ActiveIdentityTarget {
-                    version: 2,
+                    version: super::TARGET_VERSION,
                     physical_identity: token.to_owned(),
                     owner_process,
                 },
@@ -576,7 +704,7 @@ mod tests {
         publish_target_atomically(
             &target,
             &ActiveIdentityTarget {
-                version: 2,
+                version: super::TARGET_VERSION,
                 physical_identity: concat!(
                     "windows-file-id-v2:",
                     "a8f2cdd3f2cda5c2:",

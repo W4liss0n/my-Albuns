@@ -1890,19 +1890,32 @@ async fn initialize_global_runtime(
             event = "scheduled_cache_cleanup_deferred",
         );
     }
-    let profile_paths = state.recent_preview_paths.clone();
-    tauri::async_runtime::spawn_blocking(move || {
-        let removed =
-            crate::project_webview_authority::prune_retired_webview_profiles(&profile_paths);
-        if removed > 0 {
-            tracing::info!(
-                target: "myalbuns.desktop",
-                removed,
-                event = "retired_webview_profiles_pruned",
-            );
-        }
-    });
+    let local_paths = state.recent_preview_paths.clone();
+    tauri::async_runtime::spawn_blocking(move || prune_leftover_local_state(&local_paths));
     initialize_global_window(app, state, window, policy_readiness).await;
+}
+
+/// Removes local files that closed or crashed processes leave behind. Each
+/// cleanup keeps anything a running process still owns.
+fn prune_leftover_local_state(paths: &AppPaths) {
+    for (event, removed) in [
+        (
+            "retired_webview_profiles_pruned",
+            crate::project_webview_authority::prune_retired_webview_profiles(paths),
+        ),
+        (
+            "inactive_identity_leases_pruned",
+            myalbuns_core::prune_inactive_identity_leases(&paths.project_identity_leases_dir()),
+        ),
+        (
+            "closed_batch_participants_pruned",
+            crate::batch_exclusivity::prune_closed_participants(paths),
+        ),
+    ] {
+        if removed > 0 {
+            tracing::info!(target: "myalbuns.desktop", removed, event);
+        }
+    }
 }
 
 fn exit_global_after_handoff(app: &AppHandle) {

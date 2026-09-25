@@ -78,4 +78,5 @@ pub use project_document::{
 pub use project_recovery::{RecoveryCheckpoint, RecoveryCheckpointError};
 pub use project_store::{
     DocumentFailure, LoadProjectError, LoadProjectRequest, PathFailure, ProjectLocation,
+    prune_inactive_identity_leases,
 };
