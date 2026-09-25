@@ -439,6 +439,17 @@ impl MediaResolver {
         inspect_media_source_in_plan(plan, &binding.logical_path, false)
     }
 
+    /// Reads format, dimensions and orientation without decoding pixels. Only
+    /// for Originals the Processor decodes right after to prepare their
+    /// preview, which rejects a damaged image body there.
+    pub(crate) fn inspect_media_header_in_plan(
+        &self,
+        binding: &MediaBinding,
+        plan: &RootBindingPlan,
+    ) -> Result<PhotoSourceMetadata, String> {
+        inspect_media_source_with(plan, &binding.logical_path, false, false)
+    }
+
     #[cfg(test)]
     pub(crate) fn propose_relink(
         &self,
@@ -656,6 +667,15 @@ fn inspect_media_source_in_plan(
     path: &std::path::Path,
     require_jpeg: bool,
 ) -> Result<PhotoSourceMetadata, String> {
+    inspect_media_source_with(plan, path, require_jpeg, true)
+}
+
+fn inspect_media_source_with(
+    plan: &RootBindingPlan,
+    path: &std::path::Path,
+    require_jpeg: bool,
+    decode_pixels: bool,
+) -> Result<PhotoSourceMetadata, String> {
     let resolved = plan
         .resolve_existing(path, ExpectedObject::RegularFile)
         .map_err(|error| media_inspection_failure(error, "O arquivo escolhido não está disponível. Confira se ele continua no mesmo local e pode ser aberto."))?;
@@ -701,15 +721,17 @@ fn inspect_media_source_in_plan(
     ) {
         std::mem::swap(&mut width, &mut height);
     }
-    #[cfg(test)]
-    PHOTO_SOURCE_DECODES.set(PHOTO_SOURCE_DECODES.get() + 1);
-    DynamicImage::from_decoder(decoder).map_err(|_| {
-        if require_jpeg {
-            "Não foi possível ler o JPEG. O arquivo pode estar danificado.".to_string()
-        } else {
-            "Não foi possível ler a imagem. O arquivo pode estar danificado.".to_string()
-        }
-    })?;
+    if decode_pixels {
+        #[cfg(test)]
+        PHOTO_SOURCE_DECODES.set(PHOTO_SOURCE_DECODES.get() + 1);
+        DynamicImage::from_decoder(decoder).map_err(|_| {
+            if require_jpeg {
+                "Não foi possível ler o JPEG. O arquivo pode estar danificado.".to_string()
+            } else {
+                "Não foi possível ler a imagem. O arquivo pode estar danificado.".to_string()
+            }
+        })?;
+    }
     PhotoSourceMetadata::new(
         width,
         height,

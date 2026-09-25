@@ -950,6 +950,41 @@ async fn launch_confirmed_project_with_progress(
     .await
 }
 
+/// Delivers Host image progress to an opening dialog that may not exist yet.
+#[derive(Clone, Default)]
+struct OpeningProgressRelay(Arc<Mutex<OpeningProgressRelayState>>);
+
+#[derive(Default)]
+struct OpeningProgressRelayState {
+    dialog: Option<crate::project_bootstrap::StartupProgressReporter>,
+    latest: Option<crate::ipc_contract::StartupImageProgress>,
+}
+
+impl OpeningProgressRelay {
+    fn reporter(&self) -> crate::project_bootstrap::StartupProgressReporter {
+        let relay = self.0.clone();
+        crate::project_bootstrap::StartupProgressReporter::new(move |progress| {
+            let Ok(mut state) = relay.lock() else {
+                return;
+            };
+            state.latest = Some(progress);
+            if let Some(dialog) = state.dialog.as_ref() {
+                dialog.publish(progress);
+            }
+        })
+    }
+
+    fn attach(&self, dialog: crate::project_bootstrap::StartupProgressReporter) {
+        let Ok(mut state) = self.0.lock() else {
+            return;
+        };
+        if let Some(progress) = state.latest {
+            dialog.publish(progress);
+        }
+        state.dialog = Some(dialog);
+    }
+}
+
 async fn launch_confirmed_project_with_bindings_and_progress(
     app: &AppHandle,
     mut state: GlobalRuntimeState,
@@ -959,33 +994,39 @@ async fn launch_confirmed_project_with_bindings_and_progress(
     presentation: ProjectLaunchProgress<'_>,
     _launch_permit: &GlobalProjectLaunchPermit,
 ) -> ProjectLaunchOutcome {
-    let mut progress = match native_dialog_window::show_native_progress(
-        app,
-        presentation.owner_label,
-        presentation.kind,
-        &state.progress_webview_data_directory,
-    )
-    .await
-    {
-        Ok(progress) => Some(progress),
-        Err(error) => {
-            tracing::warn!(
-                target: "myalbuns.desktop",
-                process_role = ProcessRole::Global.as_str(),
-                error = %error,
-                event = "project_launch_progress_dialog_unavailable",
-            );
-            None
+    // The Host starts while the progress dialog is still being created; the
+    // relay keeps its latest image progress until the dialog attaches.
+    let progress_relay = OpeningProgressRelay::default();
+    state.bootstrap = state.bootstrap.with_progress(progress_relay.reporter());
+    let dialog = async {
+        let progress = match native_dialog_window::show_native_progress(
+            app,
+            presentation.owner_label,
+            presentation.kind,
+            &state.progress_webview_data_directory,
+        )
+        .await
+        {
+            Ok(progress) => Some(progress),
+            Err(error) => {
+                tracing::warn!(
+                    target: "myalbuns.desktop",
+                    process_role = ProcessRole::Global.as_str(),
+                    error = %error,
+                    event = "project_launch_progress_dialog_unavailable",
+                );
+                None
+            }
+        };
+        if let Some(dialog) = progress.as_ref() {
+            progress_relay.attach(dialog.image_progress_reporter());
         }
+        progress
     };
-    if let Some(dialog) = progress.as_ref() {
-        state.bootstrap = state
-            .bootstrap
-            .with_progress(dialog.image_progress_reporter());
-    }
-    let launch =
-        launch_confirmed_project_with_bindings(state.clone(), project_path, launch, root_bindings)
-            .await;
+    let (mut progress, launch) = tokio::join!(
+        dialog,
+        launch_confirmed_project_with_bindings(state.clone(), project_path, launch, root_bindings),
+    );
     let (outcome, force_owner_restore) = match launch {
         ConfirmedProjectLaunch::Completed(outcome) => (outcome, false),
         ConfirmedProjectLaunch::ExternalCopyNotWritable { pending } => {

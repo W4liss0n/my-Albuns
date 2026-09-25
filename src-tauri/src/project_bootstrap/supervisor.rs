@@ -36,6 +36,10 @@ impl StartupProgressReporter {
     ) -> Self {
         Self(Arc::new(publish))
     }
+
+    pub(crate) fn publish(&self, progress: crate::ipc_contract::StartupImageProgress) {
+        (self.0)(progress);
+    }
 }
 #[cfg(debug_assertions)]
 const HOST_WEBVIEW_DEBUG_PORT_ENV: &str = "MYALBUNS_DEV_HOST_WEBVIEW_DEBUG_PORT";

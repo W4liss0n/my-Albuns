@@ -431,6 +431,7 @@ async fn synchronize_processing_sources(
     .map_err(|_| "Não foi possível inspecionar as imagens do projeto.".to_string())??;
     drop(_permit);
     let confirmed = crate::media_confirmation::MediaConfirmation::for_app(app, &namespace)
+        .decoded_next(selected.iter().map(|binding| binding.media_id.clone()))
         .confirm(&catalog.bindings, &roots, prepared, None)
         .await?;
     if let Some(update) = confirmed.poll.update()
