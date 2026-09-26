@@ -2,6 +2,7 @@
 status: current
 document: research
 date: 2026-09-23
+updated: 2026-09-26
 platform: windows-11-x64
 ---
 
@@ -188,6 +189,7 @@ ao terminar:
 & ./scripts/Invoke-LocalCargo.ps1 -CargoArguments @('test','-p','myalbuns-desktop','--lib','benchmark_serial_native_render_with_supersession_checkpoints','--','--ignored','--nocapture')
 ```
 
-Ainda falta uma medição ponta a ponta na janela nativa com projeto real. O
-`preview-latency.mjs` existente mede somente a apresentação de uma URL de QA
-no Edge, sem preparação no Host; seus números não preenchem essa lacuna.
+A medição ponta a ponta na janela nativa foi feita em 26/09/2026 e está em
+[Latência ponta a ponta da correção de olhos](2026-09-26-latencia-ponta-a-ponta-da-correcao-de-olhos.md).
+O `preview-latency.mjs` existente mede somente a apresentação de uma URL de QA
+no Edge, sem preparação no Host; seus números não substituem aquela medição.
