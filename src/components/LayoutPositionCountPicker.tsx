@@ -46,6 +46,9 @@ export function LayoutPositionCountPicker({ value, counts, disabled, onChange }:
   };
   const onTriggerKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
     if (event.altKey && event.key === "ArrowDown") { event.preventDefault(); openGrid(); return; }
+    // Like a closed native select, Enter only confirms the value stepped with
+    // the arrows; a click or Space opens the grid.
+    if (event.key === "Enter" && !open) { event.preventDefault(); return; }
     const offset = event.key === "ArrowDown" || event.key === "ArrowRight" ? 1
       : event.key === "ArrowUp" || event.key === "ArrowLeft" ? -1 : 0;
     if (offset !== 0 && !open) { event.preventDefault(); step(offset); }

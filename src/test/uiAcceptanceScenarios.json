@@ -2507,7 +2507,8 @@
         },
         {
           "type": "context-click",
-          "selector": ".canvas-host canvas"
+          "selector": ".canvas-host canvas",
+          "offsetX": 272
         }
       ]
     },
@@ -5591,7 +5592,7 @@
           "phase": "drop",
           "sourceOffsetX": -657,
           "sourceOffsetY": -13,
-          "targetOffsetX": 270,
+          "targetOffsetX": 283,
           "targetOffsetY": 25
         }
       ]
@@ -5620,7 +5621,7 @@
           "phase": "drop",
           "sourceOffsetX": -657,
           "sourceOffsetY": -13,
-          "targetOffsetX": 613,
+          "targetOffsetX": 631,
           "targetOffsetY": 25
         }
       ]
@@ -5736,7 +5737,7 @@
           "phase": "drop",
           "sourceOffsetX": -657,
           "sourceOffsetY": -13,
-          "targetOffsetX": 270,
+          "targetOffsetX": 283,
           "targetOffsetY": 25
         },
         {
@@ -5773,7 +5774,7 @@
           "phase": "drop",
           "sourceOffsetX": -657,
           "sourceOffsetY": -13,
-          "targetOffsetX": 270,
+          "targetOffsetX": 283,
           "targetOffsetY": 25
         },
         {
@@ -5876,7 +5877,7 @@
           "phase": "preview",
           "sourceOffsetX": -657,
           "sourceOffsetY": -13,
-          "targetOffsetX": 270,
+          "targetOffsetX": 283,
           "targetOffsetY": 25
         }
       ]
@@ -14060,7 +14061,8 @@
         },
         {
           "type": "context-click",
-          "selector": ".canvas-host canvas"
+          "selector": ".canvas-host canvas",
+          "offsetX": 272
         },
         {
           "type": "focus",
