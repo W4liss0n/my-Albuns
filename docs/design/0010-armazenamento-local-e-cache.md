@@ -249,6 +249,13 @@ mudança de área visível, mas continuam sujeitos à obsolescência da origem e
 Identidade. Artefatos de imagens fora da área visível ficam no disco; a preparação
 do lote não torna todas as prévias residentes em memória.
 
+Antes de preparar o Cache, a mesma ação confirma cada origem nova ou alterada.
+Quando o Original segue em seguida para o Processador, essa confirmação lê
+apenas o cabeçalho (formato, dimensões e orientação): a decodificação completa
+acontece uma vez, no Processador, que recusa um conteúdo danificado. As
+confirmações sem preparação na sequência, como a do Monitor ou a de uma nova
+tentativa, decodificam o Original e reservam toda a capacidade do Processador.
+
 A importação conserva temporariamente a evidência da inspeção de cada Foto
 validada. A primeira atualização do Monitor pode adotá-la sem decodificar o
 Original outra vez quando caminho, tipo, identidade física, tamanho e datas

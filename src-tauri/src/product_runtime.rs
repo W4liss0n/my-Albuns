@@ -775,10 +775,19 @@ pub(crate) fn start_linked_media_monitor_if_active(app: tauri::AppHandle) {
     start_linked_media_monitor(app);
 }
 
+/// How often the Monitor lists the folders of the linked Originals.
+const LINKED_MEDIA_MONITOR_INTERVAL: Duration = Duration::from_secs(1);
+/// A full observation opens every Original. Between listing changes it runs
+/// only this often, to catch what a listing cannot show, such as a lock or a
+/// replaced file with the same size and dates.
+const LINKED_MEDIA_FULL_OBSERVATION_INTERVAL: Duration = Duration::from_secs(30);
+
 fn start_linked_media_monitor(app: tauri::AppHandle) {
     tauri::async_runtime::spawn(async move {
+        let mut last_hint = None;
+        let mut last_full_observation: Option<std::time::Instant> = None;
         loop {
-            tokio::time::sleep(Duration::from_millis(250)).await;
+            tokio::time::sleep(LINKED_MEDIA_MONITOR_INTERVAL).await;
             if app.get_webview_window(PROJECT_WINDOW_LABEL).is_none() {
                 if app.state::<ProjectWebviewAuthority>().is_transitioning() {
                     continue;
@@ -798,6 +807,22 @@ fn start_linked_media_monitor(app: tauri::AppHandle) {
                 continue;
             }
             let monitor = app.state::<MediaMonitor>().inner().clone();
+            let listed = catalog.bindings.clone();
+            let hint = tauri::async_runtime::spawn_blocking(move || {
+                crate::media_runtime::MediaListingHint::read(&listed)
+            })
+            .await
+            .ok();
+            let full_observation_due = hint.is_none()
+                || hint != last_hint
+                || monitor.has_pending_observation()
+                || last_full_observation
+                    .is_none_or(|last| last.elapsed() >= LINKED_MEDIA_FULL_OBSERVATION_INTERVAL);
+            last_hint = hint;
+            if !full_observation_due {
+                continue;
+            }
+            last_full_observation = Some(std::time::Instant::now());
             let runtime = app.state::<MediaRuntime>().inner().clone();
             let bindings = catalog.bindings.clone();
             let (prepared, roots) = match poll_linked_media_once(monitor, runtime, bindings).await {

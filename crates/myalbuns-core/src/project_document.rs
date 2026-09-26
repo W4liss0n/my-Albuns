@@ -573,6 +573,47 @@ pub struct ProjectDocument {
 }
 
 impl ProjectDocument {
+    /// Rough heap footprint, for the History budget. It counts the collections
+    /// that grow with an album rather than every allocation.
+    pub(crate) fn approximate_bytes(&self) -> usize {
+        use std::mem::size_of;
+
+        let layout = |layout: &crate::StoredLayout| {
+            size_of::<crate::StoredLayout>()
+                + layout.definition.positions.len() * size_of::<crate::RectUm>()
+        };
+        let media = self
+            .media
+            .iter()
+            .map(|media| size_of::<MediaRef>() + media.path.as_os_str().len())
+            .sum::<usize>();
+        let sheets = self
+            .sheets
+            .iter()
+            .map(|sheet| {
+                size_of::<ProjectSheet>()
+                    + sheet.frames.len() * size_of::<ProjectFrame>()
+                    + sheet.last_layout.as_ref().map_or(0, layout)
+            })
+            .sum::<usize>();
+        let folders = self
+            .media_folders
+            .iter()
+            .map(|folder| {
+                size_of::<crate::MediaFolder>()
+                    + folder.id.len()
+                    + folder.name.len()
+                    + folder.media_ids.len() * size_of::<MediaId>()
+            })
+            .sum::<usize>();
+        let favorites = self
+            .favorite_layouts
+            .iter()
+            .map(|favorite| layout(&favorite.layout))
+            .sum::<usize>();
+        size_of::<Self>() + media + sheets + folders + favorites
+    }
+
     pub fn document(&self) -> &DocumentSettings {
         &self.document
     }

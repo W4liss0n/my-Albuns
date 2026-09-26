@@ -181,7 +181,7 @@ Cache usa a Identidade do Projeto sob a raiz local do aplicativo. A localizaçã
 
 ### Monitor de Arquivos vinculados
 
-O Monitor apenas solicita nova inspeção diante de uma possível mudança. Depois de confirmada, `MediaRuntime` atualiza o estado observado e `CacheEngine` invalida a representação aplicável. Perda do compartilhamento ou falha transitória produz `Unavailable`; não transforma em massa seus arquivos em ausentes. Ao recuperar acesso, a validação normal atualiza os estados.
+O Monitor apenas solicita nova inspeção diante de uma possível mudança. A cada segundo, ele lista uma vez cada pasta que contém Arquivos vinculados, sem abrir os arquivos, e compara tamanho e datas. A observação completa, que abre cada original, só roda quando essa listagem muda, enquanto uma mudança ainda não se estabilizou ou a cada 30 segundos, para perceber o que a listagem não mostra, como uma trava ou um arquivo trocado com o mesmo tamanho e datas. A listagem é apenas um indício e nunca confirma uma origem. Depois de confirmada, `MediaRuntime` atualiza o estado observado e `CacheEngine` invalida a representação aplicável. Perda do compartilhamento ou falha transitória produz `Unavailable`; não transforma em massa seus arquivos em ausentes. Ao recuperar acesso, a validação normal atualiza os estados.
 
 ### Exportação
 

@@ -1,7 +1,7 @@
 //! Admission estimates belong to the Processor, independently of the caller.
 //! Codec limits remain authoritative; this budget preserves system headroom.
 use std::{
-    io::BufReader,
+    io::{BufReader, Seek},
     path::Path,
     sync::{
         Arc, Mutex,
@@ -42,17 +42,27 @@ fn estimate_source(plan: &RootBindingPlan, path: &Path) -> u64 {
             .ok()?;
         let file = source.reopen_for_read().ok()?;
         let compressed = file.metadata().ok()?.len();
-        let reader = image::ImageReader::new(BufReader::new(file))
-            .with_guessed_format()
-            .ok()?;
+        let mut reader = BufReader::new(file);
+        let sequential_color_jpeg =
+            myalbuns_imaging::source_memory::is_sequential_color_jpeg(&mut reader);
+        reader.rewind().ok()?;
+        let reader = image::ImageReader::new(reader).with_guessed_format().ok()?;
         let (width, height) = reader.into_dimensions().ok()?;
         let pixels = u64::from(width).checked_mul(u64::from(height))?;
         // Includes concurrent decoder, conversion/orientation and reduced-image
         // buffers. It is an admission estimate, not a replacement for codec limits.
+        // Measured peaks for one 24 MP preview were 4.3 bytes per pixel for a
+        // sequential colour JPEG, decoded straight to RGB, and 9.6 to 24 for the
+        // other paths; each estimate stays above them with margin.
+        let (bytes_per_pixel, fixed) = if sequential_color_jpeg {
+            (6, 32 * MIB)
+        } else {
+            (16, 64 * MIB)
+        };
         pixels
-            .checked_mul(16)?
+            .checked_mul(bytes_per_pixel)?
             .checked_add(compressed.saturating_mul(2))?
-            .checked_add(64 * MIB)
+            .checked_add(fixed)
     })();
     inspected.unwrap_or(GIB)
 }
@@ -305,6 +315,33 @@ pub(super) async fn cancellable_reservation<T>(
 mod tests {
     use super::*;
 
+    #[test]
+    fn sequential_color_jpeg_gets_the_measured_lighter_estimate() {
+        let root = tempfile::tempdir().unwrap();
+        let color = root.path().join("color.jpg");
+        let gray = root.path().join("gray.jpg");
+        image::RgbImage::from_pixel(64, 48, image::Rgb([90, 60, 30]))
+            .save(&color)
+            .unwrap();
+        image::GrayImage::from_pixel(64, 48, image::Luma([90]))
+            .save(&gray)
+            .unwrap();
+        let mut context = myalbuns_paths::OperationPathContext::new();
+        context.capture(&color).unwrap();
+        let plan = context.freeze();
+        let pixels = 64 * 48;
+        let bytes = |path: &Path| std::fs::metadata(path).unwrap().len();
+
+        assert_eq!(
+            estimate_source(&plan, &color),
+            pixels * 6 + bytes(&color) * 2 + 32 * MIB
+        );
+        assert_eq!(
+            estimate_source(&plan, &gray),
+            pixels * 16 + bytes(&gray) * 2 + 64 * MIB
+        );
+    }
+
     fn abundant() -> Option<Resources> {
         Some(Resources {
             physical_total: 16 * GIB,
@@ -515,8 +552,8 @@ mod tests {
             let mut context = myalbuns_paths::OperationPathContext::new();
             context.capture(&source).unwrap();
             let estimate = ImageMemoryEstimate::in_plan(&context.freeze(), [source.as_path()]);
-            assert!(estimate.0 >= 200 * 100 * 16 + 64 * MIB);
-            assert!(estimate.0 < 65 * MIB);
+            assert!(estimate.0 >= 200 * 100 * 6 + 32 * MIB);
+            assert!(estimate.0 < 33 * MIB);
         });
     }
 }

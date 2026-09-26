@@ -534,22 +534,8 @@ impl CacheEngine {
                 metadata_is_current(metadata, namespace.project_id(), namespace.paths())
             })
             .and_then(|metadata| {
-                let artifacts = metadata
-                    .entries
-                    .iter()
-                    .map(|entry| {
-                        let mut recovered = entry.recovered_artifact()?;
-                        recovered.preview_sha256 = Some(
-                            verify_cached_artifact(
-                                &storage,
-                                namespace.paths(),
-                                recovered.artifact(),
-                            )
-                            .ok()?,
-                        );
-                        Some(recovered)
-                    })
-                    .collect::<Option<Vec<_>>>()?;
+                let artifacts =
+                    verify_recovered_artifacts(&storage, namespace.paths(), &metadata.entries)?;
                 Some((metadata, artifacts))
             });
         let removed_generation_count = match recovered_metadata.as_ref() {
@@ -1863,6 +1849,49 @@ fn verify_completion(
         ));
     }
     verify_cached_artifact(storage, &request.cache_paths, artifact)
+}
+
+/// Most Hosts spare this many cores while their window is being created.
+const RECOVERY_VERIFICATION_WORKERS: usize = 8;
+
+/// Verifies every indexed preview before the Host adopts it. Each check reads,
+/// decodes and hashes one preview, so an album of hundreds of photos used to
+/// hold the Project window for seconds; the independent checks now share a few
+/// threads. One invalid entry still discards the whole index.
+fn verify_recovered_artifacts(
+    storage: &PreparedCacheStorage,
+    cache_paths: &CachePathPlan,
+    entries: &[CacheMetadataEntry],
+) -> Option<Vec<RecoveredCacheArtifact>> {
+    let workers = std::thread::available_parallelism()
+        .map_or(1, std::num::NonZeroUsize::get)
+        .clamp(1, RECOVERY_VERIFICATION_WORKERS);
+    let chunk_size = entries.len().div_ceil(workers).max(1);
+    std::thread::scope(|scope| {
+        let tasks = entries
+            .chunks(chunk_size)
+            .map(|chunk| {
+                scope.spawn(move || {
+                    chunk
+                        .iter()
+                        .map(|entry| {
+                            let mut recovered = entry.recovered_artifact()?;
+                            recovered.preview_sha256 = Some(
+                                verify_cached_artifact(storage, cache_paths, recovered.artifact())
+                                    .ok()?,
+                            );
+                            Some(recovered)
+                        })
+                        .collect::<Option<Vec<_>>>()
+                })
+            })
+            .collect::<Vec<_>>();
+        let mut artifacts = Vec::with_capacity(entries.len());
+        for task in tasks {
+            artifacts.extend(task.join().ok()??);
+        }
+        Some(artifacts)
+    })
 }
 
 fn verify_cached_artifact(

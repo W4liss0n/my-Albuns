@@ -2,6 +2,7 @@
 status: accepted
 document: design
 date: 2026-09-10
+updated: 2026-09-25
 platform: windows
 implementation-readiness: ready-for-agent
 ---
@@ -46,8 +47,12 @@ do processamento. Essa revisão também foi substituída pela política abaixo.
 ## Política de admissão
 
 O teto agregado continua sendo o menor valor entre um quarto da RAM física
-total e 4 GiB. A estimativa por Original continua incluindo 16 bytes por
-pixel, duas vezes o tamanho comprimido e 64 MiB para buffers e processo.
+total e 4 GiB. A estimativa por Original inclui 16 bytes por pixel, duas
+vezes o tamanho comprimido e 64 MiB para buffers e processo. O JPEG
+sequencial colorido, que o Processador decodifica direto para RGB, usa 6 bytes
+por pixel e 32 MiB; o cabeçalho decide o caso, e qualquer dúvida mantém a
+estimativa geral. A [medição de 2026-09-25](../research/2026-09-25-memoria-do-processador.md)
+encontrou picos de 4,3 bytes por pixel nesse caminho e de 9,6 a 24 nos demais.
 Um lote mantém um Original por vez e reserva o máximo de suas estimativas.
 
 Para iniciar trabalhos simultâneos, preserva-se a margem anterior de um

@@ -2,6 +2,7 @@
 status: accepted
 document: design
 date: 2026-09-06
+updated: 2026-09-25
 platform: windows
 implementation-readiness: ready-for-agent
 ---
@@ -71,8 +72,10 @@ devolver recursos. A inspeção de Religação reserva capacidade dentro da paus
 exclusiva que a ação já possui, sem adquirir atividade de Cache aninhada.
 
 O teto é de oito trabalhadores, limitado à capacidade lógica de CPU menos um,
-com mínimo de um. A estimativa por Original considera 16 bytes por pixel,
-duas vezes o tamanho comprimido e 64 MiB para buffers e processo. Um lote
+com mínimo de um. A estimativa por Original segue o
+[design 0032](0032-revisao-da-admissao-por-memoria.md): 16 bytes por pixel,
+duas vezes o tamanho comprimido e 64 MiB para buffers e processo, ou 6 bytes
+por pixel e 32 MiB para o JPEG sequencial colorido. Um lote
 reserva o máximo entre suas imagens, pois só mantém um Original por vez.
 Essa estimativa de admissão complementa os limites do codec; não constitui uma
 garantia contra mudanças de memória feitas por outros programas após a leitura.
