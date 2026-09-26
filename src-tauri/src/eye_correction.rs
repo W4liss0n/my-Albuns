@@ -337,14 +337,27 @@ pub(crate) enum RenderStage {
     Encode,
 }
 
-pub(crate) fn render_with_checkpoint(
+/// Everything needed to rebuild the corrected photo at confirmation: the
+/// preparation keeps only its preview, so saving composes again from these
+/// originals after checking that neither changed.
+#[derive(Clone)]
+pub(crate) struct CorrectionSource {
+    pub(crate) target: PathBuf,
+    pub(crate) reference: PathBuf,
+    pub(crate) target_face: Face,
+    pub(crate) reference_face: Face,
+    pub(crate) target_digest: [u8; 32],
+    pub(crate) reference_digest: [u8; 32],
+}
+
+/// Decodes both photos upright and transplants the reference eyes onto the target.
+fn compose(
     target_path: &Path,
     reference_path: &Path,
     target_face: &Face,
     reference_face: &Face,
-    output: &Path,
     checkpoint: impl Fn(RenderStage) -> Result<(), String>,
-) -> Result<Vec<u8>, String> {
+) -> Result<RgbaImage, String> {
     checkpoint(RenderStage::Decode)?;
     let (mut target, reference) = std::thread::scope(|scope| {
         let reference = scope.spawn(|| open_upright(reference_path));
@@ -369,68 +382,35 @@ pub(crate) fn render_with_checkpoint(
     for (dst, src) in dst.iter().zip(src.iter()) {
         transplant_eye(&mut target, &reference, dst, src)?;
     }
+    Ok(target)
+}
+
+/// Prepares only the PNG preview; nothing is written to disk.
+pub(crate) fn render_preview(
+    target_path: &Path,
+    reference_path: &Path,
+    target_face: &Face,
+    reference_face: &Face,
+    checkpoint: impl Fn(RenderStage) -> Result<(), String>,
+) -> Result<Vec<u8>, String> {
+    let target = compose(
+        target_path,
+        reference_path,
+        target_face,
+        reference_face,
+        &checkpoint,
+    )?;
     checkpoint(RenderStage::Encode)?;
     let target = DynamicImage::ImageRgba8(target);
     let preview_scale = (1600.0 / target.width().max(target.height()) as f32).min(1.0);
     let preview_width = ((target.width() as f32 * preview_scale).round() as u32).max(1);
     let preview_height = ((target.height() as f32 * preview_scale).round() as u32).max(1);
-    let temporary = output.with_extension("tmp");
-    let preview_bytes = std::thread::scope(|scope| {
-        let preview = scope.spawn(|| -> Result<Vec<u8>, String> {
-            let preview = target.resize_exact(preview_width, preview_height, FilterType::Lanczos3);
-            let mut bytes = Cursor::new(Vec::new());
-            preview
-                .write_to(&mut bytes, ImageFormat::Png)
-                .map_err(|_| "Não foi possível preparar a prévia.")?;
-            Ok(bytes.into_inner())
-        });
-        let saved = target
-            .save_with_format(&temporary, ImageFormat::Png)
-            .map_err(|_| "Não foi possível gravar a imagem corrigida.");
-        let preview = preview.join().map_err(|_| "A prévia foi interrompida.")??;
-        saved?;
-        Ok::<_, String>(preview)
-    })?;
-    std::fs::rename(&temporary, output)
-        .map_err(|_| "Não foi possível concluir a imagem corrigida.")?;
-    Ok(preview_bytes)
-}
-
-#[cfg(test)]
-pub(crate) fn render(
-    target_path: &Path,
-    reference_path: &Path,
-    target_face: &Face,
-    reference_face: &Face,
-    output: &Path,
-) -> Result<Vec<u8>, String> {
-    render_with_checkpoint(
-        target_path,
-        reference_path,
-        target_face,
-        reference_face,
-        output,
-        |_| Ok(()),
-    )
-}
-
-pub(crate) fn corrected_path(project_folder: &Path, original: &Path) -> Result<PathBuf, String> {
-    let folder = project_folder.join(".myalbuns-corrections");
-    std::fs::create_dir_all(&folder)
-        .map_err(|_| "Não foi possível criar a pasta de correções do projeto.")?;
-    let stem = original
-        .file_stem()
-        .and_then(|name| name.to_str())
-        .unwrap_or("foto");
-    let stem: String = stem
-        .chars()
-        .filter(|character| character.is_alphanumeric() || matches!(character, '-' | '_'))
-        .take(48)
-        .collect();
-    Ok(folder.join(format!(
-        "{stem}-olhos-{}.png",
-        uuid::Uuid::new_v4().simple()
-    )))
+    let preview = target.resize_exact(preview_width, preview_height, FilterType::Lanczos3);
+    let mut bytes = Cursor::new(Vec::new());
+    preview
+        .write_to(&mut bytes, ImageFormat::Png)
+        .map_err(|_| "Não foi possível preparar a prévia.")?;
+    Ok(bytes.into_inner())
 }
 
 pub(crate) fn source_digest(path: &Path) -> Result<[u8; 32], String> {
@@ -476,13 +456,9 @@ fn original_format(path: &Path) -> Result<ImageFormat, String> {
     Ok(expected)
 }
 
-/// Encode only at confirmation. The prepared PNG remains an isolated full-size
-/// candidate; the destination receives bytes matching its original extension.
-pub(crate) fn encode_replacement(
-    prepared: &Path,
-    original: &Path,
-    staging: &Path,
-) -> Result<(), String> {
+/// Encode only at confirmation; the destination receives bytes matching its
+/// original extension.
+fn encode_replacement(corrected: RgbaImage, original: &Path, staging: &Path) -> Result<(), String> {
     let format = original_format(original)?;
     let mut decoder = ImageReader::open(original)
         .map_err(|_| "Não foi possível abrir o original.")?
@@ -507,9 +483,6 @@ pub(crate) fn encode_replacement(
     if let Some(metadata) = &mut exif {
         let _ = Orientation::remove_from_exif_chunk(metadata);
     }
-    let corrected = image::open(prepared)
-        .map_err(|_| "Não foi possível ler a correção preparada.")?
-        .to_rgba8();
     let (width, height) = corrected.dimensions();
     let rotated = matches!(
         orientation,
@@ -629,16 +602,43 @@ fn replace_file(original: &Path, staging: &Path, backup: &Path) -> Result<(), St
         .map_err(|_| "Não foi possível substituir o arquivo original.".into())
 }
 
-pub(crate) fn replace_original(
+const TARGET_CHANGED: &str =
+    "A foto original mudou desde a prévia. Feche a correção e use Abrir olhos novamente.";
+const REFERENCE_CHANGED: &str =
+    "A foto de referência mudou desde a prévia. Feche a correção e use Abrir olhos novamente.";
+
+fn verify_sources(source: &CorrectionSource) -> Result<(), String> {
+    if source_digest(&source.target)? != source.target_digest {
+        return Err(TARGET_CHANGED.into());
+    }
+    if source_digest(&source.reference)? != source.reference_digest {
+        return Err(REFERENCE_CHANGED.into());
+    }
+    Ok(())
+}
+
+/// Rebuilds the previewed correction from the unchanged originals and replaces
+/// the target with it. Returns the backup of the replaced original.
+pub(crate) fn replace_original(source: &CorrectionSource) -> Result<PathBuf, String> {
+    verify_sources(source)?;
+    let corrected = compose(
+        &source.target,
+        &source.reference,
+        &source.target_face,
+        &source.reference_face,
+        |_| Ok(()),
+    )?;
+    verify_sources(source)?;
+    commit_replacement(&source.target, corrected, source.target_digest)
+}
+
+fn commit_replacement(
     original: &Path,
-    prepared: &Path,
+    corrected: RgbaImage,
     expected_digest: [u8; 32],
 ) -> Result<PathBuf, String> {
     if source_digest(original)? != expected_digest {
-        return Err(
-            "A foto original mudou desde a prévia. Feche a correção e use Abrir olhos novamente."
-                .into(),
-        );
+        return Err(TARGET_CHANGED.into());
     }
     let folder = original
         .parent()
@@ -647,9 +647,9 @@ pub(crate) fn replace_original(
     let staging = folder.join(format!(".myalbuns-eye-{nonce}.stage"));
     let backup = folder.join(format!(".myalbuns-eye-{nonce}.backup"));
     let result = (|| {
-        encode_replacement(prepared, original, &staging)?;
+        encode_replacement(corrected, original, &staging)?;
         if source_digest(original)? != expected_digest {
-            return Err("A foto original mudou desde a prévia. Feche a correção e use Abrir olhos novamente.".into());
+            return Err(TARGET_CHANGED.into());
         }
         replace_file(original, &staging, &backup)?;
         Ok(backup.clone())
@@ -695,18 +695,20 @@ pub(crate) fn restore_original(original: &Path, backup: &Path) -> Result<(), Str
 mod validation_tests {
     use super::*;
 
-    #[test]
-    fn superseded_render_stops_before_encoding_a_png() {
-        let folder = tempfile::tempdir().unwrap();
-        let target_path = folder.path().join("target.png");
-        let reference_path = folder.path().join("reference.png");
-        let output = folder.path().join("corrected.png");
-        RgbaImage::from_pixel(200, 200, Rgba([80, 100, 120, 255]))
-            .save(&target_path)
-            .unwrap();
-        RgbaImage::from_pixel(200, 200, Rgba([90, 110, 130, 255]))
-            .save(&reference_path)
-            .unwrap();
+    /// Two textured photos whose synthetic faces pass the pair validation.
+    fn synthetic_pair(folder: &Path) -> CorrectionSource {
+        let target = folder.join("target.png");
+        let reference = folder.join("reference.png");
+        RgbaImage::from_fn(200, 200, |x, y| {
+            Rgba([80 + (x % 16) as u8, 100, 120 + (y % 8) as u8, 255])
+        })
+        .save(&target)
+        .unwrap();
+        RgbaImage::from_fn(200, 200, |x, y| {
+            Rgba([(x * 5 % 256) as u8, (y * 3 % 256) as u8, 60, 255])
+        })
+        .save(&reference)
+        .unwrap();
         let face = |opening: f32| {
             let mut points = vec![
                 crate::ipc_contract::ViewerFacePoint {
@@ -727,13 +729,26 @@ mod validation_tests {
             }
             Face(points)
         };
+        CorrectionSource {
+            target_digest: source_digest(&target).unwrap(),
+            reference_digest: source_digest(&reference).unwrap(),
+            target,
+            reference,
+            target_face: face(0.06),
+            reference_face: face(0.2),
+        }
+    }
+
+    #[test]
+    fn superseded_preview_stops_before_encoding() {
+        let folder = tempfile::tempdir().unwrap();
+        let source = synthetic_pair(folder.path());
         let stages = std::sync::Mutex::new(Vec::new());
-        let result = render_with_checkpoint(
-            &target_path,
-            &reference_path,
-            &face(0.06),
-            &face(0.2),
-            &output,
+        let result = render_preview(
+            &source.target,
+            &source.reference,
+            &source.target_face,
+            &source.reference_face,
             |stage| {
                 stages.lock().unwrap().push(stage);
                 if stage == RenderStage::Encode {
@@ -752,8 +767,67 @@ mod validation_tests {
                 RenderStage::Encode
             ]
         );
-        assert!(!output.exists());
-        assert!(!output.with_extension("tmp").exists());
+    }
+
+    #[test]
+    fn preview_writes_nothing_to_disk() {
+        let folder = tempfile::tempdir().unwrap();
+        let source = synthetic_pair(folder.path());
+        let preview = render_preview(
+            &source.target,
+            &source.reference,
+            &source.target_face,
+            &source.reference_face,
+            |_| Ok(()),
+        )
+        .unwrap();
+        let preview = image::load_from_memory(&preview).unwrap();
+        assert_eq!((preview.width(), preview.height()), (200, 200));
+        assert_eq!(std::fs::read_dir(folder.path()).unwrap().count(), 2);
+    }
+
+    #[test]
+    fn saving_rebuilds_the_same_bytes_as_the_former_prepared_png() {
+        let folder = tempfile::tempdir().unwrap();
+        let source = synthetic_pair(folder.path());
+        let former = folder.path().join("former.png");
+        std::fs::copy(&source.target, &former).unwrap();
+        // The former pipeline saved the composition as PNG and read it back at confirmation.
+        let prepared = folder.path().join("prepared.png");
+        compose(
+            &source.target,
+            &source.reference,
+            &source.target_face,
+            &source.reference_face,
+            |_| Ok(()),
+        )
+        .unwrap()
+        .save_with_format(&prepared, ImageFormat::Png)
+        .unwrap();
+        let reread = image::open(&prepared).unwrap().to_rgba8();
+        let former_backup =
+            commit_replacement(&former, reread, source_digest(&former).unwrap()).unwrap();
+        let backup = replace_original(&source).unwrap();
+        assert_ne!(source_digest(&source.target).unwrap(), source.target_digest);
+        assert_eq!(
+            std::fs::read(&source.target).unwrap(),
+            std::fs::read(&former).unwrap()
+        );
+        std::fs::remove_file(backup).unwrap();
+        std::fs::remove_file(former_backup).unwrap();
+    }
+
+    #[test]
+    fn changed_reference_refuses_to_save_and_keeps_the_original() {
+        let folder = tempfile::tempdir().unwrap();
+        let source = synthetic_pair(folder.path());
+        let before = std::fs::read(&source.target).unwrap();
+        RgbaImage::from_pixel(200, 200, Rgba([10, 20, 30, 255]))
+            .save(&source.reference)
+            .unwrap();
+        assert_eq!(replace_original(&source).unwrap_err(), REFERENCE_CHANGED);
+        assert_eq!(std::fs::read(&source.target).unwrap(), before);
+        assert_eq!(std::fs::read_dir(folder.path()).unwrap().count(), 2);
     }
 
     fn eyes(widths: [f32; 2], openings: [f32; 2]) -> [Eye; 2] {
@@ -823,10 +897,6 @@ mod validation_tests {
     fn replacement_preserves_original_format_dimensions_and_rollback() {
         let folder = tempfile::tempdir().unwrap();
         let corrected = RgbaImage::from_pixel(24, 16, Rgba([30, 100, 180, 255]));
-        let prepared = folder.path().join("prepared.png");
-        corrected
-            .save_with_format(&prepared, ImageFormat::Png)
-            .unwrap();
         for (name, format) in [
             ("photo.jpg", ImageFormat::Jpeg),
             ("photo.png", ImageFormat::Png),
@@ -838,7 +908,7 @@ mod validation_tests {
                 .unwrap();
             let before = std::fs::read(&original).unwrap();
             let digest = source_digest(&original).unwrap();
-            let backup = replace_original(&original, &prepared, digest).unwrap();
+            let backup = commit_replacement(&original, corrected.clone(), digest).unwrap();
             assert_eq!(
                 image::ImageReader::open(&original)
                     .unwrap()
@@ -855,15 +925,11 @@ mod validation_tests {
     }
 
     #[test]
-    fn stale_original_aborts_without_writing_or_consuming_preview() {
+    fn stale_original_aborts_without_writing() {
         let folder = tempfile::tempdir().unwrap();
         let original = folder.path().join("photo.png");
-        let prepared = folder.path().join("prepared.png");
         RgbaImage::from_pixel(24, 16, Rgba([20, 30, 40, 255]))
             .save(&original)
-            .unwrap();
-        RgbaImage::from_pixel(24, 16, Rgba([80, 90, 100, 255]))
-            .save(&prepared)
             .unwrap();
         let digest = source_digest(&original).unwrap();
         RgbaImage::from_pixel(24, 16, Rgba([50, 60, 70, 255]))
@@ -871,21 +937,21 @@ mod validation_tests {
             .unwrap();
         let latest = std::fs::read(&original).unwrap();
         assert!(
-            replace_original(&original, &prepared, digest)
-                .unwrap_err()
-                .contains("mudou desde a prévia")
+            commit_replacement(
+                &original,
+                RgbaImage::from_pixel(24, 16, Rgba([80, 90, 100, 255])),
+                digest
+            )
+            .unwrap_err()
+            .contains("mudou desde a prévia")
         );
         assert_eq!(std::fs::read(&original).unwrap(), latest);
-        assert!(prepared.exists());
+        assert_eq!(std::fs::read_dir(folder.path()).unwrap().count(), 1);
     }
 
     #[test]
     fn high_depth_png_and_tiff_leave_originals_unchanged() {
         let folder = tempfile::tempdir().unwrap();
-        let prepared = folder.path().join("prepared.png");
-        RgbaImage::from_pixel(24, 16, Rgba([20, 30, 40, 255]))
-            .save(&prepared)
-            .unwrap();
         for (name, format) in [
             ("deep.png", ImageFormat::Png),
             ("deep.tiff", ImageFormat::Tiff),
@@ -905,12 +971,15 @@ mod validation_tests {
                     .contains("até 8 bits por canal")
             );
             assert!(
-                replace_original(&original, &prepared, digest)
-                    .unwrap_err()
-                    .contains("até 8 bits por canal")
+                commit_replacement(
+                    &original,
+                    RgbaImage::from_pixel(24, 16, Rgba([20, 30, 40, 255])),
+                    digest
+                )
+                .unwrap_err()
+                .contains("até 8 bits por canal")
             );
             assert_eq!(source_digest(&original).unwrap(), digest);
-            assert!(prepared.exists());
         }
     }
 
@@ -918,7 +987,6 @@ mod validation_tests {
     fn jpeg_replacement_normalizes_exif_orientation_and_keeps_profile() {
         let folder = tempfile::tempdir().unwrap();
         let original = folder.path().join("rotated.jpg");
-        let prepared = folder.path().join("prepared.png");
         let profile = SRGB_PROFILES[0].to_vec();
         let exif = vec![
             b'I', b'I', 42, 0, 8, 0, 0, 0, 1, 0, 0x12, 1, 3, 0, 1, 0, 0, 0, 6, 0, 0, 0, 0, 0, 0, 0,
@@ -931,11 +999,12 @@ mod validation_tests {
             .write_image(&vec![128; 16 * 24 * 3], 24, 16, ExtendedColorType::Rgb8)
             .unwrap();
         drop(file);
-        RgbaImage::from_pixel(16, 24, Rgba([30, 40, 50, 255]))
-            .save(&prepared)
-            .unwrap();
-        let backup =
-            replace_original(&original, &prepared, source_digest(&original).unwrap()).unwrap();
+        let backup = commit_replacement(
+            &original,
+            RgbaImage::from_pixel(16, 24, Rgba([30, 40, 50, 255])),
+            source_digest(&original).unwrap(),
+        )
+        .unwrap();
         let mut decoder = ImageReader::open(&original)
             .unwrap()
             .into_decoder()
@@ -990,151 +1059,96 @@ mod qa_tests {
         std::time::Duration::from_nanos((ticks(kernel) + ticks(user)) * 100)
     }
 
-    #[test]
-    #[ignore = "requires the ignored 24 MP real-photo QA fixtures"]
-    #[cfg(windows)]
-    fn benchmark_serial_native_render_with_supersession_checkpoints() {
+    fn real_pair() -> (PathBuf, PathBuf, Face, Face) {
         let root =
             Path::new(env!("CARGO_MANIFEST_DIR")).join("../.scratch/face-detection-debug-20260923");
         let results: serde_json::Value =
             serde_json::from_slice(&std::fs::read(root.join("render-pair-results.json")).unwrap())
                 .unwrap();
-        let target: Face = serde_json::from_value(results[0]["faces"][0].clone()).unwrap();
-        let reference: Face = serde_json::from_value(results[1]["faces"][0].clone()).unwrap();
-        let target_path = root.join("inputs/failing.jpg");
-        let reference_path = root.join("inputs/reference.jpg");
-        let temporary = tempfile::tempdir_in(root.join("render")).unwrap();
+        (
+            root.join("inputs/failing.jpg"),
+            root.join("inputs/reference.jpg"),
+            serde_json::from_value(results[0]["faces"][0].clone()).unwrap(),
+            serde_json::from_value(results[1]["faces"][0].clone()).unwrap(),
+        )
+    }
+
+    #[test]
+    #[ignore = "requires the ignored 24 MP real-photo QA fixtures"]
+    #[cfg(windows)]
+    fn benchmark_serial_native_render_with_supersession_checkpoints() {
+        let (target_path, reference_path, target, reference) = real_pair();
         let source_hashes = (
             source_digest(&target_path).unwrap(),
             source_digest(&reference_path).unwrap(),
         );
-        let measure = |label: &str, run: &dyn Fn() -> (Vec<u8>, PathBuf)| {
-            let wall = std::time::Instant::now();
-            let cpu = process_cpu_time();
-            let (preview, output) = run();
-            let elapsed = wall.elapsed();
-            let cpu = process_cpu_time() - cpu;
-            let full_hash = Sha256::digest(std::fs::read(output).unwrap());
-            let preview_hash = Sha256::digest(preview);
-            println!(
-                "{label} wall_ms={} cpu_ms={} png_sha256={:x} preview_sha256={:x}",
-                elapsed.as_millis(),
-                cpu.as_millis(),
-                full_hash,
-                preview_hash
-            );
-            (full_hash.to_vec(), preview_hash.to_vec())
-        };
-        let single_hashes = measure("single_pair", &|| {
-            let output = temporary.path().join("single.png");
-            let before = source_digest(&target_path).unwrap();
-            let preview = render_with_checkpoint(
+        let preview = |checkpoint: &dyn Fn(RenderStage) -> Result<(), String>| {
+            render_preview(
                 &target_path,
                 &reference_path,
                 &target,
                 &reference,
-                &output,
-                |_| Ok(()),
+                checkpoint,
             )
-            .unwrap();
-            assert_eq!(source_digest(&target_path).unwrap(), before);
-            (preview, output)
-        });
+        };
+        let measure = |label: &str, run: &dyn Fn() -> Vec<u8>| {
+            let wall = std::time::Instant::now();
+            let cpu = process_cpu_time();
+            let preview = run();
+            let elapsed = wall.elapsed();
+            let cpu = process_cpu_time() - cpu;
+            let preview_hash = Sha256::digest(preview);
+            println!(
+                "{label} wall_ms={} cpu_ms={} preview_sha256={:x}",
+                elapsed.as_millis(),
+                cpu.as_millis(),
+                preview_hash
+            );
+            preview_hash.to_vec()
+        };
+        let single = measure("single_pair", &|| preview(&|_| Ok(())).unwrap());
         // This controls native processing work, not concurrent Tauri command or window latency.
-        let before_hashes = measure("three_requests_uncancelled_serial", &|| {
+        let uncancelled = measure("three_requests_uncancelled_serial", &|| {
             let mut result = None;
-            for index in 0..3 {
-                let output = temporary.path().join(format!("before-{index}.png"));
-                let before = source_digest(&target_path).unwrap();
-                let preview = render_with_checkpoint(
-                    &target_path,
-                    &reference_path,
-                    &target,
-                    &reference,
-                    &output,
-                    |_| Ok(()),
-                )
-                .unwrap();
-                assert_eq!(source_digest(&target_path).unwrap(), before);
-                result = Some((preview, output));
+            for _ in 0..3 {
+                result = Some(preview(&|_| Ok(())).unwrap());
             }
             result.unwrap()
         });
-        let after_hashes = measure("three_requests_checkpointed_serial", &|| {
+        let checkpointed = measure("three_requests_checkpointed_serial", &|| {
             let stages = std::sync::Mutex::new(Vec::new());
-            let obsolete = temporary.path().join("obsolete.png");
-            let _obsolete_original_digest = source_digest(&target_path).unwrap();
-            assert_eq!(
-                render_with_checkpoint(
-                    &target_path,
-                    &reference_path,
-                    &target,
-                    &reference,
-                    &obsolete,
-                    |stage| {
-                        stages.lock().unwrap().push(stage);
-                        if stage == RenderStage::Encode {
-                            Err("superseded".into())
-                        } else {
-                            Ok(())
-                        }
-                    }
-                )
-                .unwrap_err(),
-                "superseded"
-            );
-            assert!(!obsolete.exists());
-            // The next queued request is invalidated before decoding.
-            assert_eq!(
-                render_with_checkpoint(
-                    &target_path,
-                    &reference_path,
-                    &target,
-                    &reference,
-                    &obsolete,
-                    |stage| {
-                        stages.lock().unwrap().push(stage);
-                        Err("superseded".into())
-                    }
-                )
-                .unwrap_err(),
-                "superseded"
-            );
-            let output = temporary.path().join("after.png");
-            let before = source_digest(&target_path).unwrap();
-            let preview = render_with_checkpoint(
-                &target_path,
-                &reference_path,
-                &target,
-                &reference,
-                &output,
-                |stage| {
-                    stages.lock().unwrap().push(stage);
+            let superseded_at_encode = |stage| {
+                stages.lock().unwrap().push(stage);
+                if stage == RenderStage::Encode {
+                    Err("superseded".into())
+                } else {
                     Ok(())
-                },
-            )
+                }
+            };
+            assert_eq!(preview(&superseded_at_encode).unwrap_err(), "superseded");
+            // The next queued request is invalidated before decoding.
+            let superseded_at_decode = |stage| {
+                stages.lock().unwrap().push(stage);
+                Err("superseded".into())
+            };
+            assert_eq!(preview(&superseded_at_decode).unwrap_err(), "superseded");
+            let current = preview(&|stage| {
+                stages.lock().unwrap().push(stage);
+                Ok(())
+            })
             .unwrap();
-            assert_eq!(source_digest(&target_path).unwrap(), before);
             let stages = stages.into_inner().unwrap();
+            let count = |wanted| stages.iter().filter(|&&stage| stage == wanted).count();
             println!(
-                "burst_after decode={} composite={} encode_reached={} png_written=1",
-                stages
-                    .iter()
-                    .filter(|&&stage| stage == RenderStage::Decode)
-                    .count(),
-                stages
-                    .iter()
-                    .filter(|&&stage| stage == RenderStage::Composite)
-                    .count(),
-                stages
-                    .iter()
-                    .filter(|&&stage| stage == RenderStage::Encode)
-                    .count()
+                "burst_after decode={} composite={} encode_reached={}",
+                count(RenderStage::Decode),
+                count(RenderStage::Composite),
+                count(RenderStage::Encode)
             );
-            (preview, output)
+            current
         });
-        assert_eq!(single_hashes, before_hashes);
-        assert_eq!(single_hashes, after_hashes);
+        assert_eq!(single, uncancelled);
+        assert_eq!(single, checkpointed);
         assert_eq!(source_digest(&target_path).unwrap(), source_hashes.0);
         assert_eq!(source_digest(&reference_path).unwrap(), source_hashes.1);
     }
@@ -1142,25 +1156,13 @@ mod qa_tests {
     #[test]
     #[ignore = "requires the ignored 24 MP real-photo QA fixtures"]
     fn profiles_real_pair_in_desktop_crate() {
-        let root =
-            Path::new(env!("CARGO_MANIFEST_DIR")).join("../.scratch/face-detection-debug-20260923");
-        let results: serde_json::Value =
-            serde_json::from_slice(&std::fs::read(root.join("render-pair-results.json")).unwrap())
-                .unwrap();
-        let target: Face = serde_json::from_value(results[0]["faces"][0].clone()).unwrap();
-        let reference: Face = serde_json::from_value(results[1]["faces"][0].clone()).unwrap();
-        let target_path = root.join("inputs/failing.jpg");
-        let reference_path = root.join("inputs/reference.jpg");
+        let (target_path, reference_path, target, reference) = real_pair();
         let start = std::time::Instant::now();
         let target_digest = source_digest(&target_path).unwrap();
         let reference_digest = source_digest(&reference_path).unwrap();
-        let preview = render(
-            &target_path,
-            &reference_path,
-            &target,
-            &reference,
-            &root.join("corrected-desktop-profile.png"),
-        )
+        let preview = render_preview(&target_path, &reference_path, &target, &reference, |_| {
+            Ok(())
+        })
         .unwrap();
         assert_eq!(source_digest(&target_path).unwrap(), target_digest);
         assert_eq!(source_digest(&reference_path).unwrap(), reference_digest);
@@ -1186,39 +1188,24 @@ mod qa_tests {
             serde_json::from_slice(&std::fs::read(root.join("faces.json")).unwrap()).unwrap();
         let reference = &faces[0][0];
         let target = &faces[1][0];
-        for (input, output, expected) in [
-            ("nikki-closed.jpg", "nikki-corrected.png", (864, 864)),
-            (
-                "nikki-closed-exif6.jpg",
-                "nikki-corrected-exif6.png",
-                (864, 864),
-            ),
-            (
-                "nikki-closed-4x.jpg",
-                "nikki-corrected-4x.png",
-                (3456, 3456),
-            ),
+        for (input, expected) in [
+            ("nikki-closed.jpg", (864, 864)),
+            ("nikki-closed-exif6.jpg", (864, 864)),
+            ("nikki-closed-4x.jpg", (3456, 3456)),
         ] {
             let reference_path = if input.ends_with("4x.jpg") {
                 root.join("nikki-open-a-4x.png")
             } else {
                 root.join("nikki-open-a.jpg")
             };
-            let result = render(
+            match compose(
                 &root.join(input),
                 &reference_path,
                 target,
                 reference,
-                &root.join(output),
-            );
-            match result {
-                Ok(preview) => {
-                    assert!(!preview.is_empty());
-                    assert_eq!(
-                        image::image_dimensions(root.join(output)).unwrap(),
-                        expected
-                    );
-                }
+                |_| Ok(()),
+            ) {
+                Ok(corrected) => assert_eq!(corrected.dimensions(), expected),
                 Err(error) => panic!("{input}: {error}"),
             }
         }
