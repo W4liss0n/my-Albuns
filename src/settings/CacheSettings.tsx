@@ -1,7 +1,14 @@
 import { useEffect, useId, useRef, useState } from "react";
 import type { CacheSettingsPort } from "../application/cacheSettings";
-import { ActionButton, InlineNotice } from "../ui";
+import {
+  ActionButton,
+  FieldValidationAutoTooltip,
+  FieldValidationTooltip,
+  fieldValidationTooltipAttributes,
+  useFieldValidationTooltip,
+} from "../ui";
 import { useDismissableSurface } from "../ui/useDismissableSurface";
+import { SettingsSection } from "./SettingsSection";
 import { useSettingsStatus } from "./useSettingsStatus";
 
 const readErrorMessage = () => "Não foi possível consultar o uso das prévias temporárias. Tente novamente.";
@@ -18,7 +25,7 @@ export function CacheSettings({ port }: { port: CacheSettingsPort }) {
   const [message, setMessage] = useState<string | null>(null);
   const clearButton = useRef<HTMLButtonElement>(null);
   const cancelButton = useRef<HTMLButtonElement>(null);
-  const confirmationAnchor = useRef<HTMLElement>(null);
+  const confirmationAnchor = useRef<HTMLDivElement>(null);
   const confirmationId = useId();
   useEffect(() => {
     if (confirmation) cancelButton.current?.focus();
@@ -52,29 +59,34 @@ export function CacheSettings({ port }: { port: CacheSettingsPort }) {
     });
   };
   const feedback = status?.clearAllScheduled ? "As prévias serão limpas quando você abrir o MyAlbuns novamente." : message;
-  return <section aria-label="Prévias temporárias" className="application-settings-panel application-settings-panel--cache" aria-busy={pending}>
-    <h2>Prévias temporárias</h2>
-    <dl className="application-settings-cache">
-      <div className="application-settings-cache-row">
+  const tooltip = useFieldValidationTooltip(useId(), [{ field: "clear", messages: error ? [error] : [] }]);
+  return <SettingsSection title="Prévias temporárias" busy={pending} className="application-settings-panel--cache">
+    <div className="application-settings-cache-row">
+      <dl className="application-settings-cache">
         <dt>Espaço ocupado</dt>
         <dd>{status ? formatCacheBytes(status.occupiedBytes) : "Calculando…"}</dd>
-        <dd ref={confirmationAnchor} className="application-settings-cache-trigger">
-          <ActionButton ref={clearButton} disabled={pending || !status || status.clearAllScheduled}
-            aria-haspopup="dialog" aria-expanded={confirmation} aria-controls={confirmation ? confirmationId : undefined}
-            onClick={() => setConfirmation((open) => !open)}>Limpar prévias</ActionButton>
-          {confirmation && <div id={confirmationId} role="dialog" aria-label="Confirmar limpeza das prévias temporárias"
-            aria-describedby={`${confirmationId}-description`}
-            className="ui-anchored-tooltip application-settings-cache-confirmation">
-            <p id={`${confirmationId}-description`}>As prévias serão recriadas quando necessário. Os álbuns podem demorar mais para abrir.</p>
-            <div className="application-settings-actions">
-              <ActionButton ref={cancelButton} disabled={pending} onClick={cancel}>Cancelar</ActionButton>
-              <ActionButton disabled={pending} variant="primary" onClick={() => void confirm()}>{pending ? "Limpando…" : "Confirmar"}</ActionButton>
-            </div>
-          </div>}
-        </dd>
+      </dl>
+      <div ref={confirmationAnchor} className="application-settings-cache-trigger">
+        <ActionButton {...fieldValidationTooltipAttributes("clear", error ?? undefined, tooltip)}
+          ref={clearButton} disabled={pending || !status || status.clearAllScheduled}
+          aria-haspopup="dialog" aria-expanded={confirmation} aria-controls={confirmation ? confirmationId : undefined}
+          onClick={() => setConfirmation((open) => !open)}>Limpar prévias</ActionButton>
+        {!confirmation && <FieldValidationAutoTooltip field="clear" tooltip={tooltip} />}
+        {confirmation && <div id={confirmationId} role="dialog" aria-label="Confirmar limpeza das prévias temporárias"
+          aria-describedby={`${confirmationId}-description`}
+          className="ui-anchored-tooltip application-settings-cache-confirmation">
+          <p id={`${confirmationId}-description`}>As prévias serão recriadas quando necessário. Os álbuns podem demorar mais para abrir.</p>
+          <div className="application-settings-actions">
+            <ActionButton ref={cancelButton} disabled={pending} onClick={cancel}>Cancelar</ActionButton>
+            <ActionButton disabled={pending} variant="primary" onClick={() => void confirm()}>{pending ? "Limpando…" : "Confirmar"}</ActionButton>
+          </div>
+        </div>}
       </div>
-    </dl>
-    {feedback && <p role="status">{feedback}</p>}
-    {error && <InlineNotice role="alert" tone="error">{error}</InlineNotice>}
-  </section>;
+    </div>
+    <p className="application-settings-support">
+      Cópias reduzidas das fotos que deixam os álbuns mais rápidos. Limpar não altera projetos nem fotos originais.
+    </p>
+    {feedback && <p className="application-settings-feedback" role="status">{feedback}</p>}
+    <FieldValidationTooltip tooltip={tooltip} />
+  </SettingsSection>;
 }

@@ -4,6 +4,7 @@ import { ActionButton } from "../ui/ActionButton";
 import { DialogWindowFrame } from "../ui/DialogWindowFrame";
 import { TextInput } from "../ui/TextInput";
 import "../ui/OperationForm.css";
+import "../ui/ExportForm.css";
 import "./batchExport.css";
 
 export function BatchConfiguration({ port, busy, onSubmit, onError, onClose }: {
@@ -34,7 +35,7 @@ export function BatchConfiguration({ port, busy, onSubmit, onError, onClose }: {
       if (selected !== null) (target === "source" ? setSource : setDestination)(selected);
     } catch (error) { onError(error); }
   };
-  return <div className="ui-operation-dialog batch-configuration">
+  return <div className="ui-operation-dialog ui-export-dialog batch-configuration">
     <DialogWindowFrame title="Exportação em lote" layout="form" actions={<>
       <span className="ui-operation-form__summary" aria-live="polite">
         {count !== null ? `${count} ${count === 1 ? "projeto encontrado" : "projetos encontrados"}` : ""}
@@ -46,40 +47,45 @@ export function BatchConfiguration({ port, busy, onSubmit, onError, onClose }: {
     </>}>
       <form className="ui-operation-form" onSubmit={event => event.preventDefault()} aria-busy={busy}>
         <fieldset className="ui-operation-form__section" disabled={busy}>
-          <legend>Pasta dos projetos</legend>
+          <legend>Projetos</legend>
           <div className="ui-operation-form__destination">
             <TextInput className="ui-field-control" aria-label="Pasta dos projetos" value={source} title={source}
               onChange={event => setSource(event.target.value)} />
             <ActionButton onClick={() => void choose("source")}>Escolher…</ActionButton>
           </div>
         </fieldset>
-        <div className="batch-configuration__columns">
-          <fieldset className="ui-operation-form__section" disabled={busy}>
-            <legend>Formato</legend>
-            <select className="ui-field-control" aria-label="Formato" value={format}
-              onChange={event => setFormat(event.target.value as typeof format)}>
-              <option value="jpeg">JPEG</option><option value="png">PNG</option><option value="pdf">PDF</option>
-            </select>
-          </fieldset>
-          <fieldset className="ui-operation-form__section" disabled={busy}>
-            <legend>Modo</legend>
-            <select className="ui-field-control" aria-label="Modo" value={mode}
-              onChange={event => setMode(event.target.value as typeof mode)}>
-              <option value="sheet">Por lâmina</option><option value="page">Por página</option>
-            </select>
-          </fieldset>
-        </div>
         <fieldset className="ui-operation-form__section" disabled={busy}>
-          <legend>Destino da exportação</legend>
-          <div className="batch-configuration__destination-mode">
-            <label><input type="radio" name="batch-destination" checked={!alternate} onChange={() => setAlternate(false)} />Padrão de cada projeto</label>
-            <label><input type="radio" name="batch-destination" checked={alternate} onChange={() => setAlternate(true)} />Outra pasta</label>
+          <legend>Formato</legend>
+          <div className="ui-export-form__format-row">
+            <div className="ui-export-form__format-select">
+              <select className="ui-field-control" aria-label="Formato" value={format}
+                onChange={event => setFormat(event.target.value as typeof format)}>
+                <option value="jpeg">JPEG</option><option value="png">PNG</option><option value="pdf">PDF</option>
+              </select>
+            </div>
+            {/* The same control as the Export dialog for the sheet/page mode. */}
+            <label className="ui-export-form__choice ui-export-form__page-mode">
+              <input type="checkbox" checked={mode === "page"} onChange={event => setMode(event.target.checked ? "page" : "sheet")} />
+              Exportar como páginas simples
+            </label>
           </div>
-          <div className="ui-operation-form__destination">
-            <TextInput className="ui-field-control" aria-label="Pasta de destino" disabled={!alternate}
-              placeholder={alternate ? "" : "Ao lado de cada projeto"} value={alternate ? destination : ""}
-              title={destination} onChange={event => setDestination(event.target.value)} />
-            <ActionButton disabled={!alternate} onClick={() => void choose("destination")}>Escolher…</ActionButton>
+        </fieldset>
+        <fieldset className="ui-operation-form__section" disabled={busy}>
+          <legend>Destino</legend>
+          <div className="ui-export-form__selection">
+            <label className="ui-export-form__choice">
+              <input type="radio" name="batch-destination" checked={!alternate} onChange={() => setAlternate(false)} />
+              Padrão de cada projeto
+            </label>
+            <div className="batch-configuration__alternate">
+              <label className="ui-export-form__choice">
+                <input type="radio" name="batch-destination" checked={alternate} onChange={() => setAlternate(true)} />
+                Outra pasta
+              </label>
+              <TextInput className="ui-field-control" aria-label="Pasta de destino" disabled={!alternate}
+                value={alternate ? destination : ""} title={destination} onChange={event => setDestination(event.target.value)} />
+              <ActionButton disabled={!alternate} onClick={() => void choose("destination")}>Escolher…</ActionButton>
+            </div>
           </div>
         </fieldset>
       </form>

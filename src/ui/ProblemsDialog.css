@@ -1,50 +1,124 @@
+/* Problems screen: a list with one entry per project (batch, generation) or
+   per file (a single Project), in the compact pattern of the form windows.
+   No boxed table: entries run edge to edge with one hairline between them. */
+
 .ui-dialog-window--problems {
+  --ui-problems-gutter: var(--ui-space-5);
+
   max-height: calc(var(--ui-owned-window-height-limit, 100vh) - var(--ui-titlebar-height) - 2px);
+  background: var(--ui-surface);
+}
+
+.ui-dialog-window--problems .ui-dialog-window__header {
+  padding: var(--ui-space-5) var(--ui-problems-gutter) var(--ui-space-1);
 }
 
 .ui-dialog-window--problems .ui-dialog-window__body {
   display: flex;
   min-height: 0;
   flex-direction: column;
-  padding: 0 18px 18px;
+  padding: 0 0 var(--ui-space-5);
+  color: var(--ui-text);
+}
+
+.ui-problems-intro {
+  display: flex;
+  flex-shrink: 0;
+  align-items: flex-end;
+  justify-content: space-between;
+  margin: 0 0 var(--ui-space-4);
+  padding: 0 var(--ui-problems-gutter);
+  gap: var(--ui-space-4);
 }
 
 .ui-problems-description {
-  flex-shrink: 0;
-  margin: 0 0 14px;
+  margin: 0;
+  color: var(--ui-text-secondary);
+}
+
+.ui-problems-toolbar,
+.ui-problems-item__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ui-space-1);
+}
+
+.ui-problems-toolbar .ui-action-button,
+.ui-problems-item__actions .ui-action-button {
+  min-height: var(--ui-compact-control-height);
+  padding: 0 var(--ui-space-3);
+  font-size: var(--ui-font-size-support);
+  white-space: nowrap;
 }
 
 .ui-problems-scroll {
   min-height: 0;
-  max-height: 260px;
+  max-height: 300px;
   overflow: auto;
-  border: 1px solid var(--ui-border);
-  border-radius: var(--ui-radius-control);
 }
 
-.ui-problems-table {
-  width: 100%;
-  border-collapse: collapse;
-  table-layout: fixed;
-  text-align: left;
+.ui-problems-scroll:focus-visible {
+  outline: 2px solid var(--ui-focus-neutral);
+  outline-offset: -2px;
 }
 
-.ui-problems-table th {
-  position: sticky;
-  top: 0;
-  z-index: 1;
-  color: var(--ui-text);
-  background: var(--ui-surface);
+.ui-problems-list {
+  margin: 0;
+  padding: 0;
+  border-top: 1px solid var(--ui-border);
+  list-style: none;
+}
+
+.ui-problems-list > li {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: var(--ui-space-3) var(--ui-problems-gutter);
+  gap: var(--ui-space-4);
+}
+
+.ui-problems-list > li + li {
+  border-top: 1px solid var(--ui-border);
+}
+
+.ui-problems-item {
+  display: grid;
+  min-width: 0;
+  gap: var(--ui-space-1);
+}
+
+.ui-problems-item__title {
   font-weight: 600;
-}
-
-.ui-problems-table th,
-.ui-problems-table td {
-  padding: 9px 12px;
-  border-bottom: 1px solid var(--ui-border);
-  vertical-align: top;
   overflow-wrap: anywhere;
 }
 
-.ui-problems-table th:first-child { width: 36%; }
-.ui-problems-table tr:last-child td { border-bottom: 0; }
+.ui-problems-item__details {
+  display: grid;
+  color: var(--ui-text-secondary);
+  gap: 2px;
+  overflow-wrap: anywhere;
+}
+
+.ui-problems-item__actions {
+  flex: none;
+  justify-content: flex-end;
+  max-width: 55%;
+}
+
+/* Footer: tinted band; secondary actions on the left, Close and the main
+   action on the right. */
+.ui-dialog-window--problems .ui-dialog-window__footer {
+  padding: var(--ui-space-3) var(--ui-problems-gutter);
+  background: var(--ui-surface-muted);
+}
+
+.ui-dialog-window--problems .ui-dialog-window__footer .ui-action-button {
+  min-width: 96px;
+}
+
+.ui-problems-leading-actions {
+  display: flex;
+  flex-wrap: wrap;
+  margin-right: auto;
+  gap: var(--ui-space-2);
+}

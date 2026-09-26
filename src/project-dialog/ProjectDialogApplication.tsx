@@ -28,6 +28,11 @@ type ProjectDialogApplicationProps =
       windowControls: WindowControls;
     };
 
+const exportDialogKinds: ReadonlySet<string> = new Set([
+  "exportConfiguration", "exportConflicts", "exportMediaProblems", "exportProblems",
+  "exportProgress", "exportSuccess", "exportFailure",
+]);
+
 export function ProjectDialogApplication(
   props: ProjectDialogApplicationProps,
 ) {
@@ -71,6 +76,9 @@ export function ProjectDialogApplication(
     }),
     [client, closeAction, sessionId, windowControls],
   );
+  // Every step of a Project's export is titled "Exportar"; dialogs outside a
+  // named flow show no title text (no dialog repeats the brand).
+  const exportTitled = state !== null && state !== undefined && exportDialogKinds.has(state.kind);
   const submit = (action: ProjectDialogAction) => {
     if (!client || !sessionId) return;
     void client.submit(sessionId, action).catch(() => undefined);
@@ -79,6 +87,7 @@ export function ProjectDialogApplication(
   return (
     <WindowControlsProvider controls={controls}>
       <OwnedWindowShell
+        context={exportTitled ? "Exportar" : undefined}
         controls={closeAction ? "close" : "none"}
         width={props.mode === "owned" ? presentation?.windowWidth : state?.kind === "storageFull" ? 520 : undefined}
       >

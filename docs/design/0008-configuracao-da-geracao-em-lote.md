@@ -1,6 +1,7 @@
 ---
 status: accepted
 document: design
+updated: 2026-09-24
 ---
 
 # Configuração da Geração de Projetos em lote
@@ -18,35 +19,46 @@ cancelamento devolve o controle à mesma sessão, sem salvá-la.
 
 A janela mostra:
 
-- `Projeto modelo`, somente para consulta;
-- `Pasta de origem`, contendo a árvore de pastas com Fotos;
-- `Pasta de destino`, onde a hierarquia será recriada;
-- quantidade de pastas que produzirão Projetos.
+- `Modelo`, o Projeto modelo, somente para consulta;
+- `Origem`, a pasta que contém a árvore de pastas com Fotos;
+- `Destino`, a pasta onde a hierarquia será recriada;
+- quantidade de pastas que produzirão Projetos, no rodapé.
 
 Origem e Destino aceitam os caminhos totalmente qualificados da [política de caminhos](0011-resolucao-e-politica-de-caminhos.md). Cada tentativa usa um `OperationPathContext` próprio para comparar raízes e identidades físicas resolvidas e impedir que duas representações do mesmo local escondam um Destino igual ou interno à origem. Antes de distribuir trabalho, congela seus bindings em um `RootBindingPlan`; uma nova tentativa cria outro contexto.
 
 ```text
 ┌──────────────────────────────────────────────────────────────────┐
-│  Gerar Projetos em lote                                         │
+│                      Gerar projetos em lote                   ✕  │
 ├──────────────────────────────────────────────────────────────────┤
-│  Projeto modelo    Álbum Formatura 2026                          │
+│  Modelo                                                          │
+│  Álbum Formatura 2026                                            │
+│  Inclui as alterações ainda não salvas. O modelo permanece…      │
 │                                                                  │
-│  Pasta de origem   [ caminho ]                       [ Escolher ] │
-│  Pasta de destino  [ caminho ]                       [ Escolher ] │
+│  Origem                                                          │
+│  [ caminho ]                                      [ Escolher… ]  │
 │                                                                  │
-│  42 Projetos serão gerados                                      │
+│  Destino                                                         │
+│  [ caminho ]                                      [ Escolher… ]  │
 ├──────────────────────────────────────────────────────────────────┤
-│                                  Cancelar   Verificar e gerar     │
+│  42 projetos                      Cancelar   Verificar e gerar   │
 └──────────────────────────────────────────────────────────────────┘
 ```
 
 O Projeto modelo exibido é o estado visível da sessão, inclusive mudanças ainda não salvas. A geração não salva nem modifica esse Projeto.
 
-A configuração segue o formulário de Exportação: largura de 800 px, cabeçalho
-com fechar à direita, seções espaçadas e campos de 36 px. O modelo aparece em
-um resumo compacto, com ícone de Lâmina, nome e fundo neutro; origem e destino
-têm botões `Escolher…`. A contagem
-fica à esquerda no rodapé, com `Cancelar` e `Verificar e gerar` à direita.
+A configuração segue o padrão da [Exportação normal](0004-exportacao-normal.md#refinamento-de-24092026),
+refinado em 24/09/2026 por decisão do autor validada em protótipo: largura de
+800 px; a barra da janela mostra somente `Gerar projetos em lote`, sem a marca,
+em todas as fases; blocos com títulos curtos (`Modelo`, `Origem`, `Destino`)
+separados apenas por espaço; campos de 31 px; rodapé em faixa de tom.
+
+O modelo é informação, não um controle: o bloco `Modelo` mostra o nome em
+destaque e, abaixo, a frase `Inclui as alterações ainda não salvas. O modelo
+permanece inalterado.`, sem caixa nem ícone. `Origem` e `Destino` conservam as
+dicas por tooltip sobre subpastas e sobre o destino fora da origem. Os dois
+`Escolher…` são ações comuns; somente `Verificar e gerar` é ação principal. A
+contagem fica à esquerda no rodapé, com `Cancelar` e `Verificar e gerar` à
+direita.
 
 ## Verificação
 

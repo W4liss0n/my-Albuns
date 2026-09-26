@@ -2,7 +2,7 @@
 .image-viewer__correction-content { position: relative; display: flex; flex: 1; min-width: 0; min-height: 0; }
 .image-viewer__confirmation { position: absolute; z-index: 8; inset: 0; display: flex; align-items: center; justify-content: center; padding: var(--ui-space-5); background: color-mix(in srgb, var(--ui-canvas) 42%, transparent); }
 .image-viewer__confirmation .ui-dialog-window { width: min(100%, 29rem); min-height: 0; height: auto; flex: none; grid-template-rows: auto auto; border: 1px solid var(--ui-border-strong); box-shadow: var(--ui-shadow-menu); }
-.image-viewer__stage { position: relative; display: flex; flex: 1; align-items: center; justify-content: center; min-width: 0; min-height: 0; padding: var(--ui-space-5); overflow: hidden; background: var(--ui-canvas); touch-action: none; }
+.image-viewer__stage { position: relative; display: flex; flex: 1; align-items: center; justify-content: center; min-width: 0; min-height: 0; padding: var(--ui-space-5) calc(16px + 42px + var(--ui-space-2)); overflow: hidden; background: var(--ui-canvas); touch-action: none; }
 .image-viewer__stage[data-handoff] { position: absolute; z-index: 5; inset: 0; pointer-events: none; }
 .image-viewer__stage[data-handoff="pending"] + .image-viewer__correction-content .eye-correction__tools { z-index: 6; }
 .image-viewer__image { display: block; max-width: 100%; max-height: 100%; object-fit: contain; transform-origin: center; user-select: none; }
@@ -49,12 +49,19 @@
 .eye-correction__pane-image:focus-visible { outline: 2px solid var(--ui-focus-neutral); outline-offset: -3px; }
 .eye-correction__fit { right: 12px; bottom: 12px; }
 .eye-correction__face-layer { position: absolute; z-index: 2; inset: 0; overflow: hidden; pointer-events: none; }
-.eye-correction__face { position: absolute; box-sizing: border-box; border: 1px solid var(--ui-text); border-radius: 2px; background: transparent; cursor: pointer; pointer-events: auto; }
-.eye-correction__face::before { content: ""; position: absolute; inset: 0; border: 1px solid var(--ui-surface); pointer-events: none; }
-.eye-correction__face[data-selected="true"] { border: 2px solid var(--ui-text); }
-.eye-correction__face:hover { border-color: var(--ui-text); }
+.eye-correction__face { position: absolute; box-sizing: border-box; border: 1.5px solid rgb(255 255 255 / 88%); border-radius: 10px; background: transparent; box-shadow: 0 0 0 1px rgb(20 18 15 / 35%), inset 0 0 0 1px rgb(20 18 15 / 20%); cursor: pointer; pointer-events: auto; }
+.eye-correction__face[data-selected="true"] { border: 2px solid var(--ui-accent); box-shadow: 0 0 0 1px rgb(255 255 255 / 70%); }
+.eye-correction__face:hover:not([data-selected="true"]) { border-color: #ffffff; }
 .eye-correction__face:focus-visible { outline: 2px solid var(--ui-focus-neutral); outline-offset: 2px; }
-.eye-correction__face-check { position: absolute; top: -7px; right: -7px; display: grid; place-items: center; width: 16px; height: 16px; border: 1px solid var(--ui-text); border-radius: 50%; background: var(--ui-surface); color: var(--ui-text); pointer-events: none; }
+.eye-correction__face-check { position: absolute; top: -9px; right: -9px; display: grid; place-items: center; width: 18px; height: 18px; border: 2px solid #ffffff; border-radius: 50%; background: var(--ui-accent-fill); color: #ffffff; pointer-events: none; }
 .eye-correction__face-check svg { width: 12px; height: 12px; }
+/* Before and after: one button naming both versions; the shown one sits on a
+   raised pill. It floats where the reference action floats on the other side. */
+.eye-correction__compare { position: absolute; z-index: 3; left: 50%; bottom: 16px; display: flex; height: 36px; align-items: center; padding: 3px; border: 0; border-radius: 18px; background: color-mix(in srgb, var(--ui-surface) 56%, transparent); color: var(--ui-text-secondary); font: inherit; cursor: pointer; transform: translateX(-50%); gap: 2px; }
+.eye-correction__compare > span { display: inline-flex; height: 30px; align-items: center; padding: 0 var(--ui-space-3); border-radius: 15px; font-size: var(--ui-font-size-control); font-weight: 500; white-space: nowrap; }
+.eye-correction__compare > span[data-current="true"] { color: var(--ui-text); background: var(--ui-surface-raised); box-shadow: 0 1px 2px rgb(60 54 44 / 18%); }
+.eye-correction__compare:hover:not(:disabled) > span:not([data-current="true"]) { color: var(--ui-text); }
+.eye-correction__compare:focus-visible { outline: 2px solid var(--ui-focus-neutral); outline-offset: 2px; }
+.eye-correction__compare:disabled { cursor: default; }
 .eye-correction__nav--previous { left: 4px; top: 50%; transform: translateY(-50%); }
 .eye-correction__nav--next { right: 4px; top: 50%; transform: translateY(-50%); }

@@ -3,14 +3,12 @@ import { parseNormalExportOptions } from "../application/normalExport";
 import type {
   ProjectDialogAction,
   ProjectDialogActionEvent,
-  ProjectDialogDetail,
   ProjectDialogPresentation,
   ProjectDialogProgress,
   ProjectDialogState,
 } from "../application/projectDialogPort";
 import type { ProjectDialogAction as IpcProjectDialogAction } from "../contracts/generated/ProjectDialogAction";
 import type { ProjectDialogActionEvent as IpcProjectDialogActionEvent } from "../contracts/generated/ProjectDialogActionEvent";
-import type { ProjectDialogDetail as IpcProjectDialogDetail } from "../contracts/generated/ProjectDialogDetail";
 import type { ProjectDialogPresentation as IpcProjectDialogPresentation } from "../contracts/generated/ProjectDialogPresentation";
 import type { ProjectDialogProgress as IpcProjectDialogProgress } from "../contracts/generated/ProjectDialogProgress";
 import type { ProjectDialogState as IpcProjectDialogState } from "../contracts/generated/ProjectDialogState";
@@ -72,22 +70,10 @@ function isProjectDialogSessionId(value: unknown): value is string {
   return typeof value === "string" && value.length > 0 && value.length <= 128;
 }
 
-function decodeDetails(
-  value: unknown,
-): IpcProjectDialogDetail[] | null {
-  if (!Array.isArray(value)) return null;
-  const details: IpcProjectDialogDetail[] = [];
-  for (const detail of value) {
-    if (
-      !isRecord(detail) ||
-      typeof detail.label !== "string" ||
-      typeof detail.value !== "string"
-    ) {
-      return null;
-    }
-    details.push({ label: detail.label, value: detail.value });
-  }
-  return details;
+function decodeConsequences(value: unknown): string[] | null {
+  return Array.isArray(value) && value.every((consequence) => typeof consequence === "string")
+    ? [...value]
+    : null;
 }
 
 type ProgressDecoder = (
@@ -181,11 +167,11 @@ const stateDecoders: Record<
       ? { kind: "exportProblems", projectName: value.projectName, problems } : null;
   },
   albumInformationConfirmation: (value) => {
-    const details = decodeDetails(value.details);
-    return typeof value.busy === "boolean" && details
+    const consequences = decodeConsequences(value.consequences);
+    return typeof value.busy === "boolean" && consequences
       ? {
           busy: value.busy,
-          details,
+          consequences,
           kind: "albumInformationConfirmation",
         }
       : null;
@@ -334,7 +320,7 @@ export function toIpcProjectDialogState(
     case "albumInformationConfirmation":
       return {
         busy: state.busy,
-        details: state.details.map(toIpcProjectDialogDetail),
+        consequences: [...state.consequences],
         kind: state.kind,
       };
     case "layoutDeletionConfirmation":
@@ -383,7 +369,7 @@ function fromIpcProjectDialogState(
     case "albumInformationConfirmation":
       return {
         busy: state.busy,
-        details: state.details.map(fromIpcProjectDialogDetail),
+        consequences: [...state.consequences],
         kind: state.kind,
       };
     case "layoutDeletionConfirmation":
@@ -412,18 +398,6 @@ function fromIpcProjectDialogState(
       };
   }
   return assertNever(state);
-}
-
-function toIpcProjectDialogDetail(
-  detail: ProjectDialogDetail,
-): IpcProjectDialogDetail {
-  return { label: detail.label, value: detail.value };
-}
-
-function fromIpcProjectDialogDetail(
-  detail: IpcProjectDialogDetail,
-): ProjectDialogDetail {
-  return { label: detail.label, value: detail.value };
 }
 
 function toIpcProjectDialogProgress(

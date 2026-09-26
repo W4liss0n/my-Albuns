@@ -1,15 +1,12 @@
-.generation-model {
-  display: flex;
-  align-items: center;
-  gap: var(--ui-space-3);
-  padding: var(--ui-space-4);
-  border: 1px solid var(--ui-border);
-  border-radius: var(--ui-radius);
-  background: var(--ui-surface-muted);
+/* The model is plain information in the Export-dialog pattern: a short title,
+   the name and one sentence, without a box or icon. */
+.generation-model__title {
+  margin: 0 0 var(--ui-space-3);
+  color: var(--ui-text);
+  font-size: var(--ui-font-size-heading);
+  font-weight: 600;
+  line-height: 1.3;
 }
-.generation-model__icon { display: flex; flex: none; color: var(--ui-accent-text); }
 .generation-model__identity { display: grid; min-width: 0; gap: var(--ui-space-1); }
-.generation-model__identity > span { color: var(--ui-text-secondary); font-size: var(--ui-font-size-action); }
 .generation-model__identity > strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; line-height: 1.4; }
-.generation-row-actions { display: flex; flex-wrap: wrap; gap: 6px; }
-.generation-global-actions { display: flex; gap: 8px; margin-bottom: 12px; }
+.generation-model__identity > p { margin: 0; color: var(--ui-text-muted); font-size: var(--ui-font-size-support); line-height: 1.45; }

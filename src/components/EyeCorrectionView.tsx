@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
-import { Check, ChevronLeft, ChevronRight, Columns2, EyeOff, RefreshCcw, Save, Scan } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, EyeOff, RefreshCcw, Save, Scan } from "lucide-react";
 import type { ViewerCorrectionAction, ViewerPresentation } from "../application/imageViewerWindow";
 import { acquireFaces, faceBounds, type Face } from "../image-viewer/faceLandmarks";
 import { ImageToolButton } from "../ui/ImageToolButton";
@@ -101,7 +101,8 @@ function FaceImage({ side, url, displayUrl, name, notice, choosing, interactive,
     });
     return () => { active = false; lease.release(); };
   }, [url, choosing, loadedUrl, side]);
-  const fitted = fitPhoto(natural, size, 24, true);
+  // The reference pane keeps its 42 px arrows (4 px from the edge) beside the photo.
+  const fitted = fitPhoto(natural, size, side === "reference" ? { x: 4 + 42 + 8, y: 24 } : 24, true);
   const imageWidth = fitted.width;
   const imageHeight = fitted.height;
   const canManipulateImage = !retained && !visualHidden && imageWidth > 0 && imageHeight > 0;
@@ -275,11 +276,7 @@ export function EyeCorrectionView({ presentation, onNavigate, onCorrection, onTa
     <div className="eye-correction__tools">
       <ImageToolButton label="Fechar correção" icon={EyeOff} tooltipPlacement="bottom" className="eye-correction__close" disabled={busy} onClick={() => action("cancel")} />
       <div className="eye-correction__tool-extension">
-        {currentResult && <>
-          <ImageToolButton label={showOriginal ? "Antes e depois: mostrar correção" : "Antes e depois: mostrar original"} icon={Columns2} tooltipPlacement="bottom" aria-pressed={showOriginal} disabled={busy || !correction.resultUrl}
-            onClick={() => setComparison({ key: compareKey, original: !showOriginal })} />
-          <ImageToolButton label="Salvar correção" icon={Save} tooltipPlacement="bottom" disabled={busy} blocked={!correction.resultUrl} onClick={() => action("apply")} />
-        </>}
+        {currentResult && <ImageToolButton label="Salvar correção" icon={Save} tooltipPlacement="bottom" disabled={busy} blocked={!correction.resultUrl} onClick={() => action("apply")} />}
       </div>
     </div>
     <div className="eye-correction__panes">
@@ -298,8 +295,8 @@ export function EyeCorrectionView({ presentation, onNavigate, onCorrection, onTa
           <ImageToolButton label="Próxima referência" icon={ChevronRight} glyph="navigation" className="eye-correction__nav--next" blocked={!correction.canNextReference} onClick={() => onNavigate(1)} />
         </>}
         {correction.phase === "browse"
-          ? <ImageToolButton label="Usar esta foto" icon={Check} className="eye-correction__reference-action" blocked={browseBlocked} aria-busy={referencePending || undefined} onClick={() => action("select")} />
-          : <ImageToolButton label="Trocar referência" icon={RefreshCcw} className="eye-correction__reference-action" disabled={busy} onClick={() => action("browse")} />}
+          ? <ImageToolButton label="Usar esta foto" icon={Check} labelled className="eye-correction__reference-action" blocked={browseBlocked} aria-busy={referencePending || undefined} onClick={() => action("select")} />
+          : <ImageToolButton label="Trocar referência" icon={RefreshCcw} labelled className="eye-correction__reference-action" disabled={busy} onClick={() => action("browse")} />}
       </div>
       <div className="eye-correction__pane">
         <FaceImage key={targetIdentity} side="target" url={presentation.url} displayUrl={currentResult && !showOriginal ? correction.resultUrl : null}
@@ -309,6 +306,13 @@ export function EyeCorrectionView({ presentation, onNavigate, onCorrection, onTa
             if (retryPreparation) requestedPair.current = null;
             setTargetIndex(index); setTargetSelectionIdentity(targetIdentity); setTargetFaces(faces); setSelectionRevision((value) => value + 1);
           }} onStatus={setTargetAnalysis} onVisualSettled={onTargetSettled} />
+        {/* One button: both versions stay named and a click swaps them. */}
+        {currentResult && <button type="button" className="eye-correction__compare" aria-pressed={showOriginal} disabled={busy || !correction.resultUrl}
+          aria-label={showOriginal ? "Antes e depois: mostrar correção" : "Antes e depois: mostrar original"}
+          onClick={() => setComparison({ key: compareKey, original: !showOriginal })}>
+          <span aria-hidden="true" data-current={showOriginal}>Original</span>
+          <span aria-hidden="true" data-current={!showOriginal}>Corrigida</span>
+        </button>}
       </div>
     </div>
   </div>;

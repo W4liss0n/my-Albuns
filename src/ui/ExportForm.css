@@ -1,57 +1,112 @@
-.ui-export-form__format-row { display: flex; align-items: center; gap: 24px; }
-.ui-export-form__format-select { position: relative; flex: 0 0 184px; }
-.ui-export-form__format-select select { width: 100%; appearance: none; padding-right: 38px; }
-.ui-export-form__format-select .ui-app-icon { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); pointer-events: none; }
-.ui-export-form__quality { display: flex; flex: 1; max-width: 380px; align-items: center; gap: 22px; color: var(--ui-text); }
-.ui-export-form__quality label { flex: none; }
-.ui-export-form__quality .ui-range { flex: 1; min-width: 60px; }
-.ui-export-form__quality output { min-width: 42px; font-variant-numeric: tabular-nums; }
-.ui-export-form__quality .ui-range::-webkit-slider-runnable-track { background: var(--ui-border-strong); }
-.ui-export-form__quality .ui-range::-moz-range-track { background: var(--ui-border-strong); }
-.ui-export-form__quality .ui-range::-webkit-slider-thumb { width: 18px; height: 18px; margin-top: -7px; border-color: var(--ui-accent-fill); background: var(--ui-accent-fill); box-shadow: none; }
-.ui-export-form__quality .ui-range::-moz-range-thumb { width: 18px; height: 18px; border-color: var(--ui-accent-fill); background: var(--ui-accent-fill); box-shadow: none; }
-.ui-export-form__quality .ui-range:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 2px var(--ui-surface-raised), 0 0 0 3px var(--ui-focus-neutral); }
-.ui-export-form__quality .ui-range:focus-visible::-moz-range-thumb { box-shadow: 0 0 0 2px var(--ui-surface-raised), 0 0 0 3px var(--ui-focus-neutral); }
-.ui-export-form__quality input:disabled { opacity: 0.5; }
-.ui-export-form__selection { display: grid; gap: 16px; }
-.ui-export-form__selection-row { display: flex; flex-wrap: wrap; align-items: center; gap: 20px; }
-.ui-export-form__range { display: flex; flex-wrap: wrap; align-items: center; gap: 20px; }
-.ui-export-form__range-field { position: relative; width: 156px; }
+/* Normal Export dialog. It keeps the shared operation-form structure but uses
+   the compact density of the other auxiliary windows: 31 px controls, 13 px
+   section titles, sections separated by space only and a tinted footer band.
+   Batch export and generation keep OperationForm.css unchanged. */
+
+.ui-operation-dialog.ui-export-dialog .ui-dialog-window--form .ui-dialog-window__body {
+  padding: var(--ui-space-5) var(--ui-space-5) var(--ui-space-6);
+}
+
+.ui-operation-dialog.ui-export-dialog .ui-dialog-window--form .ui-dialog-window__footer {
+  padding: var(--ui-space-3) var(--ui-space-5);
+  background: var(--ui-surface-muted);
+  gap: var(--ui-space-2);
+}
+
+.ui-operation-dialog.ui-export-dialog .ui-action-button {
+  min-width: 96px;
+  height: var(--ui-control-height);
+  font-size: var(--ui-font-size-control);
+}
+
+.ui-export-dialog .ui-dialog-window__body { color: var(--ui-text); }
+
+.ui-export-dialog .ui-operation-form {
+  gap: var(--ui-space-6);
+  font-size: var(--ui-font-size-control);
+}
+
+.ui-export-dialog .ui-operation-form__section legend {
+  margin-bottom: var(--ui-space-3);
+  font-size: var(--ui-font-size-heading);
+  font-weight: 600;
+}
+
+.ui-export-dialog .ui-operation-form .ui-field-control {
+  height: var(--ui-control-height);
+  padding-inline: var(--ui-space-2);
+  font-size: var(--ui-font-size-control);
+}
+
+.ui-export-dialog .ui-operation-form__destination { gap: var(--ui-space-2); }
+
+.ui-export-dialog .ui-operation-form__summary {
+  margin: 0 auto 0 0;
+  color: var(--ui-text-secondary);
+  font-size: var(--ui-font-size-control);
+  font-variant-numeric: tabular-nums;
+}
+
+.ui-export-form__format-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--ui-space-3) var(--ui-space-6); }
+.ui-export-form__format-select { flex: 0 0 160px; }
+.ui-export-form__format-select select { width: 100%; }
+.ui-export-form__quality { display: flex; flex: 1; max-width: 360px; align-items: center; gap: var(--ui-space-3); }
+.ui-export-form__quality label { flex: none; color: var(--ui-text-secondary); }
+.ui-export-form__quality .ui-range { flex: 1; min-width: 80px; }
+.ui-export-form__quality output {
+  min-width: 40px;
+  font-family: var(--ui-font-mono);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.ui-export-form__selection { display: grid; gap: var(--ui-space-2); }
+.ui-export-form__selection-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--ui-space-2) var(--ui-space-5); }
+.ui-export-form__range { display: flex; flex-wrap: wrap; align-items: center; gap: var(--ui-space-3); }
+.ui-export-form__range-field { position: relative; width: 140px; }
 .ui-export-form__range-field > .ui-field-control { width: 100%; font-variant-numeric: tabular-nums; }
-.ui-export-form__range-field > .ui-anchored-tooltip { top: auto; bottom: calc(100% + var(--ui-space-2)); right: auto; width: 280px; max-width: calc(100vw - 64px); }
+.ui-export-form__range-field > .ui-anchored-tooltip { top: auto; bottom: calc(100% + var(--ui-space-2)); right: auto; width: 280px; max-width: calc(100vw - 64px); white-space: normal; }
 .ui-export-form__range-field > .ui-anchored-tooltip::before { top: auto; bottom: -5px; transform: rotate(225deg); }
-.ui-export-form__choice { display: flex; width: max-content; align-items: center; gap: 12px; color: var(--ui-text); }
+
+/* "Páginas simples" shares the interval row and ends on the right edge,
+   aligned with "Escolher…" and "Exportar". */
 .ui-export-form__page-mode { margin-left: auto; }
+
+.ui-export-form__choice {
+  display: flex;
+  width: max-content;
+  min-height: var(--ui-compact-control-height);
+  align-items: center;
+  color: var(--ui-text);
+  gap: var(--ui-space-2);
+}
 .ui-export-form__choice input {
   display: grid;
   flex: none;
   place-content: center;
-  width: 20px;
-  height: 20px;
+  width: 16px;
+  height: 16px;
   margin: 0;
   appearance: none;
   border: 1.5px solid var(--ui-text-disabled);
   background: var(--ui-surface-raised);
 }
-.ui-export-form__choice input[type="radio"] { border-width: 2px; border-radius: 50%; }
-.ui-export-form__choice input[type="radio"]::after { width: 10px; height: 10px; border-radius: 50%; background: var(--ui-accent-fill); content: ""; opacity: 0; }
+.ui-export-form__choice input[type="radio"] { border-radius: 50%; }
+.ui-export-form__choice input[type="radio"]::after { width: 8px; height: 8px; border-radius: 50%; background: var(--ui-accent-fill); content: ""; opacity: 0; }
 .ui-export-form__choice input[type="checkbox"] { border-radius: 3px; }
-.ui-export-form__choice input[type="checkbox"]::after { width: 9px; height: 5px; margin-top: -2px; border-bottom: 2px solid var(--ui-on-accent); border-left: 2px solid var(--ui-on-accent); content: ""; opacity: 0; transform: rotate(-45deg); }
+.ui-export-form__choice input[type="checkbox"]::after { width: 8px; height: 4px; margin-top: -2px; border-bottom: 2px solid var(--ui-on-accent); border-left: 2px solid var(--ui-on-accent); content: ""; opacity: 0; transform: rotate(-45deg); }
 .ui-export-form__choice input:checked { border-color: var(--ui-accent-fill); }
 .ui-export-form__choice input[type="checkbox"]:checked { background: var(--ui-accent-fill); }
 .ui-export-form__choice input:checked::after { opacity: 1; }
-.ui-export-form__choice input:focus-visible { outline: 1px solid var(--ui-focus-neutral); outline-offset: 3px; }
+.ui-export-form__choice input:focus-visible { outline: 2px solid var(--ui-focus-neutral); outline-offset: 2px; }
 .ui-export-form__choice:has(input:disabled) { color: var(--ui-text-disabled); }
 .ui-export-form__choice input:disabled { opacity: 0.5; }
-.ui-export-form__error { margin: 0; color: var(--ui-danger-text); font-size: var(--ui-font-size-action); line-height: 1.5; }
-.ui-export-form__status { margin: -12px 0 0; color: var(--ui-text-muted); font-size: var(--ui-font-size-action); }
-.ui-export-form__status.ui-export-form__error { color: var(--ui-danger-text); }
 
-@media (max-width: 740px) {
-  .ui-export-form__page-mode { margin-left: 0; }
-}
+/* A verification message takes the summary's place in the footer. */
+.ui-export-form__error { color: var(--ui-danger-text); line-height: 1.45; }
+.ui-export-dialog .ui-operation-form__summary.ui-export-form__error { color: var(--ui-danger-text); }
 
 @media (max-width: 560px) {
-  .ui-export-form__format-row { flex-wrap: wrap; gap: 18px; }
-  .ui-export-form__quality { flex-basis: 100%; }
+  .ui-export-form__page-mode { margin-left: 0; }
+  .ui-export-form__quality { flex-basis: 100%; max-width: none; }
 }

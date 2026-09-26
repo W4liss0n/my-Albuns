@@ -82,7 +82,7 @@ A queda do Processador durante Cache descarta o trabalho incompleto e permite re
 
 ## Requisitos gráficos e de segurança
 
-WebGL2 acelerado por hardware é requisito do editor. Criar um contexto não basta: o diagnóstico deve confirmar um backend de hardware. Contexto ausente, rasterizador de software ou verificação inconclusiva preservam Boas-vindas, Configurações e diagnóstico, mas não abrem o editor. Não haverá fallback de edição por Canvas 2D ou software na primeira versão.
+WebGL2 acelerado por hardware é requisito do editor. Criar um contexto não basta: o diagnóstico deve confirmar um backend de hardware. Contexto ausente, rasterizador de software ou verificação inconclusiva preservam Boas-vindas, Configurações e diagnóstico, mas não abrem o editor. A apresentação desse estado está no [design 0002](../design/0002-tela-de-boas-vindas.md#editor-indisponível). Não haverá fallback de edição por Canvas 2D ou software na primeira versão.
 
 O instalador usará inicialmente WebView2 Evergreen e verificará sua disponibilidade. Capabilities, permissions e scopes do Tauri devem ser mínimos e explícitos; o frontend não recebe acesso genérico ao sistema de arquivos nem permissão genérica para iniciar processos.
 

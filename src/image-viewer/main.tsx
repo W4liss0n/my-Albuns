@@ -78,7 +78,7 @@ function ViewerWindow() {
   const controls = { ...tauriWindowControls, close };
   return <WindowControlsProvider controls={controls}>
     <div className="image-viewer-window">
-      <ApplicationHeader showBrand={false} controls="maximize-close" context={presentation?.correction ? "" : (visibleTitle?.sessionId === presentation?.sessionId ? visibleTitle?.name : presentation?.name) ?? "Imagem"} />
+      <ApplicationHeader showBrand={false} controls="maximize-close" context={presentation?.correction ? `Corrigir olhos · ${presentation.name}` : (visibleTitle?.sessionId === presentation?.sessionId ? visibleTitle?.name : presentation?.name) ?? "Imagem"} />
       {presentation ? <ImageViewer presentation={presentation} onVisibleNameChange={onVisibleNameChange} onNavigate={(offset) => {
         if (preview) { setPresentation((current) => {
           if (!current) return current;

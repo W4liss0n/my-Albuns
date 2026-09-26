@@ -1,4 +1,5 @@
 export interface RecentProjectOpeningTime {
+  /** Visible card line, e.g. "Aberto hoje às 14:30". */
   label: string;
   fullLabel: string;
   dateTime: string;
@@ -31,14 +32,18 @@ export function recentProjectOpeningTime(
   if (!Number.isFinite(openedAt.getTime())) return null;
 
   const yesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
-  const day = sameLocalDay(openedAt, now)
+  const relativeDay = sameLocalDay(openedAt, now)
     ? "Hoje"
     : sameLocalDay(openedAt, yesterday)
       ? "Ontem"
-      : localDate.format(openedAt);
+      : null;
+  const day = relativeDay ?? localDate.format(openedAt);
+  const time = localTime.format(openedAt);
   return {
-    label: day,
-    fullLabel: `${day} às ${localTime.format(openedAt)}`,
+    label: relativeDay
+      ? `Aberto ${relativeDay.toLowerCase()} às ${time}`
+      : `Aberto em ${day} às ${time}`,
+    fullLabel: `${day} às ${time}`,
     dateTime: openedAt.toISOString(),
   };
 }

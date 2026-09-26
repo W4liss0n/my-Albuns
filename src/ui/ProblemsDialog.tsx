@@ -5,28 +5,43 @@ import { DialogFocusScope } from "./DialogFocusScope";
 import { DialogWindowFrame } from "./DialogWindowFrame";
 import "./ProblemsDialog.css";
 
+/** One entry of the list: what is affected, what happened and what can be done. */
+export interface ProblemsDialogItem {
+  key: string;
+  /** The affected project or file; one entry per project or per file. */
+  title: ReactNode;
+  /** Extra identification shown on hover, such as the project path. */
+  titleHint?: string;
+  /** One or more lines describing the problems of this entry. */
+  details: ReactNode;
+  actions?: ReactNode;
+}
+
 interface ProblemsDialogProps {
   title: string;
   description: string;
-  columns: readonly string[];
-  rows: readonly (readonly ReactNode[])[];
+  items: readonly ProblemsDialogItem[];
   onClose(): void;
   closeDisabled?: boolean;
   closeLabel?: string;
-  actions?: ReactNode;
+  /** Actions for the whole list, beside the description. */
   toolbar?: ReactNode;
+  /** Secondary actions on the left of the footer. */
+  leadingActions?: ReactNode;
+  /** The main action, after Close on the right of the footer. */
+  primaryAction?: ReactNode;
 }
 
 export function ProblemsDialog({
   title,
   description,
-  columns,
-  rows,
+  items,
   onClose,
   closeDisabled = false,
   closeLabel = "Fechar",
-  actions,
   toolbar,
+  leadingActions,
+  primaryAction,
 }: ProblemsDialogProps) {
   const closeRef = useRef<HTMLButtonElement>(null);
   return (
@@ -38,30 +53,33 @@ export function ProblemsDialog({
       <DialogWindowFrame
         title={title}
         layout="problems"
-        actions={<>{actions}<ActionButton ref={closeRef} disabled={closeDisabled} onClick={onClose}>{closeLabel}</ActionButton></>}
+        actions={<>
+          {leadingActions && <div className="ui-problems-leading-actions">{leadingActions}</div>}
+          <ActionButton ref={closeRef} disabled={closeDisabled} onClick={onClose}>{closeLabel}</ActionButton>
+          {primaryAction}
+        </>}
       >
-        <p className="ui-problems-description">{description}</p>
-        {toolbar}
+        <div className="ui-problems-intro">
+          <p className="ui-problems-description">{description}</p>
+          {toolbar && <div className="ui-problems-toolbar">{toolbar}</div>}
+        </div>
         <div
           className="ui-problems-scroll"
           tabIndex={0}
           role="region"
           aria-label={title}
         >
-          <table className="ui-problems-table ui-copyable-text">
-            <thead>
-              <tr>{columns.map(column => (
-                <th scope="col" key={column}>{column}</th>
-              ))}</tr>
-            </thead>
-            <tbody>
-              {rows.map((cells, rowIndex) => (
-                <tr key={rowIndex}>
-                  {cells.map((cell, columnIndex) => <td key={columnIndex}>{cell}</td>)}
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <ul className="ui-problems-list ui-copyable-text">
+            {items.map(item => (
+              <li key={item.key}>
+                <div className="ui-problems-item">
+                  <strong className="ui-problems-item__title" title={item.titleHint}>{item.title}</strong>
+                  <div className="ui-problems-item__details">{item.details}</div>
+                </div>
+                {item.actions && <div className="ui-problems-item__actions">{item.actions}</div>}
+              </li>
+            ))}
+          </ul>
         </div>
       </DialogWindowFrame>
     </DialogFocusScope>

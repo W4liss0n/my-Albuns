@@ -61,21 +61,27 @@ export function ProjectDialogView({
     case "exportMediaProblems":
       return <ProblemsDialog title="Problemas na exportação"
         description={state.message || "Resolva os problemas abaixo para exportar."}
-        columns={["Projeto", "Problema", "Ações"]}
-        rows={state.problems.map(problem => [state.projectName,
-          `${problem.fileName}: arquivo ${problem.state === "absent" ? "ausente" : "indisponível"}.`,
-          <ActionButton disabled={state.busy} onClick={() => onAction(problem.state === "absent" ? "relinkExportMedia" : "retryExportMedia")}>
+        items={state.problems.map(problem => ({
+          key: problem.mediaId,
+          title: problem.fileName,
+          titleHint: state.projectName,
+          details: problem.state === "absent" ? "Arquivo ausente." : "Arquivo indisponível.",
+          actions: <ActionButton disabled={state.busy} onClick={() => onAction(problem.state === "absent" ? "relinkExportMedia" : "retryExportMedia")}>
             {problem.state === "absent" ? "Localizar imagens…" : "Tentar novamente"}
-          </ActionButton>])}
+          </ActionButton>,
+        }))}
         closeDisabled={state.busy}
         onClose={() => onAction("dismissExport")} />;
     case "exportProblems":
       return <ProblemsDialog title="Problemas na exportação"
         description="Adicione fotos aos quadros vazios para exportar a seleção."
-        columns={["Projeto", "Motivo", "Ação"]}
-        rows={state.problems.map((problem) => [state.projectName,
-          `Lâmina ${String(problem.sheetNumber).padStart(2, "0")}, posição ${problem.frameNumber}: quadro vazio.`,
-          <ActionButton onClick={() => onAction("openExportProject")}>Voltar ao álbum</ActionButton>])}
+        items={state.problems.map((problem) => ({
+          key: problem.frameId,
+          title: `Lâmina ${String(problem.sheetNumber).padStart(2, "0")}, posição ${problem.frameNumber}`,
+          titleHint: state.projectName,
+          details: "Quadro vazio.",
+          actions: <ActionButton onClick={() => onAction("openExportProject")}>Voltar ao álbum</ActionButton>,
+        }))}
         onClose={() => onAction("dismissExport")} />;
     case "imageProcessingProgress":
       return <ProgressDialog title="Processando imagens" progress={state.progress} />;
@@ -89,8 +95,11 @@ export function ProjectDialogView({
           secondaryAction={{ label: "Fechar", onClick: () => onAction("dismissImageProcessingProblems") }} />;
       }
       return <ProblemsDialog title={title} description={description}
-        columns={["Arquivo", "Motivo"]}
-        rows={state.problems.map(problem => [problem.fileName, problem.reason])}
+        items={state.problems.map((problem, index) => ({
+          key: `${index}:${problem.fileName}`,
+          title: problem.fileName,
+          details: problem.reason,
+        }))}
         onClose={() => onAction("dismissImageProcessingProblems")} />;
     }
     case "albumInformationConfirmation":
@@ -106,26 +115,10 @@ export function ProjectDialogView({
             label: state.busy ? "Aplicando…" : "Aplicar",
             onClick: () => onAction("confirmAlbumInformation"),
           }}
-          description="As alterações serão aplicadas juntas e poderão ser desfeitas em uma única ação."
+          description={state.consequences.map((consequence) => <p key={consequence}>{consequence}</p>)}
           title="Aplicar alterações no álbum?"
         >
-          <dl className="album-information-change-list">
-            {state.details.map((detail) => {
-              return (
-                <div
-                  className="album-information-change"
-                  key={`${detail.label}:${detail.value}`}
-                >
-                  <dt className="album-information-change__label">
-                    {detail.label}
-                  </dt>
-                  <dd className="album-information-change__value">
-                    {detail.value}
-                  </dd>
-                </div>
-              );
-            })}
-          </dl>
+          <p className="album-information-undo">Você pode desfazer tudo de uma vez.</p>
         </ConfirmationDialog>
       );
 

@@ -192,17 +192,20 @@ test("blocks Project hosts at the global graphics boundary when hardware WebGL2 
   );
 
   expect(
-    await screen.findByRole("heading", { name: "Boas-vindas" }),
+    await screen.findByRole("heading", { name: "Não foi possível iniciar o editor neste computador" }),
   ).toBeInTheDocument();
   expect(
     screen.getByText("WebGL2 acelerado por hardware não foi confirmado."),
   ).toBeInTheDocument();
-  expect(
-    screen.queryByRole("button", { name: "Novo projeto" }),
-  ).not.toBeInTheDocument();
-  expect(
-    screen.queryByRole("button", { name: "Abrir projeto" }),
-  ).not.toBeInTheDocument();
+  // Welcome keeps its layout: Project actions stay visible but off, and the
+  // shortcuts do nothing; the recent projects give way to the explanation.
+  expect(screen.getByRole("button", { name: "Novo projeto" })).toBeDisabled();
+  expect(screen.getByRole("button", { name: "Abrir projeto" })).toBeDisabled();
+  expect(screen.getByRole("button", { name: "Exportação em lote" })).toBeDisabled();
+  expect(screen.queryByRole("list", { name: "Projetos recentes" })).not.toBeInTheDocument();
+  expect(screen.getByText("Modo seguro")).toBeInTheDocument();
+  fireEvent.keyDown(window, { ctrlKey: true, key: "n" });
+  fireEvent.keyDown(window, { ctrlKey: true, key: "o" });
   expect(completeGraphicsGate).toHaveBeenCalledWith(false);
   expect(openProject).not.toHaveBeenCalled();
   expect(createProject).not.toHaveBeenCalled();
@@ -371,8 +374,7 @@ test("loads and renders recent Projects by name", async () => {
   expect(listRecentProjects).toHaveBeenCalledOnce();
 });
 
-test("shows compact dates with a full accessible description and no filler for older records", async () => {
-  const user = userEvent.setup();
+test("shows the full opening time on its own line and no filler for older records", async () => {
   const dates = welcomePreviewRecentProjects(new URLSearchParams("recents=dates"));
   const { container } = render(
     <GlobalShell
@@ -382,46 +384,19 @@ test("shows compact dates with a full accessible description and no filler for o
     />,
   );
   expect(await screen.findByRole("button", { name: dates[0].name })).toBeEnabled();
-  expect(screen.getByText("Hoje").tagName).toBe("TIME");
-  expect(screen.getByText("Ontem").tagName).toBe("TIME");
-  expect(screen.getByText("18/09/2026").tagName).toBe("TIME");
+  expect(screen.getByText("Aberto hoje às 14:30").tagName).toBe("TIME");
+  expect(screen.getByText("Aberto ontem às 09:15").tagName).toBe("TIME");
+  expect(screen.getByText("Aberto em 18/09/2026 às 09:15").tagName).toBe("TIME");
   expect(screen.getByRole("button", { name: dates[0].name }))
     .toHaveAttribute("aria-description", "Última abertura: Hoje às 14:30");
-  const date = screen.getByRole("button", { name: dates[0].name }).querySelector("time");
-  fireEvent.pointerMove(document.body, { pointerType: "mouse" });
-  await user.hover(date!);
-  expect(await screen.findByRole("tooltip")).toHaveTextContent("Hoje às 14:30");
   expect(container.querySelectorAll("time")).toHaveLength(3);
   expect(screen.getByRole("button", { name: dates[3].name }).querySelector("time")).toBeNull();
   expect(screen.getByRole("button", { name: dates[3].name }))
     .not.toHaveAttribute("aria-description");
+  expect(container.querySelector(".global-project-date-tooltip")).toBeNull();
 });
 
-test("hides the date tooltip when the pointer leaves the date for the same card preview", async () => {
-  const user = userEvent.setup();
-  const dates = welcomePreviewRecentProjects(new URLSearchParams("recents=dates"));
-  const { container } = render(
-    <GlobalShell
-      graphicsDiagnostic={supportedGraphics}
-      recentProjectsNow={welcomeDatesNow}
-      projectPort={createProjectPort({ listRecentProjects: async () => dates })}
-    />,
-  );
-  const button = await screen.findByRole("button", { name: dates[0].name });
-  const date = button.querySelector("time");
-  const thumbnail = button.querySelector(".global-project-thumbnail");
-  expect(date).not.toBeNull();
-  expect(thumbnail).not.toBeNull();
-
-  fireEvent.pointerMove(document.body, { pointerType: "mouse" });
-  await user.hover(date!);
-  expect(await screen.findByRole("tooltip")).toHaveTextContent("Hoje às 14:30");
-  await user.hover(thumbnail!);
-  await waitFor(() => expect(screen.queryByRole("tooltip")).not.toBeInTheDocument());
-  expect(container.querySelectorAll("time")).toHaveLength(3);
-});
-
-test("opens date details only over the date and switches to a truncated name tooltip", async () => {
+test("opens the full name only over a truncated name and closes it over the preview", async () => {
   const user = userEvent.setup();
   const projects = welcomePreviewRecentProjects(new URLSearchParams("recents=long-names"));
   render(
@@ -433,7 +408,6 @@ test("opens date details only over the date and switches to a truncated name too
   );
   const first = await screen.findByRole("button", { name: projects[0].name });
   const thumbnail = first.querySelector(".global-project-thumbnail")!;
-  const date = first.querySelector("time")!;
   const name = first.querySelector("strong")!;
   Object.defineProperties(name, {
     clientWidth: { configurable: true, value: 40 },
@@ -443,11 +417,8 @@ test("opens date details only over the date and switches to a truncated name too
 
   await user.hover(thumbnail);
   expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
-  await user.hover(date);
-  expect(await screen.findByRole("tooltip")).toHaveClass("global-project-date-tooltip");
   await user.hover(name);
   expect(await screen.findByRole("tooltip")).toHaveClass("global-project-name-tooltip");
-  expect(screen.queryByText("18/09/2026 às 09:15")).not.toBeInTheDocument();
   expect(screen.getByRole("tooltip")).toHaveTextContent(projects[0].name);
   await user.hover(thumbnail);
   await waitFor(() => expect(screen.queryByRole("tooltip")).not.toBeInTheDocument());
@@ -480,25 +451,6 @@ test("dismisses a truncated name tooltip with Escape", async () => {
   expect(await screen.findByRole("tooltip")).toHaveClass("global-project-name-tooltip");
   fireEvent.scroll(window);
   await waitFor(() => expect(screen.queryByRole("tooltip")).not.toBeInTheDocument());
-});
-
-test("keeps the full date available from keyboard focus and dismisses it with Escape", async () => {
-  const user = userEvent.setup();
-  const dates = welcomePreviewRecentProjects(new URLSearchParams("recents=dates"));
-  render(
-    <GlobalShell
-      graphicsDiagnostic={supportedGraphics}
-      recentProjectsNow={welcomeDatesNow}
-      projectPort={createProjectPort({ listRecentProjects: async () => dates })}
-    />,
-  );
-  const first = await screen.findByRole("button", { name: dates[0].name });
-  for (let step = 0; step < 4; step += 1) await user.tab();
-  expect(first).toHaveFocus();
-  expect(await screen.findByRole("tooltip")).toHaveTextContent("Hoje às 14:30");
-  await user.keyboard("{Escape}");
-  await waitFor(() => expect(screen.queryByRole("tooltip")).not.toBeInTheDocument());
-  expect(first).toHaveFocus();
 });
 
 test("shows a real first Sheet and keeps an unavailable card usable", async () => {
@@ -856,7 +808,7 @@ test("editor entry opens directly in New Project and repeated activation preserv
   const { unmount } = render(<GlobalShell initialSurface="newProject" onNewProjectRequest={requests}
     graphicsDiagnostic={supportedGraphics} projectPort={createProjectPort()} />);
   expect(screen.queryByRole("heading", { name: "Projetos recentes" })).not.toBeInTheDocument();
-  const count = screen.getByRole("textbox", { name: "Quantidade de lâminas" });
+  const count = screen.getByRole("textbox", { name: "Lâminas" });
   fireEvent.change(count, { target: { value: "23" } });
   await waitFor(() => expect(requests).toHaveBeenCalledOnce());
   act(() => activate());
@@ -864,7 +816,7 @@ test("editor entry opens directly in New Project and repeated activation preserv
   fireEvent.click(screen.getByRole("button", { name: "Cancelar" }));
   expect(screen.getByRole("status", { name: "Nenhum projeto recente" })).toBeInTheDocument();
   act(() => activate());
-  expect(screen.getByRole("textbox", { name: "Quantidade de lâminas" })).toBeVisible();
+  expect(screen.getByRole("textbox", { name: "Lâminas" })).toBeVisible();
   unmount();
   expect(release).toHaveBeenCalledOnce();
 });

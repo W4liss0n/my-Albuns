@@ -107,7 +107,7 @@ test("centralizes the shared type scale used by every application surface", () =
 
 test("shares dense application chrome metrics", () => {
   expect(themeStyles).toContain(
-    "--ui-commandbar-height: var(--ui-control-height);",
+    "--ui-commandbar-height: var(--ui-compact-control-height);",
   );
   expect(themeStyles).toContain("--ui-toolbar-height: 34px;");
   expect(themeStyles).toContain("--ui-compact-control-height: 28px;");
@@ -124,12 +124,13 @@ test("shares dense application chrome metrics", () => {
   expect(albumInformationSource).not.toContain("<ActionButton");
 });
 
-test("uses the shared subtle shadow below the media toolbar", () => {
-  expect(themeStyles).toContain(
-    "--ui-shadow-toolbar: 0 2px 6px rgb(60 54 44 / 8%);",
-  );
+test("sets the media toolbar apart as a tinted strip the active tab opens from", () => {
+  const toolbar = mediaPanelStyles.match(/\.media-toolbar\s*\{[^}]*\}/s)?.[0] ?? "";
+  expect(toolbar).toContain("background: var(--ui-surface-muted);");
+  expect(toolbar).toContain("border-bottom: 1px solid var(--ui-border);");
+  expect(toolbar).not.toContain("box-shadow");
   expect(mediaPanelStyles).toMatch(
-    /\.media-toolbar\s*\{[^}]*box-shadow:\s*var\(--ui-shadow-toolbar\);/s,
+    /\.media-tabs button\.active\s*\{[^}]*background:\s*var\(--ui-surface\);[^}]*inset 0 2px 0 var\(--ui-accent\)/s,
   );
 });
 

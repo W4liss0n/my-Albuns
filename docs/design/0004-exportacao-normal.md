@@ -1,7 +1,7 @@
 ---
 status: accepted
 document: design
-updated: 2026-09-13
+updated: 2026-09-24
 ---
 
 # Exportação normal
@@ -12,21 +12,25 @@ A tela de Exportação reúne somente as decisões necessárias para gerar a sa�
 
 ## Estrutura do diálogo
 
-A Exportação normal usa um único diálogo modal com largura inicial de 800 px,
-sem uma linha interna de título `Exportar`. A proposta abaixo foi aprovada
-pelo usuário como refinamento da referência visual do projeto:
+A Exportação normal usa um único diálogo modal com largura inicial de 800 px.
+A barra da janela mostra somente `Exportar`, sem a marca MyAlbuns, como a
+janela de Configurações; não há outra linha interna de título. O mesmo título
+vale para todas as etapas da exportação: Tela de Problemas, conflitos,
+progresso, conclusão e falha. A proposta
+original abaixo foi aprovada pelo usuário como refinamento da referência visual
+do projeto e recebeu o refinamento de 24/09/2026 descrito a seguir:
 
 ![Proposta aprovada para a Exportação normal](assets/0004-exportacao-aprovada.png)
 
-Os blocos têm títulos acima dos controles, margens laterais amplas e espaço
-entre eles, na seguinte ordem:
+Os blocos têm títulos curtos acima dos controles, separados apenas por espaço,
+sem faixas ou linhas entre eles, na seguinte ordem:
 
-1. `Destino da exportação`: campo de pasta e botão `Escolher…` na mesma linha;
-2. `Formato de exportação`: seletor `JPEG`, `PNG` ou `PDF`, acompanhado do
-   slider e percentual de qualidade quando o formato é JPEG;
-3. `Seleção de lâminas`: opções exclusivas `Todas as lâminas` e
-   `Intervalo personalizado`, uma abaixo da outra. O intervalo tem um único
-   campo ao lado. Na mesma linha, à direita, fica a opção independente
+1. `Destino`: campo de pasta e botão `Escolher…` na mesma linha;
+2. `Formato`: seletor `JPEG`, `PNG` ou `PDF`, acompanhado do slider e
+   percentual de qualidade quando o formato é JPEG;
+3. `Lâminas`: opções exclusivas `Todas as lâminas` e `Intervalo`, uma abaixo
+   da outra. O intervalo tem um único campo ao lado. Na mesma linha, encostada
+   à direita e alinhada com `Escolher…` e `Exportar`, fica a opção independente
    `Exportar como páginas simples`.
 
 `Todas as lâminas` é o padrão. O campo de intervalo permanece desabilitado
@@ -35,7 +39,26 @@ nessa seleção e preserva o texto ao alternar. O intervalo aceita uma lâmina
 à saída por lâmina; marcado corresponde à saída por página. Em janelas mais
 estreitas, a opção de páginas simples passa para a linha seguinte.
 
-O rodapé fixo apresenta a quantidade calculada de arquivos para JPEG/PNG ou de páginas para PDF, além de `Cancelar` e `Exportar`.
+O rodapé fixo, em uma faixa de tom (`--ui-surface-muted`), apresenta a
+quantidade calculada de arquivos para JPEG/PNG ou de páginas para PDF, além de
+`Cancelar` e `Exportar`. Uma mensagem da verificação ocupa o lugar dessa
+quantidade, em vermelho e sem caixa, sem acrescentar linhas à janela.
+
+### Refinamento de 24/09/2026
+
+Decisão do autor, validada em protótipo, para alinhar o diálogo à densidade
+das demais janelas auxiliares:
+
+- controles de 31 pixels, texto de controle de 12,5 pixels e títulos de bloco
+  de 13 pixels em peso 600, com 12 pixels entre título e conteúdo e 32 pixels
+  entre blocos; opções de escolha com 16 pixels;
+- somente `Exportar` usa a ação principal azul; `Escolher…` é uma ação comum;
+- o seletor de formato usa a seta nativa, sem ícone próprio, e o slider de
+  qualidade usa o controle compartilhado do aplicativo;
+- o percentual de qualidade usa fonte monoespaçada;
+- a [Exportação em lote](0006-configuracao-da-exportacao-em-lote.md#refinamento-de-24092026)
+  e a [Geração em lote](0008-configuracao-da-geracao-em-lote.md) seguem o
+  mesmo padrão.
 
 Na abertura, a pasta de destino padrão é obtida antes de apresentar o diálogo.
 A janela aparece diretamente com os campos prontos para edição, sem um estado
@@ -44,17 +67,19 @@ já abre editável com a mensagem de erro e permite escolher outra pasta.
 
 ```text
 ┌──────────────────────────────────────────────────────────────────┐
-│  Destino da exportação                                          │
-│  [ caminho calculado ou escolhido ]                [ Escolher ] │
-│                                                                 │
-│  Formato de exportação                                          │
-│  [ JPEG ▾ ]    Qualidade: ─────────● 100%                         │
-│                                                                 │
-│  Seleção de lâminas                                             │
-│  ● Todas as lâminas                                             │
-│  ○ Intervalo personalizado [ 3-8 ]    □ Páginas simples          │
+│                            Exportar                           ✕  │
 ├──────────────────────────────────────────────────────────────────┤
-│  28 arquivos                              Cancelar   Exportar     │
+│  Destino                                                        │
+│  [ caminho calculado ou escolhido ]               [ Escolher… ] │
+│                                                                 │
+│  Formato                                                        │
+│  [ JPEG ▾ ]    Qualidade ─────────● 100%                         │
+│                                                                 │
+│  Lâminas                                                        │
+│  ● Todas as lâminas                                             │
+│  ○ Intervalo [ 3-8 ]            □ Exportar como páginas simples  │
+├──────────────────────────────────────────────────────────────────┤
+│  28 arquivos · JPEG                       Cancelar   Exportar     │
 └──────────────────────────────────────────────────────────────────┘
 ```
 
@@ -71,10 +96,10 @@ Quando o formato do lote é JPEG, a codificação usa obrigatoriamente qualidade
 ## Entrada contextual
 
 `Exportar Lâmina`, acionado pelo menu de contexto, abre o mesmo diálogo com
-`Intervalo personalizado` selecionado e o número da Lâmina de origem preenchido no
+`Intervalo` selecionado e o número da Lâmina de origem preenchido no
 campo. Todas as demais opções continuam editáveis antes de iniciar.
 
-Ao selecionar `Intervalo personalizado`, o campo vazio permanece neutro. Um valor preenchido inválido recebe indicação no campo e orientação em tooltip, sem adicionar linhas ou alterar a altura da janela. O botão `Exportar` permanece desabilitado enquanto o intervalo estiver vazio ou inválido. A operação mantém os arquivos fora do intervalo. Uma Exportação integral é a única operação que restabelece um conjunto completo autoritativo no destino.
+Ao selecionar `Intervalo`, o campo vazio permanece neutro. Um valor preenchido inválido recebe indicação no campo e orientação em tooltip, sem adicionar linhas ou alterar a altura da janela. O botão `Exportar` permanece desabilitado enquanto o intervalo estiver vazio ou inválido. A operação mantém os arquivos fora do intervalo. Uma Exportação integral é a única operação que restabelece um conjunto completo autoritativo no destino.
 
 ## Pré-validação
 

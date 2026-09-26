@@ -1,6 +1,7 @@
 ---
 status: accepted
 document: design
+updated: 2026-09-24
 ---
 
 # Progresso de operações
@@ -8,6 +9,11 @@ document: design
 ## Objetivo
 
 O aplicativo reutiliza uma única representação simples para operações que precisam mostrar progresso. O componente não expõe a organização interna em processos, threads, filas ou trabalhos simultâneos.
+
+Desde 24/09/2026, por decisão do autor validada em protótipo, a barra da janela
+mostra o nome do fluxo que abriu o progresso (`Exportar`, `Exportação em lote`,
+`Gerar projetos em lote`), sem a marca. O corpo usa margens de 24 pixels e o
+rodapé com `Cancelar` fica em uma faixa de tom, como nas demais janelas.
 
 Cada tentativa fornece seu próprio `ProgressSink` ao componente. A janela somente apresenta os eventos recebidos: não possui o trabalho, a exclusividade global ou o token de cancelamento e não mantém um serviço global de progresso.
 

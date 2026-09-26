@@ -1,7 +1,7 @@
 ---
 status: accepted
 document: design
-updated: 2026-09-11
+updated: 2026-09-24
 ---
 
 # Criação de Projeto
@@ -19,24 +19,48 @@ A criação possui exatamente duas etapas dentro do aplicativo:
 1. `Configurações`, dedicada à base física e estrutural do Álbum;
 2. `Personalização`, dedicada aos padrões visuais iniciais.
 
-`Novo Projeto` aparece como contexto no título da janela e não se repete na
-área de conteúdo. A faixa superior compartilhada centraliza as duas etapas no
-espaço disponível à esquerda do controle `Modelo inicial` e mantém esse controle
-alinhado à direita durante todo o fluxo. Quando recebe foco, o controle composto
-usa somente uma mudança neutra de fundo; o campo e a ação de salvar não
-desenham contorno azul nem bordas de foco adicionais.
+`Novo projeto` aparece sozinho no título da janela, sem a marca, e não se repete
+na área de conteúdo. A faixa superior compartilhada contém somente as duas
+etapas, centralizadas. `Modelo inicial` é a primeira seção do painel de
+controles nas duas etapas, alinhada aos campos abaixo dela. Quando recebe foco,
+o controle composto usa somente uma mudança neutra de fundo; o campo e a ação de
+salvar não desenham contorno azul nem bordas de foco adicionais.
+
+#### Refinamento de 24/09/2026
+
+Decisão do autor, validada em protótipo, para usar na criação os mesmos nomes e
+controles do painel `Informações do Álbum` do editor:
+
+- os grupos de `Configurações` são `Documento` (Unidade e Resolução),
+  `Dimensão da lâmina fechada` (Largura e Altura), `Áreas técnicas` (Sangria e
+  Área de segurança) e `Estrutura` (Lâminas, Primeira lâmina e Última lâmina),
+  em uma grade de duas colunas com todos os campos da mesma largura. Cada campo
+  tem seu próprio rótulo; não há títulos que repitam os rótulos nem o sinal `×`
+  entre largura e altura;
+- os campos numéricos usam a aparência integrada do editor, com sublinhado
+  discreto e unidade dentro do campo; os seletores de extremidade mantêm a
+  caixa, como no editor;
+- os títulos de grupo usam o título de subseção do editor: 11 pixels, cinza
+  secundário;
+- a validação continua transferindo o foco ao primeiro campo inválido na nova
+  ordem visual: Resolução, Largura, Altura, Sangria, Área de segurança e
+  Lâminas;
+- em `Personalização`, Fundo e Sobreposição usam a mesma ação compacta
+  `Escolher imagem…`, sem ícone nem área tracejada, e o grupo dos quadros se
+  chama `Padrão dos quadros`, como no editor;
+- o rodapé fica em uma faixa de tom, com `Cancelar` na forma de botão comum,
+  ainda isolado à esquerda.
 
 ### Configurações
 
 A primeira etapa mantém uma prévia proporcional da Lâmina aberta à esquerda e
 organiza os controles à direita nesta ordem:
 
-- Unidade de medida;
-- Dimensão da Lâmina fechada;
-- Sangria e Área de segurança;
-- quantidade inicial de Lâminas;
-- Resolução do Projeto;
-- Configuração das extremidades.
+- `Modelo inicial`;
+- `Documento`: Unidade de medida e Resolução do Projeto;
+- `Dimensão da lâmina fechada`: Largura e Altura;
+- `Áreas técnicas`: Sangria e Área de segurança;
+- `Estrutura`: quantidade inicial de Lâminas e configuração das extremidades.
 
 A largura informada em `Dimensão da Lâmina fechada` corresponde à largura da
 Página. A interface deriva a largura da Dimensão da Lâmina aberta multiplicando
@@ -74,16 +98,20 @@ controles, sem repetir essas informações em um card de resumo.
 
 ```text
 ┌──────────────────────────────────────────────────────────────────┐
-│    1 Configurações ─ 2 Personalização        Modelo inicial [⌄]  │
+│              1 Configurações ─ 2 Personalização                  │
 ├───────────────────────────────────────────┬──────────────────────┤
-│  Lâmina aberta · quantidade · guias       │  Unidade              │
-│          prévia proporcional              │  Dimensão fechada     │
-│                                           │  Sangria · Segurança │
+│  Lâmina aberta · quantidade · guias       │  Modelo inicial [⌄]   │
+│          prévia proporcional              │  Documento            │
+│                                           │  Unidade · Resolução  │
+│                                           │  Dimensão fechada     │
+│                                           │  Largura · Altura     │
+│                                           │  Áreas técnicas       │
+│                                           │  Sangria · Segurança  │
+│                                           │  Estrutura            │
 │                                           │  Lâminas              │
-│                                           │  Resolução do Projeto │
-│                                           │  Extremidades         │
+│                                           │  Primeira · Última    │
 ├──────────────────────────────────────────────────────────────────┤
-│  Cancelar                                           Continuar    │
+│  [Cancelar]                                        Continuar     │
 └──────────────────────────────────────────────────────────────────┘
 ```
 
@@ -197,18 +225,19 @@ A reprodução é somente visual: sua Lâmina, seus Frames e qualquer conteúdo 
 `Personalização` usa duas colunas durante toda a etapa:
 
 - a coluna esquerda, maior, mantém a reprodução da Lâmina;
-- a coluna direita contém os controles de Background, Overlay e Padrão dos Frames;
+- a coluna direita começa por `Modelo inicial` e contém os controles de Background, Overlay e Padrão dos Frames;
 - o rodapé fixo contém `Voltar`, `Cancelar` e `Criar Projeto`.
 
 Os controles podem rolar dentro de sua região quando necessário, sem retirar a reprodução da área visível. O rodapé também permanece acessível independentemente da rolagem.
 
 ```text
 ┌──────────────────────────────────────────────────────────────────┐
-│    1 Configurações ─ 2 Personalização        Modelo inicial [⌄]  │
+│              1 Configurações ─ 2 Personalização                  │
 ├───────────────────────────────────────────┬──────────────────────┤
-│                                           │  Background          │
-│                                           │  Overlay             │
-│          reprodução da Lâmina             │  Padrão dos Frames   │
+│                                           │  Modelo inicial [⌄]  │
+│                                           │  Fundo               │
+│                                           │  Sobreposição        │
+│          reprodução da Lâmina             │  Padrão dos quadros  │
 │                                           │                      │
 │                                           │                      │
 ├───────────────────────────────────────────┴──────────────────────┤

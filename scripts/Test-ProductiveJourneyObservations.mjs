@@ -50,10 +50,10 @@ test("locates the New Project flow through stable accessible names", () => {
 
   assert.match(
     runner,
-    /"css selector",\s*"button\[aria-label='Novo Projeto'\]"/,
+    /"css selector",\s*"button\[aria-label='Novo projeto'\]"/,
   );
-  assert.match(runner, /\["Largura da Lâmina fechada", "50\.8"\]/);
-  assert.match(runner, /\["Altura da Lâmina fechada", "25\.4"\]/);
+  assert.match(runner, /\["Largura", "50\.8"\]/);
+  assert.match(runner, /\["Altura", "25\.4"\]/);
   assert.match(
     runner,
     /"css selector",\s*"button\[aria-label='Continuar'\]"/,
@@ -106,7 +106,7 @@ test("locates the New Project flow through stable accessible names", () => {
   assert.match(runner, /\$\{label\} confirmation dialog/);
   assert.doesNotMatch(
     runner,
-    /\/\/button\[normalize-space\(\)='(?:Novo Projeto|Próximo|Criar)'\]/,
+    /\/\/button\[normalize-space\(\)='(?:Novo [Pp]rojeto|Próximo|Criar)'\]/,
   );
   assert.doesNotMatch(runner, /document-dpi-control|Aplicar DPI/);
   assert.doesNotMatch(

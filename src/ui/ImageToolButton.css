@@ -20,3 +20,7 @@
 .ui-image-tool svg { width: 18px; height: 18px; }
 .ui-image-tool[data-glyph="navigation"] svg { width: 26px; height: 26px; }
 .ui-image-tool:focus-visible { outline: 2px solid var(--ui-focus-neutral); outline-offset: 2px; }
+.ui-action-button.ui-image-tool--labelled { display: inline-flex; width: auto; align-items: center; padding: 0 var(--ui-space-4) 0 var(--ui-space-3); border-radius: 21px; gap: var(--ui-space-2); white-space: nowrap; }
+.ui-image-tool--labelled::before { border-radius: 18px; }
+.ui-image-tool--labelled:focus-visible { border-radius: 21px; }
+.ui-image-tool__label { font-size: var(--ui-font-size-control); font-weight: 500; }

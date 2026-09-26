@@ -13,6 +13,6 @@
   min-width: min(220px, calc(100vw - 16px));
   max-width: calc(100vw - 16px);
   max-height: calc(100vh - 16px);
-  padding: var(--ui-space-1) 0;
+  padding: var(--ui-space-1);
   overflow-y: auto;
 }

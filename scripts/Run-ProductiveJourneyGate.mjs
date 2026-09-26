@@ -1023,14 +1023,14 @@ try {
   await click(
     globalDriver,
     "css selector",
-    "button[aria-label='Novo Projeto']",
+    "button[aria-label='Novo projeto']",
     "New Project action",
   );
   for (const [label, text] of [
-    ["Largura da Lâmina fechada", "50.8"],
-    ["Altura da Lâmina fechada", "25.4"],
-    ["DPI", "240"],
-    ["Quantidade de Lâminas", "3"],
+    ["Largura", "50.8"],
+    ["Altura", "25.4"],
+    ["Resolução", "240"],
+    ["Lâminas", "3"],
   ]) {
     await replaceInput(
       globalDriver,
@@ -1040,7 +1040,7 @@ try {
       label,
     );
   }
-  for (const label of ["Primeira Lâmina", "Última Lâmina"]) {
+  for (const label of ["Primeira lâmina", "Última lâmina"]) {
     await changeFormControl(
       globalDriver,
       "xpath",

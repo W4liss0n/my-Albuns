@@ -321,6 +321,9 @@ test("a correction preview compares only the target and saves once even while sh
   expect(screen.getByRole("img", { name: "Imagem a" })).toHaveAttribute("src", "data:image/png;id=corrected");
   const reference = screen.getByRole("img", { name: "Outra foto.jpg" });
   const compare = screen.getByRole("button", { name: "Antes e depois: mostrar original" });
+  expect(compare.closest(".eye-correction__pane:last-child")).not.toBeNull();
+  expect(compare.closest(".eye-correction__tools")).toBeNull();
+  expect(compare).toHaveTextContent("OriginalCorrigida");
   expect(compare).toHaveAttribute("aria-pressed", "false");
   fireEvent.click(compare);
   expect(screen.getByRole("img", { name: "Imagem a" })).toHaveAttribute("src", initial.url);
@@ -559,12 +562,17 @@ test("correction tooltips follow focus and close when focus leaves the group", a
     referenceState: "ready", canPreviousReference: false, canNextReference: false, resultUrl: "data:image/png;id=corrected", error: null,
   };
   render(<ImageViewer presentation={{ ...initial, correction }} onNavigate={vi.fn()} onClose={vi.fn()} onCorrection={vi.fn()} />);
-  const compare = screen.getByRole("button", { name: "Antes e depois: mostrar original" });
-  expect(compare).not.toHaveAttribute("title");
-  compare.focus();
-  expect(await screen.findByRole("tooltip")).toHaveTextContent("Antes e depois: mostrar original");
-  screen.getByRole("button", { name: "Salvar correção" }).focus();
-  await waitFor(() => expect(screen.getByRole("tooltip")).toHaveTextContent("Salvar correção"));
+  const save = screen.getByRole("button", { name: "Salvar correção" });
+  expect(save).not.toHaveAttribute("title");
+  save.focus();
+  expect(await screen.findByRole("tooltip")).toHaveTextContent("Salvar correção");
+  screen.getByRole("button", { name: "Fechar correção" }).focus();
+  await waitFor(() => expect(screen.getByRole("tooltip")).toHaveTextContent("Fechar correção"));
+  // Labelled controls already say what they do.
+  screen.getByRole("button", { name: "Antes e depois: mostrar original" }).focus();
+  await waitFor(() => expect(screen.queryByRole("tooltip")).not.toBeInTheDocument());
+  screen.getByRole("button", { name: "Trocar referência" }).focus();
+  await waitFor(() => expect(screen.queryByRole("tooltip")).not.toBeInTheDocument());
   screen.getByRole("img", { name: "Imagem a" }).closest<HTMLElement>(".eye-correction__pane-image")?.focus();
   await waitFor(() => expect(screen.queryByRole("tooltip")).not.toBeInTheDocument());
 });

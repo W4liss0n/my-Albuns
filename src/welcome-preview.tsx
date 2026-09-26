@@ -78,7 +78,7 @@ ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
       recentProjectsNow={["dates", "long-names", "favorites", "favorites-only", "favorites-long-names"].includes(previewParameters.get("recents") ?? "")
         ? welcomeDatesNow : undefined}
       onOpenBatch={secondaryActionsDisabled ? undefined : async () => { window.location.href = "/batch-export-preview.html?scenario=configuration"; }}
-      onOpenSettings={secondaryActionsDisabled || previewParameters.get("graphics") === "unsupported" ? undefined : async () => { window.location.href = "/settings-preview.html?section=performance"; }}
+      onOpenSettings={secondaryActionsDisabled ? undefined : async () => { window.location.href = "/settings-preview.html?section=performance"; }}
       failureDialogPort={failureDialogPort}
       graphicsDiagnostic={graphicsDiagnostic}
       newProjectPort={newProjectPort}

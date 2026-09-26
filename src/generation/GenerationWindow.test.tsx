@@ -108,3 +108,17 @@ test("distinguishes ignored projects from failures even when both retain a reaso
   expect(screen.getByText("O projeto está aberto.")).toBeVisible();
   expect(screen.getByText("A foto mudou.")).toBeVisible();
 });
+
+test("shows the model as plain information and keeps Verificar e gerar as the only primary action", async () => {
+  const { container } = render(<GenerationWindow port={port({ model: async () => "Formatura 2026" })} />);
+  const model = await screen.findByRole("region", { name: "Modelo" });
+  expect(model).toHaveTextContent("Formatura 2026");
+  expect(model).toHaveTextContent("Inclui as alterações ainda não salvas. O modelo permanece inalterado.");
+  expect(model.querySelector("svg")).toBeNull();
+  for (const choose of screen.getAllByRole("button", { name: "Escolher…" })) {
+    expect(choose).not.toHaveClass("ui-action-button--primary");
+  }
+  expect(screen.getByRole("button", { name: "Verificar e gerar" })).toHaveClass("ui-action-button--primary");
+  expect(container.querySelector(".ui-application-header .ui-brand")).toBeNull();
+  expect(screen.getByRole("banner", { name: "Barra da janela" })).toHaveTextContent("Gerar projetos em lote");
+});

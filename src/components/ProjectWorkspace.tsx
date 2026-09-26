@@ -771,9 +771,11 @@ export function ProjectWorkspace({
   return (
     <div className="app-shell ui-chrome-selection-scope">
       <ApplicationHeader
+        align="start"
         context={projection.state.projectName}
         metadata={projectMetadata}
-        status={projection.state.dirty ? "alterações não salvas" : "salvo"}
+        status={projection.state.dirty ? "Alterações não salvas" : "Salvo"}
+        statusEmphasis={projection.state.dirty}
       />
 
       <div className="commandbar">

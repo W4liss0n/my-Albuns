@@ -2267,7 +2267,7 @@ test("keeps a completed Save authoritative when a monitor read finishes during s
       logger={silentLogger}
     />,
   );
-  await screen.findByText("alterações não salvas");
+  await screen.findByText("Alterações não salvas");
   act(() => notify(["media-001"]));
   await waitFor(() => expect(load).toHaveBeenCalledTimes(2));
   fireEvent.click(screen.getByRole("menuitem", { name: "Arquivo" }));
@@ -2278,7 +2278,7 @@ test("keeps a completed Save authoritative when a monitor read finishes during s
     outcome: { kind: "saved", revision: saved.state.revision },
     projection: saved,
   }));
-  await waitFor(() => expect(screen.queryByText("alterações não salvas")).not.toBeInTheDocument());
+  await waitFor(() => expect(screen.queryByText("Alterações não salvas")).not.toBeInTheDocument());
 });
 
 test.each(["ready", "decode_failed", "native_unavailable", "storage_paused"] as const)("delivers imported cards together after visible preview preparation: %s", async (outcome) => {

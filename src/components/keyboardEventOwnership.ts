@@ -4,7 +4,7 @@ import { isTextEntryTarget } from "./isTextEntryTarget";
 export function ownsEditingKeys(target: EventTarget | null) {
   return isTextEntryTarget(target) || (
     target instanceof Element && target.closest(
-      '[role="dialog"], [role="menu"], [role="menubar"], [role="listbox"], [role="scrollbar"]',
+      '[role="dialog"], [role="menu"], [role="menubar"], [role="combobox"], [role="listbox"], [role="scrollbar"]',
     ) !== null
   );
 }

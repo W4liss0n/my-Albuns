@@ -49,7 +49,8 @@ export function OwnedWindowShell({
       ref={shellRef}
       style={width === undefined ? undefined : { width }}
     >
-      <ApplicationHeader controls={controls} status={status} context={context} />
+      {/* Dialogs never repeat the brand: the title bar names the flow, when there is one. */}
+      <ApplicationHeader controls={controls} status={status} context={context} showBrand={false} />
       {children}
     </div>
   );

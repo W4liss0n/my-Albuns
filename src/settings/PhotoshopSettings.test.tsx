@@ -101,6 +101,36 @@ test("manual cancellation preserves selection and an invalid executable displays
   expect(screen.getByRole("combobox")).toHaveValue("new");
 });
 
+test("an operation error opens the shared tooltip on the control that failed, without a notice box", async () => {
+  const service = port();
+  const { container } = render(<PhotoshopSettings port={service} />);
+  await screen.findByText(installations[0].path);
+  vi.mocked(service.locate).mockRejectedValueOnce(new PhotoshopError("invalid_installation", "Selecione um executável do Adobe Photoshop."));
+  const locate = screen.getByRole("button", { name: "Localizar…" });
+  fireEvent.click(locate);
+  const tooltip = await screen.findByRole("tooltip");
+  expect(tooltip).toHaveTextContent("Selecione um executável");
+  expect(locate.parentElement).toContainElement(tooltip);
+  expect(locate).toHaveAttribute("aria-invalid", "true");
+  expect(screen.getByRole("combobox")).not.toHaveAttribute("aria-invalid");
+  expect(container.querySelector(".ui-inline-notice")).toBeNull();
+
+  fireEvent.pointerDown(document.body);
+  await waitFor(() => expect(screen.queryByRole("tooltip")).not.toBeInTheDocument());
+  expect(screen.getByRole("alert")).toHaveTextContent("Selecione um executável");
+
+  vi.mocked(service.select).mockRejectedValueOnce(new PhotoshopError("invalid_installation", "Escolha outra instalação."));
+  fireEvent.change(screen.getByRole("combobox"), { target: { value: "old" } });
+  expect(await screen.findByRole("tooltip")).toHaveTextContent("Escolha outra instalação.");
+  expect(screen.getByRole("combobox").parentElement).toContainElement(screen.getByRole("tooltip"));
+  expect(locate).not.toHaveAttribute("aria-invalid");
+});
+
+test("names the command that uses the installation with its shortcut", async () => {
+  render(<PhotoshopSettings port={port()} />);
+  expect(await screen.findByText("Usado em Abrir no Photoshop (Ctrl+E).")).toBeVisible();
+});
+
 test("absence disables only installation selection and focus discovers a later installation", async () => {
   const service = port();
   vi.mocked(service.status).mockResolvedValueOnce({ revision: 0, installations: [], selectedInstallationId: null });

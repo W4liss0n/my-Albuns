@@ -141,3 +141,14 @@ test("presents standard error messages as an actionable dialog", () => {
     within(dialog).getByRole("button", { name: "Localizar arquivo…" }),
   ).toHaveClass("ui-action-button--primary");
 });
+
+test("messages and confirmations carry no tone icon; the title and text say what happened", () => {
+  const { container, rerender } = render(<MessageDialog tone="error" title="Exportação não concluída"
+    description="Não foi possível publicar a exportação." secondaryAction={{ label: "Fechar", onClick: () => undefined }} />);
+  expect(container.querySelector("svg")).toBeNull();
+  expect(screen.getByRole("alert")).toHaveAttribute("data-tone", "error");
+  rerender(<ConfirmationDialog title="Já existe uma exportação" description="Deseja substituir?"
+    cancelAction={{ label: "Cancelar", onClick: () => undefined }} confirmAction={{ label: "Substituir", onClick: () => undefined }} />);
+  expect(container.querySelector("svg")).toBeNull();
+  expect(container.querySelector(".ui-standard-message__icon")).toBeNull();
+});

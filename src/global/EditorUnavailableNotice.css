@@ -1,0 +1,49 @@
+/* Sits where the recent projects would be, in the same Welcome layout. */
+.editor-unavailable {
+  max-width: 640px;
+}
+
+.editor-unavailable > h1 {
+  margin: 0 0 var(--ui-space-2);
+  color: var(--ui-text);
+  font-size: var(--ui-font-size-heading);
+  font-weight: 600;
+}
+
+.editor-unavailable > p {
+  margin: 0;
+  color: var(--ui-text-secondary);
+  font-size: var(--ui-font-size-control);
+  line-height: 1.5;
+}
+
+.editor-unavailable__details {
+  display: grid;
+  margin-top: var(--ui-space-6);
+  gap: var(--ui-space-3);
+}
+
+.editor-unavailable__details dl {
+  display: grid;
+  margin: 0;
+  gap: var(--ui-space-2);
+}
+
+.editor-unavailable__details dl > div {
+  display: grid;
+  grid-template-columns: 180px minmax(0, 1fr);
+  gap: var(--ui-space-3);
+}
+
+.editor-unavailable__details :is(dt, dd) {
+  margin: 0;
+  font-size: var(--ui-font-size-support);
+}
+
+.editor-unavailable__details dt {
+  color: var(--ui-text-muted);
+}
+
+.editor-unavailable__details dd {
+  color: var(--ui-text);
+}

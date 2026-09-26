@@ -133,12 +133,12 @@ try {
       await new Promise(resolve => setTimeout(resolve, 100));
       result = await execute(`
         const frame=document.querySelector('iframe'),doc=frame.contentDocument;
-        const scroll=doc.querySelector('.ui-problems-scroll'),row=doc.querySelector('tbody tr');
+        const scroll=doc.querySelector('.ui-problems-scroll'),row=doc.querySelector('.ui-problems-list > li');
         const box=scroll?.getBoundingClientRect(),rowBox=row?.getBoundingClientRect();
         const footer=doc.querySelector('.ui-dialog-window__footer')?.getBoundingClientRect();
         const tooltip=doc.querySelector('[role="tooltip"]')?.getBoundingClientRect();
         const body=doc.querySelector('.ui-dialog-window__body')?.getBoundingClientRect();
-        return {...window.fitting,width:frame.clientWidth,height:frame.clientHeight,rows:doc.querySelectorAll('tbody tr').length,
+        return {...window.fitting,width:frame.clientWidth,height:frame.clientHeight,rows:doc.querySelectorAll('.ui-problems-list > li').length,
           intervalInvalid:doc.querySelector('[aria-label="Lâminas do intervalo"]')?.getAttribute('aria-invalid')==='true',
           tooltipVisible:Boolean(tooltip),tooltipContained:!tooltip||(tooltip.top>=body.top&&tooltip.bottom<=body.bottom&&tooltip.left>=0&&tooltip.right<=frame.clientWidth),
           firstRowVisible:rowBox?Math.max(0,Math.min(rowBox.bottom,box.bottom)-Math.max(rowBox.top,box.top)):0,

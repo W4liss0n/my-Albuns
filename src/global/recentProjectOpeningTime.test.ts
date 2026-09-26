@@ -9,13 +9,13 @@ test("formats the opening time using local calendar days and pt-BR time", () => 
   const yesterday = new Date(2026, 8, 21, 9, 15);
   const older = new Date(2026, 8, 18, 9, 15);
   expect(recentProjectOpeningTime(today.getTime(), now)).toEqual({
-    label: "Hoje", fullLabel: "Hoje às 14:30", dateTime: today.toISOString(),
+    label: "Aberto hoje às 14:30", fullLabel: "Hoje às 14:30", dateTime: today.toISOString(),
   });
   expect(recentProjectOpeningTime(yesterday.getTime(), now)).toMatchObject({
-    label: "Ontem", fullLabel: "Ontem às 09:15",
+    label: "Aberto ontem às 09:15", fullLabel: "Ontem às 09:15",
   });
   expect(recentProjectOpeningTime(older.getTime(), now)).toMatchObject({
-    label: "18/09/2026", fullLabel: "18/09/2026 às 09:15",
+    label: "Aberto em 18/09/2026 às 09:15", fullLabel: "18/09/2026 às 09:15",
   });
 });
 

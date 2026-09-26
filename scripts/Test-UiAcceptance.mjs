@@ -388,7 +388,7 @@ test("the manifest covers critical integrated workspace, panel, menu, and graphi
     },
     "safe-application-shell": {
       path: "/welcome-preview.html?graphics=unsupported",
-      ready: /safe-shell/u,
+      ready: /editor-unavailable/u,
     },
   };
 
