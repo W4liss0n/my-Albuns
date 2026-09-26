@@ -99,7 +99,7 @@ ponta a ponta:
 
 1. **Não gravar o PNG completo na preparação.** Cerca de 0,9 s a menos no
    perfil `dev` e 0,3 s em `release`. Também elimina 35 MB temporários por
-   prévia.
+   prévia. Implementada na #131; ver o resultado abaixo.
 2. **Redução mais rápida da prévia.** Cerca de 200 ms, com `fast_image_resize`
    num pacote otimizado ou redução em duas etapas. Altera apenas os bytes da
    prévia.
@@ -110,14 +110,45 @@ ponta a ponta:
 
 Quando o aplicativo foi encerrado à força com uma prévia pendente, o PNG de
 35 MB permaneceu em `.myalbuns-corrections`, ao lado do Projeto, nos três
-encerramentos forçados do ensaio. Nenhum código remove esses arquivos depois. Com **Trocar referência**, os seis PNGs intermediários foram
-removidos normalmente.
+encerramentos forçados do ensaio. Nenhum código remove esses arquivos depois.
+Com **Trocar referência**, os seis PNGs intermediários foram removidos
+normalmente. Desde a #131 a preparação não grava arquivos, e o problema deixa
+de existir.
+
+## Resultado da #131: refazer a imagem ao salvar
+
+A preparação passou a devolver somente a prévia. Ao confirmar **Substituir
+original**, o Host confere os hashes da foto a corrigir e da referência,
+refaz a correção a partir das duas e a codifica no formato do original.
+
+A comparação usou as mesmas cópias, o mesmo perfil `dev` e o mesmo roteiro,
+agora estendido até **Salvar correção** → **Substituir original**. Versão
+anterior (`2c5d54f7`) e nova foram executadas alternadamente, três vezes cada,
+com projeto e dados novos em cada rodada. Outra sessão compilava na mesma
+máquina durante o ensaio, o que afeta as duas versões; por isso a alternância.
+
+| Trecho, mediana de 3 rodadas | Antes | Depois |
+| --- | ---: | ---: |
+| Clique → prévia pintada | 2.108 ms | 1.046 ms |
+| ↳ comando `prepare_eye_correction` | 1.985 ms | 911 ms |
+| **Substituir original** → correção encerrada | 2.597 ms | 1.997 ms |
+| ↳ comando `apply_eye_correction` | 2.524 ms | 1.937 ms |
+
+O Salvar também ficou mais rápido: refazer a composição custa menos que ler
+de volta o PNG de 35 MB. As seis fotos substituídas têm o mesmo SHA-256,
+`7857216ee0eb76731480f968a90db7bd621b4e89cb3f70f19e5c50e55ba7a686`, e a prévia
+continua idêntica byte a byte à de 23/09/2026 (`b78b0cca…`). A versão nova não
+criou `.myalbuns-corrections` em nenhuma rodada, nem ao ser encerrada à força
+com uma prévia pendente; nesse caso, as duas fotos mantiveram seus hashes.
+Com prévias seguidas no mesmo aplicativo, o clique → prévia ficou entre 903 e
+976 ms.
 
 ## Reprodução
 
 O roteiro, o gerador do projeto e o ensaio por etapas ficam somente em
 `.scratch/eye-latency-20260926/tools`; os resultados, em `native-dev.json`,
-`stage-bench-dev.txt` e `stage-bench-release.txt` na mesma pasta. As fotos
+`stage-bench-dev.txt` e `stage-bench-release.txt` na mesma pasta. A comparação
+da #131 usa `tools/apply-run.sh` e fica em `apply-cmp-*`. As fotos
 de entrada vêm de `.scratch/face-detection-debug-20260923/inputs`.
 
 A execução visível abre janelas do aplicativo e exige autorização explícita,
