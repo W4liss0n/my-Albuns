@@ -2,7 +2,7 @@
 status: accepted
 document: design
 date: 2026-09-22
-updated: 2026-09-23
+updated: 2026-09-26
 ---
 
 # Visualizador de imagens em janela própria
@@ -40,7 +40,7 @@ análise devolva um rosto com o mesmo índice. A preparação anterior também p
 a validade: uma resposta atrasada não pode reaparecer nem habilitar o salvamento
 para a nova versão.
 
-**Salvar correção** abre o diálogo compartilhado **Substituir foto original?**, identificando o nome do arquivo sem sinais decorativos como « » e explicando que o original será substituído pela versão corrigida. As ações são **Cancelar** e **Substituir original**, com foco inicial seguro em Cancelar. Cancelar preserva a prévia para conferência. A substituição exige confirmação explícita mesmo se a pessoa estiver olhando o original em Antes e depois. Até essa confirmação, analisar, selecionar, comparar e fechar não alteram o arquivo original.
+**Salvar correção** abre o diálogo compartilhado **Substituir foto original?**, identificando o nome do arquivo sem sinais decorativos como « » e explicando que o original será substituído pela versão corrigida. As ações são **Cancelar** e **Substituir original**, com foco inicial seguro em Cancelar. Cancelar preserva a prévia para conferência. A substituição exige confirmação explícita mesmo se a pessoa estiver olhando o original em Antes e depois. Até essa confirmação, analisar, selecionar, comparar e fechar não alteram o arquivo original. A preparação gera somente a prévia e não grava arquivos ao lado do Projeto. Ao confirmar, o Host confere que a foto a corrigir e a referência não mudaram desde a prévia e refaz a correção em resolução total a partir das duas; se alguma mudou, a substituição é recusada e o original permanece intacto.
 
 Após confirmar, a correção substitui o conteúdo do arquivo original, preservando seu caminho e formato. Essa decisão substitui a política anterior de manter uma cópia corrigida como novo vínculo. A gravação deve evitar deixar um arquivo incompleto em caso de falha e não pode sobrescrever silenciosamente uma foto alterada externamente desde a preparação. As prévias e os vínculos do Projeto precisam refletir o novo conteúdo; reabrir ou exportar deve usar a foto corrigida. O salvamento da correção não substitui o salvamento do arquivo do Projeto. Enquanto o diálogo está aberto, teclado e ponteiro pertencem à confirmação; Esc cancela somente o diálogo.
 

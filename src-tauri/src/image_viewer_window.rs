@@ -1,7 +1,4 @@
-use std::{
-    path::PathBuf,
-    sync::{Arc, Mutex},
-};
+use std::sync::{Arc, Mutex};
 use tokio::sync::{Semaphore, watch};
 
 use tauri::{AppHandle, Emitter, Manager, State, WebviewWindow, WindowEvent};
@@ -298,10 +295,8 @@ struct PendingEyes {
     session_id: String,
     media_id: String,
     token: String,
-    path: PathBuf,
     url: String,
-    original_path: PathBuf,
-    original_digest: [u8; 32],
+    source: eye_correction::CorrectionSource,
 }
 
 #[derive(Clone, Eq, PartialEq)]
@@ -399,7 +394,6 @@ impl CorrectionStore {
         let generation = self.advance_generation(state);
         if let Some(pending) = state.pending.take() {
             previews.revoke_viewer_preview(&pending.url);
-            let _ = std::fs::remove_file(pending.path);
         }
         generation
     }
@@ -590,7 +584,6 @@ pub(crate) async fn prepare_eye_correction(
         &target_face,
         &reference_face,
     )?;
-    let output = eye_correction::corrected_path(&host.project_directory()?, &target.logical_path)?;
     let generation = match corrections.admit(key.clone(), &previews)? {
         PreparationAdmission::Ready(result) => return Ok(result),
         PreparationAdmission::Join(mut signal) => loop {
@@ -607,34 +600,33 @@ pub(crate) async fn prepare_eye_correction(
     let result: Result<PreparedEyes, String> = async {
     let permit = corrections.acquire_current(generation).await?;
     let current = corrections.generation.subscribe();
-    let output_for_render = output.clone();
-    let rendered = tauri::async_runtime::spawn_blocking(move || {
+    let rendered = tauri::async_runtime::spawn_blocking(move || -> Result<(Vec<u8>, eye_correction::CorrectionSource), String> {
         let checkpoint = |_: eye_correction::RenderStage| {
             if *current.borrow() == generation { Ok(()) }
             else { Err("A correção foi cancelada.".into()) }
         };
         checkpoint(eye_correction::RenderStage::Decode)?;
-        let before = eye_correction::source_digest(&target_path)?;
-        let bytes = eye_correction::render_with_checkpoint(&target_path, &reference_path, &target_face, &reference_face, &output_for_render, checkpoint)?;
+        let target_digest = eye_correction::source_digest(&target_path)?;
+        let reference_digest = eye_correction::source_digest(&reference_path)?;
+        let bytes = eye_correction::render_preview(&target_path, &reference_path, &target_face, &reference_face, checkpoint)?;
         if *current.borrow() != generation { return Err("A correção foi cancelada.".into()); }
-        if eye_correction::source_digest(&target_path)? != before {
+        if eye_correction::source_digest(&target_path)? != target_digest {
             return Err("A foto original mudou durante a preparação. Feche a correção e use Abrir olhos novamente.".into());
         }
+        if eye_correction::source_digest(&reference_path)? != reference_digest {
+            return Err("A foto de referência mudou durante a preparação. Feche a correção e use Abrir olhos novamente.".into());
+        }
         drop(permit);
-        Ok((bytes, before))
+        let source = eye_correction::CorrectionSource { target: target_path, reference: reference_path,
+            target_face, reference_face, target_digest, reference_digest };
+        Ok((bytes, source))
     }).await.map_err(|_| "A correção foi interrompida.".to_string());
-    let (bytes, original_digest) = match rendered {
-        Ok(Ok(result)) => result,
-        Ok(Err(error)) => { let _ = std::fs::remove_file(&output); let _ = std::fs::remove_file(output.with_extension("tmp")); return Err(error); }
-        Err(error) => { let _ = std::fs::remove_file(&output); let _ = std::fs::remove_file(output.with_extension("tmp")); return Err(error); }
-    };
+    let (bytes, source) = rendered??;
     let url = previews.publish_viewer_preview(bytes);
     let token = uuid::Uuid::new_v4().to_string();
-    let pending = PendingEyes { key, session_id, media_id: target_media_id, token: token.clone(), path: output.clone(), url: url.clone(),
-        original_path: target.logical_path.clone(), original_digest };
+    let pending = PendingEyes { key, session_id, media_id: target_media_id, token: token.clone(), url: url.clone(), source };
     if !corrections.accept(generation, pending) {
         previews.revoke_viewer_preview(&url);
-        let _ = std::fs::remove_file(output);
         return Err("A correção foi cancelada.".into());
     }
     Ok(PreparedEyes { token, url })
@@ -687,13 +679,12 @@ pub(crate) async fn apply_eye_correction(
     let catalog = host.authorized_media_catalog()?;
     let binding = catalog.bindings.iter().find(|binding| binding.media_id == pending.media_id)
         .ok_or("A foto não pertence mais ao projeto.")?.clone();
-    if binding.logical_path != pending.original_path { return Err("A foto original mudou desde a prévia. Feche a correção e use Abrir olhos novamente.".into()); }
-    let affected: Vec<_> = catalog.bindings.iter().filter(|media| media.logical_path == pending.original_path).cloned().collect();
+    if binding.logical_path != pending.source.target { return Err("A foto original mudou desde a prévia. Feche a correção e use Abrir olhos novamente.".into()); }
+    let affected: Vec<_> = catalog.bindings.iter().filter(|media| media.logical_path == pending.source.target).cloned().collect();
     let mut paths = myalbuns_paths::OperationPathContext::new();
     let cache_root = app.state::<crate::cache_service::ActiveCacheNamespace>().namespace().paths().root().to_path_buf();
     paths.capture(&cache_root).map_err(|error| error.to_string())?;
     for media in &catalog.bindings { paths.capture(&media.logical_path).map_err(|error| error.to_string())?; }
-    paths.capture(&pending.path).map_err(|error| error.to_string())?;
     let roots = paths.freeze();
     let engine = app.state::<CacheEngine>();
     let pause = engine.pause().await;
@@ -703,10 +694,8 @@ pub(crate) async fn apply_eye_correction(
         engine.invalidate_relinked_media(&pause, &app_paths, &active.namespace(), &previews, &media.media_id)
             .map_err(|error| error.message)?;
     }
-    let original = pending.original_path.clone();
-    let prepared = pending.path.clone();
-    let digest = pending.original_digest;
-    let replacement = tauri::async_runtime::spawn_blocking(move || eye_correction::replace_original(&original, &prepared, digest))
+    let source = pending.source.clone();
+    let replacement = tauri::async_runtime::spawn_blocking(move || eye_correction::replace_original(&source))
         .await.map_err(|_| "A substituição do original foi interrompida.".to_string()).and_then(|value| value);
     let backup = match replacement {
         Ok(backup) => backup,
@@ -728,7 +717,7 @@ pub(crate) async fn apply_eye_correction(
         Ok(projection) => projection,
         Err(error) => {
             tracing::warn!(target: "myalbuns.desktop", error = %error, event = "eye_correction_project_refresh_failed");
-            eye_correction::restore_original(&pending.original_path, &backup)?;
+            eye_correction::restore_original(&pending.source.target, &backup)?;
             for media in &affected {
                 if let Ok(metadata) = MediaResolver.inspect_media_binding_in_plan(media, &roots) {
                     let _ = host.observe_photo_source(media, metadata);
@@ -752,7 +741,7 @@ pub(crate) async fn apply_eye_correction(
     }
     if let Some(error) = cache_failure {
         tracing::warn!(target: "myalbuns.desktop", error = %error, event = "eye_correction_cache_refresh_failed");
-        eye_correction::restore_original(&pending.original_path, &backup)?;
+        eye_correction::restore_original(&pending.source.target, &backup)?;
         let repair_result: Result<(), String> = async {
             for media in &affected {
                 let metadata = MediaResolver.inspect_media_binding_in_plan(media, &roots)?;
@@ -780,7 +769,6 @@ pub(crate) async fn apply_eye_correction(
         Ok(projection) => {
             corrections.finish();
             previews.revoke_viewer_preview(&pending.url);
-            let _ = std::fs::remove_file(&pending.path);
             Ok(projection)
         }
         Err(error) => {
@@ -942,12 +930,11 @@ mod tests {
     }
 
     #[test]
-    fn applying_correction_keeps_prepared_candidate_until_mutation_finishes() {
-        let path = std::env::temp_dir().join(format!("myalbuns-eye-{}.png", uuid::Uuid::new_v4()));
-        std::fs::write(&path, b"prepared candidate").unwrap();
+    fn applying_correction_keeps_prepared_preview_until_mutation_finishes() {
         let previews = CachePreviewRegistry::new(LABEL);
         let url = previews.publish_viewer_preview(vec![1, 2, 3]);
         let corrections = CorrectionStore::default();
+        let face = Face(Vec::new());
         assert!(corrections.accept(
             0,
             PendingEyes {
@@ -955,10 +942,15 @@ mod tests {
                 session_id: "session".into(),
                 media_id: "target".into(),
                 token: "token".into(),
-                path: path.clone(),
-                url,
-                original_path: path.with_extension("jpg"),
-                original_digest: [0; 32],
+                url: url.clone(),
+                source: eye_correction::CorrectionSource {
+                    target: "target.jpg".into(),
+                    reference: "reference.jpg".into(),
+                    target_face: face.clone(),
+                    reference_face: face,
+                    target_digest: [0; 32],
+                    reference_digest: [0; 32],
+                },
             }
         ));
         assert!(matches!(
@@ -969,16 +961,16 @@ mod tests {
         assert!(corrections.clear(&previews).is_none());
         assert!(corrections.admit(key("reference"), &previews).is_err());
         assert!(
-            path.exists(),
-            "cancellation must not unlink a derivative during commit"
+            previews.is_published_url(&url),
+            "cancellation must not revoke the preview during commit"
         );
         assert!(corrections.is_applying());
-        // A failed commit after viewer retirement releases ownership, then discards the orphan.
+        // A failed commit after viewer retirement releases ownership, then discards the preview.
         corrections.release_apply();
         assert!(corrections.clear(&previews).is_some());
         assert!(
-            !path.exists(),
-            "a failed retired commit must discard its orphan"
+            !previews.is_published_url(&url),
+            "a failed retired commit must discard its preview"
         );
     }
 
