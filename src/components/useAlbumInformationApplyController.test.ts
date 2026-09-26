@@ -6,9 +6,10 @@ import type {
   ProjectDialogPort,
 } from "../application/projectDialogPort";
 import { createAlbumInformationProjectDraft } from "../application/projectSettingsDraft";
-import type { AlbumInformation } from "../domain/project";
+import { createAlbumInformationReview } from "../application/albumInformationReview";
+import type { AlbumInformation, AlbumInformationImpact, EdgeConversionLoss } from "../domain/project";
 import {
-  albumInformationDetails,
+  albumInformationConsequences,
   useAlbumInformationApplyController,
 } from "./useAlbumInformationApplyController";
 
@@ -23,87 +24,52 @@ const baseline: AlbumInformation = {
   lastSheet: "double",
 };
 
-test("describes only the Album information field that actually changed", () => {
-  const details = albumInformationDetails(
-    { ...baseline, firstSheet: "singlePage" },
-    baseline,
-    { conversionLosses: [],
-      sheetWidthPx: 7_087,
-      pageWidthPx: 3_543,
-      heightPx: 3_543,
-    },
-  );
+const noImpact: AlbumInformationImpact = { conversionLosses: [], sheetWidthPx: 7_087, pageWidthPx: 3_543, heightPx: 3_543 };
+const backgroundLoss = (sheetNumber: number, side: "left" | "right"): EdgeConversionLoss => ({
+  sheetId: `sheet-${sheetNumber}`, sheetNumber, side, overlay: null,
+  background: { kind: "custom", content: { kind: "color", rgb: "#123456" }, mapping: "side" },
+});
+const overlayLoss = (sheetNumber: number, side: "left" | "right"): EdgeConversionLoss => ({
+  ...backgroundLoss(sheetNumber, side), background: null,
+  overlay: { kind: "custom", content: { kind: "media", mediaId: "overlay-001" }, mapping: "side" },
+});
+const consequencesOf = (information: AlbumInformation, impact: AlbumInformationImpact) =>
+  albumInformationConsequences(createAlbumInformationReview(baseline, information, impact));
 
-  expect(details).toEqual([
-    {
-      label: "Primeira lâmina",
-      value: "Lâmina dupla → página única",
-    },
+test("changes the panel already shows need no confirmation", () => {
+  expect(consequencesOf({ ...baseline, dpi: 240, bleedUm: 5_000, safetyUm: 4_000, displayUnit: "cm" }, noImpact)).toEqual([]);
+  expect(consequencesOf({ ...baseline, firstSheet: "singlePage" }, noImpact)).toEqual([]);
+  expect(consequencesOf({ ...baseline, sheetWidthUm: 700_000, sheetHeightUm: 350_000 }, { ...noImpact,
+    dimensionalChange: { proportionChanged: false, confirmationKey: "same-proportion" } })).toEqual([]);
+});
+
+test("warns about crops only when the Core reports a proportion change", () => {
+  expect(consequencesOf({ ...baseline, sheetWidthUm: 630_000 }, { ...noImpact,
+    dimensionalChange: { proportionChanged: true, confirmationKey: "review-a" } })).toEqual([
+    "A proporção das lâminas muda. As fotos mantêm a proporção, e o recorte pode ser ajustado.",
   ]);
 });
 
-test("describes final raster size and structural and dimensional impact", () => {
-  const details = albumInformationDetails(
-    {
-      ...baseline,
-      sheetWidthUm: 700_000,
-      sheetHeightUm: 350_000,
-      dpi: 240,
-      firstSheet: "singlePage",
-    },
-    baseline,
-    { conversionLosses: [],
-      sheetWidthPx: 6_614,
-      pageWidthPx: 3_307,
-      heightPx: 3_307,
-    },
-  );
-
-  expect(details).toEqual([
-    {
-      label: "Primeira lâmina",
-      value: "Lâmina dupla → página única",
-    },
-    { label: "DPI", value: "300 → 240" },
-    { label: "Largura da lâmina", value: "600 mm → 700 mm" },
-    { label: "Altura da lâmina", value: "300 mm → 350 mm" },
-    {
-      label: "Resolução resultante",
-      value: "Lâmina 6.614 × 3.307 px · página 3.307 × 3.307 px",
-    },
-    {
-      label: "Composição",
-      value: "A composição acompanhará o novo tamanho.",
-    },
+test("names the converted ends and every removed customization in one sentence", () => {
+  expect(consequencesOf({ ...baseline, firstSheet: "singlePage" },
+    { ...noImpact, conversionLosses: [backgroundLoss(1, "left")] })).toEqual([
+    "A primeira lâmina vira página única. O fundo da lâmina 1 será removido.",
   ]);
-});
-
-test("warns about crop only when the Core reports a proportion change", () => {
-  const details = albumInformationDetails({ ...baseline, sheetWidthUm: 630_000 }, baseline, { conversionLosses: [],
-    sheetWidthPx: 7_441, pageWidthPx: 3_720, heightPx: 3_543,
-    dimensionalChange: { proportionChanged: true, confirmationKey: "review-a" },
-  });
-  expect(details).toContainEqual({ label: "Composição", value: "As fotos manterão a proporção. O recorte poderá ser ajustado." });
-});
-
-test("uses the selected Unit for changed measurements without unrelated raster details", () => {
-  const details = albumInformationDetails(
-    {
-      ...baseline,
-      bleedUm: 5_000,
-      displayUnit: "cm",
-    },
-    baseline,
-    { conversionLosses: [],
-      sheetWidthPx: 7_087,
-      pageWidthPx: 3_543,
-      heightPx: 3_543,
-    },
-  );
-
-  expect(details).toEqual([
-    { label: "Unidade", value: "mm → cm" },
-    { label: "Sangria", value: "0.3 cm → 0.5 cm" },
+  expect(consequencesOf({ ...baseline, lastSheet: "singlePage" },
+    { ...noImpact, conversionLosses: [overlayLoss(18, "right")] })).toEqual([
+    "A última lâmina vira página única. A sobreposição da lâmina 18 será removida.",
+  ]);
+  expect(consequencesOf({ ...baseline, firstSheet: "singlePage", lastSheet: "singlePage", sheetWidthUm: 630_000 }, {
+    ...noImpact, conversionLosses: [backgroundLoss(1, "left"), overlayLoss(18, "right")],
+    dimensionalChange: { proportionChanged: true, confirmationKey: "review-b" },
+  })).toEqual([
+    "A primeira e a última lâmina viram página única. O fundo da lâmina 1 e a sobreposição da lâmina 18 serão removidos.",
+    "A proporção das lâminas muda. As fotos mantêm a proporção, e o recorte pode ser ajustado.",
+  ]);
+  expect(consequencesOf({ ...baseline, firstSheet: "singlePage" }, { ...noImpact, conversionLosses: [{
+    ...backgroundLoss(1, "left"), overlay: overlayLoss(1, "left").overlay,
+  }] })).toEqual([
+    "A primeira lâmina vira página única. O fundo e a sobreposição da lâmina 1 serão removidos.",
   ]);
 });
 
@@ -130,13 +96,29 @@ function dialogHarness(
 
 const changedDraft = createAlbumInformationProjectDraft(3, baseline).transition({
   ...baseline,
-  dpi: 600,
+  sheetWidthUm: 630_000,
 });
-const impact = { conversionLosses: [],
-  heightPx: 7_087,
-  pageWidthPx: 7_087,
-  sheetWidthPx: 14_173,
+const impact: AlbumInformationImpact = { conversionLosses: [],
+  heightPx: 3_543,
+  pageWidthPx: 3_720,
+  sheetWidthPx: 7_441,
+  dimensionalChange: { proportionChanged: true, confirmationKey: "review-a" },
 };
+
+test("applies directly, without a dialog, when nothing is removed or recropped", async () => {
+  const dialog = dialogHarness();
+  const onApply = vi.fn(async () => ({ kind: "completed" as const }));
+  const { result } = renderHook(() =>
+    useAlbumInformationApplyController({ projectDialogPort: dialog.port, onApply, onError: vi.fn() }),
+  );
+  const draft = createAlbumInformationProjectDraft(3, baseline).transition({ ...baseline, dpi: 600 });
+  await act(async () => {
+    await expect(result.current.requestApply(draft, noImpact)).resolves.toBe(true);
+  });
+  expect(dialog.present).not.toHaveBeenCalled();
+  expect(onApply).toHaveBeenCalledOnce();
+  expect(result.current.active).toBe(false);
+});
 
 test("completes the Apply request only after the owned confirmation commits", async () => {
   const dialog = dialogHarness();
@@ -322,20 +304,19 @@ test("settles an outstanding Apply completion when its controller unmounts", asy
   expect(dialog.dismiss).toHaveBeenCalledOnce();
 });
 
-test("includes edge losses in the existing Album information confirmation", async () => {
+test("asks before an edge conversion removes a customization", async () => {
   const dialog = dialogHarness();
   const onApply = vi.fn(async () => ({ kind: "completed" as const }));
   const view = renderHook(() => useAlbumInformationApplyController({ projectDialogPort: dialog.port, onApply, onError: vi.fn() }));
   const draft = createAlbumInformationProjectDraft(3, baseline).transition({ ...baseline, firstSheet: "singlePage" });
   let completion!: Promise<boolean>;
-  await act(async () => { completion = view.result.current.requestApply(draft, { ...impact, conversionLosses: [{
+  await act(async () => { completion = view.result.current.requestApply(draft, { ...noImpact, conversionLosses: [{
     sheetId: "sheet-001", sheetNumber: 1, side: "left", overlay: null,
     background: { kind: "custom", content: { kind: "color", rgb: "#123456" }, mapping: "side" },
   }] }); });
   expect(dialog.present).toHaveBeenCalledOnce();
-  expect(dialog.present).toHaveBeenCalledWith({ kind: "albumInformationConfirmation", busy: false, details: [
-    { label: "Primeira lâmina", value: "Lâmina dupla → página única" },
-    { label: "Remoção na lâmina 1", value: "O fundo personalizado da página esquerda da lâmina 1 será removido." },
+  expect(dialog.present).toHaveBeenCalledWith({ kind: "albumInformationConfirmation", busy: false, consequences: [
+    "A primeira lâmina vira página única. O fundo da lâmina 1 será removido.",
   ] });
   await act(async () => { dialog.emit("cancelAlbumInformation"); expect(await completion).toBe(false); });
   expect(onApply).not.toHaveBeenCalled();

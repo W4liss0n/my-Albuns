@@ -58,6 +58,6 @@
   min-width: 0;
 }
 
-.album-entry-control .ui-field-control {
+.album-entry-control input.ui-field-control {
   padding-right: 30px;
 }

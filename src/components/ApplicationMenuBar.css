@@ -42,7 +42,7 @@
   z-index: 30;
   display: grid;
   min-width: 232px;
-  padding: var(--ui-space-1) 0;
+  padding: var(--ui-space-1);
 }
 
 .app-menu-submenu {

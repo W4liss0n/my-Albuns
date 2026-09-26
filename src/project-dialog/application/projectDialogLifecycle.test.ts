@@ -17,7 +17,7 @@ test.each<{
     expected: "cancelAlbumInformation",
     state: {
       busy: false,
-      details: [],
+      consequences: [],
       kind: "albumInformationConfirmation",
     },
   },
@@ -25,7 +25,7 @@ test.each<{
     expected: null,
     state: {
       busy: true,
-      details: [],
+      consequences: [],
       kind: "albumInformationConfirmation",
     },
   },

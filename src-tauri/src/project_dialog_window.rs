@@ -5,8 +5,8 @@ use tauri::{AppHandle, Emitter, Manager, State, WebviewWindow, WindowEvent};
 use crate::{
     desktop_webview_policy,
     ipc_contract::{
-        ProjectDialogAction, ProjectDialogActionEvent, ProjectDialogDetail,
-        ProjectDialogPresentation, ProjectDialogProgress, ProjectDialogState,
+        ProjectDialogAction, ProjectDialogActionEvent, ProjectDialogPresentation,
+        ProjectDialogProgress, ProjectDialogState,
     },
     native_dialog_window,
     product_runtime::PROJECT_WINDOW_LABEL,
@@ -16,7 +16,7 @@ pub(crate) const PROJECT_DIALOG_ACTION_EVENT: &str = "myalbuns://project-dialog-
 pub(crate) const PROJECT_DIALOG_PRESENTATION_EVENT: &str = "myalbuns://project-dialog-presentation";
 pub(crate) const PROJECT_DIALOG_LABEL: &str = "project-dialog";
 const MAX_DIALOG_TEXT_CHARS: usize = 800;
-const MAX_DIALOG_DETAILS: usize = 12;
+const MAX_DIALOG_CONSEQUENCES: usize = 12;
 const MAX_DIALOG_SESSION_ID_CHARS: usize = 128;
 
 impl ProjectDialogState {
@@ -70,16 +70,13 @@ impl ProjectDialogState {
                     })
                     .collect(),
             },
-            Self::AlbumInformationConfirmation { busy, details } => {
+            Self::AlbumInformationConfirmation { busy, consequences } => {
                 Self::AlbumInformationConfirmation {
                     busy,
-                    details: details
+                    consequences: consequences
                         .into_iter()
-                        .take(MAX_DIALOG_DETAILS)
-                        .map(|detail| ProjectDialogDetail {
-                            label: bound_text(detail.label),
-                            value: bound_text(detail.value),
-                        })
+                        .take(MAX_DIALOG_CONSEQUENCES)
+                        .map(bound_text)
                         .collect(),
                 }
             }
@@ -468,21 +465,23 @@ mod tests {
     }
 
     #[test]
-    fn album_information_dialog_keeps_the_complete_change_summary() {
+    fn album_information_dialog_keeps_every_consequence_and_bounds_its_text() {
         let state = ProjectDialogState::AlbumInformationConfirmation {
             busy: false,
-            details: (0..12)
-                .map(|index| ProjectDialogDetail {
-                    label: format!("Alteração {index}"),
-                    value: format!("Valor {index}"),
-                })
+            consequences: (0..14)
+                .map(|index| format!("Consequência {index} {}", "a".repeat(MAX_DIALOG_TEXT_CHARS)))
                 .collect(),
         }
         .sanitized();
-        let ProjectDialogState::AlbumInformationConfirmation { details, .. } = state else {
+        let ProjectDialogState::AlbumInformationConfirmation { consequences, .. } = state else {
             panic!("the variant is preserved")
         };
-        assert_eq!(details.len(), 12);
+        assert_eq!(consequences.len(), MAX_DIALOG_CONSEQUENCES);
+        assert!(
+            consequences
+                .iter()
+                .all(|consequence| consequence.chars().count() == MAX_DIALOG_TEXT_CHARS)
+        );
     }
 
     #[test]
@@ -583,7 +582,7 @@ mod tests {
                 "album-information",
                 ProjectDialogState::AlbumInformationConfirmation {
                     busy: false,
-                    details: Vec::new(),
+                    consequences: Vec::new(),
                 },
             )
             .expect("the first session owns the dialog");

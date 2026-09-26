@@ -2,7 +2,7 @@
 status: accepted
 document: design
 date: 2026-09-09
-updated: 2026-09-24
+updated: 2026-09-25
 ticket: 26
 ---
 
@@ -22,7 +22,8 @@ Undo/Redo e passam pela fila compartilhada de mutações, inclusive quando
 Salvar ou Desfazer chegam enquanto uma confirmação está pendente.
 
 Por padrão, as sugestões usam a quantidade e as orientações dos Frames
-existentes. O seletor de quantidade de Frames permite pedir uma quantidade
+existentes. O seletor de quantidade de Frames, no título `Layouts com N
+quadros` do Painel (refinamento de 25/09/2026 no design 0001), permite pedir uma quantidade
 entre a quantidade de Frames com Foto e o limite de 30 posições do Gerador,
 ignorando placeholders no mínimo permitido. Conforme decisão de 10/09/2026,
 é necessário destravar antes de alterar essa quantidade. Pedir uma quantidade

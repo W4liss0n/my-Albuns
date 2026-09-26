@@ -1,7 +1,7 @@
 ---
 status: accepted
 document: design
-updated: 2026-09-24
+updated: 2026-09-25
 ---
 
 # Estrutura da Janela do Projeto
@@ -49,6 +49,14 @@ a um fluxo com nome, a barra mostra esse nome (`Exportar`, `Exportação em lote
 fechamento, a barra fica sem texto e o título do próprio diálogo identifica o
 assunto. A marca aparece somente nas janelas principais, a Tela de Boas-vindas
 e a Janela do Projeto. Decisão do autor de 24/09/2026.
+
+Refinamento de 25/09/2026: todas as barras de título têm 36 px, com o nome em 13 px; na Janela do Projeto, a barra de menus logo abaixo é mais baixa, com 28 px, e `Exportar` tem 22 px, para que o título lidere a hierarquia. A marca é
+escrita sempre como `myalbuns` em minúsculas, em grafite, como na Tela de
+Boas-vindas, e nunca em azul: o azul fica reservado a ações e seleção. Na
+Janela do Projeto, a barra é de documento: `myalbuns · <nome do Projeto>` e
+o tamanho ficam à esquerda, e o estado aparece por extenso à direita, com um
+ponto: `Alterações não salvas`, em destaque, ou `Salvo`. Na Tela de
+Boas-vindas, a barra não repete a marca, que já está no painel de entrada.
 
 Cada diálogo conserva uma largura estável adequada ao seu tipo, mas sua altura acompanha o conteúdo efetivamente renderizado, sem reservar uma área vazia padrão. Mudanças de estado, mensagens ou detalhes recalculam essa altura; a janela é recentralizada depois do ajuste e, quando o conteúdo excede a área útil do monitor, fica limitada a ela em vez de ultrapassar a tela.
 
@@ -141,6 +149,8 @@ Posições que deslocariam uma Página única para o interior são inválidas e 
 
 Os comandos exatos e seus atalhos serão definidos no mapa de fluxos. A barra de menus não substitui controles contextuais dentro dos painéis.
 
+`Exportar`, à direita da barra de menus, é um botão principal comum de 22 px com cantos arredondados, centralizado na barra e afastado da borda, e não uma faixa da altura inteira da barra (refinamento de 24/09/2026).
+
 Comandos rotineiros e serializados, como `Salvar`, `Desfazer`, `Refazer` e alterações imediatas da composição, não exibem avisos transitórios de andamento e não desabilitam controles sem relação com a ação. Eles preservam a aparência da barra de menus e de botões como `Exportar`. Falhas e conclusões que precisam ser comunicadas usam os diálogos pertencentes à Janela; a Janela do Projeto não cria avisos flutuantes próprios. Um controle muda para estado ocupado ou desabilitado apenas enquanto a própria ação dele está ativa ou quando um diálogo ou fluxo realmente exclusivo bloqueia a Janela.
 
 ## Canvas contínuo
@@ -222,6 +232,8 @@ A faixa contém duas seções horizontais:
 
 - `Automáticos`, com os Layouts produzidos pelo Gerador de Layouts;
 - `Personalizados`, com os Layouts criados pelo usuário e disponíveis globalmente.
+
+Refinamento de 25/09/2026: a faixa abre com uma linha de tom (`--ui-surface-muted`) cujo título, `Layouts com 4 quadros`, contém o seletor de quantidade. O número aparece sublinhado, em cinza escuro, com uma seta pequena. Ao ser acionado, abre abaixo dele uma grade compacta de seis colunas com todas as quantidades permitidas de uma vez, e a atual fica em azul suave. Escolher um número atualiza as sugestões, fecha a grade e mantém o Painel aberto. Fechado, o seletor aceita as setas para subir ou descer a quantidade, como um seletor nativo. `Esc` fecha somente a grade. As seções têm títulos horizontais em frase (`Automáticos`, `Personalizados`), sem a faixa vertical girada, e ficam separadas apenas por espaço. Dentro da miniatura, a estrela ocupa sozinha o canto esquerdo; cadeado e lixeira formam uma única cápsula clara e translúcida no canto direito. Os três aparecem com o ponteiro ou o foco, e estrela preenchida e cadeado fechado continuam visíveis em azul.
 
 Clicar em uma preview aplica sua geometria; clicar no cadeado da preview aplica e trava no mesmo fluxo. Qualquer preview pode ser favoritada para o Projeto atual pela estrela. A estrela preenchida indica que existe uma cópia local independente, mas favoritar não move a preview entre as seções: a categoria continua representando a origem automática ou personalizada do Layout.
 
@@ -342,7 +354,7 @@ Quando o Zoom ultrapassa `Ajustar Lâmina`, `Espaço` + arraste com o botão esq
 - Ocupa a região inferior da coluna de trabalho e termina antes do Painel contextual.
 - Um splitter horizontal entre Canvas e Painel de imagens permite alterar sua altura. Ele ocupa somente uma linha visual discreta de `1 px`; uma área de hit-test invisível de `12 px`, centralizada sobre essa linha e sobreposta ao layout, preserva mouse e pen sem retirar espaço útil. Hover realça a linha discretamente, foco por teclado permanece claramente visível e cursor, ARIA, teclas e arraste conservam o contrato de redimensionamento.
 - `Exibir > Painel de imagens` recolhe ou restaura completamente a região; quando recolhida, o Canvas usa a altura disponível.
-- Mantém as abas já definidas `Fotos` e `Decorativos`.
+- Mantém as abas já definidas `Fotos` e `Decorativos`, representadas só por ícones: uma imagem para Fotos e formas geométricas para Decorativos.
 - `Importar` abre um menu com `Arquivos...` e `Pasta...`. `Arquivos...` usa o seletor do Windows com seleção múltipla; `Pasta...` importa somente imagens diretamente contidas na pasta escolhida, sem visitar subpastas.
 - Seletores e arraste aceitam os caminhos locais, UNC, mapeados e longos definidos pela [política de caminhos](0011-resolucao-e-politica-de-caminhos.md). Cada importação usa um contexto temporário próprio e nunca resolve rede na thread da interface.
 - Arquivos e pastas também podem ser arrastados do sistema operacional e soltos em qualquer área livre ou de grade do Painel. Pastas arrastadas seguem a mesma importação não recursiva de `Pasta...`.
@@ -352,6 +364,7 @@ Quando o Zoom ultrapassa `Ajustar Lâmina`, `Espaço` + arraste com o botão esq
 - Todos os novos itens aceitos por uma seleção, uma pasta ou uma única soltura formam uma ação de Undo/Redo e deixam o Projeto alterado. Desfazer remove somente esses vínculos do Painel; refazer os restaura. Arquivos originais e duplicatas preexistentes nunca são afetados.
 - Se a operação não criar nenhum item novo, ela não adiciona uma entrada ao Histórico nem marca alterações pendentes.
 - A barra segue a referência moderna: abas e `Importar` à esquerda; o chip ativo `Todas`, chips de organização e a ação circular tracejada de nova pasta no espaço central; busca e o botão `Filtro, ordem e tamanho` à direita.
+- Refinamento de 24/09/2026: a barra é uma faixa de tom (`--ui-surface-muted`) com linha inferior e sem sombra. A aba ativa usa a superfície da grade, traço azul de 2 px no topo e bordas laterais finas, abrindo-se para a grade como as abas das Configurações. Não há divisórias verticais, exceto a que separa `Importar`, texto discreto logo após as abas, dos chips. Os chips não têm fundo; só o ativo usa o azul suave de seleção. A busca é um campo integrado de 160 px com linha inferior. O chip `Ausentes` só aparece quando a aba atual tem arquivos ausentes, ou enquanto o próprio filtro está ligado, para que possa ser desligado.
 - As Pastas de organização são salvas no Projeto e cada imagem pertence a no máximo uma pasta. O `+` cria uma pasta; clique no chip filtra e seu menu permite renomear ou excluir. `Mover para pasta…` no menu das imagens organiza a seleção. `Todas` usa a contagem real da aba. O [design 0035](0035-pastas-de-organizacao-e-schema-v12.md) detalha o fluxo, o Histórico e a persistência.
 - A busca permanece diretamente visível. Filtro de uso, Ordenação e Tamanho ficam reunidos em um popover compacto aberto pelo botão `Filtro, ordem e tamanho`, sem selects ou slider permanentes na barra.
 - A busca filtra a grade em tempo real pelo Nome do arquivo, ignorando maiúsculas, minúsculas e acentos, e atua somente na aba atualmente visível.
@@ -417,6 +430,8 @@ Arquivos vinculados usados pelos Projetos abertos são monitorados. Eventos suce
 
 É uma única região reutilizável, fixa à direita, com rolagem vertical própria. Seu conteúdo é organizado em seções recolhíveis no padrão accordion.
 
+Refinamento de 25/09/2026: o cabeçalho de cada seção é uma faixa de tom (`--ui-surface-muted`), separada do conteúdo por uma linha quando a seção está aberta, como as seções das Configurações; o cabeçalho de contexto (`Quadro selecionado`) usa a mesma faixa. Dentro das seções, os grupos (`Estrutura`, `Documento`, `Áreas técnicas`, `Ambos os lados`) usam o mesmo título de subseção em frase e ficam separados só por espaço, sem linhas. Não há rótulos em maiúsculas nem fonte monoespaçada: números, leituras e unidades usam a fonte da interface com algarismos alinhados, e as unidades ficam em cinza discreto. Seletores não reservam o espaço do `X` de restauração, que só existe nas entradas numéricas.
+
 O estado aberto ou fechado das seções é lembrado separadamente para os contextos do Álbum, de `Design da Lâmina` e de Frame/Foto. Ao retornar a um contexto, sua disposição anterior é restaurada.
 
 Esses estados são preferências da interface reutilizadas entre Projetos e sessões; não pertencem ao Projeto e não participam de Undo/Redo.
@@ -464,7 +479,7 @@ Novas configurações globais devem ser incorporadas a `Informações do Álbum`
 
 `Quantidade de Lâminas` é um campo exclusivo do diálogo de criação e não aparece como configuração editável em `Informações do Álbum`. Depois da criação, adicionar ou excluir Lâminas continua sendo uma ação estrutural explícita do editor, não a alteração de um valor global.
 
-`Estrutura` contém somente os controles independentes `Primeira Lâmina` e `Última Lâmina`. Cada um permite escolher `Lâmina dupla` ou `Página única`. O `Aplicar` de `Informações do Álbum` apresenta o impacto das conversões antes de executar atomicamente as alterações confirmadas.
+`Estrutura` contém somente os controles independentes `Primeira Lâmina` e `Última Lâmina`. Cada um permite escolher `Lâmina dupla` ou `Página única`. O `Aplicar` de `Informações do Álbum` apresenta as perdas das conversões antes de executar atomicamente as alterações confirmadas.
 
 Em `Documento`, trocar a Unidade converte imediatamente somente a apresentação dos valores, sem alterar tamanho físico ou pixels. A Unidade pendente passa a representar toda medida física visível na Janela do Projeto enquanto o draft de `Informações do Álbum` existir, inclusive medidas apresentadas no cabeçalho e em `Design do Álbum`; nenhuma dessas conversões persiste antes de `Aplicar`.
 
@@ -472,7 +487,12 @@ Mensagens de validação que orientam a correção de uma medida física seguem 
 
 O estado físico continua armazenado em micrômetros. Propagar a Unidade pendente não altera o draft de `Design do Álbum`, não habilita seu `Aplicar` e não cria operação de Undo/Redo. Descartar ou desmontar o formulário de `Informações do Álbum`, assim como trocar de Projeto, elimina essa apresentação pendente e restaura imediatamente a Unidade aplicada. Largura, altura e DPI permanecem pendentes até o mesmo `Aplicar` de `Informações do Álbum`.
 
-A confirmação de `Informações do Álbum` enumera somente os campos cujo valor pendente difere do valor aplicado, cada um no formato `anterior → novo`. Primeira e Última Lâmina aparecem separadamente. A resolução resultante aparece somente quando Largura, Altura ou DPI mudam; a preservação proporcional é informada somente em uma mudança dimensional. Rótulos e valores formam colunas visuais distintas para que o resumo continue legível com uma ou várias alterações.
+Refinamento de 25/09/2026: a confirmação de `Informações do Álbum` só aparece quando aplicar tem uma consequência que o painel não mostra, e só descreve essa consequência. Os valores alterados continuam visíveis no próprio painel, marcados pelo `X` de restauração, e um único Desfazer reverte a aplicação; por isso a confirmação não lista campos nem valores `anterior → novo`. As consequências são duas, cada uma em uma frase:
+
+- uma extremidade que vira página única remove personalizações do lado que deixa de existir: a frase nomeia as extremidades convertidas e cada fundo ou sobreposição removido, com a Lâmina correspondente;
+- uma mudança dimensional que altera a proporção das Lâminas pode ajustar o recorte das fotos, que mantêm a proporção.
+
+Quando não há nenhuma das duas, como em Sangria, Área de segurança, Unidade, DPI, conversão sem perda ou um tamanho que mantém a proporção, `Aplicar` executa diretamente, sem diálogo. A confirmação termina com uma nota discreta de que tudo pode ser desfeito de uma vez. Se o resultado mudar enquanto a confirmação está aberta, uma nova revisão com consequência pede outra confirmação; sem consequência, a aplicação prossegue diretamente.
 
 As entradas numéricas de `Informações do Álbum` mostram um `X` dentro do controle somente enquanto o próprio draft diverge do último valor aplicado. Essa ação restaura apenas a entrada correspondente. Para medidas físicas, o valor restaurado é apresentado na Unidade corrente; trocar somente a Unidade não marca as medidas como editadas nem cria ações de restauração falsas.
 

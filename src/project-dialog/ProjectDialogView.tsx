@@ -115,26 +115,10 @@ export function ProjectDialogView({
             label: state.busy ? "Aplicando…" : "Aplicar",
             onClick: () => onAction("confirmAlbumInformation"),
           }}
-          description="As alterações serão aplicadas juntas e poderão ser desfeitas em uma única ação."
+          description={state.consequences.map((consequence) => <p key={consequence}>{consequence}</p>)}
           title="Aplicar alterações no álbum?"
         >
-          <dl className="album-information-change-list">
-            {state.details.map((detail) => {
-              return (
-                <div
-                  className="album-information-change"
-                  key={`${detail.label}:${detail.value}`}
-                >
-                  <dt className="album-information-change__label">
-                    {detail.label}
-                  </dt>
-                  <dd className="album-information-change__value">
-                    {detail.value}
-                  </dd>
-                </div>
-              );
-            })}
-          </dl>
+          <p className="album-information-undo">Você pode desfazer tudo de uma vez.</p>
         </ConfirmationDialog>
       );
 

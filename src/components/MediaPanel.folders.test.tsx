@@ -179,7 +179,9 @@ test("leaving a folder forwards the existing Canvas drag and drop unchanged", ()
 });
 
 test.each(["Todas 2", /^Ausentes/, "Nova pasta de organização"])("%s is not a folder drop target", (name) => {
-  const h = harness(); dragHit(screen.getByRole("button", { name })); startDrag(); moveDrag(); dropDrag();
+  const h = harness();
+  h.view.rerender(<MediaPanel {...h.props} mediaFiles={{ p2: { mediaId: "p2", state: "absent", createdAtMs: null, modifiedAtMs: null } }} />);
+  dragHit(screen.getByRole("button", { name })); startDrag(); moveDrag(); dropDrag();
   expect(h.edit).not.toHaveBeenCalled();
   expect(document.querySelector(".media-folder-chip--drop")).toBeNull();
 });
@@ -338,6 +340,19 @@ test("losing an active folder clears its Ausentes filter and returns to All", as
     mediaFiles={{ p1: { mediaId: "p1", state: "absent", createdAtMs: null, modifiedAtMs: null } }} />);
   expect(screen.getByRole("button", { name: "Todas 2" })).toHaveAttribute("aria-pressed", "true");
   expect(gridItems()).toEqual(["p1", "p2"]);
+});
+
+test("Ausentes appears only while files are missing or its filter is on", async () => {
+  const h = harness(); const user = userEvent.setup();
+  const absent = { p1: { mediaId: "p1", state: "absent" as const, createdAtMs: null, modifiedAtMs: null } };
+  expect(screen.queryByRole("button", { name: /Ausentes/ })).not.toBeInTheDocument();
+  h.view.rerender(<MediaPanel {...h.props} mediaFiles={absent} />);
+  await user.click(screen.getByRole("button", { name: /Ausentes/ }));
+  h.view.rerender(<MediaPanel {...h.props} mediaFiles={{}} />);
+  expect(screen.getByRole("button", { name: /Ausentes/ })).toHaveAttribute("aria-pressed", "true");
+  await user.click(screen.getByRole("button", { name: /Ausentes/ }));
+  expect(screen.queryByRole("button", { name: /Ausentes/ })).not.toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Todas 2" })).toHaveAttribute("aria-pressed", "true");
 });
 
 test("moving the focused thumbnail out of the active folder restores connected panel focus", async () => {

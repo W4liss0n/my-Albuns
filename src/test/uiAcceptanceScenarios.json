@@ -730,7 +730,7 @@
     {
       "id": "album-dimensional-confirmation",
       "title": "Mudança dimensional — confirmação do recorte",
-      "implementationPath": "/project-dialog.html?state=%7B%22kind%22%3A%22albumInformationConfirmation%22%2C%22busy%22%3Afalse%2C%22details%22%3A%5B%7B%22label%22%3A%22Largura%20da%20l%C3%A2mina%22%2C%22value%22%3A%22600%20mm%20%E2%86%92%20630%20mm%22%7D%2C%7B%22label%22%3A%22Resolu%C3%A7%C3%A3o%20resultante%22%2C%22value%22%3A%22L%C3%A2mina%207.441%20%C3%97%203.543%20px%20%C2%B7%20p%C3%A1gina%203.720%20%C3%97%203.543%20px%22%7D%2C%7B%22label%22%3A%22Composi%C3%A7%C3%A3o%22%2C%22value%22%3A%22As%20fotos%20manter%C3%A3o%20a%20propor%C3%A7%C3%A3o.%20O%20recorte%20poder%C3%A1%20ser%20ajustado.%22%7D%5D%7D",
+      "implementationPath": "/project-dialog.html?state=%7B%22kind%22%3A%22albumInformationConfirmation%22%2C%22busy%22%3Afalse%2C%22consequences%22%3A%5B%22A%20propor%C3%A7%C3%A3o%20das%20l%C3%A2minas%20muda.%20As%20fotos%20mant%C3%AAm%20a%20propor%C3%A7%C3%A3o%2C%20e%20o%20recorte%20pode%20ser%20ajustado.%22%5D%7D",
       "comparison": {
         "kind": "implementation-only",
         "surface": "owned-confirmation-dialog",
@@ -741,7 +741,7 @@
         "width": 600,
         "height": 410
       },
-      "readySelector": ".album-information-change-list",
+      "readySelector": ".album-information-undo",
       "actions": []
     },
     {
@@ -1827,7 +1827,7 @@
     {
       "id": "album-information-conversion-losses",
       "title": "Informações do Álbum — conversão das duas extremidades",
-      "implementationPath": "/project-dialog.html?state=%7B%22kind%22%3A%22albumInformationConfirmation%22%2C%22busy%22%3Afalse%2C%22details%22%3A%5B%7B%22label%22%3A%22Primeira%20l%C3%A2mina%22%2C%22value%22%3A%22L%C3%A2mina%20dupla%20%E2%86%92%20p%C3%A1gina%20%C3%BAnica%22%7D%2C%7B%22label%22%3A%22%C3%9Altima%20l%C3%A2mina%22%2C%22value%22%3A%22L%C3%A2mina%20dupla%20%E2%86%92%20p%C3%A1gina%20%C3%BAnica%22%7D%2C%7B%22label%22%3A%22Remo%C3%A7%C3%A3o%20na%20l%C3%A2mina%201%22%2C%22value%22%3A%22O%20fundo%20personalizado%20da%20p%C3%A1gina%20esquerda%20da%20l%C3%A2mina%201%20ser%C3%A1%20removido.%22%7D%2C%7B%22label%22%3A%22Remo%C3%A7%C3%A3o%20na%20l%C3%A2mina%2018%22%2C%22value%22%3A%22A%20sobreposi%C3%A7%C3%A3o%20personalizada%20da%20p%C3%A1gina%20direita%20da%20l%C3%A2mina%2018%20ser%C3%A1%20removida.%22%7D%5D%7D",
+      "implementationPath": "/project-dialog.html?state=%7B%22kind%22%3A%22albumInformationConfirmation%22%2C%22busy%22%3Afalse%2C%22consequences%22%3A%5B%22A%20primeira%20e%20a%20%C3%BAltima%20l%C3%A2mina%20viram%20p%C3%A1gina%20%C3%BAnica.%20O%20fundo%20da%20l%C3%A2mina%201%20e%20a%20sobreposi%C3%A7%C3%A3o%20da%20l%C3%A2mina%2018%20ser%C3%A3o%20removidos.%22%5D%7D",
       "comparison": {
         "kind": "implementation-only",
         "surface": "owned-confirmation-dialog",
@@ -1843,8 +1843,8 @@
     },
     {
       "id": "album-information-confirmation-single-change",
-      "title": "Diálogo de Informações do Álbum — uma alteração",
-      "implementationPath": "/project-dialog.html?state=%7B%22kind%22%3A%22albumInformationConfirmation%22%2C%22busy%22%3Afalse%2C%22details%22%3A%5B%7B%22label%22%3A%22Primeira%20l%C3%A2mina%22%2C%22value%22%3A%22P%C3%A1gina%20%C3%BAnica%20%E2%86%92%20l%C3%A2mina%20dupla%22%7D%5D%7D",
+      "title": "Diálogo de Informações do Álbum — uma remoção",
+      "implementationPath": "/project-dialog.html?state=%7B%22kind%22%3A%22albumInformationConfirmation%22%2C%22busy%22%3Afalse%2C%22consequences%22%3A%5B%22A%20primeira%20l%C3%A2mina%20vira%20p%C3%A1gina%20%C3%BAnica.%20O%20fundo%20da%20l%C3%A2mina%201%20ser%C3%A1%20removido.%22%5D%7D",
       "comparison": {
         "kind": "implementation-only",
         "surface": "owned-confirmation-dialog",
@@ -1855,7 +1855,7 @@
         "width": 600,
         "height": 320
       },
-      "readySelector": ".album-information-change-list",
+      "readySelector": ".album-information-undo",
       "actions": []
     },
     {
@@ -1895,7 +1895,7 @@
     {
       "id": "album-information-confirmation-busy",
       "title": "Diálogo de Informações do Álbum — aplicação em andamento",
-      "implementationPath": "/project-dialog.html?state=%7B%22kind%22%3A%22albumInformationConfirmation%22%2C%22busy%22%3Atrue%2C%22details%22%3A%5B%7B%22label%22%3A%22Primeira%20l%C3%A2mina%22%2C%22value%22%3A%22P%C3%A1gina%20%C3%BAnica%20%E2%86%92%20l%C3%A2mina%20dupla%22%7D%5D%7D",
+      "implementationPath": "/project-dialog.html?state=%7B%22kind%22%3A%22albumInformationConfirmation%22%2C%22busy%22%3Atrue%2C%22consequences%22%3A%5B%22A%20primeira%20l%C3%A2mina%20vira%20p%C3%A1gina%20%C3%BAnica.%20O%20fundo%20da%20l%C3%A2mina%201%20ser%C3%A1%20removido.%22%5D%7D",
       "comparison": {
         "kind": "implementation-only",
         "surface": "owned-confirmation-dialog",
@@ -1906,7 +1906,7 @@
         "width": 600,
         "height": 320
       },
-      "readySelector": ".album-information-change-list",
+      "readySelector": ".album-information-undo",
       "actions": []
     },
     {
@@ -2867,19 +2867,19 @@
     },
     {
       "id": "safe-application-shell",
-      "title": "Aplicativo — Safe Shell por falha gráfica",
+      "title": "Aplicativo — boas-vindas com o editor indisponível",
       "implementationPath": "/welcome-preview.html?graphics=unsupported",
       "comparison": {
         "kind": "implementation-only",
         "surface": "safe-application-shell",
-        "implementationCaptureSelector": ".safe-application-shell",
-        "reason": "A referência visual vigente não representa o Safe Shell global definido pelas decisões aceitas posteriores para hardware gráfico indisponível."
+        "implementationCaptureSelector": ".global-shell",
+        "reason": "A referência visual vigente não representa a tela de boas-vindas com o editor indisponível, definida pelas decisões aceitas posteriores para hardware gráfico indisponível."
       },
       "viewport": {
         "width": 1280,
         "height": 720
       },
-      "readySelector": ".safe-shell",
+      "readySelector": ".editor-unavailable",
       "actions": []
     },
     {
@@ -9137,7 +9137,7 @@
         },
         {
           "type": "focus",
-          "selector": "select[aria-label=\"Quantidade de quadros\"]"
+          "selector": "button[aria-label=\"Quantidade de quadros\"]"
         },
         {
           "type": "key",
@@ -9190,7 +9190,7 @@
         },
         {
           "type": "focus",
-          "selector": "select[aria-label=\"Quantidade de quadros\"]"
+          "selector": "button[aria-label=\"Quantidade de quadros\"]"
         },
         {
           "type": "key",
@@ -9247,7 +9247,7 @@
         },
         {
           "type": "focus",
-          "selector": "select[aria-label=\"Quantidade de quadros\"]"
+          "selector": "button[aria-label=\"Quantidade de quadros\"]"
         },
         {
           "type": "key",
@@ -9279,7 +9279,7 @@
         },
         {
           "type": "assert",
-          "selector": "select[aria-label=\"Quantidade de quadros\"]:disabled"
+          "selector": "button[aria-label=\"Quantidade de quadros\"]:disabled"
         },
         {
           "type": "click",
@@ -9287,11 +9287,11 @@
         },
         {
           "type": "assert",
-          "selector": "select[aria-label=\"Quantidade de quadros\"]:not(:disabled):has(option[value=\"2\"]):not(:has(option[value=\"1\"]))"
+          "selector": "button[aria-label=\"Quantidade de quadros\"]:not(:disabled)[data-minimum=\"2\"]"
         },
         {
           "type": "focus",
-          "selector": "select[aria-label=\"Quantidade de quadros\"]"
+          "selector": "button[aria-label=\"Quantidade de quadros\"]"
         },
         {
           "type": "key",
@@ -9352,7 +9352,7 @@
         },
         {
           "type": "focus",
-          "selector": "select[aria-label=\"Quantidade de quadros\"]"
+          "selector": "button[aria-label=\"Quantidade de quadros\"]"
         },
         {
           "type": "key",
@@ -9384,7 +9384,7 @@
         },
         {
           "type": "assert",
-          "selector": "select[aria-label=\"Quantidade de quadros\"]:disabled"
+          "selector": "button[aria-label=\"Quantidade de quadros\"]:disabled"
         },
         {
           "type": "click",
@@ -9392,11 +9392,11 @@
         },
         {
           "type": "assert",
-          "selector": "select[aria-label=\"Quantidade de quadros\"]:not(:disabled):has(option[value=\"2\"]):not(:has(option[value=\"1\"]))"
+          "selector": "button[aria-label=\"Quantidade de quadros\"]:not(:disabled)[data-minimum=\"2\"]"
         },
         {
           "type": "focus",
-          "selector": "select[aria-label=\"Quantidade de quadros\"]"
+          "selector": "button[aria-label=\"Quantidade de quadros\"]"
         },
         {
           "type": "key",
@@ -9465,7 +9465,7 @@
         },
         {
           "type": "focus",
-          "selector": "select[aria-label=\"Quantidade de quadros\"]"
+          "selector": "button[aria-label=\"Quantidade de quadros\"]"
         },
         {
           "type": "key",
@@ -9497,7 +9497,7 @@
         },
         {
           "type": "assert",
-          "selector": "select[aria-label=\"Quantidade de quadros\"]:disabled"
+          "selector": "button[aria-label=\"Quantidade de quadros\"]:disabled"
         },
         {
           "type": "click",
@@ -9505,11 +9505,11 @@
         },
         {
           "type": "assert",
-          "selector": "select[aria-label=\"Quantidade de quadros\"]:not(:disabled):has(option[value=\"2\"]):not(:has(option[value=\"1\"]))"
+          "selector": "button[aria-label=\"Quantidade de quadros\"]:not(:disabled)[data-minimum=\"2\"]"
         },
         {
           "type": "focus",
-          "selector": "select[aria-label=\"Quantidade de quadros\"]"
+          "selector": "button[aria-label=\"Quantidade de quadros\"]"
         },
         {
           "type": "key",
@@ -9570,7 +9570,7 @@
         },
         {
           "type": "focus",
-          "selector": "select[aria-label=\"Quantidade de quadros\"]"
+          "selector": "button[aria-label=\"Quantidade de quadros\"]"
         },
         {
           "type": "key",
@@ -9602,7 +9602,7 @@
         },
         {
           "type": "assert",
-          "selector": "select[aria-label=\"Quantidade de quadros\"]:disabled"
+          "selector": "button[aria-label=\"Quantidade de quadros\"]:disabled"
         },
         {
           "type": "click",
@@ -9610,11 +9610,11 @@
         },
         {
           "type": "assert",
-          "selector": "select[aria-label=\"Quantidade de quadros\"]:not(:disabled):has(option[value=\"2\"]):not(:has(option[value=\"1\"]))"
+          "selector": "button[aria-label=\"Quantidade de quadros\"]:not(:disabled)[data-minimum=\"2\"]"
         },
         {
           "type": "focus",
-          "selector": "select[aria-label=\"Quantidade de quadros\"]"
+          "selector": "button[aria-label=\"Quantidade de quadros\"]"
         },
         {
           "type": "key",
@@ -9703,7 +9703,7 @@
         },
         {
           "type": "focus",
-          "selector": "select[aria-label=\"Quantidade de quadros\"]"
+          "selector": "button[aria-label=\"Quantidade de quadros\"]"
         },
         {
           "type": "key",
@@ -9735,7 +9735,7 @@
         },
         {
           "type": "assert",
-          "selector": "select[aria-label=\"Quantidade de quadros\"]:disabled"
+          "selector": "button[aria-label=\"Quantidade de quadros\"]:disabled"
         },
         {
           "type": "click",
@@ -9743,11 +9743,11 @@
         },
         {
           "type": "assert",
-          "selector": "select[aria-label=\"Quantidade de quadros\"]:not(:disabled):has(option[value=\"2\"]):not(:has(option[value=\"1\"]))"
+          "selector": "button[aria-label=\"Quantidade de quadros\"]:not(:disabled)[data-minimum=\"2\"]"
         },
         {
           "type": "focus",
-          "selector": "select[aria-label=\"Quantidade de quadros\"]"
+          "selector": "button[aria-label=\"Quantidade de quadros\"]"
         },
         {
           "type": "key",
@@ -9852,7 +9852,7 @@
         },
         {
           "type": "focus",
-          "selector": "select[aria-label=\"Quantidade de quadros\"]"
+          "selector": "button[aria-label=\"Quantidade de quadros\"]"
         },
         {
           "type": "key",
@@ -9884,7 +9884,7 @@
         },
         {
           "type": "assert",
-          "selector": "select[aria-label=\"Quantidade de quadros\"]:disabled"
+          "selector": "button[aria-label=\"Quantidade de quadros\"]:disabled"
         },
         {
           "type": "click",
@@ -9892,11 +9892,11 @@
         },
         {
           "type": "assert",
-          "selector": "select[aria-label=\"Quantidade de quadros\"]:not(:disabled):has(option[value=\"2\"]):not(:has(option[value=\"1\"]))"
+          "selector": "button[aria-label=\"Quantidade de quadros\"]:not(:disabled)[data-minimum=\"2\"]"
         },
         {
           "type": "focus",
-          "selector": "select[aria-label=\"Quantidade de quadros\"]"
+          "selector": "button[aria-label=\"Quantidade de quadros\"]"
         },
         {
           "type": "key",
@@ -9965,7 +9965,7 @@
         },
         {
           "type": "focus",
-          "selector": "select[aria-label=\"Quantidade de quadros\"]"
+          "selector": "button[aria-label=\"Quantidade de quadros\"]"
         },
         {
           "type": "key",
@@ -9997,7 +9997,7 @@
         },
         {
           "type": "assert",
-          "selector": "select[aria-label=\"Quantidade de quadros\"]:disabled"
+          "selector": "button[aria-label=\"Quantidade de quadros\"]:disabled"
         },
         {
           "type": "click",
@@ -10005,11 +10005,11 @@
         },
         {
           "type": "assert",
-          "selector": "select[aria-label=\"Quantidade de quadros\"]:not(:disabled):has(option[value=\"2\"]):not(:has(option[value=\"1\"]))"
+          "selector": "button[aria-label=\"Quantidade de quadros\"]:not(:disabled)[data-minimum=\"2\"]"
         },
         {
           "type": "focus",
-          "selector": "select[aria-label=\"Quantidade de quadros\"]"
+          "selector": "button[aria-label=\"Quantidade de quadros\"]"
         },
         {
           "type": "key",
@@ -10078,7 +10078,7 @@
         },
         {
           "type": "focus",
-          "selector": "select[aria-label=\"Quantidade de quadros\"]"
+          "selector": "button[aria-label=\"Quantidade de quadros\"]"
         },
         {
           "type": "key",
@@ -10131,7 +10131,7 @@
         },
         {
           "type": "focus",
-          "selector": "select[aria-label=\"Quantidade de quadros\"]"
+          "selector": "button[aria-label=\"Quantidade de quadros\"]"
         },
         {
           "type": "key",

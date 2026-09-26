@@ -725,7 +725,15 @@
 }
 
 .new-project-group-eyebrow {
-  margin-bottom: 10px;
+  margin-bottom: 2px;
+}
+
+/* Here the scope reads as a quiet note over the group it applies to, not as
+   a second title. */
+:is(.new-project-scope-label, .new-project-group-eyebrow).ui-section-eyebrow {
+  color: var(--ui-text-muted);
+  font-size: var(--ui-font-size-caption);
+  font-weight: 500;
 }
 
 .new-project-color-swatches--frames {

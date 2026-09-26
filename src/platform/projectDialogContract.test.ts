@@ -26,7 +26,7 @@ const states: readonly ProjectDialogState[] = [
   { kind: "imageProcessingProblems", importedCount: 2, problems: [], operationProblem: "Memória indisponível" },
   {
     busy: false,
-    details: [{ label: "DPI", value: "300 → 240" }],
+    consequences: ["O fundo da lâmina 1 será removido."],
     kind: "albumInformationConfirmation",
   },
   { busy: false, kind: "projectCloseConfirmation" },
@@ -94,7 +94,7 @@ test("rejects malformed states and actions at the native seam", () => {
   expect(
     parseProjectDialogState({
       busy: false,
-      details: ["DPI: 300 → 240"],
+      consequences: [{ label: "DPI", value: "300 → 240" }],
       kind: "albumInformationConfirmation",
     }),
   ).toBeNull();

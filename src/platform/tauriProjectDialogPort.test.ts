@@ -101,7 +101,7 @@ test("queues a second owner until the current owner dismisses", async () => {
   const second = port.acquire(vi.fn());
   const firstState = {
     busy: false,
-    details: [],
+    consequences: [],
     kind: "albumInformationConfirmation",
   } as const;
   const secondState = {

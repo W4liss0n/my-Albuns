@@ -22,7 +22,6 @@ import {
   projectCommandShortcutAria,
   projectCommandShortcutLabel,
 } from "../application/projectCommandCatalog";
-import { SafeApplicationShell } from "../components/SafeApplicationShell";
 import type {
   GlobalProjectPort,
   NewProjectPort,
@@ -31,6 +30,7 @@ import type {
   RecentProjectSummary,
   RecentProjectFirstSheet,
 } from "./application/globalProjectPort";
+import { EditorUnavailableNotice } from "./EditorUnavailableNotice";
 import { NewProjectFlow } from "./NewProjectFlow";
 import { recentProjectOpeningTime } from "./recentProjectOpeningTime";
 import { SheetPreviewShell } from "../components/SheetPreview";
@@ -473,11 +473,11 @@ export function GlobalShell({
     surface,
   ]);
 
-  if (!graphicsDiagnostic.supported) {
-    return <SafeApplicationShell diagnostic={graphicsDiagnostic} onOpenSettings={onOpenSettings} />;
-  }
+  // Without the editor, Welcome stays in place with its Project actions off and
+  // the reason where the recent projects would be; settings keep working.
+  const editorUnavailable = !graphicsDiagnostic.supported;
 
-  if (surface === "newProject") {
+  if (surface === "newProject" && !editorUnavailable) {
     return (
       <div className="global-shell global-shell--new-project ui-chrome-selection-scope">
         <ApplicationHeader context="Novo projeto" showBrand={false} />
@@ -521,9 +521,10 @@ export function GlobalShell({
 
   return (
     <div className="global-shell ui-chrome-selection-scope">
-      <ApplicationHeader />
+      <ApplicationHeader showBrand={false} status={editorUnavailable ? "Modo seguro" : undefined} />
 
       <main className="global-recent-projects">
+        {editorUnavailable ? <EditorUnavailableNotice diagnostic={graphicsDiagnostic} /> : <>
         {recentProjects.length === 0 ? (
           <EmptyState
             className="global-empty-state"
@@ -545,6 +546,7 @@ export function GlobalShell({
           </h1>
           <ul aria-label="Projetos recentes" className="global-recent-list">{renderProjects(nonFavorites)}</ul>
         </section>}
+        </>}
       </main>
 
       <aside aria-label="Ações principais" className="global-primary-actions">
@@ -553,7 +555,7 @@ export function GlobalShell({
           <ActionButton
             aria-label="Novo projeto"
             aria-keyshortcuts={projectCommandShortcutAria("new-project")}
-            disabled={isOpening}
+            disabled={isOpening || editorUnavailable}
             onClick={startCreation}
             ref={newProjectTriggerRef}
             variant="primary"
@@ -565,7 +567,7 @@ export function GlobalShell({
           <ActionButton
             aria-label={isOpening ? "Abrindo projeto…" : "Abrir projeto"}
             aria-keyshortcuts={projectCommandShortcutAria("open-project")}
-            disabled={isOpening}
+            disabled={isOpening || editorUnavailable}
             onClick={openProject}
           >
             <AppIcon icon={FolderOpen} size={16} />
@@ -586,7 +588,7 @@ export function GlobalShell({
           {settingsError && <p role="alert">{settingsError}</p>}
           <button
             aria-label="Exportação em lote"
-            disabled={isOpening || !onOpenBatch}
+            disabled={isOpening || editorUnavailable || !onOpenBatch}
             onClick={() => { void onOpenBatch?.().catch(() => setSettingsError("Não foi possível abrir a exportação em lote.")); }}
             type="button"
           >

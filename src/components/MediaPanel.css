@@ -17,8 +17,7 @@
   height: var(--ui-toolbar-height);
   align-items: stretch;
   border-bottom: 1px solid var(--ui-border);
-  background: var(--ui-surface);
-  box-shadow: var(--ui-shadow-toolbar);
+  background: var(--ui-surface-muted);
   white-space: nowrap;
 }
 
@@ -31,7 +30,6 @@
   align-items: stretch;
 }
 
-.media-tabs,
 .media-import-menu {
   border-right: 1px solid var(--ui-border);
 }
@@ -66,22 +64,16 @@
 .media-options-button:focus-visible,
 .media-options-button.active {
   color: var(--ui-text-secondary);
-  background: var(--ui-surface-muted);
+  background: var(--ui-surface);
 }
 
 .media-tabs button.active {
-  color: var(--ui-accent);
-  background: var(--ui-surface-raised);
-}
-
-.media-tabs button.active::after {
-  position: absolute;
-  right: 0;
-  bottom: 0;
-  left: 0;
-  height: 2px;
-  background: var(--ui-accent);
-  content: "";
+  color: var(--ui-text);
+  background: var(--ui-surface);
+  box-shadow:
+    inset 0 2px 0 var(--ui-accent),
+    1px 0 0 var(--ui-border),
+    -1px 0 0 var(--ui-border);
 }
 
 .media-file-drop-hint {
@@ -137,7 +129,7 @@
   display: flex;
   min-width: 0;
   align-items: center;
-  padding: 0 8px 0 10px;
+  padding: 0 var(--ui-space-2) 0 var(--ui-space-3);
   flex: 1 1 auto;
   gap: 6px;
 }
@@ -159,14 +151,19 @@
   padding: 0 10px;
   border-radius: 999px;
   color: var(--ui-text-secondary);
-  background: var(--ui-surface-muted);
+  background: transparent;
   font-size: var(--ui-font-size-support);
   gap: 5px;
 }
 
+.media-folder-chip:hover {
+  background: var(--ui-surface);
+}
+
 .media-folder-chip.active {
-  color: var(--ui-on-accent);
-  background: var(--ui-accent-fill);
+  color: var(--ui-accent-text);
+  background: var(--ui-accent-soft);
+  font-weight: 600;
 }
 
 .media-folder-chip:focus-visible {
@@ -174,7 +171,7 @@
 }
 
 .media-folder-chip.active:focus-visible {
-  box-shadow: inset 0 0 0 1px var(--ui-focus-on-accent);
+  box-shadow: inset 0 0 0 1px var(--ui-accent-text);
 }
 
 .media-folder-chip.media-folder-chip--drop {
@@ -209,17 +206,24 @@
 
 .media-toolbar-actions {
   flex: none;
-  border-left: 1px solid var(--ui-border);
+  align-items: center;
+  padding-right: var(--ui-space-2);
+  gap: var(--ui-space-1);
 }
 
+/* Integrated search: an underlined field, like the inspector's fields. */
 .media-search {
   display: flex;
-  width: 92px;
+  width: 160px;
   min-width: 0;
-  height: 100%;
+  height: 24px;
   align-items: center;
-  padding: 0 5px 0 8px;
-  border-right: 1px solid var(--ui-border);
+  padding: 0 var(--ui-space-1);
+  border-bottom: 1px solid var(--ui-border-strong);
+}
+
+.media-search:focus-within {
+  border-bottom-color: var(--ui-focus-neutral);
 }
 
 .media-search input {
@@ -246,9 +250,11 @@
 
 .media-options-button {
   display: grid;
-  width: 32px;
+  width: 28px;
+  height: 28px;
   flex: none;
   padding: 0;
+  border-radius: var(--ui-radius-small);
   place-items: center;
 }
 

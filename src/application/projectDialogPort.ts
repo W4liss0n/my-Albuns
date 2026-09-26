@@ -16,11 +16,6 @@ export type ProjectDialogProgress =
       total: number;
     };
 
-export interface ProjectDialogDetail {
-  label: string;
-  value: string;
-}
-
 export type ProjectDialogState =
   | StorageFullPresentation
   | { kind: "exportConfiguration"; sheets: ExportSheetInfo[]; options: NormalExportOptions; busy: boolean; message: string }
@@ -39,7 +34,8 @@ export type ProjectDialogState =
     }
   | {
       busy: boolean;
-      details: readonly ProjectDialogDetail[];
+      /** What applying does that the panel cannot show; never the changed values. */
+      consequences: readonly string[];
       kind: "albumInformationConfirmation";
     }
   | {

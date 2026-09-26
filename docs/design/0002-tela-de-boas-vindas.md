@@ -1,7 +1,7 @@
 ---
 status: accepted
 document: design
-updated: 2026-09-24
+updated: 2026-09-25
 ---
 
 # Tela de Boas-vindas
@@ -202,6 +202,12 @@ Se o Host correlacionado detectar Recuperação ou uma Cópia externa somente le
 Após a decisão de Recuperação e antes de apresentar o editor, o Host aplica as dimensões já orientadas do Cache verificado ao catálogo efetivo da sessão. A correspondência exige a mesma mídia e o mesmo caminho, inclusive para Fotos importadas ou religadas após o último salvamento. Isso preserva as proporções das miniaturas e dos Frames mesmo quando o Original está ausente, sem salvar o Projeto nem incorporar dados de Cache ao estado criativo recuperável.
 
 `Novo Projeto` não herda essa exceção. O fluxo de criação ocupa a própria janela e qualquer seletor, confirmação, aviso ou progresso solicitado por ele preserva essa janela visível e bloqueada ao fundo, conforme o contrato de [diálogos pertencentes](0001-estrutura-da-janela-do-projeto.md#diálogos-pertencentes-a-uma-janela).
+
+## Editor indisponível
+
+Decisão de 25/09/2026: quando o diagnóstico gráfico não confirma a aceleração exigida pelo editor ([ADR 0005](../adr/0005-adotar-tauri-react-rust.md#requisitos-gráficos-e-de-segurança)), a própria Tela de Boas-vindas continua em uso, sem cartão flutuante, abas ou avisos em caixa. A barra da janela mostra `modo seguro`. `Novo projeto`, `Abrir projeto…` e `Exportação em lote` ficam visíveis e desabilitados, e seus atalhos não agem; `Configurações…` continua disponível e abre a janela de Configurações.
+
+No lugar dos Projetos recentes aparece o motivo em linguagem simples, `Não foi possível iniciar o editor neste computador`, seguido do que isso impede e do que continua disponível. Abaixo, `Detalhes para o suporte` lista, como texto selecionável, o motivo técnico, a placa de vídeo detectada, o requisito e os limites informados, quando existem. Não há uma superfície separada de diagnóstico nem uma cópia local das Configurações.
 
 ## Relação com as Janelas de Projeto
 

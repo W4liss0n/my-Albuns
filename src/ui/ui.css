@@ -66,20 +66,9 @@
   width: 100%;
   align-items: center;
   margin: 0;
-  color: var(--ui-text-muted);
-  font-family: var(--ui-font-mono);
-  font-size: var(--ui-font-size-micro);
+  color: var(--ui-text-secondary);
+  font-size: var(--ui-font-size-support);
   font-weight: 650;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  gap: 10px;
-}
-
-.ui-section-eyebrow::after {
-  height: 1px;
-  background: var(--ui-border);
-  content: "";
-  flex: 1;
 }
 
 /* Heading for a content group (e.g. a list of Projects). The optional count is
@@ -165,11 +154,10 @@
 }
 
 .ui-brand--compact {
-  color: var(--ui-accent-text);
-  font-size: var(--ui-font-size-caption);
-  font-weight: 750;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
+  color: var(--ui-text-secondary);
+  font-size: var(--ui-font-size-heading);
+  font-weight: 400;
+  letter-spacing: 0;
 }
 
 /* Desktop chrome is not document prose. Native text selection remains opt-in
@@ -277,7 +265,7 @@
 .ui-application-header__identity strong {
   overflow: hidden;
   color: var(--ui-text);
-  font-size: var(--ui-font-size-control);
+  font-size: var(--ui-font-size-heading);
   font-weight: 500;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -286,10 +274,36 @@
 .ui-application-header__identity small,
 .ui-application-header__status {
   color: var(--ui-text-muted);
-  font-family: var(--ui-font-mono);
   font-size: var(--ui-font-size-support);
+  font-variant-numeric: tabular-nums;
   font-weight: 400;
   white-space: nowrap;
+}
+
+/* Document windows: identity at the left, the state in words at the right. */
+.ui-application-header[data-align="start"] .ui-application-header__identity {
+  left: var(--ui-space-4);
+  max-width: calc(100% - 360px);
+  transform: none;
+}
+
+.ui-application-header[data-align="start"] .ui-application-header__status {
+  display: flex;
+  align-items: center;
+  gap: var(--ui-space-2);
+}
+
+.ui-application-header[data-align="start"] .ui-application-header__status::before {
+  width: 6px;
+  height: 6px;
+  flex: none;
+  border-radius: 50%;
+  background: currentColor;
+  content: "";
+}
+
+.ui-application-header[data-status-emphasis] .ui-application-header__status {
+  color: var(--ui-text-secondary);
 }
 
 .ui-application-header__status {

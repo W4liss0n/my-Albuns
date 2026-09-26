@@ -192,17 +192,20 @@ test("blocks Project hosts at the global graphics boundary when hardware WebGL2 
   );
 
   expect(
-    await screen.findByRole("heading", { name: "Boas-vindas" }),
+    await screen.findByRole("heading", { name: "Não foi possível iniciar o editor neste computador" }),
   ).toBeInTheDocument();
   expect(
     screen.getByText("WebGL2 acelerado por hardware não foi confirmado."),
   ).toBeInTheDocument();
-  expect(
-    screen.queryByRole("button", { name: "Novo projeto" }),
-  ).not.toBeInTheDocument();
-  expect(
-    screen.queryByRole("button", { name: "Abrir projeto" }),
-  ).not.toBeInTheDocument();
+  // Welcome keeps its layout: Project actions stay visible but off, and the
+  // shortcuts do nothing; the recent projects give way to the explanation.
+  expect(screen.getByRole("button", { name: "Novo projeto" })).toBeDisabled();
+  expect(screen.getByRole("button", { name: "Abrir projeto" })).toBeDisabled();
+  expect(screen.getByRole("button", { name: "Exportação em lote" })).toBeDisabled();
+  expect(screen.queryByRole("list", { name: "Projetos recentes" })).not.toBeInTheDocument();
+  expect(screen.getByText("Modo seguro")).toBeInTheDocument();
+  fireEvent.keyDown(window, { ctrlKey: true, key: "n" });
+  fireEvent.keyDown(window, { ctrlKey: true, key: "o" });
   expect(completeGraphicsGate).toHaveBeenCalledWith(false);
   expect(openProject).not.toHaveBeenCalled();
   expect(createProject).not.toHaveBeenCalled();

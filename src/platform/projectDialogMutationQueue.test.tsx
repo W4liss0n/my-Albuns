@@ -1,4 +1,5 @@
 import { rasterLimitsAt300Dpi } from "../test/projectConfigurationFixtures";
+import type { AlbumInformationImpact } from "../domain/project";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { act, renderHook, waitFor } from "@testing-library/react";
@@ -35,7 +36,9 @@ test("conversion and Album information can share the owned dialog while Save is 
   let finishSave!: () => void;
   const pendingSave = new Promise<void>((resolve) => { finishSave = resolve; });
   const apply = vi.fn<ProjectCorePort["apply"]>(async () => initial);
-  const impact = { conversionLosses: [], sheetWidthPx: 14_173, pageWidthPx: 7_087, heightPx: 7_087 };
+  // A removed customization is what makes Album information ask for confirmation.
+  const impact: AlbumInformationImpact = { conversionLosses: [{ sheetId: "sheet-001", sheetNumber: 1, side: "left", overlay: null,
+    background: { kind: "custom", content: { kind: "color", rgb: "#123456" }, mapping: "side" } }], sheetWidthPx: 14_173, pageWidthPx: 7_087, heightPx: 7_087 };
   const port: ProjectCorePort = {
     ...tauriProjectCorePort,
     apply,

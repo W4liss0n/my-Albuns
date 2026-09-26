@@ -3,6 +3,7 @@ import { LockKeyhole, LockKeyholeOpen, Star, Trash2 } from "lucide-react";
 import type { ComposedFrame, ComposedSheet } from "../domain/project";
 import { AppIcon } from "../ui";
 import { useDismissableSurface } from "../ui/useDismissableSurface";
+import { LayoutPositionCountPicker } from "./LayoutPositionCountPicker";
 import { SheetPreviewSurface } from "./SheetPreview";
 import type { LayoutPanelController } from "./useLayoutPanel";
 import type { LayoutCatalogController } from "./useLayoutCatalog";
@@ -46,6 +47,7 @@ export function LayoutPanel({ controller, sheet, catalog }: LayoutPanelProps) {
   const range = controller.positionRange;
   const counts = range ? Array.from({ length: range.maximum - range.minimum + 1 }, (_, index) => range.minimum + index) : [];
   if (!counts.includes(controller.positionCount)) counts.push(controller.positionCount);
+  counts.sort((first, second) => first - second);
   const emptyMessage = query?.listing.generationStatus === "empty"
     ? "Escolha quantos quadros o layout deve ter."
     : query?.listing.generationStatus === "outsideCoverage"
@@ -54,14 +56,13 @@ export function LayoutPanel({ controller, sheet, catalog }: LayoutPanelProps) {
   return (
     <section aria-label="Painel de layouts" className="layout-panel" id="layout-panel" ref={rootRef}>
       <div className="layout-panel__header">
-        <label className="layout-panel__positions">Quadros
-          <select aria-label="Quantidade de quadros" value={controller.positionCount}
+        <div className="layout-panel__title">
+          Layouts com
+          <LayoutPositionCountPicker value={controller.positionCount} counts={counts}
             disabled={controller.committing || !range}
-            onChange={(event) => controller.configurePositions(Number(event.target.value))}>
-            {counts.map((value) =>
-              <option key={value} value={value}>{value}</option>)}
-          </select>
-        </label>
+            onChange={(count) => controller.configurePositions(count)} />
+          quadros
+        </div>
       </div>
       {(["automatic", "custom"] as const).map((origin) => {
         const candidates = query?.listing.candidates.map((candidate, index) => ({ candidate, index }))

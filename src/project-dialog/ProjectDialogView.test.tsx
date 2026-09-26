@@ -64,9 +64,9 @@ test("confirms all Album information changes as one action", async () => {
       onAction={onAction}
       state={{
         busy: false,
-        details: [
-          { label: "Lâmina", value: "700 mm × 350 mm" },
-          { label: "DPI", value: "240" },
+        consequences: [
+          "A primeira lâmina vira página única. O fundo da lâmina 1 será removido.",
+          "A proporção das lâminas muda. As fotos mantêm a proporção, e o recorte pode ser ajustado.",
         ],
         kind: "albumInformationConfirmation",
       }}
@@ -76,15 +76,11 @@ test("confirms all Album information changes as one action", async () => {
   const dialog = screen.getByRole("dialog", {
     name: "Aplicar alterações no álbum?",
   });
-  expect(
-    dialog.querySelector(".album-information-change-list"),
-  ).toBeInTheDocument();
-  expect(within(dialog).getByText("Lâmina")).toHaveClass(
-    "album-information-change__label",
-  );
-  expect(within(dialog).getByText("700 mm × 350 mm")).toHaveClass(
-    "album-information-change__value",
-  );
+  // Only consequences, one sentence each, then the undo note; no list of values.
+  expect(within(dialog).getByText(/O fundo da lâmina 1 será removido\./).tagName).toBe("P");
+  expect(within(dialog).getByText(/o recorte pode ser ajustado/)).toBeInTheDocument();
+  expect(within(dialog).getByText("Você pode desfazer tudo de uma vez.")).toHaveClass("album-information-undo");
+  expect(dialog.querySelector("dl")).toBeNull();
   await user.click(within(dialog).getByRole("button", { name: "Aplicar" }));
   await user.click(within(dialog).getByRole("button", { name: "Cancelar" }));
   expect(onAction.mock.calls).toEqual([

@@ -14,7 +14,7 @@ test("keeps feature CSS with its rendering owner", () => {
       "./CanvasHorizontalScrollbar.css",
     ],
     ["src/components/SheetPreview.tsx", "./SheetPreview.css"],
-    ["src/components/SafeApplicationShell.tsx", "./SafeApplicationShell.css"],
+    ["src/global/EditorUnavailableNotice.tsx", "./EditorUnavailableNotice.css"],
     ["src/components/workspacePanelLayout.tsx", "./WorkspacePanelLayout.css"],
   ] as const;
 
