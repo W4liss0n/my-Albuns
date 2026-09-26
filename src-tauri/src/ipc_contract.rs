@@ -86,13 +86,6 @@ pub enum ProjectDialogProgress {
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-pub struct ProjectDialogDetail {
-    pub(crate) label: String,
-    pub(crate) value: String,
-}
-
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize, TS)]
 #[serde(
     tag = "kind",
     rename_all = "camelCase",
@@ -141,9 +134,11 @@ pub enum ProjectDialogState {
         problems: Vec<ImageProcessingProblem>,
         operation_problem: Option<String>,
     },
+    /// Only consequences the panel cannot show: removed customizations and
+    /// recropped photos. Changed values stay visible in the panel itself.
     AlbumInformationConfirmation {
         busy: bool,
-        details: Vec<ProjectDialogDetail>,
+        consequences: Vec<String>,
     },
     ProjectCloseConfirmation {
         busy: bool,
@@ -264,8 +259,8 @@ mod project_dialog_contract_tests {
     use serde_json::json;
 
     use super::{
-        ProjectDialogAction, ProjectDialogActionEvent, ProjectDialogDetail,
-        ProjectDialogPresentation, ProjectDialogProgress, ProjectDialogState,
+        ProjectDialogAction, ProjectDialogActionEvent, ProjectDialogPresentation,
+        ProjectDialogProgress, ProjectDialogState,
     };
 
     #[test]
@@ -325,10 +320,7 @@ mod project_dialog_contract_tests {
             },
             ProjectDialogState::AlbumInformationConfirmation {
                 busy: false,
-                details: vec![ProjectDialogDetail {
-                    label: "DPI".into(),
-                    value: "300 → 240".into(),
-                }],
+                consequences: vec!["O fundo da lâmina 1 será removido.".into()],
             },
             ProjectDialogState::EdgeConversionConfirmation {
                 message: "O Background personalizado será removido.".into(),

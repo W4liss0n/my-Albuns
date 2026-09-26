@@ -32,7 +32,7 @@ test("exports the whole album at maximum JPEG quality without collapsing configu
   fireEvent.change(screen.getByRole("textbox", { name: "Pasta dos projetos" }), { target: { value: "C:\\Projetos" } });
   await screen.findByText("1 projeto encontrado");
   expect(screen.queryByRole("slider")).not.toBeInTheDocument();
-  expect(screen.queryByText("Intervalo personalizado")).not.toBeInTheDocument();
+  expect(screen.queryByRole("radio", { name: "Intervalo" })).not.toBeInTheDocument();
   fireEvent.click(screen.getByRole("button", { name: "Verificar e exportar" }));
   await waitFor(() => expect(api.run).toHaveBeenCalledWith("ask"));
   expect(api.prepare).toHaveBeenCalledWith(ready.options);
@@ -42,9 +42,26 @@ test("exports the whole album at maximum JPEG quality without collapsing configu
   expect(await screen.findByText("Exportação concluída")).toBeVisible();
 });
 
+test("uses the Export dialog's single-pages option for the page mode and an inline alternate folder", async () => {
+  const api = port();
+  render(<BatchExportWindow port={api} />);
+  fireEvent.change(screen.getByRole("textbox", { name: "Pasta dos projetos" }), { target: { value: "C:\\Projetos" } });
+  await screen.findByText("1 projeto encontrado");
+  expect(screen.queryByRole("combobox", { name: "Modo" })).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole("checkbox", { name: "Exportar como páginas simples" }));
+  const destination = screen.getByRole("textbox", { name: "Pasta de destino" });
+  expect(destination).toBeDisabled();
+  expect(destination).not.toHaveAttribute("placeholder");
+  fireEvent.click(screen.getByRole("radio", { name: "Outra pasta" }));
+  expect(screen.getByRole("button", { name: "Verificar e exportar" })).toBeDisabled();
+  fireEvent.change(destination, { target: { value: "E:\\Exportações" } });
+  fireEvent.click(screen.getByRole("button", { name: "Verificar e exportar" }));
+  await waitFor(() => expect(api.prepare).toHaveBeenCalledWith({ ...ready.options, destinationFolder: "E:\\Exportações", mode: "page" }));
+});
+
 test("saved corrections and relinks require explicit Continue even after the last problem disappears", async () => {
   const api = port({ current: async () => ({ ...ready, canContinue: false, items: [{ ...ready.items[0],
-    problems: [{ kind: "missingMedia", mediaId: "photo", message: "Imagem ausente: 001.jpg" }] }] }) });
+    problems: [{ kind: "missingMedia", mediaId: "photo", message: "Imagem ausente: 001.jpg", fileName: "001.jpg" }] }] }) });
   render(<BatchExportWindow port={api} />);
   fireEvent.click(await screen.findByRole("button", { name: "Localizar imagens…" }));
   await screen.findByText("Pronto para exportar");
@@ -52,6 +69,22 @@ test("saved corrections and relinks require explicit Continue even after the las
   expect(api.run).not.toHaveBeenCalled();
   fireEvent.click(screen.getByRole("button", { name: "Continuar exportação" }));
   await waitFor(() => expect(api.run).toHaveBeenCalledOnce());
+});
+
+test("lists one entry per project with similar problems grouped and the path on hover", async () => {
+  const missing = (fileName: string) => ({ kind: "missingMedia" as const, mediaId: fileName, message: `Imagem ausente: ${fileName}`, fileName });
+  const api = port({ current: async () => ({ ...ready, canContinue: false, items: [{ ...ready.items[0], problems: [
+    missing("001.jpg"), missing("014.jpg"),
+    { kind: "placeholder", mediaId: null, message: "Preencha os quadros vazios e salve o projeto.", fileName: null },
+  ] }] }) });
+  render(<BatchExportWindow port={api} />);
+  const [entry] = await screen.findAllByRole("listitem");
+  expect(screen.getAllByRole("listitem")).toHaveLength(1);
+  expect(screen.getByText("A")).toHaveAttribute("title", "C:\\Projetos\\A.myalbuns");
+  expect(screen.queryByText("C:\\Projetos\\A.myalbuns")).not.toBeInTheDocument();
+  expect(entry).toHaveTextContent("2 imagens ausentes: 001.jpg, 014.jpg");
+  expect(entry).toHaveTextContent("Preencha os quadros vazios e salve o projeto.");
+  expect(screen.queryByText("Imagem ausente: 001.jpg")).not.toBeInTheDocument();
 });
 
 test("asks once for generic conflicts with Ignore, Replace or Cancel", async () => {

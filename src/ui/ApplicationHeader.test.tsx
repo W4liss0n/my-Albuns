@@ -92,6 +92,17 @@ test("uses the same titlebar with only the controls supported by a dialog", () =
   ).not.toBeNull();
 });
 
+test("a document window puts its identity at the left and can emphasize its state", () => {
+  render(<WindowControlsProvider controls={windowActions}>
+    <ApplicationHeader align="start" context="Álbum Horizonte" metadata="300×300 mm · 2 lâminas" status="Alterações não salvas" statusEmphasis />
+  </WindowControlsProvider>);
+  const header = screen.getByRole("banner", { name: "Barra da janela" });
+  expect(header).toHaveAttribute("data-align", "start");
+  expect(header).toHaveAttribute("data-status-emphasis", "true");
+  expect(screen.getByLabelText("MyAlbuns")).toBeInTheDocument();
+  expect(screen.getByText("Alterações não salvas")).toBeInTheDocument();
+});
+
 test("viewer titlebar keeps maximize and close without an inaccessible minimize action", () => {
   render(<WindowControlsProvider controls={windowActions}>
     <ApplicationHeader showBrand={false} controls="maximize-close" context="Nome muito longo da imagem.jpg" />

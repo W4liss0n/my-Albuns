@@ -5,7 +5,7 @@ import {
   Image as ImageIcon,
   ListFilter,
   Plus,
-  SlidersHorizontal,
+  Shapes,
   X,
 } from "lucide-react";
 
@@ -122,7 +122,7 @@ export function MediaPanelToolbar({
           type="button"
           onClick={() => changeMediaKind("decorative")}
         >
-          <AppIcon icon={SlidersHorizontal} size={14} />
+          <AppIcon icon={Shapes} size={16} />
           {missingCounts.decorative > 0 && <span className="media-missing-badge" aria-label={`${missingCounts.decorative} decorativos com arquivo ausente`}>{missingCounts.decorative}</span>}
         </button>
       </div>
@@ -174,10 +174,13 @@ export function MediaPanelToolbar({
             <span>Todas</span>
             <small>{itemCount}</small>
           </button>
-          <button type="button" className={`media-folder-chip${missingOnly ? " active" : ""}`}
-            aria-pressed={missingOnly} onClick={() => onMissingOnlyChange(!missingOnly)}>
-            Ausentes<small>{missingCounts[activeMediaKind]}</small>
-          </button>
+          {/* Shown only when needed; an active filter stays reachable until turned off. */}
+          {(missingCounts[activeMediaKind] > 0 || missingOnly) && (
+            <button type="button" className={`media-folder-chip${missingOnly ? " active" : ""}`}
+              aria-pressed={missingOnly} onClick={() => onMissingOnlyChange(!missingOnly)}>
+              Ausentes<small>{missingCounts[activeMediaKind]}</small>
+            </button>
+          )}
           {folders.map((folder) => <button key={folder.id} type="button"
             className={`media-folder-chip${activeFolderId === folder.id ? " active" : ""}${dropFolderId === folder.id ? " media-folder-chip--drop" : ""}`}
             data-media-folder-id={folder.id}

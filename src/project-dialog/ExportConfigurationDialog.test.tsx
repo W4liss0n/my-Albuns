@@ -16,7 +16,7 @@ test("exports only the selected continuous sheets and counts active pages for PD
   expect(screen.getByText("3 arquivos")).toBeInTheDocument();
   await user.click(screen.getByLabelText("Exportar como páginas simples"));
   expect(screen.getByText("4 arquivos")).toBeInTheDocument();
-  await user.click(screen.getByLabelText("Intervalo personalizado"));
+  await user.click(screen.getByLabelText("Intervalo"));
   fireEvent.change(screen.getByLabelText("Lâminas do intervalo"), { target: { value: "2" } });
   await user.selectOptions(screen.getByLabelText("Formato de exportação"), "pdf");
   expect(screen.getByText("1 PDF · 2 páginas")).toBeInTheDocument();
@@ -52,7 +52,7 @@ test("invalid ranges never submit and contextual export starts at the chosen she
 test("keeps an empty interval neutral and moves invalid input guidance into a tooltip", async () => {
   const user = userEvent.setup();
   render(<ExportConfigurationDialog state={state} onAction={vi.fn()} />);
-  await user.click(screen.getByLabelText("Intervalo personalizado"));
+  await user.click(screen.getByLabelText("Intervalo"));
   const interval = screen.getByLabelText("Lâminas do intervalo");
 
   expect(interval).toHaveValue("");
@@ -82,7 +82,7 @@ test("contextual export remains an interval even when the album has only one she
     sheets: [{ sheetId: "middle", number: 1, pageCount: 2 }],
     options: { ...state.options, scope: "range", sheetIds: ["middle"] },
   }} onAction={onAction} />);
-  expect(screen.getByLabelText("Intervalo personalizado")).toBeChecked();
+  expect(screen.getByLabelText("Intervalo")).toBeChecked();
   fireEvent.keyDown(screen.getByLabelText("Lâminas do intervalo"), { key: "Escape" });
   expect(onAction).toHaveBeenCalledWith("dismissExport");
 });
@@ -104,7 +104,7 @@ test("wraps keyboard navigation from the destination without leaving the dialog"
 test("exports all sheets by default and restores them after selecting a custom interval", async () => {
   const user = userEvent.setup(); const onAction = vi.fn();
   render(<ExportConfigurationDialog state={state} onAction={onAction} />);
-  const intervalToggle = screen.getByRole("radio", { name: "Intervalo personalizado" });
+  const intervalToggle = screen.getByRole("radio", { name: "Intervalo" });
   expect(intervalToggle).not.toBeChecked();
   expect(screen.getByRole("radio", { name: "Todas as lâminas" })).toBeChecked();
   expect(screen.getByLabelText("Lâminas do intervalo")).toBeDisabled();
@@ -129,4 +129,17 @@ test.each(["0", "4", "3-2", "1,3", "1.5", "1-2-3"])("rejects an invalid interval
   fireEvent.change(screen.getByLabelText("Lâminas do intervalo"), { target: { value: interval } });
   expect(screen.getByRole("button", { name: "Exportar" })).toBeDisabled();
   expect(screen.getByRole("alert")).toBeInTheDocument();
+});
+
+test("keeps Exportar as the only primary action", () => {
+  render(<ExportConfigurationDialog state={state} onAction={vi.fn()} />);
+  expect(screen.getByRole("button", { name: "Escolher…" })).not.toHaveClass("ui-action-button--primary");
+  expect(screen.getByRole("button", { name: "Exportar" })).toHaveClass("ui-action-button--primary");
+});
+
+test("shows a verification message in place of the footer summary", () => {
+  render(<ExportConfigurationDialog state={{ ...state, message: "Não foi possível acessar a pasta de destino." }} onAction={vi.fn()} />);
+  expect(screen.getByRole("alert")).toHaveTextContent("Não foi possível acessar a pasta de destino.");
+  expect(screen.getByRole("alert").closest("footer")).not.toBeNull();
+  expect(screen.queryByText("3 arquivos")).not.toBeInTheDocument();
 });

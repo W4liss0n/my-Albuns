@@ -2,6 +2,7 @@
 status: accepted
 document: design
 date: 2026-09-10
+updated: 2026-09-24
 ticket: 24
 platform: windows
 implementation-readiness: ready-for-agent
@@ -44,6 +45,9 @@ O Painel contextual não exibe aviso de arquivos ausentes nem atalho para
 uma revisão temporária. A ausência continua indicada no próprio item do
 Painel de imagens. O filtro `Ausentes` permanece disponível por escolha do
 usuário, dentro da aba atual e em conjunto com a busca e o filtro de uso.
+Desde 24/09/2026, o chip `Ausentes` só aparece quando a aba atual tem arquivos
+ausentes. Se o filtro estiver ligado e o último arquivo voltar, o chip
+continua visível, com contagem zero, até o usuário desligá-lo.
 
 Na miniatura, a ausência aparece somente como um ícone quadrado no canto
 superior direito, com descrição acessível e ao passar o mouse. Não há texto

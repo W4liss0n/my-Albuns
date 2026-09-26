@@ -37,7 +37,6 @@
   top: 50%;
   right: 9px;
   color: var(--ui-text-muted);
-  font-family: var(--ui-font-mono);
   font-size: var(--ui-font-size-caption);
   pointer-events: none;
   transform: translateY(-50%);
@@ -55,7 +54,7 @@
 .ui-text-field--compact input { padding-right: 30px; }
 .ui-text-field--compact .ui-text-field__entry--suffix input {
   padding-right: 54px;
-  font-family: var(--ui-font-mono);
+  font-variant-numeric: tabular-nums;
 }
 .ui-text-field--compact .ui-text-field__suffix {
   right: var(--ui-space-2);

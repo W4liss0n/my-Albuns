@@ -18,14 +18,14 @@ export function BatchProgressWindow({ port }: { port: BatchExportPort }) {
     return observation.dispose;
   }, [port]);
   if (!progress && !failed) return null;
-  if (failed) return <OwnedWindowShell controls="none" width={400}>
+  if (failed) return <OwnedWindowShell context="Exportação em lote" controls="none" width={400}>
     <MessageDialog tone="error" title="Progresso indisponível" description="Cancele a exportação e tente novamente."
       primaryAction={{ label: "Cancelar", disabled: cancelled, onClick: () => {
         setCancelled(true); void port.cancel().catch(() => setCancelled(false));
       } }} />
   </OwnedWindowShell>;
   if (!progress) return null;
-  return <OwnedWindowShell controls="none" width={400}>
+  return <OwnedWindowShell context="Exportação em lote" controls="none" width={400}>
     <ProgressDialog title="Exportando" progress={{ kind: "determinate", completed: progress.percent, total: 100,
       status: null,
       countLabel: `${progress.completed} ${progress.completed === 1 ? "álbum" : "álbuns"} de ${progress.total}` }}

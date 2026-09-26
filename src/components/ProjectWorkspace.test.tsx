@@ -374,6 +374,12 @@ function projectWindowHarness() {
   };
 }
 
+// Album information only asks for confirmation when applying removes or
+// recrops something; the flows below exercise that dialog, so their validation
+// reports a removed customization.
+const albumInformationLoss = { sheetId: "sheet-001", sheetNumber: 1, side: "left", overlay: null,
+  background: { kind: "custom", content: { kind: "color", rgb: "#123456" }, mapping: "side" } } as const;
+
 function projectCorePortWithApply(
   apply: ProjectCorePort["apply"],
 ): ProjectCorePort {
@@ -381,7 +387,7 @@ function projectCorePortWithApply(
     load: async () => projection,
     validateAlbumInformation: async () => ({ rasterLimits: rasterLimitsAt300Dpi,
       errors: [],
-      impact: { conversionLosses: [], sheetWidthPx: 7_087, pageWidthPx: 3_543, heightPx: 3_543 },
+      impact: { conversionLosses: [albumInformationLoss], sheetWidthPx: 7_087, pageWidthPx: 3_543, heightPx: 3_543 },
     }),
     apply,
     applyWithOutcome: async (intent, publish) => ({
@@ -2886,7 +2892,7 @@ test("projects the pending Unidade across the Project Window without changing Al
     design.getByRole("spinbutton", { name: "Espaço entre quadros em pol" }),
   ).toHaveValue("0.197");
   expect(designApply).toBeDisabled();
-  expect(screen.getByText("salvo")).toBeVisible();
+  expect(screen.getByText("Salvo")).toBeVisible();
   expect(apply).not.toHaveBeenCalled();
 
   fireEvent.click(
@@ -5023,7 +5029,7 @@ test("revalidates materialized Album Information after pending History and block
       ? { rasterLimits: rasterLimitsAt300Dpi, errors: ["sheetWidthRasterOutOfRange"], impact: null }
       : { rasterLimits: rasterLimitsAt300Dpi,
           errors: [],
-          impact: { conversionLosses: [],
+          impact: { conversionLosses: [albumInformationLoss],
             sheetWidthPx: 7_087,
             pageWidthPx: 3_543,
             heightPx: 3_543,
@@ -5163,15 +5169,16 @@ test("updates a stale Album Information summary and requires reconfirmation afte
     await pendingRedo.promise;
   });
 
-  await waitFor(() =>
-    expect(dialog.present).toHaveBeenCalledWith({
-      busy: false,
-      details: expect.arrayContaining([
-        { label: "DPI", value: "400 → 600" },
-      ]),
-      kind: "albumInformationConfirmation",
-    }),
-  );
+  // The first confirmation was for the pre-History baseline: a fresh review
+  // presents the confirmation again instead of applying.
+  const confirmationRequests = () => dialog.present.mock.calls.filter(([state]) =>
+    state.kind === "albumInformationConfirmation" && !state.busy);
+  await waitFor(() => expect(confirmationRequests()).toHaveLength(2));
+  expect(confirmationRequests()[1]![0]).toEqual({
+    busy: false,
+    consequences: ["O fundo da lâmina 1 será removido."],
+    kind: "albumInformationConfirmation",
+  });
   expect(apply).not.toHaveBeenCalled();
 
   dialog.emit("confirmAlbumInformation");

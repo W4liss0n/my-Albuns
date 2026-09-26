@@ -17,13 +17,16 @@ const ready: BatchExportView = {
 };
 const view: BatchExportView | null = scenario === "configuration" || !scenario || scenario === "recovery" ? null
   : scenario === "problems" ? { ...ready, canContinue: false, items: ready.items.map((item, index) => ({ ...item,
-    problems: index === 0 ? [{ kind: "missingMedia", mediaId: "photo", message: "Imagem ausente: 001.jpg" }]
-      : index === 1 ? [{ kind: "placeholder", mediaId: null, message: "Preencha os quadros vazios e salve o projeto." }]
-      : [{ kind: "unavailable", mediaId: null, message: "Projeto indisponível. Verifique a pasta e tente novamente." }],
+    problems: index === 0 ? [
+        ...["001.jpg", "014.jpg"].map(fileName => ({ kind: "missingMedia" as const, mediaId: fileName, message: `Imagem ausente: ${fileName}`, fileName })),
+        { kind: "placeholder", mediaId: null, message: "Preencha os quadros vazios e salve o projeto.", fileName: null },
+      ]
+      : index === 1 ? [{ kind: "placeholder", mediaId: null, message: "Preencha os quadros vazios e salve o projeto.", fileName: null }]
+      : [{ kind: "unavailable", mediaId: null, message: "Projeto indisponível. Verifique a pasta e tente novamente.", fileName: null }],
   })) }
   : scenario === "result" ? { ...ready, phase: "finished", items: ready.items.map((item, index) => ({ ...item,
     status: index === 0 ? "completed" : index === 1 ? "ignored" : "failed",
-    problems: index === 2 ? [{ kind: "failed", mediaId: null, message: "O projeto mudou depois da verificação. Verifique novamente antes de exportar." }] : [],
+    problems: index === 2 ? [{ kind: "failed", mediaId: null, message: "O projeto mudou depois da verificação. Verifique novamente antes de exportar.", fileName: null }] : [],
   })) } : scenario.startsWith("storage-full") ? { ...ready, phase: "storageFull", canContinue: false, partialPublication: scenario === "storage-full-partial",
     items: ready.items.map((item, index) => ({ ...item, status: index === 0 ? "completed" : "pending" })) }
   : scenario === "success" ? { ...ready, phase: "finished", items: ready.items.map(item => ({ ...item, status: "completed" })) } : ready;

@@ -43,12 +43,13 @@ export function usePhotoContinuity<T>({ key, sessionId, url, name, state, allowR
 export interface Size { width: number; height: number }
 export interface Point { x: number; y: number }
 
-export function fitPhoto(natural: Size, space: Size, margin: number, allowUpscale: boolean): Size {
+export function fitPhoto(natural: Size, space: Size, margin: number | { x: number; y: number }, allowUpscale: boolean): Size {
   if (!natural.width || !natural.height) return { width: 0, height: 0 };
+  const { x, y } = typeof margin === "number" ? { x: margin, y: margin } : margin;
   const scale = Math.min(
     allowUpscale ? Number.POSITIVE_INFINITY : 1,
-    Math.max(0, space.width - margin * 2) / natural.width,
-    Math.max(0, space.height - margin * 2) / natural.height,
+    Math.max(0, space.width - x * 2) / natural.width,
+    Math.max(0, space.height - y * 2) / natural.height,
   );
   return { width: natural.width * scale, height: natural.height * scale };
 }

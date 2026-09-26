@@ -2,11 +2,12 @@
   display: contents;
 }
 
+/* A regular primary button inside the menu bar, not a full-height slab. */
 .export-preview-trigger.ui-action-button {
-  height: 100%;
+  align-self: center;
+  height: 22px;
   min-height: 0;
-  padding: 0 var(--ui-control-padding-inline);
-  border-width: 0 0 0 1px;
-  border-radius: 0;
-  font-size: var(--ui-font-size-support);
+  margin: 0 var(--ui-space-3) 0 var(--ui-space-2);
+  padding: 0 var(--ui-space-3);
+  font-size: var(--ui-font-size-control);
 }

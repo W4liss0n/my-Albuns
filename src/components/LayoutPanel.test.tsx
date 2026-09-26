@@ -58,10 +58,36 @@ test("an outside press closes the panel even when the outside control stops prop
 test("the frame count requests additional positions without applying a Layout", () => {
   const { controller } = panel();
   const count = screen.getByRole("combobox", { name: "Quantidade de quadros" });
-  fireEvent.change(count, { target: { value: "6" } });
+  fireEvent.click(count);
+  fireEvent.pointerDown(screen.getByRole("option", { name: "6" }));
+  fireEvent.click(screen.getByRole("option", { name: "6" }));
   expect(controller.configurePositions).toHaveBeenCalledExactlyOnceWith(6);
+  expect(controller.close).not.toHaveBeenCalled();
   expect(controller.apply).not.toHaveBeenCalled();
   expect(controller.lock).not.toHaveBeenCalled();
+  expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
+  expect(count).toHaveFocus();
+});
+
+test("the frame count shows every count at once and steps with the arrows while closed", () => {
+  const { controller } = panel();
+  const count = screen.getByRole("combobox", { name: "Quantidade de quadros" });
+  expect(count).toHaveTextContent("4");
+  fireEvent.keyDown(count, { key: "ArrowDown" });
+  expect(controller.configurePositions).toHaveBeenLastCalledWith(5);
+  fireEvent.keyDown(count, { key: "ArrowUp" });
+  expect(controller.configurePositions).toHaveBeenLastCalledWith(3);
+  fireEvent.click(count);
+  const grid = screen.getByRole("listbox", { name: "Quantidade de quadros" });
+  expect(count).toHaveAttribute("aria-expanded", "true");
+  expect(within(grid).getByRole("option", { name: "4" })).toHaveAttribute("aria-selected", "true");
+  expect(within(grid).getByRole("option", { name: "4" })).toHaveFocus();
+  fireEvent.keyDown(grid, { key: "ArrowRight" });
+  expect(within(grid).getByRole("option", { name: "5" })).toHaveFocus();
+  fireEvent.keyDown(grid, { key: "Escape" });
+  expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
+  expect(count).toHaveFocus();
+  expect(controller.close).not.toHaveBeenCalled();
 });
 
 test("placeholders do not prevent choosing a smaller Layout that keeps every Photo", () => {
@@ -71,9 +97,8 @@ test("placeholders do not prevent choosing a smaller Layout that keeps every Pho
   expect(photoCount).toBeGreaterThan(0);
   expect(photoCount).toBeLessThan(sheet.frames.length);
   const { controller } = panel();
-  const count = screen.getByRole("combobox", { name: "Quantidade de quadros" });
-  expect(within(count).getByRole("option", { name: String(photoCount) })).toBeInTheDocument();
-  fireEvent.change(count, { target: { value: String(photoCount) } });
+  fireEvent.click(screen.getByRole("combobox", { name: "Quantidade de quadros" }));
+  fireEvent.click(screen.getByRole("option", { name: String(photoCount) }));
   expect(controller.configurePositions).toHaveBeenCalledExactlyOnceWith(photoCount);
   expect(controller.apply).not.toHaveBeenCalled();
 });

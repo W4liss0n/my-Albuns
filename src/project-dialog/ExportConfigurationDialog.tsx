@@ -1,8 +1,7 @@
 import { useEffect, useId, useRef, useState } from "react";
-import { ChevronDown } from "lucide-react";
 import type { ProjectDialogAction, ProjectDialogState } from "../application/projectDialogPort";
 import type { ExportFormat } from "../application/normalExport";
-import { ActionButton, AppIcon, FieldValidationAutoTooltip, FieldValidationTooltip, fieldValidationTooltipAttributes, useFieldValidationTooltip } from "../ui";
+import { ActionButton, FieldValidationAutoTooltip, FieldValidationTooltip, fieldValidationTooltipAttributes, useFieldValidationTooltip } from "../ui";
 import { DialogWindowFrame } from "../ui/DialogWindowFrame";
 import { DialogFocusScope } from "../ui/DialogFocusScope";
 import { TextInput } from "../ui/TextInput";
@@ -50,13 +49,15 @@ export function ExportConfigurationDialog({ state, onAction }: {
     : `${count} ${count === 1 ? "arquivo" : "arquivos"}`;
 
   return (
-    <DialogFocusScope className="ui-operation-dialog" focusKey={`export-${state.busy}`}
+    <DialogFocusScope className="ui-operation-dialog ui-export-dialog" focusKey={`export-${state.busy}`}
       initialFocusRef={initialFocus} onEscape={() => { if (!state.busy) onAction("dismissExport"); }}>
       <DialogWindowFrame layout="form" title="Exportar" actions={
         <>
-          <div className="ui-operation-form__summary" aria-live="polite">
-            <span>{summary}</span>{options.format.kind !== "pdf" && <> · {options.format.kind.toUpperCase()}</>}
-          </div>
+          {state.message
+            ? <p role="alert" className="ui-operation-form__summary ui-export-form__error">{state.message}</p>
+            : <div className="ui-operation-form__summary" aria-live="polite">
+              <span>{summary}</span>{options.format.kind !== "pdf" && <> · {options.format.kind.toUpperCase()}</>}
+            </div>}
           <ActionButton disabled={state.busy} onClick={() => onAction("dismissExport")}>Cancelar</ActionButton>
           <ActionButton variant="primary" disabled={state.busy || count === 0 || !options.destination.trim()}
             onClick={() => onAction({ configureExport: request })}>Exportar</ActionButton>
@@ -64,26 +65,25 @@ export function ExportConfigurationDialog({ state, onAction }: {
       }>
         <form className="ui-operation-form" aria-busy={state.busy} onSubmit={event => event.preventDefault()}>
           <fieldset className="ui-operation-form__section ui-operation-form__section--destination" disabled={state.busy}>
-            <legend>Destino da exportação</legend>
+            <legend>Destino</legend>
             <div className="ui-operation-form__destination">
               <TextInput ref={initialFocus} className="ui-field-control" aria-label="Pasta de destino" value={options.destination}
                 title={options.destination} onChange={event => setOptions(current => ({ ...current, destination: event.target.value }))} />
-              <ActionButton variant="primary" onClick={() => onAction({ chooseExportDestination: { ...request, sheetIds: options.sheetIds } })}>Escolher…</ActionButton>
+              <ActionButton onClick={() => onAction({ chooseExportDestination: { ...request, sheetIds: options.sheetIds } })}>Escolher…</ActionButton>
             </div>
           </fieldset>
 
           <fieldset className="ui-operation-form__section" disabled={state.busy}>
-            <legend>Formato de exportação</legend>
+            <legend>Formato</legend>
             <div className="ui-export-form__format-row">
               <div className="ui-export-form__format-select">
                 <select className="ui-field-control" aria-label="Formato de exportação" value={options.format.kind}
                   onChange={event => setFormat(event.target.value as ExportFormat["kind"])}>
                   <option value="jpeg">JPEG</option><option value="png">PNG</option><option value="pdf">PDF</option>
                 </select>
-                <AppIcon icon={ChevronDown} size={16} />
               </div>
               {options.format.kind === "jpeg" && <div className="ui-export-form__quality">
-                <label htmlFor={`${id}-quality`}>Qualidade:</label>
+                <label htmlFor={`${id}-quality`}>Qualidade</label>
                 <input id={`${id}-quality`} className="ui-range" aria-label="Qualidade JPEG" type="range"
                   min={1} max={100} step={1} value={quality} onChange={event => setQuality(Number(event.target.value))}
                   onDoubleClick={() => setQuality(100)} title="Dois cliques para restaurar 100%" />
@@ -93,7 +93,7 @@ export function ExportConfigurationDialog({ state, onAction }: {
           </fieldset>
 
           <fieldset className="ui-operation-form__section" disabled={state.busy}>
-            <legend>Seleção de lâminas</legend>
+            <legend>Lâminas</legend>
             <div className="ui-export-form__selection">
               <label className="ui-export-form__choice">
                 <input type="radio" name={`${id}-scope`} checked={scope === "album"} onChange={() => setScope("album")} />
@@ -103,7 +103,7 @@ export function ExportConfigurationDialog({ state, onAction }: {
                 <div className="ui-export-form__range">
                   <label className="ui-export-form__choice">
                     <input type="radio" name={`${id}-scope`} checked={scope === "range"} onChange={() => setScope("range")} />
-                    Intervalo personalizado
+                    Intervalo
                   </label>
                   <span className="ui-export-form__range-field">
                     <TextInput className="ui-field-control" aria-label="Lâminas do intervalo"
@@ -124,7 +124,6 @@ export function ExportConfigurationDialog({ state, onAction }: {
             </div>
             <FieldValidationTooltip tooltip={rangeTooltip} />
           </fieldset>
-          {state.message && <p role="alert" className="ui-export-form__status ui-export-form__error">{state.message}</p>}
         </form>
       </DialogWindowFrame>
     </DialogFocusScope>

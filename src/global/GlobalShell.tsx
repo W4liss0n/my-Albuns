@@ -9,10 +9,10 @@ import { createPortal } from "react-dom";
 import { useHover, useTooltip, useTooltipTrigger } from "react-aria";
 import { useTooltipTriggerState } from "react-stately";
 import {
-  ChevronRight,
   Download,
   FolderOpen,
   Plus,
+  Settings,
   Star,
 } from "lucide-react";
 
@@ -22,7 +22,6 @@ import {
   projectCommandShortcutAria,
   projectCommandShortcutLabel,
 } from "../application/projectCommandCatalog";
-import { SafeApplicationShell } from "../components/SafeApplicationShell";
 import type {
   GlobalProjectPort,
   NewProjectPort,
@@ -31,6 +30,7 @@ import type {
   RecentProjectSummary,
   RecentProjectFirstSheet,
 } from "./application/globalProjectPort";
+import { EditorUnavailableNotice } from "./EditorUnavailableNotice";
 import { NewProjectFlow } from "./NewProjectFlow";
 import { recentProjectOpeningTime } from "./recentProjectOpeningTime";
 import { SheetPreviewShell } from "../components/SheetPreview";
@@ -99,7 +99,7 @@ function RecentProjectThumbnail({
           className="global-project-first-sheet"
           style={{
             aspectRatio: `${sheet.widthUm * (sheet.activeSides === "both" ? 1 : 2)} / ${sheet.heightUm}`,
-            width: `${Math.round(102 * sheet.widthUm * (sheet.activeSides === "both" ? 1 : 2) / sheet.heightUm)}px`,
+            width: `${Math.round(104 * sheet.widthUm * (sheet.activeSides === "both" ? 1 : 2) / sheet.heightUm)}px`,
           }}
         >
           <SheetPreviewShell sheet={sheet} mediaPreviewUrls={preview.mediaPreviewUrls} />
@@ -122,7 +122,6 @@ function RecentProjectCard({
   onOpen(id: string): void;
   onFavorite(id: string, favorite: boolean): void;
 }) {
-  const trigger = useRef<HTMLButtonElement>(null);
   const name = useRef<HTMLElement>(null);
   const nameTooltipElement = useRef<HTMLDivElement>(null);
   const favoriteTrigger = useRef<HTMLButtonElement>(null);
@@ -137,19 +136,9 @@ function RecentProjectCard({
     placement: "above" | "below";
   } | null>(null);
   const openedAt = recentProjectOpeningTime(project.lastOpenedAtMs, now);
-  const dateOptions = {
-    isDisabled: disabled || !openedAt,
-    trigger: "focus" as const,
-    delay: 600,
-    closeDelay: 100,
-  };
-  const dateTooltip = useTooltipTriggerState(dateOptions);
   const nameTooltip = useTooltipTriggerState({ delay: 600, closeDelay: 100 });
   const closeNameTooltip = useRef(nameTooltip.close);
   closeNameTooltip.current = nameTooltip.close;
-  const { triggerProps, tooltipProps: dateDescriptionProps } =
-    useTooltipTrigger(dateOptions, dateTooltip, trigger);
-  const { tooltipProps: dateTooltipProps } = useTooltip(dateDescriptionProps, dateTooltip);
   const { tooltipProps: nameTooltipProps } = useTooltip({}, nameTooltip);
   useEffect(() => {
     if (!nameTooltip.isOpen) return;
@@ -190,11 +179,6 @@ function RecentProjectCard({
     };
   }, [nameTooltip.isOpen]);
 
-  const { hoverProps: dateHoverProps } = useHover({
-    isDisabled: disabled || !openedAt,
-    onHoverStart: () => dateTooltip.open(),
-    onHoverEnd: () => dateTooltip.close(true),
-  });
   const { hoverProps: nameHoverProps } = useHover({
     isDisabled: disabled,
     onHoverStart: () => {
@@ -208,12 +192,10 @@ function RecentProjectCard({
   return (
     <li className="global-project-card" data-project-id={project.id}>
       <button
-        {...triggerProps}
         aria-label={project.name}
         aria-description={openedAt ? `Última abertura: ${openedAt.fullLabel}` : undefined}
         disabled={disabled}
         onClick={() => onOpen(project.id)}
-        ref={trigger}
         type="button"
         className="global-project-launch"
       >
@@ -221,14 +203,10 @@ function RecentProjectCard({
         <span className="global-project-summary">
           <strong {...nameHoverProps} ref={name}>{project.name}</strong>
           {openedAt && (
-            <time {...dateHoverProps} className="global-project-when" dateTime={openedAt.dateTime}
-              aria-label={`Última abertura: ${openedAt.fullLabel}`}>
+            <time className="global-project-when" dateTime={openedAt.dateTime}>
               {openedAt.label}
             </time>
           )}
-        </span>
-        <span aria-hidden="true" className="global-project-open">
-          <AppIcon icon={ChevronRight} size={12} />
         </span>
       </button>
       <button
@@ -246,11 +224,6 @@ function RecentProjectCard({
       {favoriteTooltip.isOpen && (
         <div {...favoriteTooltipProps} className="ui-anchored-tooltip global-project-favorite-tooltip">
           {favoriteLabel}
-        </div>
-      )}
-      {openedAt && dateTooltip.isOpen && (
-        <div {...dateTooltipProps} className="ui-anchored-tooltip global-project-date-tooltip">
-          {openedAt.fullLabel}
         </div>
       )}
       {nameTooltip.isOpen && createPortal(
@@ -500,14 +473,14 @@ export function GlobalShell({
     surface,
   ]);
 
-  if (!graphicsDiagnostic.supported) {
-    return <SafeApplicationShell diagnostic={graphicsDiagnostic} onOpenSettings={onOpenSettings} />;
-  }
+  // Without the editor, Welcome stays in place with its Project actions off and
+  // the reason where the recent projects would be; settings keep working.
+  const editorUnavailable = !graphicsDiagnostic.supported;
 
-  if (surface === "newProject") {
+  if (surface === "newProject" && !editorUnavailable) {
     return (
       <div className="global-shell global-shell--new-project ui-chrome-selection-scope">
-        <ApplicationHeader context="Novo projeto" />
+        <ApplicationHeader context="Novo projeto" showBrand={false} />
         <NewProjectFlow
           onCancel={cancelCreation}
           onChooseDecorative={() =>
@@ -548,9 +521,10 @@ export function GlobalShell({
 
   return (
     <div className="global-shell ui-chrome-selection-scope">
-      <ApplicationHeader status="diagramação de álbuns" />
+      <ApplicationHeader showBrand={false} status={editorUnavailable ? "Modo seguro" : undefined} />
 
       <main className="global-recent-projects">
+        {editorUnavailable ? <EditorUnavailableNotice diagnostic={graphicsDiagnostic} /> : <>
         {recentProjects.length === 0 ? (
           <EmptyState
             className="global-empty-state"
@@ -559,22 +533,29 @@ export function GlobalShell({
           />
         ) : null}
         {favorites.length > 0 && <section className="global-project-section">
-          <h1 className="ui-section-eyebrow">Favoritos</h1>
+          <h1 className="ui-section-heading">
+            Favoritos
+            <span aria-hidden="true" className="ui-section-heading__count">{favorites.length}</span>
+          </h1>
           <ul aria-label="Favoritos" className="global-recent-list">{renderProjects(favorites)}</ul>
         </section>}
         {nonFavorites.length > 0 && <section className="global-project-section">
-          <h1 className="ui-section-eyebrow">Projetos recentes</h1>
+          <h1 className="ui-section-heading">
+            Projetos recentes
+            <span aria-hidden="true" className="ui-section-heading__count">{nonFavorites.length}</span>
+          </h1>
           <ul aria-label="Projetos recentes" className="global-recent-list">{renderProjects(nonFavorites)}</ul>
         </section>}
+        </>}
       </main>
 
       <aside aria-label="Ações principais" className="global-primary-actions">
-        <BrandWordmark subtitle="diagramação de álbuns · versão 0.1.0" />
+        <BrandWordmark subtitle="diagramação de álbuns" />
         <div className="global-action-stack">
           <ActionButton
             aria-label="Novo projeto"
             aria-keyshortcuts={projectCommandShortcutAria("new-project")}
-            disabled={isOpening}
+            disabled={isOpening || editorUnavailable}
             onClick={startCreation}
             ref={newProjectTriggerRef}
             variant="primary"
@@ -586,7 +567,7 @@ export function GlobalShell({
           <ActionButton
             aria-label={isOpening ? "Abrindo projeto…" : "Abrir projeto"}
             aria-keyshortcuts={projectCommandShortcutAria("open-project")}
-            disabled={isOpening}
+            disabled={isOpening || editorUnavailable}
             onClick={openProject}
           >
             <AppIcon icon={FolderOpen} size={16} />
@@ -596,16 +577,18 @@ export function GlobalShell({
             <kbd>{projectCommandShortcutLabel("open-project")}</kbd>
           </ActionButton>
         </div>
-        <div aria-hidden="true" className="global-action-divider" />
         <div className="global-secondary-actions">
           <button type="button" disabled={isOpening || !onOpenSettings} onClick={() => {
             setSettingsError(null);
             void onOpenSettings?.().catch(() => setSettingsError("Não foi possível abrir Configurações. Tente novamente."));
-          }}><span>Configurações…</span></button>
+          }}>
+            <AppIcon icon={Settings} size={14} />
+            <span>Configurações…</span>
+          </button>
           {settingsError && <p role="alert">{settingsError}</p>}
           <button
             aria-label="Exportação em lote"
-            disabled={isOpening || !onOpenBatch}
+            disabled={isOpening || editorUnavailable || !onOpenBatch}
             onClick={() => { void onOpenBatch?.().catch(() => setSettingsError("Não foi possível abrir a exportação em lote.")); }}
             type="button"
           >
@@ -613,6 +596,7 @@ export function GlobalShell({
             <span>Exportação em lote</span>
           </button>
         </div>
+        <p className="global-version">Versão 0.1.0</p>
       </aside>
     </div>
   );

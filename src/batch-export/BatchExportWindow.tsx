@@ -7,6 +7,7 @@ import { MessageDialog } from "../ui/MessageDialog";
 import { OwnedWindowShell } from "../ui/OwnedWindowShell";
 import { ProblemsDialog } from "../ui/ProblemsDialog";
 import { BatchConfiguration } from "./BatchConfiguration";
+import { summarizeBatchProblems } from "./batchProblemSummary";
 import { StorageRecoveryController, unavailableStorageRecovery, type StorageFullPresentation } from "../application/storageRecovery";
 import { StorageFullDialog } from "../ui/StorageFullDialog";
 
@@ -115,12 +116,15 @@ export function BatchExportWindow({ port }: { port: BatchExportPort }) {
   } else if (view && problems.length > 0) {
     content = <ProblemsDialog title={terminal ? "Resultado da exportação" : "Problemas na exportação"}
       description={terminal ? resultSummary : "Resolva ou ignore os projetos abaixo para continuar."}
-      columns={["Projeto", "Problema", "Ações"]} rows={problems.map(item => [
-        <span key="project">{item.name}<span className="batch-project-path" title={item.projectPath}>{item.projectPath}</span></span>,
-        <div key="reasons" className="batch-problem-reasons">{item.status === "ignored" && <strong>Ignorado neste lote</strong>}
-          {item.problems.map((problem, index) => <span key={index}>{problem.message}</span>)}
-        </div>,
-        !terminal && item.status !== "ignored" ? <div key="actions" className="batch-problem-actions">
+      items={problems.map(item => ({
+        key: item.id,
+        title: item.name,
+        titleHint: item.projectPath,
+        details: <>
+          {item.status === "ignored" && <span>Ignorado neste lote</span>}
+          {summarizeBatchProblems(item.problems).map((line, index) => <span key={index} title={line.hint}>{line.text}</span>)}
+        </>,
+        actions: !terminal && item.status !== "ignored" ? <>
           <ActionButton disabled={busy} onClick={() => void act(async () => {
             const outcome = await port.openProject(item.id);
             if (outcome.status === "failed") throw new Error(outcome.error.message);
@@ -128,8 +132,8 @@ export function BatchExportWindow({ port }: { port: BatchExportPort }) {
           {item.problems.some(problem => problem.kind === "missingMedia") && <ActionButton disabled={busy}
             onClick={() => refresh(() => port.relink(item.id))}>Localizar imagens…</ActionButton>}
           <ActionButton disabled={busy} onClick={() => refresh(() => port.ignore(item.id))}>Ignorar neste lote</ActionButton>
-        </div> : "—",
-      ])} closeDisabled={busy} onClose={close} actions={terminal ? <>
+        </> : undefined,
+      }))} closeDisabled={busy} onClose={close} leadingActions={terminal ? <>
         {view.items.some(item => item.status === "failed") && <ActionButton disabled={busy}
           onClick={() => refresh(() => port.resume(view.id))}>Tentar novamente</ActionButton>}
         <ActionButton disabled={busy} onClick={() => end(view.id)}>Encerrar</ActionButton>
@@ -137,9 +141,8 @@ export function BatchExportWindow({ port }: { port: BatchExportPort }) {
         {problems.some(item => item.status !== "ignored" && item.problems.some(problem => problem.kind === "missingMedia")) &&
           <ActionButton disabled={busy} onClick={() => refresh(() => port.relink(null))}>Localizar todas as imagens…</ActionButton>}
         <ActionButton disabled={busy} onClick={() => refresh(() => port.recheck())}>Tentar novamente</ActionButton>
-        <ActionButton variant="primary" disabled={busy || !view.canContinue}
-          onClick={() => void act(() => continueBatch(view))}>Continuar exportação</ActionButton>
-      </>} />;
+      </>} primaryAction={terminal ? undefined : <ActionButton variant="primary" disabled={busy || !view.canContinue}
+        onClick={() => void act(() => continueBatch(view))}>Continuar exportação</ActionButton>} />;
   } else if (view) {
     content = <ConfirmationDialog title="Pronto para exportar" tone="neutral"
       description={`${view.items.filter(item => item.status === "pending").length} projetos prontos.`}

@@ -18,7 +18,7 @@ export function GenerationProgressWindow({ port }: { port: Pick<ProjectGeneratio
     return observation.dispose;
   }, [port]);
   const cancel = () => { setCancelled(true); void port.cancel().catch(() => setCancelled(false)); };
-  return <OwnedWindowShell width={400}>{failed ? <MessageDialog tone="error" title="Progresso indisponível" description="Cancele a geração e tente novamente." primaryAction={{ label: "Cancelar", disabled: cancelled, onClick: cancel }} /> : <ProgressDialog
+  return <OwnedWindowShell context="Gerar projetos em lote" width={400}>{failed ? <MessageDialog tone="error" title="Progresso indisponível" description="Cancele a geração e tente novamente." primaryAction={{ label: "Cancelar", disabled: cancelled, onClick: cancel }} /> : <ProgressDialog
     title="Gerando projetos"
     reserveProgressMeta
     progress={progress?.total == null ? { kind: "indeterminate", status: null } : {

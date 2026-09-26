@@ -80,7 +80,8 @@ describe("semantic color contracts", () => {
   });
 
   test("keeps accent-colored labels distinct from spatial selection blue", () => {
-    for (const surface of ["ui-surface", "ui-surface-raised"]) {
+    // --ui-accent-soft is the active media folder chip.
+    for (const surface of ["ui-surface", "ui-surface-raised", "ui-accent-soft"]) {
       expect(
         contrastRatio(themeColor("ui-accent-text"), themeColor(surface)),
         `--ui-accent-text on --${surface}`,
@@ -136,9 +137,6 @@ describe("semantic color contracts", () => {
   test("uses the accessible fill token wherever small white accent text appears", () => {
     expect(sharedStyles).toMatch(
       /\.ui-action-button--primary\s*\{[^}]*color:\s*var\(--ui-on-accent\);[^}]*background:\s*var\(--ui-accent-fill\);/s,
-    );
-    expect(mediaPanelStyles).toMatch(
-      /\.media-folder-chip\.active\s*\{[^}]*color:\s*var\(--ui-on-accent\);[^}]*background:\s*var\(--ui-accent-fill\);/s,
     );
     expect(newProjectStyles).toMatch(
       /\.new-project-steps li\[aria-current="step"\] > span\s*\{[^}]*color:\s*var\(--ui-on-accent\);[^}]*background:\s*var\(--ui-accent-fill\);/s,

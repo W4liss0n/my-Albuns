@@ -66,20 +66,29 @@
   width: 100%;
   align-items: center;
   margin: 0;
-  color: var(--ui-text-muted);
-  font-family: var(--ui-font-mono);
-  font-size: var(--ui-font-size-micro);
+  color: var(--ui-text-secondary);
+  font-size: var(--ui-font-size-support);
   font-weight: 650;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  gap: 10px;
 }
 
-.ui-section-eyebrow::after {
-  height: 1px;
-  background: var(--ui-border);
-  content: "";
-  flex: 1;
+/* Heading for a content group (e.g. a list of Projects). The optional count is
+   decorative: the group's own list already exposes its size. */
+.ui-section-heading {
+  display: flex;
+  align-items: baseline;
+  margin: 0;
+  color: var(--ui-text-secondary);
+  font-size: var(--ui-font-size-heading);
+  font-weight: 600;
+  line-height: 1.25;
+  gap: var(--ui-space-2);
+}
+
+.ui-section-heading__count {
+  color: var(--ui-text-muted);
+  font-size: var(--ui-font-size-support);
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
 }
 
 .ui-empty-state {
@@ -145,11 +154,10 @@
 }
 
 .ui-brand--compact {
-  color: var(--ui-accent-text);
-  font-size: var(--ui-font-size-caption);
-  font-weight: 750;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
+  color: var(--ui-text-secondary);
+  font-size: var(--ui-font-size-heading);
+  font-weight: 400;
+  letter-spacing: 0;
 }
 
 /* Desktop chrome is not document prose. Native text selection remains opt-in
@@ -257,7 +265,7 @@
 .ui-application-header__identity strong {
   overflow: hidden;
   color: var(--ui-text);
-  font-size: var(--ui-font-size-control);
+  font-size: var(--ui-font-size-heading);
   font-weight: 500;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -266,10 +274,36 @@
 .ui-application-header__identity small,
 .ui-application-header__status {
   color: var(--ui-text-muted);
-  font-family: var(--ui-font-mono);
   font-size: var(--ui-font-size-support);
+  font-variant-numeric: tabular-nums;
   font-weight: 400;
   white-space: nowrap;
+}
+
+/* Document windows: identity at the left, the state in words at the right. */
+.ui-application-header[data-align="start"] .ui-application-header__identity {
+  left: var(--ui-space-4);
+  max-width: calc(100% - 360px);
+  transform: none;
+}
+
+.ui-application-header[data-align="start"] .ui-application-header__status {
+  display: flex;
+  align-items: center;
+  gap: var(--ui-space-2);
+}
+
+.ui-application-header[data-align="start"] .ui-application-header__status::before {
+  width: 6px;
+  height: 6px;
+  flex: none;
+  border-radius: 50%;
+  background: currentColor;
+  content: "";
+}
+
+.ui-application-header[data-status-emphasis] .ui-application-header__status {
+  color: var(--ui-text-secondary);
 }
 
 .ui-application-header__status {
@@ -554,7 +588,7 @@ kbd {
 }
 
 .ui-dialog-window__header {
-  padding: 16px 18px 6px;
+  padding: var(--ui-space-5) var(--ui-space-5) var(--ui-space-2);
 }
 
 .ui-dialog-window__header h2 {
@@ -574,9 +608,9 @@ kbd {
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  padding: var(--ui-footer-padding);
+  padding: var(--ui-space-3) var(--ui-space-5);
   border-top: 1px solid var(--ui-border);
-  background: var(--ui-surface);
+  background: var(--ui-surface-muted);
   gap: var(--ui-space-2);
 }
 
@@ -585,7 +619,7 @@ kbd {
 }
 
 .ui-dialog-window--progress .ui-dialog-window__body {
-  padding: 0 18px 16px;
+  padding: 0 var(--ui-space-5) var(--ui-space-5);
 }
 
 .ui-dialog-window--message {
@@ -604,7 +638,7 @@ kbd {
 }
 
 .ui-dialog-window--message .ui-dialog-window__body {
-  padding: 18px;
+  padding: var(--ui-space-5);
 }
 
 .ui-dialog-window__footer .ui-action-button--primary {
@@ -669,35 +703,11 @@ kbd {
   gap: 8px;
 }
 
+/* Messages and confirmations carry no tone icon: the title and text say what
+   happened. An error keeps its meaning in the title color. */
 .ui-standard-message {
   display: flex;
   align-items: flex-start;
-  gap: 13px;
-}
-
-.ui-standard-message__icon {
-  display: grid;
-  width: 26px;
-  height: 26px;
-  flex: none;
-  border-radius: 50%;
-  place-items: center;
-}
-
-.ui-standard-message__icon[data-tone="question"] {
-  color: var(--ui-accent);
-  background: var(--ui-accent-soft);
-}
-
-.ui-standard-message__icon[data-tone="danger"],
-.ui-standard-message__icon[data-tone="error"] {
-  color: var(--ui-danger);
-  background: var(--ui-danger-soft);
-}
-
-.ui-standard-message__icon[data-tone="success"] {
-  color: var(--ui-success);
-  background: var(--ui-success-soft);
 }
 
 .ui-standard-message__content {
@@ -705,7 +715,11 @@ kbd {
   min-width: 0;
   flex: 1;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--ui-space-1);
+}
+
+.ui-standard-message[data-tone="error"] .ui-standard-message__title {
+  color: var(--ui-danger-text);
 }
 
 .ui-standard-message__title {

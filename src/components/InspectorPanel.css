@@ -27,12 +27,18 @@
   display: flex;
   min-width: 0;
   align-items: center;
-  background: var(--ui-surface);
+  background: var(--ui-surface-muted);
+}
+
+/* An open section separates its band from the content; a closed one keeps
+   only the section's own bottom rule. */
+.inspector-section-header:has(.inspector-section-trigger[aria-expanded="true"]) {
+  border-bottom: 1px solid var(--ui-border);
 }
 
 .inspector-section-header:has(.inspector-section-trigger:hover),
 .inspector-section-header:has(.inspector-section-trigger:focus-visible) {
-  background: var(--ui-surface-muted);
+  background: color-mix(in srgb, var(--ui-surface-muted) 70%, var(--ui-border));
 }
 
 .inspector-section-trigger {
@@ -59,13 +65,12 @@
 .inspector-section-meta {
   flex: none;
   color: var(--ui-text-muted);
-  font-family: var(--ui-font-mono);
-  font-size: var(--ui-font-size-micro);
+  font-size: var(--ui-font-size-caption);
   font-weight: 400;
 }
 
 .inspector-section-content {
-  padding: 0 var(--inspector-gutter) var(--inspector-gutter);
+  padding: var(--ui-space-4) var(--inspector-gutter) var(--inspector-gutter);
 }
 
 .inspector-section-action {
@@ -77,16 +82,13 @@
 .context-heading {
   padding: var(--ui-space-4) var(--ui-space-3);
   border-bottom: 1px solid var(--ui-border);
-  background: var(--ui-surface);
+  background: var(--ui-surface-muted);
 }
 
 .context-heading span {
-  color: var(--ui-accent-text);
-  font-family: var(--ui-font-mono);
-  font-size: var(--ui-font-size-micro);
-  font-weight: 650;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
+  color: var(--ui-text-muted);
+  font-size: var(--ui-font-size-caption);
+  font-weight: 500;
 }
 
 .context-heading h2 {
@@ -154,8 +156,8 @@
 
 .photo-rotation-readout {
   min-width: 4ch;
-  font-family: var(--ui-font-mono);
   font-size: var(--ui-font-size-support);
+  font-variant-numeric: tabular-nums;
   font-weight: 400;
   color: var(--ui-text-secondary);
   text-align: center;
@@ -196,9 +198,9 @@
   display: flex;
   align-items: center;
   overflow: hidden;
-  color: var(--ui-text-secondary);
-  font-family: var(--ui-font-mono);
-  font-size: var(--ui-font-size-action);
+  color: var(--ui-text);
+  font-size: var(--ui-font-size-control);
+  font-variant-numeric: tabular-nums;
   line-height: 1.35;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -225,7 +227,7 @@
 
 .inspector-subsections {
   display: grid;
-  gap: var(--ui-space-4);
+  gap: var(--ui-space-5);
 }
 
 .inspector-subsection h3 {
@@ -244,14 +246,7 @@
 
 .inspector-subsection {
   display: grid;
-  padding-top: var(--ui-space-3);
-  border-top: 1px solid var(--ui-border);
   gap: var(--ui-space-3);
-}
-
-.inspector-subsections > .inspector-subsection:first-child {
-  padding-top: 0;
-  border-top: 0;
 }
 
 .sheet-grid {

@@ -1,7 +1,7 @@
 ---
 status: accepted
 document: design
-updated: 2026-09-22
+updated: 2026-09-25
 ---
 
 # Tela de Boas-vindas
@@ -40,8 +40,28 @@ canônico da operação.
 
 Quando conectadas, `Configurações…` e `Exportação em lote` usam o mesmo feedback
 discreto: texto e ícone escurecem para grafite no hover ou foco visível, sem
-sublinhado. O botão mantém fundo transparente, posição e área de clique; quando
-desabilitado, não recebe esse feedback.
+sublinhado. As duas têm ícone de 14 px e altura compacta de 28 px. O botão
+mantém fundo transparente, posição e área de clique; quando desabilitado, não
+recebe esse feedback.
+
+### Refinamento de 24/09/2026
+
+Decisão do autor, validada em protótipo, para dar hierarquia clara e medidas
+padronizadas sem alterar a estrutura acima:
+
+- o painel de entrada tem 320 px e começa no topo, com 32 px de margem, em vez
+  de centralizar seu conteúdo na altura da janela. A marca mostra apenas
+  “diagramação de álbuns” como subtítulo; `Versão 0.1.0` fica discreta no pé do
+  painel. A barra da janela não repete o subtítulo;
+- `Novo Projeto` e `Abrir Projeto` têm 40 px de altura, cantos de 4 px e 8 px de
+  intervalo. As ações secundárias ficam 24 px abaixo, separadas por uma borda
+  superior do próprio grupo;
+- a área de Projetos não tem título de página. Os grupos começam alinhados ao
+  topo da marca e usam o título de seção compartilhado (`.ui-section-heading`):
+  texto de 13 px em peso 600, seguido da quantidade de itens em tom discreto,
+  que é apenas visual. Grupos ficam a 32 px um do outro;
+- espaçamentos seguem a escala de 4 px e as cores vêm dos tokens do tema, sem
+  valores avulsos.
 
 ```text
 ┌──────────────────────────────────────────────────────────────────┐
@@ -55,13 +75,14 @@ desabilitado, não recebe esse feedback.
 └──────────────────────────────────────────────────────────────────┘
 ```
 
-As proporções, os espaçamentos e as dimensões seguem a referência visual aceita.
+As proporções seguem a referência visual aceita; espaçamentos e dimensões seguem
+o refinamento de 24/09/2026.
 
 ## Projetos recentes
 
 Os Projetos recentes aparecem em uma grade de cartões. Cada cartão reserva uma
-capa visual, o Nome do Projeto, a última abertura conhecida e a indicação de abertura.
-Clicar em qualquer ponto do cartão abre o Projeto correspondente.
+capa visual, o Nome do Projeto e a última abertura conhecida. Clicar em qualquer
+ponto do cartão abre o Projeto correspondente.
 
 O cartão mostra a **primeira lâmina salva do Projeto**, no lugar da representação
 genérica da referência original. Essa decisão do autor, de 22 de setembro de
@@ -104,28 +125,26 @@ composição disponível segue a apresentação degradada do desenho compartilha
 A ausência da miniatura não impede a tentativa normal de abertura. Alterações
 ainda não salvas em uma Janela de Projeto não aparecem na miniatura dos recentes.
 
-A faixa inferior usa **uma única linha**: Nome do Projeto à esquerda e,
-quando conhecida, a data da última abertura à direita, menor e discreta.
-A data aparece como **Hoje**, **Ontem** ou **18/09/2026**. O tooltip compartilhado
-e a descrição acessível informam também o horário local, por exemplo
-**Última abertura: Hoje às 14:30**. O nome ocupa o espaço restante e usa reticências
-quando necessário; nome, data e seta não se sobrepõem. A data conserva seu
-espaço mesmo quando o nome é muito comprido ou não contém espaços.
+A faixa inferior usa **duas linhas**: o Nome do Projeto em destaque e, abaixo,
+quando conhecida, a última abertura completa, menor e discreta:
+**Aberto hoje às 14:30**, **Aberto ontem às 09:15** ou
+**Aberto em 18/09/2026 às 09:15**. Como o horário já está visível, a data não
+tem tooltip próprio. A descrição acessível do cartão repete a informação, por
+exemplo **Última abertura: Hoje às 14:30**. Nome e data usam reticências quando
+necessário e não se sobrepõem, mesmo com nomes muito compridos ou sem espaços.
 
-O hover do horário pertence apenas à data: sair dela para o nome, a miniatura ou
-outra parte do mesmo cartão fecha esse tooltip. Passar sobre um nome truncado
-mostra o nome completo no mesmo padrão visual, com quebra de palavras longas;
-nomes que já cabem não recebem uma dica redundante. Os tooltips não aumentam o
-cartão e devem permanecer dentro da área visível. A navegação por teclado usa
-o único botão de abrir o cartão, preserva acesso ao nome completo e ao horário
-conhecido e permite fechar a dica com Escape; não há um foco adicional na data.
+Passar sobre um nome truncado mostra o nome completo no tooltip compartilhado,
+com quebra de palavras longas; nomes que já cabem não recebem uma dica
+redundante. O tooltip não aumenta o cartão, permanece dentro da área visível e
+fecha com Escape. A navegação por teclado usa o único botão de abrir o cartão.
 
 A linha “Projeto MyAlbuns” e a expressão genérica “Aberto recentemente” não
-aparecem. Os cartões têm 160 px de altura, com 126 px reservados à miniatura
-e uma faixa inferior de 32 px; o espaço da seta permanece reservado.
-Sem data conhecida, a mesma linha mostra apenas o nome, sem uma linha vazia
-abaixo nem texto substituto. Essa decisão do autor, de 22 de setembro de 2026,
-substitui a apresentação inicial do rodapé em duas linhas.
+aparecem. A grade usa colunas de pelo menos 184 px com 16 px de intervalo. Cada
+cartão reserva 136 px à miniatura, com a lâmina limitada a 104 px de altura, e
+uma faixa inferior de 54 px; não há seta, porque o cartão inteiro abre o Projeto.
+Sem data conhecida, a faixa mostra apenas o nome e conserva a mesma altura, sem
+texto substituto. Essa decisão do autor, de 24 de setembro de 2026, substitui a
+faixa de uma única linha adotada em 22 de setembro.
 
 A lista usa a abertura mais recente como ordenação decrescente. O backend
 registra o instante e promove a entrada somente depois que o Host independente
@@ -183,6 +202,12 @@ Se o Host correlacionado detectar Recuperação ou uma Cópia externa somente le
 Após a decisão de Recuperação e antes de apresentar o editor, o Host aplica as dimensões já orientadas do Cache verificado ao catálogo efetivo da sessão. A correspondência exige a mesma mídia e o mesmo caminho, inclusive para Fotos importadas ou religadas após o último salvamento. Isso preserva as proporções das miniaturas e dos Frames mesmo quando o Original está ausente, sem salvar o Projeto nem incorporar dados de Cache ao estado criativo recuperável.
 
 `Novo Projeto` não herda essa exceção. O fluxo de criação ocupa a própria janela e qualquer seletor, confirmação, aviso ou progresso solicitado por ele preserva essa janela visível e bloqueada ao fundo, conforme o contrato de [diálogos pertencentes](0001-estrutura-da-janela-do-projeto.md#diálogos-pertencentes-a-uma-janela).
+
+## Editor indisponível
+
+Decisão de 25/09/2026: quando o diagnóstico gráfico não confirma a aceleração exigida pelo editor ([ADR 0005](../adr/0005-adotar-tauri-react-rust.md#requisitos-gráficos-e-de-segurança)), a própria Tela de Boas-vindas continua em uso, sem cartão flutuante, abas ou avisos em caixa. A barra da janela mostra `modo seguro`. `Novo projeto`, `Abrir projeto…` e `Exportação em lote` ficam visíveis e desabilitados, e seus atalhos não agem; `Configurações…` continua disponível e abre a janela de Configurações.
+
+No lugar dos Projetos recentes aparece o motivo em linguagem simples, `Não foi possível iniciar o editor neste computador`, seguido do que isso impede e do que continua disponível. Abaixo, `Detalhes para o suporte` lista, como texto selecionável, o motivo técnico, a placa de vídeo detectada, o requisito e os limites informados, quando existem. Não há uma superfície separada de diagnóstico nem uma cópia local das Configurações.
 
 ## Relação com as Janelas de Projeto
 

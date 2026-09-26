@@ -7,9 +7,13 @@ import { useWindowControls } from "./WindowControlsContext";
 interface ApplicationHeaderProps {
   showBrand?: boolean;
   controls?: "all" | "maximize-close" | "close" | "none";
+  /** `start` places the identity at the left, like a document window. */
+  align?: "center" | "start";
   context?: string;
   metadata?: string;
   status?: string;
+  /** The status asks for attention (for example, unsaved changes). */
+  statusEmphasis?: boolean;
 }
 
 function runWindowAction(action: () => Promise<void> | void) {
@@ -23,9 +27,11 @@ function runWindowAction(action: () => Promise<void> | void) {
 export function ApplicationHeader({
   showBrand = true,
   controls = "all",
+  align = "center",
   context,
   metadata,
   status,
+  statusEmphasis = false,
 }: ApplicationHeaderProps) {
   const windowControls = useWindowControls();
 
@@ -33,6 +39,8 @@ export function ApplicationHeader({
     <header
       aria-label="Barra da janela"
       className="ui-application-header"
+      data-align={align}
+      data-status-emphasis={statusEmphasis || undefined}
       data-window-controls={controls}
     >
       <div

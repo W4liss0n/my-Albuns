@@ -2,6 +2,7 @@
 status: accepted
 document: design
 date: 2026-09-22
+updated: 2026-09-25
 implementation-readiness: ready-for-agent
 ---
 
@@ -29,6 +30,14 @@ contextuais continuam usando apenas as setas verticais para percorrer itens.
 `MenuItem` e `MenuSeparator`, em `src/ui`, possuem os rótulos, atalhos,
 marcação de seleção, estados visuais e divisores. Os consumidores são os menus
 principal, de quadro, de lâmina, de imagens, de pastas e de importação.
+
+Refinamento de 25/09/2026: o menu tem 4 px de respiro interno, e o destaque do
+item sob o ponteiro ou com foco é arredondado e afastado das bordas. Os
+comandos disponíveis ficam em grafite e os desabilitados em cinza claro, sem
+transparência adicional. Os atalhos usam a fonte da interface, e não a
+monoespaçada, em cinza mais discreto que o comando. Os divisores não encostam
+nas laterais do menu. Borda, cantos, fundo e sombra continuam sendo os das
+superfícies flutuantes compartilhadas.
 
 O menu Importar conserva sua apresentação compacta. Os catálogos continuam
 donos dos nomes, atalhos e identidades de comandos. Disponibilidade, execução
