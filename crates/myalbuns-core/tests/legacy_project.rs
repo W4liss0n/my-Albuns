@@ -5,14 +5,16 @@
 //! first confirmed save (ADR 0012).
 
 use std::{
+    collections::HashMap,
     fs,
     path::{Path, PathBuf},
 };
 
 use myalbuns_core::{
-    DocumentFailure, LegacyConversionNote, LoadProjectError, LoadProjectRequest, OpenProjectError,
-    OpenProjectRequest, ProjectCore, ProjectLocation, SaveAsAuthorization, SaveAsProjectRequest,
-    SaveProjectError, SaveProjectOutcome,
+    DocumentFailure, LegacyConversionNote, LoadProjectError, LoadProjectRequest, MediaId,
+    MediaKind, OpenProjectError, OpenProjectRequest, PhotoSourceMetadata, ProjectCore,
+    ProjectLocation, SaveAsAuthorization, SaveAsProjectRequest, SaveProjectError,
+    SaveProjectOutcome,
 };
 use myalbuns_paths::OperationPathContext;
 use rusqlite::{Connection, params};
@@ -688,6 +690,63 @@ fn favorite_layouts_and_locked_layouts_are_kept() {
         locked["lastLayout"]["positions"].as_array().unwrap().len(),
         2
     );
+}
+
+#[test]
+fn a_read_only_export_composes_photos_with_their_observed_dimensions() {
+    let mut fixture = LegacyFixture::new().image("img_foto", "Foto.jpg", false, "");
+    let mut photo_frame = frame(
+        "b0000000-0000-4000-8000-000000000001",
+        100.0,
+        100.0,
+        1200.0,
+        1200.0,
+    );
+    photo_frame["image_id"] = json!("img_foto");
+    photo_frame["image_size"] = json!([3000, 2000]);
+    fixture.sheets[1]["frames"] = json!([photo_frame]);
+    let opened = fixture_file(&fixture);
+    let loaded = opened
+        .core
+        .load_persisted_revision(LoadProjectRequest::new(project_location(&opened.path)))
+        .unwrap();
+    let photo_id = MediaId::try_from(
+        loaded
+            .project()
+            .media()
+            .iter()
+            .find(|media| media.kind() == MediaKind::Photo)
+            .unwrap()
+            .id(),
+    )
+    .unwrap();
+    let draw_rect = |frozen: myalbuns_core::FrozenProjectRendering| {
+        frozen.render_snapshot().composition.sheets[1].frames[0]
+            .photo
+            .as_ref()
+            .unwrap()
+            .draw_rect
+            .clone()
+    };
+
+    let unobserved = draw_rect(loaded.freeze_rendering());
+    let observed = draw_rect(
+        loaded.freeze_rendering_with_photo_sources(&HashMap::from([(
+            photo_id,
+            PhotoSourceMetadata::new(
+                3000,
+                2000,
+                ["#D8DEE2".into(), "#BBC4CA".into(), "#929EA6".into()],
+            )
+            .unwrap(),
+        )])),
+    );
+
+    // Without its dimensions a Photo is composed as a 1 × 1 source and would be
+    // stretched into a square; the batch export observes every Photo first.
+    assert_eq!(unobserved.width, unobserved.height);
+    let aspect = observed.width as f64 / observed.height as f64;
+    assert!((aspect - 1.5).abs() < 1e-3, "{observed:?}");
 }
 
 // ---------------------------------------------------------------------------

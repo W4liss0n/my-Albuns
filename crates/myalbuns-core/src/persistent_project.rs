@@ -109,13 +109,39 @@ impl LoadedProjectRevision {
     /// Resolves the persisted document through the same composition owner as
     /// an editor, without an editable identity lease, History or disk writes.
     pub fn freeze_rendering(&self) -> FrozenProjectRendering {
+        self.freeze_rendering_with_photo_sources(&HashMap::new())
+    }
+
+    /// Composes with the observed Photo sources. A Photo without an
+    /// observation is composed as a 1 × 1 source, so an export must observe
+    /// every Photo it renders; the Processor draws each Photo in the composed
+    /// rectangle.
+    pub fn freeze_rendering_with_photo_sources(
+        &self,
+        photo_sources: &HashMap<MediaId, PhotoSourceMetadata>,
+    ) -> FrozenProjectRendering {
+        let observations = self
+            .revision
+            .project
+            .media()
+            .iter()
+            .filter_map(|media| {
+                let id = MediaId::from_uuid(media.id());
+                photo_sources.get(&id).map(|metadata| {
+                    (
+                        id,
+                        HashMap::from([(media.path().to_path_buf(), metadata.clone())]),
+                    )
+                })
+            })
+            .collect();
         FrozenProjectRendering {
             snapshot: persistent_projection::render_snapshot(
                 &self.revision.project,
                 self.revision.project_id,
                 &project_name_from_path(&self.project_path),
                 self.revision.revision,
-                &HashMap::new(),
+                &observations,
             ),
             sources: self.revision.project.media().to_vec(),
         }

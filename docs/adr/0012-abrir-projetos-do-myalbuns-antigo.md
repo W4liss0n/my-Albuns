@@ -31,3 +31,4 @@ O [ADR 0009](0009-adotar-arquivo-myalbuns-json-versionado.md) recusa importador 
 - Um Projeto antigo pode ser aberto, conferido e exportado sem ser convertido.
 - A conversão depende de `rusqlite` com SQLite embutido no núcleo.
 - A equivalência de enquadramento é verificada contra as fórmulas do myAlbuns antigo: a foto convertida mantém o centro e o tamanho exibidos em todas as combinações de Giro, Ângulo, Espelhamento, Zoom e Pan.
+- Em 26/09/2026, 49 lâminas de três Projetos reais foram exportadas pelo processador a partir dos arquivos antigos e comparadas com o renderizador de exportação do myAlbuns antigo: a diferença média ficou entre 0,35 e 6,8 em 255, só de reamostragem nas bordas. A prova, incluindo a jornada na janela real, está em [Prova ponta a ponta dos Projetos do myAlbuns antigo](../research/2026-09-26-prova-de-projetos-do-myalbuns-antigo.md).

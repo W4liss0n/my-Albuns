@@ -12,7 +12,8 @@ use std::{
 
 use myalbuns_core::{
     DocumentFailure, ExportFormat, ExportMode, LoadProjectError, LoadProjectRequest,
-    LoadedProjectRevision, MediaId, ProjectCore, ProjectLocation, project_name_from_path,
+    LoadedProjectRevision, MediaId, MediaKind, ProjectCore, ProjectLocation,
+    project_name_from_path,
 };
 use myalbuns_imaging_protocol::RenderSource;
 use myalbuns_paths::{
@@ -404,6 +405,9 @@ fn inspect_and_plan(
         .collect();
     let mut sources = vec![];
     let mut originals = vec![];
+    // The Processor draws each Photo in its composed rectangle, which depends
+    // on the Photo's dimensions; read them from each header before composing.
+    let mut photo_sources = HashMap::new();
     for media in loaded.project().media() {
         originals.push(media.path().to_path_buf());
         if !paths.covers(media.path()) {
@@ -444,14 +448,12 @@ fn inspect_and_plan(
             });
             continue;
         }
-        let observation = MediaResolver.observe_in_plan(
-            paths,
-            &MediaBinding {
-                media_id: id.clone(),
-                kind: media.kind(),
-                logical_path: path.to_path_buf(),
-            },
-        );
+        let binding = MediaBinding {
+            media_id: id.clone(),
+            kind: media.kind(),
+            logical_path: path.to_path_buf(),
+        };
+        let observation = MediaResolver.observe_in_plan(paths, &binding);
         let file_name = media
             .path()
             .file_name()
@@ -459,6 +461,22 @@ fn inspect_and_plan(
             .to_string_lossy();
         match observation.availability {
             MediaAvailability::Candidate => {
+                if media.kind() == MediaKind::Photo {
+                    match MediaResolver.inspect_media_header_in_plan(&binding, paths) {
+                        Ok(metadata) => {
+                            photo_sources.insert(media_id, metadata);
+                        }
+                        Err(message) => {
+                            problems.push(BatchProblem {
+                                kind: BatchProblemKind::Unavailable,
+                                message,
+                                media_id: Some(id),
+                                file_name: Some(file_name.into_owned()),
+                            });
+                            continue;
+                        }
+                    }
+                }
                 originals.push(path.to_path_buf());
                 sources.push(
                     RenderSource::new(media_id, path.to_path_buf()).map_err(|error| {
@@ -485,7 +503,8 @@ fn inspect_and_plan(
     if !problems.is_empty() {
         return Err(problems);
     }
-    let (snapshot, _) = frozen
+    let (snapshot, _) = loaded
+        .freeze_rendering_with_photo_sources(&photo_sources)
         .into_export(&sheet_ids)
         .map_err(|error| vec![problem(BatchProblemKind::InvalidProject, error.to_string())])?;
     let plan = export_pipeline::plan_album_in_paths(
