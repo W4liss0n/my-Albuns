@@ -77,6 +77,6 @@ pub use project_document::{
 };
 pub use project_recovery::{RecoveryCheckpoint, RecoveryCheckpointError};
 pub use project_store::{
-    DocumentFailure, LoadProjectError, LoadProjectRequest, PathFailure, ProjectLocation,
-    prune_inactive_identity_leases,
+    DocumentFailure, LegacyConversionNote, LoadProjectError, LoadProjectRequest, PathFailure,
+    ProjectLocation, legacy_layout_definition, prune_inactive_identity_leases,
 };

@@ -44,6 +44,10 @@ Criação de um novo Projeto independente a partir da Sessão atual, com nova Id
 **Cópia de Projeto**:
 Projeto independente que começa com o mesmo conteúdo de outro, sem relação de herança ou sincronização posterior.
 
+**Projeto do myAlbuns antigo**:
+Projeto criado pelo programa anterior, gravado como banco SQLite com a mesma extensão `.myalbuns`. Abre convertido em memória e passa ao formato atual no primeiro Salvamento, depois de um aviso.
+_Evitar_: Projeto legado, importação
+
 **Cópia externa**:
 Duplicação do arquivo de Projeto realizada fora do MyAlbuns, que passa a existir como Projeto distinto do original.
 

@@ -1,7 +1,7 @@
 ---
 status: accepted
 date: 2026-08-03
-updated: 2026-09-24
+updated: 2026-09-26
 ---
 
 # Adotar `.myalbuns` como arquivo JSON versionado de Projeto
@@ -12,7 +12,7 @@ O Arquivo de Projeto será um único documento JSON UTF-8 com extensão `.myalbu
 
 O envelope identifica o tipo `myalbuns.project`, a versão do esquema, a Identidade do Projeto, a Revisão do Projeto confirmada e o conteúdo persistente. Nome, Localização, Histórico, estado transitório, Cache e Recuperação não são duplicados no conteúdo. O DTO do arquivo é fechado, recusa campos desconhecidos e é separado dos tipos de domínio e das representações de IPC. `ProjectStore` possui JSON, detecção de versão e escrita; `ProjectDomain` recebe somente o modelo já validado.
 
-A primeira versão pública é `schemaVersion: 1`, definida no [Contrato do Arquivo de Projeto](../design/0051-contrato-do-arquivo-de-projeto.md). Durante o desenvolvimento, cada recurso criou uma versão e uma migração, chegando a doze versões. Nenhuma chegou a usuários, então todas foram descartadas antes da publicação: a estrutura foi reorganizada e recomeçou em `1`, sem migrações. Arquivos dessas versões, assim como os `.myalbum` e o `schemaVersion: 3` dos spikes, não recebem importador.
+A primeira versão pública é `schemaVersion: 1`, definida no [Contrato do Arquivo de Projeto](../design/0051-contrato-do-arquivo-de-projeto.md). Durante o desenvolvimento, cada recurso criou uma versão e uma migração, chegando a doze versões. Nenhuma chegou a usuários, então todas foram descartadas antes da publicação: a estrutura foi reorganizada e recomeçou em `1`, sem migrações. Arquivos dessas versões, assim como os `.myalbum` e o `schemaVersion: 3` dos spikes, não recebem importador. Os Projetos do myAlbuns antigo, outro programa com Projetos reais, são abertos e convertidos conforme o [ADR 0012](0012-abrir-projetos-do-myalbuns-antigo.md).
 
 ### Evolução depois da primeira distribuição
 

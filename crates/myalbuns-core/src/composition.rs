@@ -507,21 +507,7 @@ fn compose_photo(frame: &RectUm, photo: &PhotoSnapshot, media: &MediaCatalogItem
         x: frame_width / 2.0,
         y: frame_height / 2.0,
     };
-    // Horizontal mirroring reflects the fine angle's axes. Keep the quarter-turn
-    // direction used by legacy projects, so mirroring never reverses Pan controls.
-    let pan_radians = if photo.transform.mirror_x {
-        f64::from(photo.transform.quarter_turns) * std::f64::consts::PI - radians
-    } else {
-        radians
-    };
-    let horizontal_direction = VectorUm {
-        x: pan_radians.cos(),
-        y: pan_radians.sin(),
-    };
-    let vertical_direction = VectorUm {
-        x: -pan_radians.sin(),
-        y: pan_radians.cos(),
-    };
+    let (horizontal_direction, vertical_direction) = pan_axes(&photo.transform, radians);
     let horizontal_span = fit.horizontal_span;
     let vertical_span = fit.vertical_span;
     let horizontal_offset = scale_vector(&horizontal_direction, horizontal_span / 2.0);
@@ -576,6 +562,58 @@ fn compose_photo(frame: &RectUm, photo: &PhotoSnapshot, media: &MediaCatalogItem
         mirror_x: photo.transform.mirror_x,
         black_and_white: photo.transform.black_and_white,
         palette: media.palette.clone().expect("validated Photo palette"),
+    }
+}
+
+/// Unit axes along which normalized Pan moves the Photo center.
+fn pan_axes(
+    transform: &crate::model::MediaTransform,
+    rotation_radians: f64,
+) -> (VectorUm, VectorUm) {
+    // Horizontal mirroring reflects the fine angle's axes. Keep the quarter-turn
+    // direction used by legacy projects, so mirroring never reverses Pan controls.
+    let pan_radians = if transform.mirror_x {
+        f64::from(transform.quarter_turns) * std::f64::consts::PI - rotation_radians
+    } else {
+        rotation_radians
+    };
+    (
+        VectorUm {
+            x: pan_radians.cos(),
+            y: pan_radians.sin(),
+        },
+        VectorUm {
+            x: -pan_radians.sin(),
+            y: pan_radians.cos(),
+        },
+    )
+}
+
+/// Fill scale, Pan axes and Pan room of one Photo in one Frame, as rendering
+/// computes them. The old-project conversion inverts this to keep the Photo
+/// exactly where the old program showed it.
+pub(crate) struct PhotoPanBasis {
+    pub(crate) fill_scale: f64,
+    pub(crate) horizontal: VectorUm,
+    pub(crate) vertical: VectorUm,
+    pub(crate) horizontal_span: f64,
+    pub(crate) vertical_span: f64,
+}
+
+pub(crate) fn photo_pan_basis(
+    frame: &RectUm,
+    transform: &crate::model::MediaTransform,
+    source: (u32, u32),
+) -> PhotoPanBasis {
+    let fit = PhotoFit::new(frame, transform, source);
+    let rotation_degrees = transform.quarter_turns as f32 * 90.0 - transform.fine_rotation_degrees;
+    let (horizontal, vertical) = pan_axes(transform, f64::from(rotation_degrees).to_radians());
+    PhotoPanBasis {
+        fill_scale: fit.scale,
+        horizontal,
+        vertical,
+        horizontal_span: fit.horizontal_span,
+        vertical_span: fit.vertical_span,
     }
 }
 

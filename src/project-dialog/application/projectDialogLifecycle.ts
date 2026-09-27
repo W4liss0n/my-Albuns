@@ -8,6 +8,7 @@ export function defaultProjectDialogCloseAction(
 ): ProjectDialogAction | null {
   switch (state.kind) {
     case "edgeConversionConfirmation": return "cancelEdgeConversion";
+    case "formatConversionSaveConfirmation": return "cancelFormatConversionSave";
     case "storageFull": return state.busy ? null : "cancelStorage";
     case "exportConfiguration": return state.busy ? null : "dismissExport";
     case "exportConflicts": return "dismissExport";

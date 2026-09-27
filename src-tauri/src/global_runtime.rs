@@ -1460,6 +1460,26 @@ fn bootstrap_failure(failure: BootstrapFailure) -> ProjectLaunchFailure {
             "O projeto contém um estado que não pode ser editado com segurança.",
             "Restaure uma cópia válida do projeto.",
         ),
+        (_, Some(FailureCode::LegacyProjectInUse)) => (
+            "legacy_project_in_use",
+            "O projeto parece estar aberto no myAlbuns antigo.",
+            "Feche o myAlbuns antigo em todos os computadores e abra o projeto de novo.",
+        ),
+        (_, Some(FailureCode::LegacyProjectOldVersion)) => (
+            "legacy_project_old_version",
+            "Este projeto usa uma versão muito antiga do myAlbuns.",
+            "Abra e salve o projeto no myAlbuns antigo antes de abri-lo aqui.",
+        ),
+        (_, Some(FailureCode::LegacyProjectUnsupportedStructure)) => (
+            "legacy_project_unsupported_structure",
+            "O álbum tem uma lâmina no meio com só uma página ativa ou tem menos de duas lâminas.",
+            "Ajuste as lâminas no myAlbuns antigo e abra o projeto de novo.",
+        ),
+        (_, Some(FailureCode::LegacyProjectDamaged)) => (
+            "legacy_project_damaged",
+            "O arquivo do myAlbuns antigo está danificado.",
+            "Restaure uma cópia do projeto.",
+        ),
         (_, Some(FailureCode::ExternalCopyRequiresInteractiveResolution)) => (
             "external_copy_requires_interactive_resolution",
             "O arquivo parece ser uma Cópia externa de outro projeto.",
@@ -1485,10 +1505,18 @@ fn bootstrap_failure(failure: BootstrapFailure) -> ProjectLaunchFailure {
             "A Janela do projeto respondeu de forma inválida e foi encerrada.",
             "Tente novamente. Se o problema continuar, reinicie o MyAlbuns.",
         ),
+        // The Project window stays hidden until startup completes and the
+        // opening progress cannot be closed, so this is a Host that ended.
+        (BootstrapFailureKind::Transport, _) => (
+            "host_exited_before_ready",
+            "O projeto foi encerrado antes de terminar de abrir.",
+            "Abra o projeto de novo. Se o problema continuar, reinicie o MyAlbuns.",
+        ),
+        // The dialog title already says that the Project did not open.
         _ => (
             "open_project_failed",
-            "Não foi possível abrir este projeto.",
-            "Confirme o arquivo e tente novamente.",
+            "O MyAlbuns encontrou um problema ao preparar a janela do projeto.",
+            "Abra o projeto de novo. Se o problema continuar, reinicie o MyAlbuns.",
         ),
     };
     staged_failure(code, stage, message, action)

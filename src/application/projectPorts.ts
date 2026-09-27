@@ -166,6 +166,7 @@ export interface SaveAsProjectResult {
 
 export type SaveProjectFailureCode =
   | "stale_revision"
+  | "format_conversion_confirmation_required"
   | "persisted_baseline_conflict"
   | "save_state_indeterminate"
   | "recovery_cleanup_failed"
@@ -315,7 +316,8 @@ export interface ProjectCorePort {
   replaceImage(mediaId: string, onProgress: (progress: ImageProcessingProgress) => void): Promise<EditorProjection>;
   undo(onProgress?: (progress: ImageProcessingProgress) => void): Promise<EditorProjection>;
   redo(onProgress?: (progress: ImageProcessingProgress) => void): Promise<EditorProjection>;
-  save(expectedRevision: number): Promise<SaveProjectResult>;
+  /** `confirmFormatConversion` authorizes replacing an old myAlbuns file. */
+  save(expectedRevision: number, confirmFormatConversion?: boolean): Promise<SaveProjectResult>;
   saveAs(expectedRevision: number): Promise<SaveAsProjectResult>;
 }
 

@@ -2,7 +2,7 @@
 status: accepted
 document: design
 date: 2026-08-03
-updated: 2026-09-24
+updated: 2026-09-26
 ---
 
 # Contrato público de persistência do ProjectCore
@@ -97,6 +97,8 @@ Uma Cópia externa gravável mantém a barreira da Identidade repetida enquanto 
 
 `load_persisted_revision` reutiliza leitura, migração, classificação e validação, mas devolve somente um valor imutável suficiente para produzir snapshots. Ela não cria `ProjectSession`, não retém um Bloqueio de abertura editável, não promove schema, não corrige a origem e não autoriza estado local por Projeto. Uma Cópia externa que depender de nova Identidade retorna `ExternalCopyRequiresInteractiveResolution`.
 
+Um Projeto do myAlbuns antigo ([ADR 0012](../adr/0012-abrir-projetos-do-myalbuns-antigo.md)) abre convertido em memória como Sessão não salva: `requires_format_conversion()` é verdadeiro e a projeção expõe `formatConversionPending`. Sua Identidade é um UUID v4 guardado no registro local por conteúdo e local do arquivo, e o lease se vincula ao arquivo antigo; o registro de Identidade e Localização só é publicado pelo primeiro Salvamento. Reabrir os mesmos bytes no mesmo local reencontra essa Identidade, e com ela a Recuperação de sessão. `load_persisted_revision` converte da mesma forma, reutiliza a Identidade pendente quando existe e nunca a publica.
+
 O `ProjectCore` não altera Projetos recentes. O coordenador só promove uma entrada depois que o Host devolver o terminal `Ready` para uma criação ou abertura bem-sucedida. Reutilizar ou focalizar uma Janela já existente também é responsabilidade do coordenador e usa a indicação estruturada de `Same`; um bloqueio vivo que não possa ser encaminhado continua `ProjectInUse`.
 
 ## Handshake de Salvamento
@@ -132,6 +134,8 @@ Salvar sem nenhum dos dois retorna `AlreadyCurrent { revision }` sem I/O. Salvar
 | `PersistedBaselineConflict` | não substitui o destino divergente | mantém a Sessão válida e preserva separadamente `creativeDirty` e `storageUpgradePending`; não mescla, recarrega ou sobrescreve automaticamente |
 | falha conclusiva de caminho ou I/O | preserva o estado final comprovado | mantém a Sessão válida e preserva os dois flags anteriores; uma nova tentativa pode ser oferecida quando fizer sentido |
 | `SaveStateIndeterminate` | o núcleo não afirma qual versão ocupa o destino | não confirma a revisão e invalida a Sessão; o Host encerra a edição e exige reabertura |
+
+Numa Sessão aberta de um Projeto do myAlbuns antigo, `save` retorna `FormatConversionConfirmationRequired` antes de qualquer I/O. `save_converting_format` registra a confirmação do usuário: publica o formato atual no mesmo caminho pelo handshake acima, com o conteúdo SQLite lido na abertura como baseline, publica a Identidade e encerra o estado antigo. `Salvar como` não precisa de confirmação e deixa o arquivo antigo intacto.
 
 Revisão igual com bytes diferentes continua sendo `PersistedBaselineConflict`. `revision` não substitui a comparação física e byte a byte.
 

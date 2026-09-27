@@ -475,6 +475,10 @@ pub struct EditorState {
     pub dirty: bool,
     pub can_undo: bool,
     pub can_redo: bool,
+    /// The file is still an old myAlbuns Project; saving replaces it.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    #[ts(as = "Option<bool>", optional)]
+    pub format_conversion_pending: bool,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]

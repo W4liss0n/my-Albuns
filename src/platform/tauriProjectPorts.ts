@@ -329,10 +329,15 @@ export const tauriProjectCorePort: ProjectCorePort = {
     invokeImageProcessing<EditorProjection>("replace_media", { mediaId }, onProgress),
   undo: (onProgress) => invokeImageProcessing<EditorProjection>("undo_project", {}, onProgress),
   redo: (onProgress) => invokeImageProcessing<EditorProjection>("redo_project", {}, onProgress),
-  save: async (expectedRevision) => {
+  save: async (expectedRevision, confirmFormatConversion) => {
     try {
       return toSaveProjectResult(
-        await invoke<unknown>("save_project", { expectedRevision }),
+        await invoke<unknown>(
+          "save_project",
+          confirmFormatConversion
+            ? { expectedRevision, confirmFormatConversion: true }
+            : { expectedRevision },
+        ),
       );
     } catch (error: unknown) {
       throw error instanceof SaveProjectError

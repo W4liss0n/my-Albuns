@@ -75,7 +75,7 @@ function DialogContent() {
     const title = parameter("title", "Não foi possível abrir o projeto");
     const message = parameter(
       "message",
-      "Não foi possível abrir este projeto.",
+      "O MyAlbuns encontrou um problema ao preparar a janela do projeto.",
     );
     const action = parameter("action", "Tente novamente.");
 

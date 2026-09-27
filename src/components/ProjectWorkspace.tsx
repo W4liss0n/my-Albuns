@@ -252,6 +252,7 @@ export function ProjectWorkspace({
     projectDialogPort,
     projectWindowPort,
     requestBlocked: sessionBarrierActive || mediaRemoval.active,
+    formatConversionPending: projection.state.formatConversionPending === true,
     waitForPendingMutations: runProjectMutation.waitForIdle,
     onProjectionChange,
     onError: reportCloseError,

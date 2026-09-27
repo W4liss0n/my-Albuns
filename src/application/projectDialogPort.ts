@@ -24,6 +24,8 @@ export type ProjectDialogState =
   | { kind: "mediaRemovalConfirmation"; mediaKind: "photo" | "decorative"; count: number; usedCount: number; usageCount: number; busy: boolean }
   | { kind: "layoutDeletionConfirmation"; busy: boolean }
   | { kind: "edgeConversionConfirmation"; message: string }
+  /** The first save of an old myAlbuns Project replaces its file. */
+  | { kind: "formatConversionSaveConfirmation" }
   | { kind: "exportProblems"; projectName: string; problems: readonly LayoutExportProblem[] }
   | { kind: "imageProcessingProgress"; progress: ProjectDialogProgress }
   | {
@@ -40,6 +42,8 @@ export type ProjectDialogState =
     }
   | {
       busy: boolean;
+      /** The Project is still an old myAlbuns file; saving replaces it. */
+      formatConversion?: boolean;
       kind: "projectCloseConfirmation";
     }
   | {
@@ -85,6 +89,8 @@ export type ProjectDialogAction =
   | "confirmLayoutDeletion"
   | "cancelEdgeConversion"
   | "confirmEdgeConversion"
+  | "cancelFormatConversionSave"
+  | "confirmFormatConversionSave"
   | "cancelAlbumInformation"
   | "cancelExport"
   | "cancelProjectClose"

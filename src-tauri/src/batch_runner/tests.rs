@@ -1323,3 +1323,150 @@ fn real_processor_exports_persisted_batches_in_every_format() {
         }
     });
 }
+
+/// End-to-end proof for Projects of the old myAlbuns (ADR 0012). Each file in
+/// `MYALBUNS_LEGACY_EXPORT_PROJECTS` (`;`-separated, usually the real files on
+/// the network share) is only read: it is converted in memory and every Sheet
+/// without empty Frames is exported by the real Processor into
+/// `MYALBUNS_LEGACY_EXPORT_OUTPUT`, for comparison with the old program.
+#[test]
+#[ignore = "run manually with real old myAlbuns Projects and a matching Processor"]
+fn real_processor_exports_old_myalbuns_projects_without_writing_them() {
+    use crate::{
+        imaging_processor::InvocationContext, imaging_recovery_integration::RealProcessTransport,
+        path_io,
+    };
+    tauri::async_runtime::block_on(async {
+        let executable = PathBuf::from(
+            std::env::var_os("MYALBUNS_TEST_IMAGING_PROCESSOR")
+                .expect("a matching Processor is configured"),
+        );
+        let projects = std::env::var("MYALBUNS_LEGACY_EXPORT_PROJECTS")
+            .expect("the old Projects to export are configured");
+        let output = PathBuf::from(
+            std::env::var_os("MYALBUNS_LEGACY_EXPORT_OUTPUT").expect("an output folder"),
+        );
+        let root = tempfile::tempdir().unwrap();
+        let core = ProjectCore::new().with_identity_storage_roots(
+            root.path().join("leases"),
+            root.path().join("identities"),
+        );
+        for project_path in projects.split(';').filter(|path| !path.is_empty()) {
+            let project_path = PathBuf::from(project_path);
+            let before = std::fs::read(&project_path).unwrap();
+            let mut paths = myalbuns_paths::OperationPathContext::new();
+            paths.capture(&project_path).unwrap();
+            let loaded = core
+                .load_persisted_revision(myalbuns_core::LoadProjectRequest::new(
+                    ProjectLocation::new(project_path.clone(), paths.freeze()),
+                ))
+                .unwrap_or_else(|error| panic!("{}: {error:?}", project_path.display()));
+            let frozen = loaded.freeze_rendering();
+            let sheet_ids: Vec<String> = frozen
+                .render_snapshot()
+                .composition
+                .sheets
+                .iter()
+                .map(|sheet| sheet.sheet_id.clone())
+                .filter(|id| {
+                    frozen
+                        .validate_export_sheets(std::slice::from_ref(id))
+                        .is_ok_and(|problems| problems.is_empty())
+                })
+                .collect();
+            let destination = output.join(project_path.file_stem().unwrap());
+            std::fs::create_dir_all(&destination).unwrap();
+            let logs = root.path().join("logs");
+            std::fs::create_dir_all(&logs).unwrap();
+            // Photos are observed from their headers, as the batch export does.
+            let mut media_paths = myalbuns_paths::OperationPathContext::new();
+            for media in loaded.project().media() {
+                let _ = media_paths.capture(media.path());
+            }
+            let media_paths = media_paths.freeze();
+            let photo_sources: HashMap<_, _> = loaded
+                .project()
+                .media()
+                .iter()
+                .filter(|media| media.kind() == MediaKind::Photo)
+                .filter_map(|media| {
+                    let binding = MediaBinding {
+                        media_id: media.id().to_string(),
+                        kind: media.kind(),
+                        logical_path: media.path().to_path_buf(),
+                    };
+                    MediaResolver
+                        .inspect_media_header_in_plan(&binding, &media_paths)
+                        .ok()
+                        .map(|metadata| (MediaId::try_from(media.id()).unwrap(), metadata))
+                })
+                .collect();
+            // An export interval must be continuous; Sheets with empty Frames
+            // are skipped, so each Sheet is exported on its own.
+            for sheet_id in &sheet_ids {
+                let frozen = loaded.freeze_rendering_with_photo_sources(&photo_sources);
+                let referenced: HashSet<_> = frozen
+                    .render_snapshot()
+                    .composition
+                    .sheets
+                    .iter()
+                    .filter(|sheet| &sheet.sheet_id == sheet_id)
+                    .flat_map(|sheet| sheet.referenced_media_ids())
+                    .collect();
+                let sources: Vec<_> = loaded
+                    .project()
+                    .media()
+                    .iter()
+                    .filter_map(|media| {
+                        let id = MediaId::try_from(media.id()).unwrap();
+                        referenced
+                            .contains(&id)
+                            .then(|| RenderSource::new(id, media.path().to_path_buf()).unwrap())
+                    })
+                    .collect();
+                let (snapshot, _) = frozen
+                    .into_export(std::slice::from_ref(sheet_id))
+                    .unwrap_or_else(|error| panic!("{}: {error:?}", project_path.display()));
+                let request_id = "legacy-export-proof";
+                let plan = export_pipeline::plan_album(
+                    snapshot,
+                    AlbumExportOptions {
+                        protected_originals: vec![project_path.clone()],
+                        sheet_ids: vec![sheet_id.clone()],
+                        whole_album: false,
+                        mode: ExportMode::Sheet,
+                        format: ExportFormat::Jpeg { quality: 100 },
+                        destination: destination.clone(),
+                        authorization: myalbuns_paths::ExportWriteAuthorization::ReplaceConfirmed,
+                        sources,
+                        request_id: request_id.into(),
+                    },
+                )
+                .unwrap();
+                let roots = path_io::capture_root_bindings(plan.required_paths())
+                    .await
+                    .unwrap();
+                export_pipeline::execute_album(
+                    &mut RealProcessTransport::stable(executable.clone(), logs.clone()),
+                    plan,
+                    &roots,
+                    &export_pipeline::ExportExecutionControl::default(),
+                    &|_| {},
+                    &InvocationContext::new(request_id, None::<String>),
+                )
+                .await
+                .unwrap_or_else(|error| panic!("{}: {error:?}", project_path.display()));
+            }
+            println!(
+                "{}: {} lâminas exportadas",
+                project_path.display(),
+                sheet_ids.len()
+            );
+            assert_eq!(
+                std::fs::read(&project_path).unwrap(),
+                before,
+                "the old file is never written"
+            );
+        }
+    });
+}

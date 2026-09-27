@@ -122,6 +122,16 @@ export function ProjectDialogView({
         </ConfirmationDialog>
       );
 
+    case "formatConversionSaveConfirmation":
+      return (
+        <ConfirmationDialog
+          cancelAction={{ label: "Cancelar", onClick: () => onAction("cancelFormatConversionSave") }}
+          confirmAction={{ label: "Salvar", onClick: () => onAction("confirmFormatConversionSave") }}
+          description="Este projeto foi criado no myAlbuns antigo e será salvo no formato novo. Depois disso, o myAlbuns antigo não vai mais abri-lo."
+          title="Salvar no formato novo?"
+        />
+      );
+
     case "projectCloseConfirmation":
       return (
         <ConfirmationDialog
@@ -135,7 +145,9 @@ export function ProjectDialogView({
             label: state.busy ? "Salvando…" : "Salvar e fechar",
             onClick: () => onAction("saveAndClose"),
           }}
-          description="O projeto tem alterações que ainda não foram salvas."
+          description={state.formatConversion
+            ? "Este projeto foi criado no myAlbuns antigo e ainda não foi salvo no formato novo. Ao salvar, o myAlbuns antigo não vai mais abri-lo."
+            : "O projeto tem alterações que ainda não foram salvas."}
           leadingAction={{
             disabled: state.busy,
             label: "Descartar e fechar",

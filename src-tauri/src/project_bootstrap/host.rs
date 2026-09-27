@@ -167,7 +167,10 @@ fn bootstrap_host_project_with_thread(
         let project = match intent {
             BootstrapIntent::OpenExisting => {
                 match core.open_editable(OpenProjectRequest::new(location)) {
-                    Ok(project) => project,
+                    Ok(project) => {
+                        log_legacy_conversion(&project);
+                        project
+                    }
                     Err(OpenProjectError::FocusExisting {
                         project_id,
                         owner_process,
@@ -275,6 +278,20 @@ fn map_create_error(error: CreateProjectError) -> FailureCode {
     }
 }
 
+/// An old myAlbuns Project opens converted in memory. What the conversion
+/// changed or dropped goes only to the diagnostic log (ADR 0012).
+fn log_legacy_conversion(project: &EditableProject) {
+    if !project.requires_format_conversion() {
+        return;
+    }
+    tracing::info!(
+        target: "myalbuns.desktop",
+        project_id = %project.project_id(),
+        notes = ?project.legacy_conversion_notes(),
+        event = "legacy_project_opened",
+    );
+}
+
 fn map_open_error(error: OpenProjectError) -> FailureCode {
     match error {
         OpenProjectError::Path(error) => map_path_error(error),
@@ -284,6 +301,17 @@ fn map_open_error(error: OpenProjectError) -> FailureCode {
             DocumentFailure::UnsupportedLegacySchema { .. } => FailureCode::UnsupportedLegacySchema,
             DocumentFailure::InvalidProjectDocument => FailureCode::InvalidProjectDocument,
             DocumentFailure::InvalidProjectState => FailureCode::InvalidProjectState,
+            DocumentFailure::LegacyProjectInUse => FailureCode::LegacyProjectInUse,
+            DocumentFailure::LegacyProjectOldVersion => FailureCode::LegacyProjectOldVersion,
+            DocumentFailure::LegacyProjectUnsupportedStructure { sheet_number } => {
+                tracing::warn!(
+                    target: "myalbuns.desktop",
+                    sheet_number = ?sheet_number,
+                    event = "legacy_project_unsupported_structure",
+                );
+                FailureCode::LegacyProjectUnsupportedStructure
+            }
+            DocumentFailure::LegacyProjectDamaged => FailureCode::LegacyProjectDamaged,
         },
         OpenProjectError::ProjectInUse => FailureCode::ProjectInUse,
         OpenProjectError::FocusExisting { .. } => FailureCode::ProjectInUse,
