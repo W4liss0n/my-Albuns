@@ -30,6 +30,8 @@ const projectDialogActionMap = {
   confirmLayoutDeletion: "confirmLayoutDeletion",
   cancelEdgeConversion: "cancelEdgeConversion",
   confirmEdgeConversion: "confirmEdgeConversion",
+  cancelFormatConversionSave: "cancelFormatConversionSave",
+  confirmFormatConversionSave: "confirmFormatConversionSave",
   cancelAlbumInformation: "cancelAlbumInformation",
   cancelExport: "cancelExport",
   cancelProjectClose: "cancelProjectClose",
@@ -142,6 +144,7 @@ const stateDecoders: Record<
     ? { kind: "layoutDeletionConfirmation", busy: value.busy } : null,
   edgeConversionConfirmation: (value) => typeof value.message === "string"
     ? { kind: "edgeConversionConfirmation", message: value.message } : null,
+  formatConversionSaveConfirmation: () => ({ kind: "formatConversionSaveConfirmation" }),
   imageProcessingProgress: (value) => {
     const progress = decodeProgress(value.progress);
     return progress ? { kind: "imageProcessingProgress", progress } : null;
@@ -211,8 +214,13 @@ const stateDecoders: Record<
       ? { kind: "graphicsFailure", reason: value.reason }
       : null,
   projectCloseConfirmation: (value) =>
-    typeof value.busy === "boolean"
-      ? { busy: value.busy, kind: "projectCloseConfirmation" }
+    typeof value.busy === "boolean" &&
+    (value.formatConversion === undefined || typeof value.formatConversion === "boolean")
+      ? {
+          busy: value.busy,
+          kind: "projectCloseConfirmation",
+          ...(value.formatConversion ? { formatConversion: true } : {}),
+        }
       : null,
   projectCloseFailure: (value) =>
     typeof value.message === "string"
@@ -324,8 +332,15 @@ export function toIpcProjectDialogState(
         kind: state.kind,
       };
     case "layoutDeletionConfirmation":
-    case "projectCloseConfirmation":
       return { busy: state.busy, kind: state.kind };
+    case "projectCloseConfirmation":
+      return {
+        busy: state.busy,
+        kind: state.kind,
+        ...(state.formatConversion ? { formatConversion: true } : {}),
+      };
+    case "formatConversionSaveConfirmation":
+      return { kind: state.kind };
     case "projectCloseFailure":
     case "edgeConversionConfirmation":
     case "projectOperationFailure":
@@ -373,8 +388,15 @@ function fromIpcProjectDialogState(
         kind: state.kind,
       };
     case "layoutDeletionConfirmation":
-    case "projectCloseConfirmation":
       return { busy: state.busy, kind: state.kind };
+    case "projectCloseConfirmation":
+      return {
+        busy: state.busy,
+        kind: state.kind,
+        ...(state.formatConversion ? { formatConversion: true } : {}),
+      };
+    case "formatConversionSaveConfirmation":
+      return { kind: state.kind };
     case "projectCloseFailure":
     case "edgeConversionConfirmation":
     case "projectOperationFailure":

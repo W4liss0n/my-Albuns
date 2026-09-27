@@ -12,8 +12,9 @@ use myalbuns_paths::{
 use uuid::Uuid;
 
 use super::{
-    DecodeFailure, DocumentFailure, PathFailure, PendingProjectIdentityLease, ProjectIdentityLease,
-    ProjectLocation, decode, encode, map_path_failure,
+    DecodeFailure, DocumentFailure, LegacyConversionNote, PathFailure, PendingProjectIdentityLease,
+    ProjectIdentityLease, ProjectLocation, convert_legacy, decode, encode, legacy,
+    map_path_failure,
     windows_publish::{publish_new, replace_existing, write_synced_new},
 };
 use crate::project_document::ProjectRevision;
@@ -129,6 +130,33 @@ impl ProjectStore {
 pub(crate) struct OpenedProject {
     pub(crate) revision: ProjectRevision,
     pub(crate) store: ProjectStore,
+    /// Present when the file is an old myAlbuns Project converted in memory.
+    pub(crate) legacy: Option<LegacyOpening>,
+}
+
+pub(crate) struct LegacyOpening {
+    /// Names the pending Identity until the first save.
+    pub(crate) identity_key: String,
+    pub(crate) notes: Vec<LegacyConversionNote>,
+}
+
+/// Reads the Identity an open file claims. An old myAlbuns Project has none,
+/// so it receives the pending Identity kept for this file and location.
+#[cfg(windows)]
+fn claimed_identity(
+    bytes: &[u8],
+    location: &ProjectLocation,
+    legacy_identity: &dyn Fn(&str) -> Result<Uuid, ()>,
+) -> Result<(Uuid, Option<String>), OpenStoreError> {
+    if legacy::is_legacy_project(bytes) {
+        let key = legacy::identity_key(bytes, location.project_path());
+        let project_id =
+            legacy_identity(&key).map_err(|()| OpenStoreError::Path(PathFailure::IoFailure))?;
+        return Ok((project_id, Some(key)));
+    }
+    decode(bytes)
+        .map(|revision| (revision.project_id, None))
+        .map_err(map_open_decode_error)
 }
 
 #[derive(Debug)]
@@ -241,6 +269,7 @@ impl PreparedReplacement {
 pub(crate) fn open_editable(
     location: ProjectLocation,
     transition_root: &Path,
+    legacy_identity: &dyn Fn(&str) -> Result<Uuid, ()>,
 ) -> Result<OpenedProject, OpenStoreError> {
     let initial = location
         .root_bindings()
@@ -249,17 +278,18 @@ pub(crate) fn open_editable(
     let initial_bytes = initial
         .read_bytes()
         .map_err(|error| OpenStoreError::Path(map_io_path(error)))?;
-    let initial_revision = decode(&initial_bytes).map_err(map_open_decode_error)?;
+    let (initial_project_id, initial_legacy_key) =
+        claimed_identity(&initial_bytes, &location, legacy_identity)?;
     let _barrier = match ProjectTransitionBarrier::try_acquire(
         transition_root,
-        &initial_revision.project_id.hyphenated().to_string(),
+        &initial_project_id.hyphenated().to_string(),
     ) {
         Ok(barrier) => barrier,
         Err(ProjectTransitionBarrierError::Conflict) => {
             return Err(classify_project_in_use_for_current_target(
                 &location,
                 &initial,
-                initial_revision.project_id,
+                initial_project_id,
             ));
         }
         Err(ProjectTransitionBarrierError::Unavailable) => {
@@ -279,7 +309,7 @@ pub(crate) fn open_editable(
             return Err(classify_project_in_use_for_current_target(
                 &location,
                 &initial,
-                initial_revision.project_id,
+                initial_project_id,
             ));
         }
         Err(ProjectFileLockError::Unavailable { .. }) => {
@@ -292,13 +322,30 @@ pub(crate) fn open_editable(
     let bytes = lock
         .read_bytes()
         .map_err(|error| OpenStoreError::Path(map_io_path(error)))?;
-    let revision = decode(&bytes).map_err(map_open_decode_error)?;
-    if revision.project_id != initial_revision.project_id {
+    let (revision, legacy) = match initial_legacy_key {
+        Some(key) => {
+            if legacy::identity_key(&bytes, location.project_path()) != key {
+                return Err(OpenStoreError::IdentityIndeterminate);
+            }
+            let converted = convert_legacy(&bytes, location.project_path(), initial_project_id)
+                .map_err(map_open_decode_error)?;
+            (
+                converted.revision,
+                Some(LegacyOpening {
+                    identity_key: key,
+                    notes: converted.notes,
+                }),
+            )
+        }
+        None => (decode(&bytes).map_err(map_open_decode_error)?, None),
+    };
+    if revision.project_id != initial_project_id {
         return Err(OpenStoreError::IdentityIndeterminate);
     }
     Ok(OpenedProject {
         revision,
         store: ProjectStore::from_verified(location, transition_root, lock, bytes),
+        legacy,
     })
 }
 
@@ -329,6 +376,7 @@ fn classify_project_in_use_for_current_target(
 pub(crate) fn open_editable(
     _location: ProjectLocation,
     _transition_root: &Path,
+    _legacy_identity: &dyn Fn(&str) -> Result<Uuid, ()>,
 ) -> Result<OpenedProject, OpenStoreError> {
     Err(OpenStoreError::Path(PathFailure::IoFailure))
 }

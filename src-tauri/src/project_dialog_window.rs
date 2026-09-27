@@ -80,7 +80,14 @@ impl ProjectDialogState {
                         .collect(),
                 }
             }
-            Self::ProjectCloseConfirmation { busy } => Self::ProjectCloseConfirmation { busy },
+            Self::ProjectCloseConfirmation {
+                busy,
+                format_conversion,
+            } => Self::ProjectCloseConfirmation {
+                busy,
+                format_conversion,
+            },
+            Self::FormatConversionSaveConfirmation => Self::FormatConversionSaveConfirmation,
             Self::ProjectCloseFailure { message } => Self::ProjectCloseFailure {
                 message: bound_text(message),
             },
@@ -155,6 +162,7 @@ impl ProjectDialogState {
             ),
             Self::LayoutDeletionConfirmation { .. }
             | Self::EdgeConversionConfirmation { .. }
+            | Self::FormatConversionSaveConfirmation
             | Self::ProjectCloseConfirmation { .. } => (
                 520.0,
                 214.0 + native_dialog_window::OWNED_WINDOW_TITLEBAR_HEIGHT,
@@ -506,7 +514,10 @@ mod tests {
         store
             .present(
                 "close",
-                ProjectDialogState::ProjectCloseConfirmation { busy: false },
+                ProjectDialogState::ProjectCloseConfirmation {
+                    busy: false,
+                    format_conversion: false,
+                },
             )
             .expect("the first dialog state is stored");
         store
@@ -536,7 +547,10 @@ mod tests {
         store
             .present(
                 "export",
-                ProjectDialogState::ProjectCloseConfirmation { busy: false },
+                ProjectDialogState::ProjectCloseConfirmation {
+                    busy: false,
+                    format_conversion: false,
+                },
             )
             .unwrap();
         assert_eq!(store.current().unwrap().unwrap().window_width, 520);
@@ -620,7 +634,10 @@ mod tests {
         store
             .present(
                 "project-close-1",
-                ProjectDialogState::ProjectCloseConfirmation { busy: false },
+                ProjectDialogState::ProjectCloseConfirmation {
+                    busy: false,
+                    format_conversion: false,
+                },
             )
             .expect("the first owner is stored");
         assert!(

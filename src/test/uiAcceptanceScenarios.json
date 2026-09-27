@@ -1825,6 +1825,40 @@
       "actions": []
     },
     {
+      "id": "format-conversion-save-confirmation",
+      "title": "Salvar no formato novo — Projeto do myAlbuns antigo",
+      "implementationPath": "/project-dialog.html?state=%7B%22kind%22%3A%22formatConversionSaveConfirmation%22%7D",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "owned-confirmation-dialog",
+        "implementationCaptureSelector": ".ui-owned-window-shell",
+        "reason": "ADR 0012: o primeiro Salvar de um Projeto do myAlbuns antigo avisa uma vez, no ConfirmationDialog compartilhado, que o arquivo antigo será substituído."
+      },
+      "viewport": {
+        "width": 520,
+        "height": 320
+      },
+      "readySelector": ".ui-standard-message",
+      "actions": []
+    },
+    {
+      "id": "format-conversion-close-confirmation",
+      "title": "Fechar Projeto do myAlbuns antigo sem salvar",
+      "implementationPath": "/project-dialog.html?state=%7B%22kind%22%3A%22projectCloseConfirmation%22%2C%22busy%22%3Afalse%2C%22formatConversion%22%3Atrue%7D",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "owned-confirmation-dialog",
+        "implementationCaptureSelector": ".ui-owned-window-shell",
+        "reason": "ADR 0012: o primeiro Salvar de um Projeto do myAlbuns antigo avisa uma vez, no ConfirmationDialog compartilhado, que o arquivo antigo será substituído."
+      },
+      "viewport": {
+        "width": 520,
+        "height": 320
+      },
+      "readySelector": ".ui-standard-message",
+      "actions": []
+    },
+    {
       "id": "album-information-conversion-losses",
       "title": "Informações do Álbum — conversão das duas extremidades",
       "implementationPath": "/project-dialog.html?state=%7B%22kind%22%3A%22albumInformationConfirmation%22%2C%22busy%22%3Afalse%2C%22consequences%22%3A%5B%22A%20primeira%20e%20a%20%C3%BAltima%20l%C3%A2mina%20viram%20p%C3%A1gina%20%C3%BAnica.%20O%20fundo%20da%20l%C3%A2mina%201%20e%20a%20sobreposi%C3%A7%C3%A3o%20da%20l%C3%A2mina%2018%20ser%C3%A3o%20removidos.%22%5D%7D",

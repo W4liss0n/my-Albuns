@@ -332,6 +332,7 @@ test("the manifest covers the integrated workspace and every critical Project di
       "exportProblems",
       "exportProgress",
       "exportSuccess",
+      "formatConversionSaveConfirmation",
       "graphicsFailure",
       "imageProcessingProblems",
       "imageProcessingProgress",

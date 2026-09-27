@@ -3,6 +3,7 @@ import type { MediaImportCompletion, MediaImportSelection, ImageProcessingProgre
 import { createLogInstanceId } from "../application/logging";
 import { useImageProcessing } from "./useImageProcessing";
 import { useEdgeConversionConfirmation } from "./useEdgeConversionConfirmation";
+import { useFormatConversionConfirmation } from "./useFormatConversionConfirmation";
 import { edgeConversionLoss, type EdgeConversionLoss } from "../application/edgeConversionReview";
 import type { ProjectDialogPort } from "../application/projectDialogPort";
 import type { CanvasPhotoDropPoint } from "./albumCanvasContract";
@@ -69,6 +70,9 @@ export function useProjectMutations({
   const [importPending, setImportPending] = useState(false);
   const imageProcessing = useImageProcessing(projection.state.projectId, runProjectMutation);
   const confirmEdgeConversion = useEdgeConversionConfirmation(
+    projection.state.projectId, runProjectMutation, projectDialogPort,
+  );
+  const confirmFormatConversion = useFormatConversionConfirmation(
     projection.state.projectId, runProjectMutation, projectDialogPort,
   );
   const importAttemptRef = useRef({ pending: false });
@@ -284,13 +288,27 @@ export function useProjectMutations({
     }
   }
 
-  function saveVisibleRevision() {
+  async function saveVisibleRevision() {
     const visibleRevision = projection.state.revision;
+    // An old myAlbuns file is replaced by this save; ask before touching it,
+    // without holding the mutation queue during the decision.
+    const convertsFormat = projection.state.formatConversionPending === true;
+    if (convertsFormat) {
+      if (saveAsBarrierRef.current) return false;
+      try {
+        if (!await confirmFormatConversion()) return false;
+      } catch (error: unknown) {
+        setMessage(messageFromError(error));
+        return false;
+      }
+    }
     return runWithErrorFeedback(
       async (port, latestProjection) => {
         const expectedRevision =
           latestProjection?.state.revision ?? visibleRevision;
-        const result = await port.save(expectedRevision);
+        const result = convertsFormat
+          ? await port.save(expectedRevision, true)
+          : await port.save(expectedRevision);
         return result.projection;
       },
       true,

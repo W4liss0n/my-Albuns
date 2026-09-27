@@ -82,6 +82,13 @@ impl PersistentProjectSession {
         }
     }
 
+    /// A Project converted in memory from the old myAlbuns: nothing of it is
+    /// saved in the current format yet, so it starts with unsaved changes.
+    pub(crate) fn from_converted(current: ProjectRevision) -> Self {
+        let saved_revision = current.revision;
+        Self::from_recovery(current, saved_revision)
+    }
+
     pub(crate) fn from_recovery(current: ProjectRevision, saved_revision: u64) -> Self {
         let latest_revision = current.revision.max(saved_revision);
         Self {

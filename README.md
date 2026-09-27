@@ -26,6 +26,7 @@ O glossário é normativo apenas para o significado dos termos. As pesquisas sã
 - [ADR 0008 — Arranjo de reserva de Layout](docs/adr/0008-garantir-layout-compativel-por-arranjo-de-reserva.md) · aceito
 - [ADR 0009 — Arquivo `.myalbuns` JSON versionado](docs/adr/0009-adotar-arquivo-myalbuns-json-versionado.md) · aceito
 - [ADR 0010 — Gerador de Layouts por composições determinísticas](docs/adr/0010-gerar-layouts-por-composicoes-deterministicas.md) · aceito
+- [ADR 0012 — Projetos do myAlbuns antigo](docs/adr/0012-abrir-projetos-do-myalbuns-antigo.md) · aceito
 
 ## Designs
 

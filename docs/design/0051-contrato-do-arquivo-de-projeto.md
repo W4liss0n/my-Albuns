@@ -2,6 +2,7 @@
 status: accepted
 document: design
 date: 2026-09-24
+updated: 2026-09-26
 ---
 
 # Contrato do Arquivo de Projeto
@@ -331,6 +332,14 @@ Falhas preservam o arquivo byte a byte, não criam Sessão e retornam resultado 
 | JSON malformado, BOM ou violação da forma fechada | `InvalidProjectDocument` |
 | caminho cuja forma não é aceita para Arquivo vinculado | `InvalidPath` |
 | invariante criativa inválida | `InvalidProjectState` |
+| Projeto do myAlbuns antigo aberto para escrita pelo programa antigo (diário SQLite ao lado) | `LegacyProjectInUse` |
+| Projeto do myAlbuns antigo nos formatos `1.0` ou `1.1` | `LegacyProjectOldVersion` |
+| Projeto do myAlbuns antigo com lâmina do meio de uma só página ou com menos de duas lâminas | `LegacyProjectUnsupportedStructure` |
+| Projeto do myAlbuns antigo ilegível | `LegacyProjectDamaged` |
+
+### Projetos do myAlbuns antigo
+
+Um arquivo que começa com `SQLite format 3 ` é um Projeto do myAlbuns antigo e não passa pelas etapas acima. O `ProjectStore` o lê dos bytes já carregados, converte-o para um documento deste contrato, que é validado pelo mesmo leitor, e o entrega como Sessão não salva. O arquivo só é gravado pelo primeiro `Salvar` confirmado, que o substitui por este formato. Regras, identidade e perdas estão no [ADR 0012](../adr/0012-abrir-projetos-do-myalbuns-antigo.md).
 
 ## Salvamento
 

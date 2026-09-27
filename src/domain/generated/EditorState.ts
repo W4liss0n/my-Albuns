@@ -3,4 +3,8 @@ import type { AlbumSnapshot } from "./AlbumSnapshot";
 import type { DocumentSnapshot } from "./DocumentSnapshot";
 import type { LayoutSettings } from "./LayoutSettings";
 
-export type EditorState = { projectId: string, projectName: string, document: DocumentSnapshot, album: AlbumSnapshot, layoutSettings: LayoutSettings, revision: number, savedRevision: number, dirty: boolean, canUndo: boolean, canRedo: boolean, };
+export type EditorState = { projectId: string, projectName: string, document: DocumentSnapshot, album: AlbumSnapshot, layoutSettings: LayoutSettings, revision: number, savedRevision: number, dirty: boolean, canUndo: boolean, canRedo: boolean, 
+/**
+ * The file is still an old myAlbuns Project; saving replaces it.
+ */
+formatConversionPending?: boolean, };

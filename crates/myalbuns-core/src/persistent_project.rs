@@ -25,9 +25,9 @@ use crate::{
     project_recovery::{RecoveryCheckpoint, RecoveryCheckpointError},
     project_store::{
         self, CreateStoreError, DocumentFailure, IdentityLeaseError, IdentityLeaseObservation,
-        IdentityRegistryLookup, OpenStoreError, PathFailure, PendingProjectIdentityLease,
-        ProjectIdentityLease, ProjectIdentityRegistry, ProjectLocation, ProjectStore,
-        SaveStoreError, SaveStoreResult,
+        IdentityRegistryLookup, LegacyConversionNote, OpenStoreError, PathFailure,
+        PendingProjectIdentityLease, ProjectIdentityLease, ProjectIdentityRegistry,
+        ProjectLocation, ProjectStore, SaveStoreError, SaveStoreResult,
     },
 };
 
@@ -323,7 +323,14 @@ pub enum SaveProjectOutcome {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum SaveProjectError {
-    StaleRevision { expected: u64, current: u64 },
+    StaleRevision {
+        expected: u64,
+        current: u64,
+    },
+    /// The Project was opened from the old myAlbuns format. Its first save
+    /// replaces the old file, so the user confirms it through
+    /// [`EditableProject::save_converting_format`].
+    FormatConversionConfirmationRequired,
     PersistedBaselineConflict,
     Path(PathFailure),
     SaveStateIndeterminate,
@@ -357,6 +364,14 @@ pub struct EditableProject {
     identity_authority: ProjectIdentityAuthority,
     photo_sources: HashMap<MediaId, HashMap<PathBuf, PhotoSourceMetadata>>,
     session_valid: bool,
+    /// Present while the file on disk is still an old myAlbuns Project.
+    legacy_format: Option<LegacyFormat>,
+}
+
+#[derive(Debug)]
+struct LegacyFormat {
+    identity_key: String,
+    notes: Vec<LegacyConversionNote>,
 }
 
 #[derive(Clone, Debug)]
@@ -483,6 +498,20 @@ impl EditableProject {
         self.session.has_unsaved_changes()
     }
 
+    /// True while the file on disk is still in the old myAlbuns format; the
+    /// next save must be confirmed because it replaces that file.
+    pub fn requires_format_conversion(&self) -> bool {
+        self.legacy_format.is_some()
+    }
+
+    /// What the in-memory conversion of an old Project changed or dropped,
+    /// for the diagnostic log only.
+    pub fn legacy_conversion_notes(&self) -> &[LegacyConversionNote] {
+        self.legacy_format
+            .as_ref()
+            .map_or(&[], |legacy| legacy.notes.as_slice())
+    }
+
     pub fn can_undo(&self) -> bool {
         self.session_valid && self.session.can_undo()
     }
@@ -528,12 +557,14 @@ impl EditableProject {
     /// Resolved editor view of the current productive Project document.
     pub fn projection(&self) -> EditorProjection {
         let project_name = project_name_from_path(self.project_path());
-        persistent_projection::editor_projection(
+        let mut projection = persistent_projection::editor_projection(
             &self.session,
             self.session_valid,
             &project_name,
             &self.photo_sources,
-        )
+        );
+        projection.state.format_conversion_pending = self.requires_format_conversion();
+        projection
     }
 
     pub fn render_snapshot(&self) -> RenderSnapshot {
@@ -941,6 +972,32 @@ impl EditableProject {
     }
 
     pub fn save(&mut self, expected_revision: u64) -> Result<SaveProjectOutcome, SaveProjectError> {
+        if self.legacy_format.is_some() {
+            return Err(SaveProjectError::FormatConversionConfirmationRequired);
+        }
+        self.save_current(expected_revision)
+    }
+
+    /// Saves after the user confirmed that an old myAlbuns file is replaced
+    /// by the current format. Without an old file this is a regular save.
+    pub fn save_converting_format(
+        &mut self,
+        expected_revision: u64,
+    ) -> Result<SaveProjectOutcome, SaveProjectError> {
+        let outcome = self.save_current(expected_revision)?;
+        if let Some(legacy) = self.legacy_format.take() {
+            // The file now carries the Identity. A registry entry that could
+            // not be written is published by the next opening instead.
+            let _ = publish_identity_location(&self.core, self.project_id(), &self.store);
+            forget_legacy_identity(&self.core, &legacy.identity_key);
+        }
+        Ok(outcome)
+    }
+
+    fn save_current(
+        &mut self,
+        expected_revision: u64,
+    ) -> Result<SaveProjectOutcome, SaveProjectError> {
         if !self.session_valid {
             return Err(SaveProjectError::SaveStateIndeterminate);
         }
@@ -1100,6 +1157,10 @@ impl EditableProject {
         let previous_authority =
             std::mem::replace(&mut self.identity_authority, identity_authority);
         drop((previous_store, previous_lease, previous_authority));
+        // The copy is in the current format; the old file stays as it was.
+        if let Some(legacy) = self.legacy_format.take() {
+            forget_legacy_identity(&self.core, &legacy.identity_key);
+        }
 
         Ok(outcome)
     }
@@ -1141,10 +1202,11 @@ impl ProjectCore {
         if lock.compare_physical(&target) != PhysicalIdentityEvidence::Same {
             return Err(CreateProjectError::IdentityIndeterminate);
         }
+        // Any other file, an old myAlbuns Project included, is simply replaced.
         let bytes = lock
-            .read_to_string()
+            .read_bytes()
             .map_err(|_| CreateProjectError::Path(PathFailure::IoFailure))?;
-        if let Ok(revision) = project_store::decode(bytes.as_bytes()) {
+        if let Ok(revision) = project_store::decode(&bytes) {
             let root = self
                 .identity_lease_root()
                 .ok_or(CreateProjectError::IdentityIndeterminate)?;
@@ -1161,8 +1223,20 @@ impl ProjectCore {
         &self,
         request: project_store::LoadProjectRequest,
     ) -> Result<LoadedProjectRevision, project_store::LoadProjectError> {
-        let loaded = project_store::load(request)?;
-        authorize_loaded_identity(self, &loaded)?;
+        let mut loaded = project_store::load(request)?;
+        // An old myAlbuns file carries no Identity. A read-only load reuses the
+        // pending one of an editor, when there is one, and never publishes it.
+        match &loaded.legacy {
+            Some(key) => {
+                if let Some(project_id) = identity_registry(self)
+                    .ok()
+                    .and_then(|registry| registry.find_legacy_pending_identity(key))
+                {
+                    loaded.revision.project_id = project_id;
+                }
+            }
+            None => authorize_loaded_identity(self, &loaded)?,
+        }
         Ok(LoadedProjectRevision {
             revision: loaded.revision,
             project_path: loaded.project_path,
@@ -1255,6 +1329,7 @@ impl ProjectCore {
             identity_authority,
             photo_sources: HashMap::new(),
             session_valid: true,
+            legacy_format: None,
         })
     }
 
@@ -1265,20 +1340,29 @@ impl ProjectCore {
         let lease_root = self
             .identity_lease_root()
             .ok_or(OpenProjectError::Path(PathFailure::IoFailure))?;
-        let opened = match project_store::open_editable(request.location, lease_root) {
-            Ok(opened) => opened,
-            Err(OpenStoreError::ProjectInUse {
-                project_id,
-                physical_identity,
-            }) => {
-                return Err(map_active_identity_observation(
-                    lease_root,
+        let legacy_identity = |key: &str| {
+            identity_registry(self)?
+                .legacy_pending_identity(key)
+                .map_err(|_| ())
+        };
+        let opened =
+            match project_store::open_editable(request.location, lease_root, &legacy_identity) {
+                Ok(opened) => opened,
+                Err(OpenStoreError::ProjectInUse {
                     project_id,
                     physical_identity,
-                ));
-            }
-            Err(error) => return Err(map_open_store_error(error)),
-        };
+                }) => {
+                    return Err(map_active_identity_observation(
+                        lease_root,
+                        project_id,
+                        physical_identity,
+                    ));
+                }
+                Err(error) => return Err(map_open_store_error(error)),
+            };
+        if opened.legacy.is_some() {
+            return open_legacy(self, lease_root, opened);
+        }
         let identity_lease =
             match ProjectIdentityLease::acquire(lease_root, opened.revision.project_id) {
                 Ok(lease) => lease,
@@ -1335,7 +1419,64 @@ impl ProjectCore {
             identity_authority,
             photo_sources: HashMap::new(),
             session_valid: true,
+            legacy_format: None,
         })
+    }
+}
+
+/// Opens an old myAlbuns Project converted in memory. It starts unsaved and
+/// its Identity reaches the registry only with the first save.
+fn open_legacy(
+    core: &ProjectCore,
+    lease_root: &Path,
+    opened: project_store::OpenedProject,
+) -> Result<EditableProject, OpenProjectError> {
+    let project_store::OpenedProject {
+        revision,
+        store,
+        legacy,
+    } = opened;
+    let Some(legacy) = legacy else {
+        return Err(OpenProjectError::IdentityIndeterminate);
+    };
+    let project_id = revision.project_id;
+    let identity_lease = match ProjectIdentityLease::acquire(lease_root, project_id) {
+        Ok(lease) => lease,
+        Err(IdentityLeaseError::Conflict) => {
+            return Err(map_active_identity_observation(
+                lease_root,
+                project_id,
+                store.physical_identity(),
+            ));
+        }
+        Err(IdentityLeaseError::Unavailable) => {
+            return Err(OpenProjectError::Path(PathFailure::IoFailure));
+        }
+    };
+    if !store.location_still_matches_baseline() {
+        identity_lease.discard_unpublished();
+        return Err(OpenProjectError::IdentityIndeterminate);
+    }
+    let identity_lease = bind_identity_target(identity_lease, &store)
+        .map_err(|_| OpenProjectError::IdentityIndeterminate)?;
+    Ok(EditableProject {
+        core: core.clone(),
+        session: PersistentProjectSession::from_converted(revision),
+        store,
+        identity_lease,
+        identity_authority: ProjectIdentityAuthority::authorized(project_id),
+        photo_sources: HashMap::new(),
+        session_valid: true,
+        legacy_format: Some(LegacyFormat {
+            identity_key: legacy.identity_key,
+            notes: legacy.notes,
+        }),
+    })
+}
+
+fn forget_legacy_identity(core: &ProjectCore, identity_key: &str) {
+    if let Ok(registry) = identity_registry(core) {
+        registry.forget_legacy_pending_identity(identity_key);
     }
 }
 
@@ -1597,6 +1738,7 @@ impl ProjectCore {
             identity_authority,
             photo_sources: HashMap::new(),
             session_valid: true,
+            legacy_format: None,
         })
     }
 }
@@ -1649,6 +1791,7 @@ fn promote_external_copy(
         identity_authority,
         photo_sources: HashMap::new(),
         session_valid: true,
+        legacy_format: None,
     })
 }
 

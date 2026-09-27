@@ -197,6 +197,8 @@ impl ProjectHostPhase {
 pub(crate) struct ProjectHostSaveResult {
     pub(crate) outcome: SaveProjectOutcome,
     pub(crate) projection: EditorProjection,
+    /// This save replaced an old myAlbuns file with the current format.
+    pub(crate) converted_format: bool,
 }
 
 pub(crate) struct ProjectHostSaveAsResult {
@@ -667,14 +669,36 @@ impl ProjectHost {
         &self,
         expected_revision: u64,
     ) -> Result<ProjectHostSaveResult, ProjectHostSaveError> {
+        self.save_with(expected_revision, false)
+    }
+
+    /// Saves after the user confirmed that an old myAlbuns file is replaced
+    /// by the current format.
+    pub(crate) fn save_converting_format(
+        &self,
+        expected_revision: u64,
+    ) -> Result<ProjectHostSaveResult, ProjectHostSaveError> {
+        self.save_with(expected_revision, true)
+    }
+
+    fn save_with(
+        &self,
+        expected_revision: u64,
+        format_conversion_confirmed: bool,
+    ) -> Result<ProjectHostSaveResult, ProjectHostSaveError> {
         let mut state = self
             .state
             .lock()
             .map_err(|_| ProjectHostSaveError::SessionUnavailable)?;
-        let result = state
+        let project = state
             .active_project_mut()
-            .map_err(|_| ProjectHostSaveError::SessionUnavailable)?
-            .save(expected_revision);
+            .map_err(|_| ProjectHostSaveError::SessionUnavailable)?;
+        let converting = project.requires_format_conversion();
+        let result = if format_conversion_confirmed {
+            project.save_converting_format(expected_revision)
+        } else {
+            project.save(expected_revision)
+        };
         match result {
             Ok(outcome) => {
                 let project = state
@@ -690,6 +714,7 @@ impl ProjectHost {
                 }
                 Ok(ProjectHostSaveResult {
                     outcome,
+                    converted_format: converting && !project.requires_format_conversion(),
                     projection: project.projection(),
                 })
             }
@@ -843,7 +868,9 @@ impl ProjectHost {
             return Err(ProjectHostSaveError::SessionUnavailable);
         }
         let revision = session.project.revision();
-        match session.project.save(revision) {
+        // The close confirmation of an old Project already says that saving
+        // replaces the old file.
+        match session.project.save_converting_format(revision) {
             Ok(outcome) => match self.finish_recovery(&session.project) {
                 Ok(_) => Ok(outcome),
                 Err(error) => {

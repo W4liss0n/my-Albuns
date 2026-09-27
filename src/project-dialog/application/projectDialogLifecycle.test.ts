@@ -8,6 +8,7 @@ test.each<{
   state: ProjectDialogState;
 }>([
   { expected: "cancelEdgeConversion", state: { kind: "edgeConversionConfirmation", message: "O fundo será removido." } },
+  { expected: "cancelFormatConversionSave", state: { kind: "formatConversionSaveConfirmation" } },
   { expected: "cancelLayoutDeletion", state: { kind: "layoutDeletionConfirmation", busy: false } },
   { expected: "cancelMediaRemoval", state: { kind: "mediaRemovalConfirmation", mediaKind: "photo", count: 2, usedCount: 1, usageCount: 3, busy: false } },
   { expected: null, state: { kind: "mediaRemovalConfirmation", mediaKind: "photo", count: 2, usedCount: 1, usageCount: 3, busy: true } },

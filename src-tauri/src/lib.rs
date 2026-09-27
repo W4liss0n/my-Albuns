@@ -36,6 +36,7 @@ mod imaging_recovery_integration;
 pub mod ipc_contract;
 mod layout_catalog_store;
 mod layout_commands;
+mod legacy_layouts;
 mod local_store_io;
 mod logging;
 mod media_confirmation;

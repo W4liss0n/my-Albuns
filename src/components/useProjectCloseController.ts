@@ -27,6 +27,8 @@ interface ProjectCloseControllerOptions {
   projectDialogPort: ProjectDialogPort;
   projectWindowPort: ProjectWindowPort;
   requestBlocked?: boolean;
+  /** The Project is still an old myAlbuns file; saving replaces it. */
+  formatConversionPending?: boolean;
   waitForPendingMutations(): Promise<ProjectMutationOutcome | null>;
   onProjectionChange(projection: EditorProjection): void;
   onError(message: string): void;
@@ -37,6 +39,14 @@ function closeErrorMessage(error: unknown) {
     return error.message;
   }
   return "Não foi possível concluir o fechamento do projeto.";
+}
+
+function closeConfirmation(busy: boolean, formatConversion: boolean) {
+  return {
+    busy,
+    kind: "projectCloseConfirmation" as const,
+    ...(formatConversion ? { formatConversion: true } : {}),
+  };
 }
 
 function hasClosePhase(
@@ -50,11 +60,14 @@ export function useProjectCloseController({
   projectDialogPort,
   projectWindowPort,
   requestBlocked = false,
+  formatConversionPending = false,
   waitForPendingMutations,
   onProjectionChange,
   onError,
 }: ProjectCloseControllerOptions) {
   const logger = useLogger();
+  const formatConversionRef = useRef(formatConversionPending);
+  formatConversionRef.current = formatConversionPending;
   const logClose = useCallback(
     (operationId: string, event: string, reason?: string) => {
       try {
@@ -95,7 +108,7 @@ export function useProjectCloseController({
     );
     dialogSessionRef.current = session;
     void session
-      .present({ busy: false, kind: "projectCloseConfirmation" })
+      .present(closeConfirmation(false, formatConversionRef.current))
       .catch(async (error: unknown) => {
         if (
           dialogSessionRef.current !== session ||
@@ -183,7 +196,7 @@ export function useProjectCloseController({
         const session = dialogSessionRef.current;
         dialogProjection =
           session
-            ?.present({ busy: true, kind: "projectCloseConfirmation" })
+            ?.present(closeConfirmation(true, formatConversionRef.current))
             .catch((error: unknown) => {
               if (dialogSessionRef.current === session) {
                 dialogSessionRef.current = null;

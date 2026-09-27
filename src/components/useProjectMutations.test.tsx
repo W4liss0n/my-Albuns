@@ -728,3 +728,57 @@ test("does not reverse a conversion that another queued action already satisfied
   await act(async () => { harness.emit("confirmEdgeConversion"); expect(await completed).toBe(false); });
   expect(harness.apply).not.toHaveBeenCalled();
 });
+
+function oldFormatProjection(): EditorProjection {
+  return {
+    ...representativeProjection,
+    state: { ...representativeProjection.state, dirty: true, formatConversionPending: true },
+  };
+}
+
+function formatConversionHarness(initial: EditorProjection) {
+  let onAction: (action: ProjectDialogAction) => void = () => undefined;
+  const present = vi.fn(async (_state: ProjectDialogState) => undefined);
+  const dismiss = vi.fn(async () => undefined);
+  const dialogPort: ProjectDialogPort = { acquire: (listener) => { onAction = listener; return { present, dismiss }; } };
+  const port = projectSessionPort(vi.fn(async () => initial), vi.fn(async () => initial));
+  const save = vi.fn<ProjectCorePort["save"]>(async (revision) => ({
+    outcome: { kind: "saved", revision },
+    projection: { ...initial, state: { ...initial.state, dirty: false, formatConversionPending: undefined } },
+  }));
+  port.save = save;
+  const view = renderHook(({ projection }) => useProjectMutations({
+    projection, projectDialogPort: dialogPort,
+    runProjectMutation: useProjectMutationRunner(projection.state.projectId, port),
+    onProjectionChange: vi.fn(), onAffectedFrame: vi.fn(), onAffectedSheet: vi.fn(),
+  }), { initialProps: { projection: initial } });
+  return { ...view, save, present, emit: (action: ProjectDialogAction) => onAction(action) };
+}
+
+test.each(["confirmFormatConversionSave", "cancelFormatConversionSave"] as const)(
+  "the first save of an old myAlbuns Project asks before replacing its file (%s)", async (action) => {
+    const initial = oldFormatProjection();
+    const harness = formatConversionHarness(initial);
+
+    act(() => harness.result.current.save());
+    await waitFor(() => expect(harness.present).toHaveBeenCalledWith({ kind: "formatConversionSaveConfirmation" }));
+    expect(harness.save).not.toHaveBeenCalled();
+
+    act(() => harness.emit(action));
+    if (action === "confirmFormatConversionSave") {
+      await waitFor(() => expect(harness.save).toHaveBeenCalledWith(initial.state.revision, true));
+    } else {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      expect(harness.save).not.toHaveBeenCalled();
+    }
+  },
+);
+
+test("a Project in the current format saves without asking", async () => {
+  const harness = formatConversionHarness(representativeProjection);
+
+  act(() => harness.result.current.save());
+
+  await waitFor(() => expect(harness.save).toHaveBeenCalledWith(representativeProjection.state.revision));
+  expect(harness.present).not.toHaveBeenCalled();
+});

@@ -11,8 +11,8 @@ use std::{
 };
 
 use myalbuns_core::{
-    ExportFormat, ExportMode, LoadProjectError, LoadProjectRequest, LoadedProjectRevision, MediaId,
-    ProjectCore, ProjectLocation, project_name_from_path,
+    DocumentFailure, ExportFormat, ExportMode, LoadProjectError, LoadProjectRequest,
+    LoadedProjectRevision, MediaId, ProjectCore, ProjectLocation, project_name_from_path,
 };
 use myalbuns_imaging_protocol::RenderSource;
 use myalbuns_paths::{
@@ -349,6 +349,20 @@ fn load_in_plan(
             BatchProblemKind::InvalidProject,
             "Abra o projeto para resolver sua identificação e salve antes de verificar novamente.",
         ),
+        LoadProjectError::Document(DocumentFailure::LegacyProjectInUse) => problem(
+            BatchProblemKind::Unavailable,
+            "O projeto parece estar aberto no myAlbuns antigo. Feche-o e tente novamente.",
+        ),
+        LoadProjectError::Document(DocumentFailure::LegacyProjectOldVersion) => problem(
+            BatchProblemKind::InvalidProject,
+            "Este projeto usa uma versão muito antiga do myAlbuns. Abra e salve o projeto no myAlbuns antigo.",
+        ),
+        LoadProjectError::Document(DocumentFailure::LegacyProjectUnsupportedStructure { .. }) => {
+            problem(
+                BatchProblemKind::InvalidProject,
+                "O álbum tem uma lâmina no meio com só uma página ativa. Ajuste as lâminas no myAlbuns antigo.",
+            )
+        }
         LoadProjectError::Document(_) => problem(
             BatchProblemKind::InvalidProject,
             "O arquivo não é um projeto válido ou usa uma versão incompatível.",

@@ -626,6 +626,7 @@ pub(crate) async fn redo_project(
 #[tauri::command]
 pub(crate) async fn save_project(
     expected_revision: u64,
+    confirm_format_conversion: Option<bool>,
     window: WebviewWindow,
     state: State<'_, ProjectHost>,
 ) -> Result<SaveProjectResult, SaveProjectCommandError> {
@@ -633,19 +634,26 @@ pub(crate) async fn save_project(
         .map_err(|_| SaveProjectCommandError::SessionUnavailable)?;
     let host = state.inner().clone();
     let window_label = window.label().to_owned();
-    let save = tauri::async_runtime::spawn_blocking(move || host.save(expected_revision))
-        .await
-        .map_err(|error| {
-            tracing::error!(
-                target: "myalbuns.desktop",
-                process_role = ProcessRole::DesktopHost.as_str(),
-                window_label = window_label.as_str(),
-                expected_revision,
-                error = %error,
-                event = "project_save_worker_failed",
-            );
-            SaveProjectCommandError::SessionUnavailable
-        })?;
+    let confirmed = confirm_format_conversion.unwrap_or(false);
+    let save = tauri::async_runtime::spawn_blocking(move || {
+        if confirmed {
+            host.save_converting_format(expected_revision)
+        } else {
+            host.save(expected_revision)
+        }
+    })
+    .await
+    .map_err(|error| {
+        tracing::error!(
+            target: "myalbuns.desktop",
+            process_role = ProcessRole::DesktopHost.as_str(),
+            window_label = window_label.as_str(),
+            expected_revision,
+            error = %error,
+            event = "project_save_worker_failed",
+        );
+        SaveProjectCommandError::SessionUnavailable
+    })?;
     let saved = save.map_err(|error| {
         let indeterminate = matches!(
             &error,
@@ -673,12 +681,18 @@ pub(crate) async fn save_project(
         map_save_project_error(error)
     })?;
     let outcome = map_save_project_outcome(saved.outcome);
+    let mut projection = saved.projection;
+    if saved.converted_format
+        && let Some(refreshed) = import_legacy_layouts(window.app_handle(), &state, &projection)
+    {
+        projection = refreshed;
+    }
     tracing::info!(
         target: "myalbuns.desktop",
         process_role = ProcessRole::DesktopHost.as_str(),
         window_label = window.label(),
-        project_id = safe_log_identifier(&saved.projection.state.project_id),
-        revision = saved.projection.state.revision,
+        project_id = safe_log_identifier(&projection.state.project_id),
+        revision = projection.state.revision,
         save_outcome = match outcome {
             SaveProjectOutcome::Saved { .. } => "saved",
             SaveProjectOutcome::AlreadyCurrent { .. } => "already_current",
@@ -687,8 +701,46 @@ pub(crate) async fn save_project(
     );
     Ok(SaveProjectResult {
         outcome,
-        projection: saved.projection,
+        projection,
     })
+}
+
+/// The first save of an old myAlbuns Project also brings the Layouts the user
+/// created in the old program, sized for this Album (ADR 0012). A failure only
+/// reaches the diagnostic log: the Project itself is already saved.
+pub(crate) fn import_legacy_layouts(
+    app: &AppHandle,
+    host: &ProjectHost,
+    projection: &EditorProjection,
+) -> Option<EditorProjection> {
+    let templates = crate::legacy_layouts::old_library_templates()?;
+    let store = app.state::<crate::layout_catalog_store::LayoutCatalogStore>();
+    let document = &projection.state.document;
+    match crate::legacy_layouts::import_custom_layouts(
+        &store,
+        &templates,
+        document.sheet_width_um,
+        document.sheet_height_um,
+    ) {
+        Ok(Some(snapshot)) => {
+            tracing::info!(
+                target: "myalbuns.desktop",
+                layouts = snapshot.entries.len(),
+                event = "legacy_custom_layouts_imported",
+            );
+            host.refresh_layout_catalog(snapshot).ok()?;
+            host.projection().ok()
+        }
+        Ok(None) => None,
+        Err(error) => {
+            tracing::warn!(
+                target: "myalbuns.desktop",
+                error = %error,
+                event = "legacy_custom_layouts_import_failed",
+            );
+            None
+        }
+    }
 }
 
 #[tauri::command]
@@ -846,6 +898,9 @@ pub(crate) fn map_save_project_error(error: ProjectHostSaveError) -> SaveProject
                 expected_revision: expected,
                 current_revision: current,
             }
+        }
+        ProjectHostSaveError::Project(SaveProjectError::FormatConversionConfirmationRequired) => {
+            SaveProjectCommandError::FormatConversionConfirmationRequired
         }
         ProjectHostSaveError::Project(SaveProjectError::PersistedBaselineConflict) => {
             SaveProjectCommandError::PersistedBaselineConflict

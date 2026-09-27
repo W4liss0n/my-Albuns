@@ -11,6 +11,8 @@ const failureMessages: Readonly<
 > = {
   stale_revision:
     "Não foi possível salvar porque há alterações mais recentes no projeto. Nada foi salvo nesta tentativa.",
+  format_conversion_confirmation_required:
+    "Este projeto foi criado no myAlbuns antigo. Salve de novo e confirme a substituição do arquivo.",
   persisted_baseline_conflict:
     "O arquivo do projeto foi alterado fora do MyAlbuns. O salvamento não substituiu essas alterações.",
   save_state_indeterminate:

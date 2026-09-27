@@ -381,3 +381,29 @@ test("edge conversion uses the standard confirmation actions and names the disca
   await user.click(screen.getByRole("button", { name: "Converter" }));
   expect(onAction.mock.calls).toEqual([["cancelEdgeConversion"], ["confirmEdgeConversion"]]);
 });
+
+test("the first save of an old myAlbuns Project says that the old program stops opening it", async () => {
+  const user = userEvent.setup();
+  const onAction = vi.fn();
+  render(<ProjectDialogView onAction={onAction} state={{ kind: "formatConversionSaveConfirmation" }} />);
+
+  const dialog = screen.getByRole("dialog", { name: "Salvar no formato novo?" });
+  expect(dialog).toHaveTextContent("o myAlbuns antigo não vai mais abri-lo");
+  await user.click(within(dialog).getByRole("button", { name: "Salvar" }));
+  await user.click(within(dialog).getByRole("button", { name: "Cancelar" }));
+
+  expect(onAction.mock.calls).toEqual([["confirmFormatConversionSave"], ["cancelFormatConversionSave"]]);
+});
+
+test("closing an old myAlbuns Project explains that saving replaces its file", () => {
+  render(
+    <ProjectDialogView
+      onAction={vi.fn()}
+      state={{ busy: false, formatConversion: true, kind: "projectCloseConfirmation" }}
+    />,
+  );
+
+  const dialog = screen.getByRole("dialog", { name: "Salvar alterações antes de fechar?" });
+  expect(dialog).toHaveTextContent("ainda não foi salvo no formato novo");
+  expect(dialog).not.toHaveTextContent("O projeto tem alterações que ainda não foram salvas.");
+});

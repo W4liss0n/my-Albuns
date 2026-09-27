@@ -116,8 +116,20 @@ async fn save_and_close(
     window: &Window,
     host: ProjectHost,
 ) -> Result<ProjectCloseResolution, SaveProjectCommandError> {
-    match tauri::async_runtime::spawn_blocking(move || host.save_and_close()).await {
+    let converting = host
+        .projection()
+        .ok()
+        .filter(|projection| projection.state.format_conversion_pending);
+    let saving = host.clone();
+    match tauri::async_runtime::spawn_blocking(move || saving.save_and_close()).await {
         Ok(Ok(outcome)) => {
+            if let Some(projection) = converting {
+                crate::project_commands::import_legacy_layouts(
+                    window.app_handle(),
+                    &host,
+                    &projection,
+                );
+            }
             tracing::info!(
                 target: "myalbuns.desktop",
                 process_role = ProcessRole::DesktopHost.as_str(),

@@ -126,6 +126,8 @@ pub enum ProjectDialogState {
     EdgeConversionConfirmation {
         message: String,
     },
+    /// The first save of an old myAlbuns Project replaces its file.
+    FormatConversionSaveConfirmation,
     ImageProcessingProgress {
         progress: ProjectDialogProgress,
     },
@@ -142,6 +144,10 @@ pub enum ProjectDialogState {
     },
     ProjectCloseConfirmation {
         busy: bool,
+        /// The Project is still an old myAlbuns file; saving replaces it.
+        #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+        #[ts(as = "Option<bool>", optional)]
+        format_conversion: bool,
     },
     ProjectCloseFailure {
         message: String,
@@ -198,6 +204,8 @@ pub enum ProjectDialogAction {
     ConfirmLayoutDeletion,
     CancelEdgeConversion,
     ConfirmEdgeConversion,
+    CancelFormatConversionSave,
+    ConfirmFormatConversionSave,
     CancelAlbumInformation,
     CancelExport,
     CancelProjectClose,
@@ -325,7 +333,10 @@ mod project_dialog_contract_tests {
             ProjectDialogState::EdgeConversionConfirmation {
                 message: "O Background personalizado será removido.".into(),
             },
-            ProjectDialogState::ProjectCloseConfirmation { busy: true },
+            ProjectDialogState::ProjectCloseConfirmation {
+                busy: true,
+                format_conversion: false,
+            },
             ProjectDialogState::ProjectCloseFailure {
                 message: "Falha ao fechar".into(),
             },
@@ -1013,6 +1024,9 @@ pub enum SaveProjectCommandError {
         expected_revision: u64,
         current_revision: u64,
     },
+    /// The file is an old myAlbuns Project; saving replaces it and needs the
+    /// user's confirmation first.
+    FormatConversionConfirmationRequired,
     PersistedBaselineConflict,
     NotFound,
     Unavailable,

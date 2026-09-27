@@ -1,6 +1,7 @@
 mod editable_store;
 mod identity_lease;
 mod identity_registry;
+mod legacy;
 mod project_file;
 mod windows_publish;
 
@@ -24,6 +25,8 @@ pub(crate) use identity_lease::{
     IdentityLeaseError, IdentityLeaseObservation, IdentityTargetBinder,
     PendingProjectIdentityLease, ProjectIdentityLease,
 };
+pub(crate) use legacy::LegacyFailure;
+pub use legacy::{LegacyConversionNote, legacy_layout_definition};
 
 /// Removes identity lock files left by closed Projects.
 pub fn prune_inactive_identity_leases(root: &std::path::Path) -> usize {
@@ -34,10 +37,24 @@ pub(crate) use identity_registry::{IdentityRegistryLookup, ProjectIdentityRegist
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum DocumentFailure {
     InvalidDocumentType,
-    UnsupportedFutureSchema { version: u32 },
-    UnsupportedLegacySchema { version: u32 },
+    UnsupportedFutureSchema {
+        version: u32,
+    },
+    UnsupportedLegacySchema {
+        version: u32,
+    },
     InvalidProjectDocument,
     InvalidProjectState,
+    /// The old myAlbuns has the file open for writing.
+    LegacyProjectInUse,
+    /// Formats 1.0 and 1.1 of the old myAlbuns.
+    LegacyProjectOldVersion,
+    /// A Sheet with a single active side in the middle of the Album, or an
+    /// Album with fewer than two Sheets.
+    LegacyProjectUnsupportedStructure {
+        sheet_number: Option<u32>,
+    },
+    LegacyProjectDamaged,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -101,6 +118,8 @@ pub enum LoadProjectError {
 
 pub(crate) struct LoadedStoredRevision {
     pub(crate) revision: ProjectRevision,
+    /// Read from the old myAlbuns format: the key of its in-memory Identity.
+    pub(crate) legacy: Option<String>,
     pub(crate) content_sha256: String,
     pub(crate) physical_identity: Option<PhysicalFileIdentity>,
     pub(crate) project_path: PathBuf,
@@ -124,14 +143,53 @@ pub(crate) fn read(location: &ProjectLocation) -> Result<LoadedStoredRevision, D
         .resolve_existing(&location.project_path, ExpectedObject::RegularFile)
         .map_err(|error| DecodeFailure::Path(map_path_failure(error)))?;
     let physical_identity = resolved.physical_identity();
-    let source = resolved.read_to_string().map_err(map_read_error)?;
-    project_file::decode(source.as_bytes()).map(|revision| LoadedStoredRevision {
+    let bytes = resolved.read_bytes().map_err(map_read_error)?;
+    let legacy = legacy::is_legacy_project(&bytes)
+        .then(|| legacy::identity_key(&bytes, &location.project_path));
+    let revision = match &legacy {
+        Some(key) => {
+            convert_legacy(
+                &bytes,
+                &location.project_path,
+                legacy::derived_identity(key),
+            )?
+            .revision
+        }
+        None => project_file::decode(&bytes)?,
+    };
+    Ok(LoadedStoredRevision {
         revision,
-        content_sha256: format!("{:x}", Sha256::digest(source.as_bytes())),
+        legacy,
+        content_sha256: format!("{:x}", Sha256::digest(&bytes)),
         physical_identity,
         project_path: location.project_path.clone(),
         root_bindings: location.root_bindings.clone(),
         resolved_object: resolved,
+    })
+}
+
+/// Converts an old myAlbuns Project in memory; the file is never written here.
+pub(crate) fn convert_legacy(
+    bytes: &[u8],
+    project_path: &Path,
+    project_id: uuid::Uuid,
+) -> Result<legacy::LegacyConversion, DecodeFailure> {
+    if legacy::has_active_journal(project_path) {
+        return Err(legacy_failure(LegacyFailure::InUse));
+    }
+    legacy::convert(bytes, project_path, project_id, &|path| path.is_file()).map_err(legacy_failure)
+}
+
+pub(crate) fn legacy_failure(failure: LegacyFailure) -> DecodeFailure {
+    DecodeFailure::Document(match failure {
+        LegacyFailure::InUse => DocumentFailure::LegacyProjectInUse,
+        LegacyFailure::OldVersion => DocumentFailure::LegacyProjectOldVersion,
+        LegacyFailure::UnsupportedStructure { sheet_number } => {
+            DocumentFailure::LegacyProjectUnsupportedStructure {
+                sheet_number: sheet_number.and_then(|number| u32::try_from(number).ok()),
+            }
+        }
+        LegacyFailure::Damaged => DocumentFailure::LegacyProjectDamaged,
     })
 }
 

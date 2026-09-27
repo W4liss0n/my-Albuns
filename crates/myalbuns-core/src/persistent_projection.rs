@@ -68,6 +68,7 @@ pub(crate) fn editor_state(
         can_undo: history_enabled && session.can_undo(),
         can_redo: history_enabled && session.can_redo(),
         album: album_snapshot(project, photo_sources),
+        format_conversion_pending: false,
     }
 }
 
