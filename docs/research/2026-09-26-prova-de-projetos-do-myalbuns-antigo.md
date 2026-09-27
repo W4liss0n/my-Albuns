@@ -73,8 +73,12 @@ As janelas foram conduzidas pelo DevTools do WebView2.
 - em outra cópia, fechar sem salvar mostra no diálogo que o programa antigo deixará de
   abrir o arquivo, e "Salvar e fechar" converte.
 
-**Observação.** Fechar um Projeto antes de terminar a abertura mostra "Não foi possível
-abrir o projeto" ([#137](https://github.com/W4liss0n/my-Albuns/issues/137)).
+**Observação.** Numa execução, o roteiro fechou a janela do Projeto pelo DevTools enquanto
+ela ainda estava invisível, antes do fim da abertura, e o processo global mostrou "Não foi
+possível abrir o projeto". Isso não acontece pela interface: a janela do Projeto só
+aparece quando a abertura termina, e o progresso de abertura não pode ser fechado
+([#137](https://github.com/W4liss0n/my-Albuns/issues/137), encerrada). Na prática, esse
+resultado indica um Host encerrado, e o texto passou a dizer isso.
 
 ## Ferramentas
 

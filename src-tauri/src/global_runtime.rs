@@ -1505,10 +1505,12 @@ fn bootstrap_failure(failure: BootstrapFailure) -> ProjectLaunchFailure {
             "A Janela do projeto respondeu de forma inválida e foi encerrada.",
             "Tente novamente. Se o problema continuar, reinicie o MyAlbuns.",
         ),
+        // The Project window stays hidden until startup completes and the
+        // opening progress cannot be closed, so this is a Host that ended.
         (BootstrapFailureKind::Transport, _) => (
-            "host_closed_before_ready",
-            "A janela do projeto fechou antes de terminar de abrir.",
-            "Abra o projeto de novo.",
+            "host_exited_before_ready",
+            "O projeto foi encerrado antes de terminar de abrir.",
+            "Abra o projeto de novo. Se o problema continuar, reinicie o MyAlbuns.",
         ),
         // The dialog title already says that the Project did not open.
         _ => (
