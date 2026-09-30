@@ -24,6 +24,14 @@ use myalbuns_paths::ResolvedObject;
 use sha2::{Digest, Sha256};
 
 pub(crate) const MAX_DECODED_SOURCE_PIXELS_TOTAL: u64 = 134_217_728;
+/// Each read of an Original on a network share is one request to the server.
+/// Reading a whole Original from the Wi‑Fi share measured on 2026-09-29 got
+/// 25.6 MiB/s in 8 KiB blocks, 28.2 in 64 KiB and 30.3 in 1 MiB.
+const ORIGINAL_READ_BLOCK_BYTES: usize = 1024 * 1024;
+/// The preflight reads only headers: a JPEG with EXIF and an ICC profile
+/// fits in one request of this size, instead of one per 8 KiB. A larger block
+/// would transfer image data the preflight never looks at.
+const PREFLIGHT_READ_BLOCK_BYTES: usize = 64 * 1024;
 const MAX_ALLOWED_ICC_PROFILE_BYTES: usize = 60_988;
 const MAX_PNG_ICCP_CHUNK_BYTES: usize = 1024 * 1024;
 const PNG_SRGB_GAMMA: u32 = 45_455;
@@ -391,7 +399,7 @@ fn inspect_open_source(
         ));
     }
     inspect_reader(
-        SourceReader::File(BufReader::new(file)),
+        SourceReader::File(BufReader::with_capacity(PREFLIGHT_READ_BLOCK_BYTES, file)),
         metadata.len(),
         allow_single_page_tiff,
     )

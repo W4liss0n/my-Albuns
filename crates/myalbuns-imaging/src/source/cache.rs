@@ -1,5 +1,5 @@
 use std::{
-    io::{BufReader, Read},
+    io::Read,
     time::{SystemTime, UNIX_EPOCH},
 };
 
@@ -61,10 +61,10 @@ fn observe_source(
     let source_modified_unix_ms = file_time_millis(metadata.modified());
     #[cfg(test)]
     FULL_READS.set(FULL_READS.get() + 1);
-    let mut reader = BufReader::new(file);
+    let mut reader = file;
     let mut hasher = Sha256::new();
     let mut observed_bytes = 0_u64;
-    let mut buffer = [0_u8; 64 * 1024];
+    let mut buffer = vec![0_u8; super::ORIGINAL_READ_BLOCK_BYTES];
     loop {
         let read = reader
             .read(&mut buffer)
@@ -86,7 +86,6 @@ fn observe_source(
         }
     }
     let final_metadata = reader
-        .get_ref()
         .metadata()
         .map_err(|error| format!("não foi possível reinspecionar a mídia {media_id}: {error}"))?;
     if observed_bytes != metadata.len()

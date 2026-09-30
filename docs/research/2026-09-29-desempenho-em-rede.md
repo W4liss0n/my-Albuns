@@ -159,6 +159,33 @@ todas as rodadas. Resultados brutos em `.scratch/rede-20260929/buffer/`, script 
 O ganho ficou perto do previsto: a Exportação para a rede passou a custar cerca de
 duas vezes a local, contra cinco vezes antes.
 
+### Leitura em blocos maiores (P7)
+
+Com a leitura antecipada do P6, a Exportação já lê cada foto da rede inteira, de
+uma vez. Restavam dois pontos do Processador lendo em blocos pequenos:
+
+- a leitura que calcula o SHA-256 de cada Original para o Cache e a importação lia
+  em blocos de 64 KiB e passou a ler em blocos de 1 MiB;
+- a leitura dos cabeçalhos antes da Exportação lia em blocos de 8 KiB e passou a
+  ler em blocos de 64 KiB. Um JPEG com EXIF e perfil ICC cabe num só pedido; um
+  bloco maior baixaria dados de imagem que essa leitura não usa.
+
+O mesmo Host com os dois Processadores, cópia nova das fotos no servidor a cada
+rodada, três rodadas em ordem alternada:
+
+| Rodada | Importação (Processador), antes | Depois | Exportação local, antes | Depois |
+| --- | ---: | ---: | ---: | ---: |
+| 1 | 52,2 s | 39,1 s | 13,7 s | 17,0 s |
+| 2 | 43,8 s | 38,1 s | 13,2 s | 11,7 s |
+| 3 | 44,9 s | 36,4 s | 11,0 s | 11,4 s |
+| Mediana | 44,9 s | 38,1 s | 13,2 s | 11,7 s |
+
+A importação ficou cerca de 15% mais rápida, e o ganho apareceu em todas as
+rodadas. As prévias geradas foram idênticas byte a byte nas duas versões. A
+Exportação local variou nos dois sentidos: a diferença fica dentro da variação do
+Wi‑Fi. As saídas somaram os mesmos 76.601.346 bytes em todas as rodadas. Resultados
+brutos em `.scratch/rede-20260929/p7/`, script em `tools/run-p7.ps1`.
+
 ### Servidor desligado (P8)
 
 Com o servidor desligado e o Projeto usando 90 Originais nele, cenário `offline` do
