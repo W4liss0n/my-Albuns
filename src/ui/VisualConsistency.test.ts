@@ -28,7 +28,7 @@ const canvasStyles = readStyles("src/components/AlbumCanvas.css");
 const canvasScrollbarStyles = readStyles(
   "src/components/CanvasHorizontalScrollbar.css",
 );
-const canvasPreviewStyles = readStyles("src/canvas-preview.css");
+const canvasPreviewStyles = readStyles("src/previews/canvas-preview.css");
 const mediaPanelStyles = readStyles("src/components/MediaPanel.css");
 const mediaThumbnailStyles = readStyles("src/components/MediaThumbnail.css");
 const mediaPreviewCardStyles = readStyles(

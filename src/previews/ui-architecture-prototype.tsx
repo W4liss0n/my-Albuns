@@ -5,9 +5,9 @@ import {
   UiArchitecturePrototype,
   type UiArchitecturePrototypeEditorMode,
   type UiArchitecturePrototypeView,
-} from "./prototypes/UiArchitecturePrototype";
-import "./ui/theme.css";
-import "./prototypes/UiArchitecturePrototype.css";
+} from "../prototypes/UiArchitecturePrototype";
+import "../ui/theme.css";
+import "../prototypes/UiArchitecturePrototype.css";
 
 const search = new URLSearchParams(window.location.search);
 const requestedView = search.get("view");

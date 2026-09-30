@@ -18,7 +18,7 @@ try {
   const port = started.port;
   evidence.browserVersion = started.edge.edgeVersion;
 
-  await request('POST', `/session/${session}/url`, { url: `http://127.0.0.1:${port}/photo-placement-preview.html` });
+  await request('POST', `/session/${session}/url`, { url: `http://127.0.0.1:${port}/previews/photo-placement-preview.html` });
   const execute = script => request('POST', `/session/${session}/execute/sync`, { script, args: [] });
   let ready = false;
   for (let i = 0; i < 200 && !ready; i++) {

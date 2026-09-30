@@ -17,7 +17,7 @@ export function photoshopSettingsPreview(state: string | null): PhotoshopSetting
 export function photoshopProjectPreview(state: string | null): PhotoshopPort {
   return {
     status: photoshopSettingsPreview(state).status,
-    openSettings: async () => { window.location.href = "/settings-preview.html?section=photoshop"; },
+    openSettings: async () => { window.location.href = "/previews/settings-preview.html?section=photoshop"; },
     openPhoto: async () => {
       if (state === "failure") throw new PhotoshopError("installation_unavailable", "A instalação selecionada do Photoshop não está mais disponível. Escolha outra instalação em Configurações.");
       document.body.dataset.photoshopOpened = "true";

@@ -111,7 +111,7 @@ test("the welcome preview declares a stable empty-recent-Projects scenario", () 
   assert.ok(scenario, "welcome-empty is missing");
   assert.equal(
     scenario.implementationPath,
-    "/welcome-preview.html?recents=empty",
+    "/previews/welcome-preview.html?recents=empty",
   );
   assert.equal(scenario.comparison.kind, "implementation-only");
   assert.equal(scenario.comparison.surface, "welcome-empty-state");
@@ -199,22 +199,22 @@ test("the manifest covers the integrated workspace and every critical Project di
     manifest.scenarios.map((scenario) => [scenario.id, scenario]),
   );
   const workspaceScenario = scenariosById.get("project-workspace-integrated");
-  assert.equal(workspaceScenario?.implementationPath, "/workspace-preview.html");
+  assert.equal(workspaceScenario?.implementationPath, "/previews/workspace-preview.html");
   assert.equal(workspaceScenario?.comparison.surface, "project-workspace");
   assert.equal(workspaceScenario?.comparison.kind, "paired");
   assert.equal(
-    existsSync(path.join(workspace, "src", "workspace-preview.tsx")),
+    existsSync(path.join(workspace, "src", "previews", "workspace-preview.tsx")),
     true,
     "the integrated workspace entrypoint is missing",
   );
 
   const workspaceEntrypoint = readFileSync(
-    path.join(workspace, "src", "workspace-preview.tsx"),
+    path.join(workspace, "src", "previews", "workspace-preview.tsx"),
     "utf8",
   );
   assert.match(
     workspaceEntrypoint,
-    /import App from "\.\/App";/u,
+    /import App from "\.\.\/App";/u,
     "the integrated workspace must use the production App composition",
   );
   assert.match(
@@ -352,35 +352,35 @@ test("the manifest covers critical integrated workspace, panel, menu, and graphi
   );
   const expectedStates = {
     "project-workspace-integrated": {
-      path: "/workspace-preview.html",
+      path: "/previews/workspace-preview.html",
       ready: /Informações do álbum/u,
     },
     "project-workspace-sheet-context": {
-      path: "/workspace-preview.html",
+      path: "/previews/workspace-preview.html",
       ready: /Design da lâmina/u,
       actions: ["focus", "key"],
     },
     "project-workspace-photo-context": {
-      path: "/workspace-preview.html?frame=photo",
+      path: "/previews/workspace-preview.html?frame=photo",
       ready: /Zoom da foto/u,
       actions: ["focus", "key", "click"],
     },
     "project-workspace-frame-placeholder-context": {
-      path: "/workspace-preview.html?frame=empty",
+      path: "/previews/workspace-preview.html?frame=empty",
       ready: /context-heading/u,
       actions: ["focus", "key", "click"],
     },
     "project-workspace-menu-open": {
-      path: "/workspace-preview.html",
+      path: "/previews/workspace-preview.html",
       ready: /application-menu-file/u,
       actions: ["click"],
     },
     "project-workspace-panels-persisted": {
-      path: "/workspace-preview.html?layout=persisted",
+      path: "/previews/workspace-preview.html?layout=persisted",
       ready: /inspector-width/u,
     },
     "project-workspace-panels-collapsed": {
-      path: "/workspace-preview.html?layout=collapsed",
+      path: "/previews/workspace-preview.html?layout=collapsed",
       ready: /not\(:has/u,
     },
     "project-graphics-failure": {
@@ -388,7 +388,7 @@ test("the manifest covers critical integrated workspace, panel, menu, and graphi
       ready: /ui-owned-window-shell/u,
     },
     "safe-application-shell": {
-      path: "/welcome-preview.html?graphics=unsupported",
+      path: "/previews/welcome-preview.html?graphics=unsupported",
       ready: /editor-unavailable/u,
     },
   };
@@ -423,7 +423,7 @@ test("the manifest captures rendered structural command surfaces at the physical
     assert.ok(scenario, "the structural command surface is missing");
     assert.equal(
       scenario.implementationPath,
-      "/workspace-preview.html?structure=minimum-single-edges",
+      "/previews/workspace-preview.html?structure=minimum-single-edges",
     );
     assert.equal(scenario.comparison.kind, "implementation-only");
     assert.equal(scenario.comparison.surface, "sheet-structure-commands");
@@ -557,10 +557,10 @@ test("the manifest preserves Program 05 proofs and promotes Sheet reordering to 
     assert.equal(
       scenario.implementationPath,
       productive
-        ? "/workspace-preview.html?structure=physical"
+        ? "/previews/workspace-preview.html?structure=physical"
         : id === "ui-architecture-map"
-          ? "/ui-architecture-prototype.html"
-          : "/ui-architecture-prototype.html?view=editor",
+          ? "/previews/ui-architecture-prototype.html"
+          : "/previews/ui-architecture-prototype.html?view=editor",
       `${id} uses the wrong acceptance surface`,
     );
     assert.equal(scenario.comparison.kind, "implementation-only");
@@ -643,7 +643,7 @@ test("the manifest preserves Program 05 proofs and promotes Sheet reordering to 
   ]) {
     assert.equal(
       scenariosById.get(id).implementationPath,
-      "/workspace-preview.html?structure=physical",
+      "/previews/workspace-preview.html?structure=physical",
     );
     assert.match(scenariosById.get(id).readySelector, /data-reorder-surface/u);
   }
@@ -827,9 +827,9 @@ test("the manifest exercises this UI correction batch in the real renderer", () 
         .implementationPath,
     ],
     [
-      "/workspace-preview.html?scale=1",
-      "/workspace-preview.html?scale=1.25",
-      "/workspace-preview.html?scale=1.5",
+      "/previews/workspace-preview.html?scale=1",
+      "/previews/workspace-preview.html?scale=1.25",
+      "/previews/workspace-preview.html?scale=1.5",
     ],
   );
   assert.deepEqual(

@@ -46,7 +46,7 @@ try {
   async function navigate(suffix) {
     const chrome = await execute('return { width: outerWidth - innerWidth, height: outerHeight - innerHeight };');
     await request('POST', `${endpoint}/window/rect`, { width: 1567 + chrome.width, height: 900 + chrome.height });
-    await request('POST', `${endpoint}/url`, { url: `http://127.0.0.1:${port}/workspace-preview.html${suffix}` });
+    await request('POST', `${endpoint}/url`, { url: `http://127.0.0.1:${port}/previews/workspace-preview.html${suffix}` });
     await until(state, value => value.editing !== null, 'Canvas ready');
   }
   async function key(value, control = false, shift = false) {

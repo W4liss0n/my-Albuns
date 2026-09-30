@@ -29,7 +29,7 @@ try {
   const point = () => execute("return window.normalSwapTest.point('swap-frame-0')");
   const state = () => execute("return {photos:document.body.dataset.frameSwapAllPhotos,selection:document.body.dataset.frameSwapSelection,intent:document.body.dataset.frameSwapLastIntent,editing:document.querySelector('.canvas-host canvas')?.getAttribute('aria-label')?.startsWith('Canvas da Lâmina em edição')} ");
   for (const name of ['click','double-click','alt-pan','cross-sheet-scroll','escape','feedback']) {
-    await request('POST', `/session/${session}/url`, {url:`http://127.0.0.1:${port}/workspace-preview.html?frame=swap&swap=cross-photos&mode=normal`});
+    await request('POST', `/session/${session}/url`, {url:`http://127.0.0.1:${port}/previews/workspace-preview.html?frame=swap&swap=cross-photos&mode=normal`});
     let ready = false;
     for(let i=0;i<600;i++) {
       ready=await execute('return Boolean(document.querySelector(".canvas-host canvas"))');

@@ -1,13 +1,13 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 
-import "./ui/theme.css";
-import "./ui/ui.css";
-import { MediaPanel } from "./components/MediaPanel";
-import { mediaPanelPreviewFixture } from "./test/mediaPanelPreviewFixtures";
+import "../ui/theme.css";
+import "../ui/ui.css";
+import { MediaPanel } from "../components/MediaPanel";
+import { mediaPanelPreviewFixture } from "../test/mediaPanelPreviewFixtures";
 import "./media-panel-preview.css";
-import type { MediaFolder } from "./domain/project";
-import type { MediaFileInfo } from "./application/projectPorts";
+import type { MediaFolder } from "../domain/project";
+import type { MediaFileInfo } from "../application/projectPorts";
 
 const { mediaItems, mediaPreviews, mediaUsage } = mediaPanelPreviewFixture;
 const parameters = new URLSearchParams(window.location.search);

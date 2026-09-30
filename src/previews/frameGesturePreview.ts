@@ -9,7 +9,7 @@ import { interactiveComposition } from "../components/albumCanvasTestFixtures";
 import "../components/AlbumCanvas.css";
 import "../components/pixiRuntime";
 import { useEditorView } from "../state/editorView";
-import { frameGeometryPreview } from "./frameGeometryPreview";
+import { frameGeometryPreview } from "../test/frameGeometryPreview";
 
 const app = new Application();
 await app.init({ width: 900, height: 600, background: "#ddd", preference: "webgl" });
