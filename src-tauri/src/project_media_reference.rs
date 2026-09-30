@@ -94,7 +94,9 @@ impl ReferenceChange<'_> {
         kind: MediaChangeKind,
         pause: CachePause,
     ) -> Result<MediaBinding, String> {
-        let estimate = ImageMemoryEstimate::in_plan(roots, [path.as_path()]);
+        let estimate = ImageMemoryEstimate::from_headers(
+            &crate::linked_files::LinkedFiles::new().headers(roots, [path.as_path()]),
+        );
         let cancellation = CacheCancellation::default();
         let _reservation = self
             .processor

@@ -22,7 +22,8 @@ use crate::{
     logging,
     media_confirmation::MediaConfirmation,
     media_runtime::{
-        MediaBinding, MediaMonitor, MediaResolutionProposal, MediaResolver, MediaRuntime,
+        MediaBinding, MediaMonitor, MediaObservationInterrupted, MediaResolutionProposal,
+        MediaRuntime,
     },
     operation_gate::OperationGate,
     project_bootstrap::{
@@ -576,14 +577,19 @@ fn images_requiring_startup_preparation(
         .iter()
         .map(|source| source.media_id.as_str())
         .collect::<std::collections::HashSet<_>>();
-    bindings
+    let pending = bindings
         .iter()
-        .filter(|binding| {
-            !recovered.contains(binding.media_id.as_str())
-                && MediaResolver.observe_in_plan(roots, binding).availability
-                    == crate::media_runtime::MediaAvailability::Candidate
+        .filter(|binding| !recovered.contains(binding.media_id.as_str()))
+        .collect::<Vec<_>>();
+    let observations =
+        crate::linked_files::LinkedFiles::new().observe(roots, pending.iter().copied());
+    pending
+        .into_iter()
+        .zip(observations)
+        .filter(|(_, observation)| {
+            observation.availability == crate::media_runtime::MediaAvailability::Candidate
         })
-        .cloned()
+        .map(|(binding, _)| binding.clone())
         .collect()
 }
 
@@ -727,12 +733,15 @@ fn refresh_changed_photo_sources_in_plan(
 ) -> Vec<String> {
     let mut refreshed = Vec::new();
     for binding in changed_photos {
-        let observation = MediaResolver.observe_in_plan(roots, &binding);
+        let observation = crate::linked_files::LinkedFiles::new().observe_one(roots, &binding);
         if host.adopt_imported_photo_inspection(&binding, &observation) {
             refreshed.push(binding.media_id);
             continue;
         }
-        match MediaResolver.inspect_media_binding_in_plan(&binding, roots) {
+        match crate::linked_files::LinkedFiles::new()
+            .inspect_decoded(roots, &binding.logical_path)
+            .and_then(|header| header.photo_metadata())
+        {
             Ok(metadata) => match host.observe_photo_source(&binding, metadata) {
                 Ok(()) => refreshed.push(binding.media_id.clone()),
                 Err(error) => tracing::warn!(
@@ -794,40 +803,82 @@ fn start_linked_media_monitor(app: tauri::AppHandle) {
                 }
                 break;
             }
-            let _causal_cache_permit = app
-                .state::<CacheEngine>()
-                .begin_cancellable_work(CacheCancellation::default())
-                .await;
             let catalog = match app.state::<ProjectHost>().authorized_media_catalog() {
                 Ok(catalog) => catalog,
                 Err(_) => break,
             };
-            let namespace = app.state::<ActiveCacheNamespace>().namespace();
-            if catalog.project_id != namespace.project_id() {
+            if catalog.project_id != app.state::<ActiveCacheNamespace>().namespace().project_id() {
                 continue;
             }
             let monitor = app.state::<MediaMonitor>().inner().clone();
             let listed = catalog.bindings.clone();
-            let hint = tauri::async_runtime::spawn_blocking(move || {
-                crate::media_runtime::MediaListingHint::read(&listed)
+            // One plan per tick serves the folder listing and the observation.
+            // The listing runs before this tick holds Cache work: it cannot be
+            // interrupted, and a server that is switched off makes it wait ~37 s.
+            let Ok((hint, roots)) = tauri::async_runtime::spawn_blocking(move || {
+                let mut paths = myalbuns_paths::OperationPathContext::new();
+                for binding in &listed {
+                    let _ = paths.capture(&binding.logical_path);
+                }
+                let roots = paths.freeze();
+                let hint = crate::media_runtime::MediaListingHint::read(
+                    &crate::linked_files::LinkedFiles::new(),
+                    &roots,
+                    &listed,
+                );
+                (Some(hint), roots)
             })
             .await
-            .ok();
-            let full_observation_due = hint.is_none()
-                || hint != last_hint
+            else {
+                continue;
+            };
+            let full_observation_due = hint != last_hint
                 || monitor.has_pending_observation()
                 || last_full_observation
                     .is_none_or(|last| last.elapsed() >= LINKED_MEDIA_FULL_OBSERVATION_INTERVAL);
-            last_hint = hint;
             if !full_observation_due {
                 continue;
             }
-            last_full_observation = Some(std::time::Instant::now());
+            // A Cache pause (Export, Save As, relinking) sets this; the full
+            // observation then stops waiting instead of holding the pause, and
+            // runs again on a later tick.
+            let cancellation = CacheCancellation::default();
+            let _causal_cache_permit = app
+                .state::<CacheEngine>()
+                .begin_cancellable_work(cancellation.clone())
+                .await;
+            // A pause while the folders were listed may have changed the
+            // Project; the observation then waits for a later tick.
+            let namespace = app.state::<ActiveCacheNamespace>().namespace();
+            match app.state::<ProjectHost>().authorized_media_catalog() {
+                Ok(current)
+                    if current.project_id == namespace.project_id()
+                        && current.bindings == catalog.bindings => {}
+                Ok(_) => continue,
+                Err(_) => break,
+            }
+            let started = std::time::Instant::now();
             let runtime = app.state::<MediaRuntime>().inner().clone();
             let bindings = catalog.bindings.clone();
-            let (prepared, roots) = match poll_linked_media_once(monitor, runtime, bindings).await {
-                Ok(poll) => poll,
+            let polled =
+                poll_linked_media_once(monitor, runtime, bindings, roots, cancellation.clone())
+                    .await;
+            let (prepared, roots) = match polled {
+                Ok(Ok(poll)) => poll,
+                Ok(Err(MediaObservationInterrupted)) => {
+                    // The listing hint and the due time stay as they were, so
+                    // the next tick after the pause observes again.
+                    tracing::info!(
+                        target: "myalbuns.desktop",
+                        media_count = catalog.bindings.len(),
+                        elapsed_ms = u64::try_from(started.elapsed().as_millis()).unwrap_or(u64::MAX),
+                        event = "linked_media_poll_interrupted",
+                    );
+                    continue;
+                }
                 Err(error) => {
+                    last_hint = hint;
+                    last_full_observation = Some(started);
                     tracing::warn!(
                         target: "myalbuns.desktop",
                         error = %error,
@@ -836,6 +887,8 @@ fn start_linked_media_monitor(app: tauri::AppHandle) {
                     continue;
                 }
             };
+            last_hint = hint;
+            last_full_observation = Some(started);
             drop(_causal_cache_permit);
             let confirmed = match MediaConfirmation::for_app(&app, &namespace)
                 .confirm(&catalog.bindings, &roots, prepared, None)
@@ -888,20 +941,22 @@ async fn poll_linked_media_once(
     monitor: MediaMonitor,
     runtime: MediaRuntime,
     bindings: Vec<MediaBinding>,
+    roots: myalbuns_paths::RootBindingPlan,
+    cancellation: CacheCancellation,
 ) -> Result<
-    (
-        Option<MediaResolutionProposal>,
-        myalbuns_paths::RootBindingPlan,
-    ),
+    Result<
+        (
+            Option<MediaResolutionProposal>,
+            myalbuns_paths::RootBindingPlan,
+        ),
+        MediaObservationInterrupted,
+    >,
     tauri::Error,
 > {
     tauri::async_runtime::spawn_blocking(move || {
-        let mut paths = myalbuns_paths::OperationPathContext::new();
-        for binding in &bindings {
-            let _ = paths.capture(&binding.logical_path);
-        }
-        let roots = paths.freeze();
-        (monitor.prepare_in_plan(&runtime, &bindings, &roots), roots)
+        monitor
+            .prepare_in_plan_unless(&runtime, &bindings, &roots, cancellation.flag())
+            .map(|prepared| (prepared, roots))
     })
     .await
 }
@@ -1191,7 +1246,7 @@ mod tests {
 
     #[test]
     fn reopening_prepares_all_available_uncached_images_but_reuses_recovered_generations() {
-        use crate::media_runtime::{MediaBinding, MediaResolver};
+        use crate::media_runtime::MediaBinding;
         let root = tempfile::tempdir().unwrap();
         let mut paths = OperationPathContext::new();
         let bindings = [
@@ -1217,7 +1272,8 @@ mod tests {
         })
         .collect::<Vec<_>>();
         let roots = paths.freeze();
-        let recovered = vec![MediaResolver.observe_in_plan(&roots, &bindings[0])];
+        let recovered =
+            vec![crate::linked_files::LinkedFiles::new().observe_one(&roots, &bindings[0])];
         let pending = super::images_requiring_startup_preparation(&bindings, &recovered, &roots);
         assert_eq!(
             pending
@@ -1234,7 +1290,7 @@ mod tests {
         );
         let recovered = cold
             .iter()
-            .map(|binding| MediaResolver.observe_in_plan(&roots, binding))
+            .map(|binding| crate::linked_files::LinkedFiles::new().observe_one(&roots, binding))
             .collect::<Vec<_>>();
         assert!(
             super::images_requiring_startup_preparation(&bindings, &recovered, &roots).is_empty()
@@ -1339,11 +1395,22 @@ mod tests {
             .recv()
             .expect("the real Monitor owns its transition before the caller starts");
 
+        let mut paths = OperationPathContext::new();
+        for binding in &bindings {
+            let _ = paths.capture(&binding.logical_path);
+        }
+        let roots = paths.freeze();
         let (runtime_progress_tx, runtime_progress_rx) = mpsc::channel();
         let caller = thread::spawn(move || {
             tauri::async_runtime::block_on(async move {
                 tokio::join!(
-                    super::poll_linked_media_once(monitor, runtime, bindings),
+                    super::poll_linked_media_once(
+                        monitor,
+                        runtime,
+                        bindings,
+                        roots,
+                        crate::cache_activity_gate::CacheCancellation::default(),
+                    ),
                     async move {
                         runtime_progress_tx
                             .send(())
@@ -1364,7 +1431,8 @@ mod tests {
         let (poll, _) = caller
             .join()
             .expect("the product runtime caller does not panic")
-            .expect("the scheduled Monitor poll joins cleanly");
+            .expect("the scheduled Monitor poll joins cleanly")
+            .expect("an uncancelled Monitor poll completes");
 
         progressed.expect(
             "another operation on the same async task must progress before inspection is released",
@@ -1511,7 +1579,9 @@ mod tests {
                     let evidence = catalog
                         .bindings
                         .iter()
-                        .map(|binding| MediaResolver.observe_in_plan(&roots, binding))
+                        .map(|binding| {
+                            crate::linked_files::LinkedFiles::new().observe_one(&roots, binding)
+                        })
                         .collect::<Vec<_>>();
                     monitor.adopt_prepared_inspections(
                         &runtime,
@@ -1685,7 +1755,7 @@ mod tests {
                     .is_none()
             );
             let confirmation = monitor.poll_readable_fixture(&runtime, &catalog.bindings);
-            let decodes = crate::media_runtime::photo_source_decode_count();
+            let decodes = crate::linked_files::photo_source_decode_count();
             assert_eq!(
                 refresh_project_photos_for_media_update(
                     &host,
@@ -1695,7 +1765,7 @@ mod tests {
                 [catalog.bindings[0].media_id.clone()],
             );
             assert_eq!(
-                crate::media_runtime::photo_source_decode_count() - decodes,
+                crate::linked_files::photo_source_decode_count() - decodes,
                 usize::from(change_before_confirmation),
                 "initial adoption must reuse the completed import inspection"
             );
@@ -1717,14 +1787,14 @@ mod tests {
                     .is_none()
             );
             let confirmation = monitor.poll_readable_fixture(&runtime, &catalog.bindings);
-            let decodes = crate::media_runtime::photo_source_decode_count();
+            let decodes = crate::linked_files::photo_source_decode_count();
             refresh_project_photos_for_media_update(
                 &host,
                 &catalog.bindings,
                 confirmation.update().unwrap(),
             );
             assert_eq!(
-                crate::media_runtime::photo_source_decode_count() - decodes,
+                crate::linked_files::photo_source_decode_count() - decodes,
                 1
             );
             assert_eq!(

@@ -14,7 +14,7 @@ use myalbuns_paths::ExpectedObject;
 use std::{
     collections::{HashMap, VecDeque},
     sync::{
-        Mutex, PoisonError,
+        Condvar, Mutex, PoisonError,
         atomic::{AtomicUsize, Ordering},
     },
 };
@@ -100,77 +100,221 @@ pub(crate) fn render_retaining(
         .iter()
         .flatten()
         .flat_map(|unit| unit.sheet.referenced_media_ids())
-        .collect();
-    let mut decoded = DecodedSources::new(
-        &captured,
-        timeline,
-        composition_workers(),
-        MAX_DECODED_SOURCE_PIXELS_TOTAL,
-    )?;
-    for (output, output_units) in request.outputs.iter().zip(&units) {
-        let path = request
-            .root_bindings
-            .resolve(output.prepared_path.as_path())
-            .map_err(|error| {
-                RenderFailure::typed(
-                    ImagingFailureCode::EncodeFailed,
-                    None,
-                    None,
-                    error.to_string(),
-                )
-            })?;
-        let mut pdf = if request.format == RenderFormat::Pdf {
-            Some(PdfOutput::create(&path)?)
-        } else {
-            None
-        };
-        let mut receipt = None;
-        let mut dimensions = (0, 0);
-        for (selected, unit) in output.units.iter().zip(output_units) {
-            progress(ImagingProgressStage::Composing, done, total)?;
-            let image = render_unit(unit, request.snapshot.dpi, &mut decoded, &mut |_, _, _| {
-                progress(ImagingProgressStage::Composing, done, total)
-            })?;
-            dimensions = (image.width(), image.height());
-            progress(ImagingProgressStage::Composing, done, total)?;
-            match request.format {
-                RenderFormat::Jpeg { quality } => {
-                    receipt = Some(write_verified_quality(
-                        &image,
-                        &path,
-                        request.snapshot.dpi,
-                        quality,
-                    )?)
-                }
-                RenderFormat::Png => {
-                    receipt = Some(write_png(&image, &path, request.snapshot.dpi)?)
-                }
-                RenderFormat::Pdf => pdf
-                    .as_mut()
-                    .expect("PDF writer owns the current output")
-                    .add_page(&image, selected.viewport.width, selected.viewport.height)?,
-            }
-            done += 1;
-            progress(ImagingProgressStage::Composing, done, total)?;
-        }
-        if let Some(pdf) = pdf {
-            receipt = Some(pdf.finish(&path)?);
-        }
-        let receipt = receipt.expect("validated nonempty output has a receipt");
-        outputs.push(RenderCompletion {
-            width_px: dimensions.0,
-            height_px: dimensions.1,
-            dpi: request.snapshot.dpi,
-            source_count: captured.len(),
-            source_bytes,
-            output_bytes: receipt.output_bytes,
-            output_sha256: receipt.output_sha256,
+        .collect::<Vec<_>>();
+    let order = first_use_order(&timeline);
+    // Reading ahead only pays where reading is slow: Originals on a share.
+    let prefetch = request
+        .sources
+        .iter()
+        .any(|source| request.root_bindings.is_remote(source.source_path()))
+        .then(Prefetch::default);
+    let captured = &captured;
+    std::thread::scope(|scope| -> Result<AlbumRenderCompletion, RenderFailure> {
+        let _stop = prefetch.as_ref().map(|prefetch| {
+            let order = &order;
+            scope.spawn(move || prefetch.run(captured, order, PREFETCH_BYTES));
+            StopPrefetch(prefetch)
         });
-    }
-    progress(ImagingProgressStage::EncodingOutput, total, total)?;
-    Ok(AlbumRenderCompletion {
-        outputs: outputs.clone(),
+        let mut decoded = DecodedSources::new(
+            captured,
+            timeline,
+            composition_workers(),
+            MAX_DECODED_SOURCE_PIXELS_TOTAL,
+        )?
+        .with_prefetch(prefetch.as_ref());
+        for (output, output_units) in request.outputs.iter().zip(&units) {
+            let path = request
+                .root_bindings
+                .resolve(output.prepared_path.as_path())
+                .map_err(|error| {
+                    RenderFailure::typed(
+                        ImagingFailureCode::EncodeFailed,
+                        None,
+                        None,
+                        error.to_string(),
+                    )
+                })?;
+            let mut pdf = if request.format == RenderFormat::Pdf {
+                Some(PdfOutput::create(&path)?)
+            } else {
+                None
+            };
+            let mut receipt = None;
+            let mut dimensions = (0, 0);
+            for (selected, unit) in output.units.iter().zip(output_units) {
+                progress(ImagingProgressStage::Composing, done, total)?;
+                let image =
+                    render_unit(unit, request.snapshot.dpi, &mut decoded, &mut |_, _, _| {
+                        progress(ImagingProgressStage::Composing, done, total)
+                    })?;
+                dimensions = (image.width(), image.height());
+                progress(ImagingProgressStage::Composing, done, total)?;
+                match request.format {
+                    RenderFormat::Jpeg { quality } => {
+                        receipt = Some(write_verified_quality(
+                            &image,
+                            &path,
+                            request.snapshot.dpi,
+                            quality,
+                        )?)
+                    }
+                    RenderFormat::Png => {
+                        receipt = Some(write_png(&image, &path, request.snapshot.dpi)?)
+                    }
+                    RenderFormat::Pdf => pdf
+                        .as_mut()
+                        .expect("PDF writer owns the current output")
+                        .add_page(&image, selected.viewport.width, selected.viewport.height)?,
+                }
+                done += 1;
+                progress(ImagingProgressStage::Composing, done, total)?;
+            }
+            if let Some(pdf) = pdf {
+                receipt = Some(pdf.finish()?);
+            }
+            let receipt = receipt.expect("validated nonempty output has a receipt");
+            outputs.push(RenderCompletion {
+                width_px: dimensions.0,
+                height_px: dimensions.1,
+                dpi: request.snapshot.dpi,
+                source_count: captured.len(),
+                source_bytes,
+                output_bytes: receipt.output_bytes,
+                output_sha256: receipt.output_sha256,
+            });
+        }
+        progress(ImagingProgressStage::EncodingOutput, total, total)?;
+        Ok(AlbumRenderCompletion {
+            outputs: outputs.clone(),
+        })
     })
+}
+
+/// Compressed bytes read ahead and not yet decoded stay under this size.
+const PREFETCH_BYTES: u64 = 128 * 1024 * 1024;
+
+/// Reads the compressed bytes of upcoming Originals on its own thread, in the
+/// order they are first needed, while earlier units are composed and encoded.
+/// On a network share reading is the slowest step of an Export; this lets the
+/// transfer overlap the CPU work instead of alternating with it. Decoding takes
+/// the bytes when they are ready, waits while they are being read, and reads
+/// the file itself for a source not read ahead. Only compressed bytes are kept,
+/// within `PREFETCH_BYTES`, so the pixel budget of the unit is unchanged.
+#[derive(Default)]
+struct Prefetch {
+    state: Mutex<PrefetchState>,
+    changed: Condvar,
+}
+
+#[derive(Default)]
+struct PrefetchState {
+    sources: HashMap<MediaId, Prefetched>,
+    held: u64,
+    stopped: bool,
+}
+
+enum Prefetched {
+    Reading,
+    Ready(Vec<u8>),
+    /// Decoding claimed the source; it is not read ahead again.
+    Taken,
+}
+
+impl Prefetch {
+    fn lock(&self) -> std::sync::MutexGuard<'_, PrefetchState> {
+        self.state.lock().unwrap_or_else(PoisonError::into_inner)
+    }
+
+    fn run(&self, captured: &HashMap<MediaId, OpenRenderSource>, order: &[MediaId], budget: u64) {
+        for id in order {
+            let size = captured[id].byte_count();
+            {
+                let mut state = self.lock();
+                while !state.stopped && state.held > 0 && state.held + size > budget {
+                    state = self
+                        .changed
+                        .wait(state)
+                        .unwrap_or_else(PoisonError::into_inner);
+                }
+                if state.stopped {
+                    return;
+                }
+                if state.sources.contains_key(id) {
+                    continue;
+                }
+                state.sources.insert(*id, Prefetched::Reading);
+            }
+            let read = captured[id].read_captured();
+            let mut state = self.lock();
+            match read {
+                Ok(bytes) => {
+                    state.held += bytes.len() as u64;
+                    state.sources.insert(*id, Prefetched::Ready(bytes));
+                }
+                // Decoding reads the file itself and reports the failure.
+                Err(_) => {
+                    state.sources.remove(id);
+                }
+            }
+            drop(state);
+            self.changed.notify_all();
+        }
+    }
+
+    /// The bytes read ahead for `id`, waiting while they are being read, or
+    /// `None` when decoding must read the file itself.
+    fn take(&self, id: MediaId) -> Option<Vec<u8>> {
+        let mut state = self.lock();
+        loop {
+            match state.sources.get(&id) {
+                None | Some(Prefetched::Taken) => {
+                    state.sources.insert(id, Prefetched::Taken);
+                    return None;
+                }
+                Some(Prefetched::Reading) => {
+                    state = self
+                        .changed
+                        .wait(state)
+                        .unwrap_or_else(PoisonError::into_inner);
+                }
+                Some(Prefetched::Ready(_)) => {
+                    let Some(Prefetched::Ready(bytes)) =
+                        state.sources.insert(id, Prefetched::Taken)
+                    else {
+                        unreachable!("the entry was just seen ready");
+                    };
+                    state.held -= bytes.len() as u64;
+                    drop(state);
+                    self.changed.notify_all();
+                    return Some(bytes);
+                }
+            }
+        }
+    }
+
+    fn stop(&self) {
+        self.lock().stopped = true;
+        self.changed.notify_all();
+    }
+}
+
+/// Stops the reader thread however the render ends, before its scope joins it.
+struct StopPrefetch<'a>(&'a Prefetch);
+
+impl Drop for StopPrefetch<'_> {
+    fn drop(&mut self) {
+        self.0.stop();
+    }
+}
+
+/// Each source once, in the order the layers first need it.
+fn first_use_order(timeline: &[MediaId]) -> Vec<MediaId> {
+    let mut seen = std::collections::HashSet::new();
+    timeline
+        .iter()
+        .copied()
+        .filter(|id| seen.insert(*id))
+        .collect()
 }
 
 /// Decoded Originals for every media layer of the request, in paint order.
@@ -191,6 +335,7 @@ struct DecodedSources<'a> {
     resident: u64,
     budget: u64,
     workers: usize,
+    prefetch: Option<&'a Prefetch>,
 }
 
 impl<'a> DecodedSources<'a> {
@@ -232,7 +377,13 @@ impl<'a> DecodedSources<'a> {
             resident: 0,
             budget,
             workers: workers.max(1),
+            prefetch: None,
         })
+    }
+
+    fn with_prefetch(mut self, prefetch: Option<&'a Prefetch>) -> Self {
+        self.prefetch = prefetch;
+        self
     }
 
     fn expect_current(&self, media_id: MediaId) -> Result<(), RenderFailure> {
@@ -283,9 +434,9 @@ impl<'a> DecodedSources<'a> {
             .iter()
             .copied()
             .partition(|id| self.captured[id].decodes_in_isolated_worker());
-        let mut decoded = decode_parallel(self.captured, &in_process, self.workers);
+        let mut decoded = decode_parallel(self.captured, self.prefetch, &in_process, self.workers);
         for id in isolated {
-            decoded.push((id, decode(self.captured, id)));
+            decoded.push((id, decode(self.captured, self.prefetch, id)));
         }
         // Report the failure of the earliest layer.
         decoded.sort_by_key(|(id, _)| batch.iter().position(|queued| queued == id));
@@ -323,9 +474,15 @@ impl LayerSources for DecodedSources<'_> {
 
 fn decode(
     captured: &HashMap<MediaId, OpenRenderSource>,
+    prefetch: Option<&Prefetch>,
     id: MediaId,
 ) -> Result<RgbaImage, RenderFailure> {
-    captured[&id].decode_captured().map_err(|failure| {
+    let source = &captured[&id];
+    match prefetch.and_then(|prefetch| prefetch.take(id)) {
+        Some(bytes) => source.decode_read(bytes),
+        None => source.decode_captured(),
+    }
+    .map_err(|failure| {
         RenderFailure::typed(
             failure.code,
             Some(id.to_string()),
@@ -337,11 +494,15 @@ fn decode(
 
 fn decode_parallel(
     captured: &HashMap<MediaId, OpenRenderSource>,
+    prefetch: Option<&Prefetch>,
     ids: &[MediaId],
     workers: usize,
 ) -> Vec<(MediaId, Result<RgbaImage, RenderFailure>)> {
     if ids.len() <= 1 || workers == 1 {
-        return ids.iter().map(|id| (*id, decode(captured, *id))).collect();
+        return ids
+            .iter()
+            .map(|id| (*id, decode(captured, prefetch, *id)))
+            .collect();
     }
     let next = AtomicUsize::new(0);
     let results = Mutex::new(Vec::with_capacity(ids.len()));
@@ -349,7 +510,7 @@ fn decode_parallel(
         for _ in 0..workers.min(ids.len()) {
             scope.spawn(|| {
                 while let Some(id) = ids.get(next.fetch_add(1, Ordering::Relaxed)) {
-                    let decoded = decode(captured, *id);
+                    let decoded = decode(captured, prefetch, *id);
                     results
                         .lock()
                         .unwrap_or_else(PoisonError::into_inner)
@@ -640,6 +801,86 @@ mod source_retention_tests {
         );
         assert_eq!(failure.failure.media_id.as_deref(), Some(IDS[2]));
         assert_eq!(crate::source::jpeg_decode_count(), before);
+    }
+
+    #[test]
+    fn sources_read_ahead_decode_to_the_same_rasters_from_memory() {
+        let root = tempfile::tempdir().unwrap();
+        let captured = captured(root.path());
+        let layers = timeline(&[0, 1, 0, 2]);
+        let rasters = |prefetch: Option<&Prefetch>| {
+            let mut sources = DecodedSources::new(&captured, layers.clone(), 1, u64::MAX)
+                .unwrap_or_else(failed)
+                .with_prefetch(prefetch);
+            layers
+                .iter()
+                .map(|id| {
+                    let raster = sources.acquire(*id).unwrap_or_else(failed).clone();
+                    sources.release(*id).unwrap_or_else(failed);
+                    raster
+                })
+                .collect::<Vec<_>>()
+        };
+        let prefetch = Prefetch::default();
+        prefetch.run(&captured, &first_use_order(&layers), u64::MAX);
+        assert!(
+            prefetch
+                .lock()
+                .sources
+                .values()
+                .all(|source| matches!(source, Prefetched::Ready(_)))
+        );
+        assert!(rasters(Some(&prefetch)) == rasters(None));
+        let state = prefetch.lock();
+        assert_eq!(state.held, 0, "every source read ahead was decoded");
+        assert!(
+            state
+                .sources
+                .values()
+                .all(|source| matches!(source, Prefetched::Taken))
+        );
+    }
+
+    #[test]
+    fn reading_ahead_waits_for_decoding_once_its_budget_is_full() {
+        let root = tempfile::tempdir().unwrap();
+        let captured = captured(root.path());
+        let order = first_use_order(&timeline(&[0, 1, 2]));
+        let first = captured[&order[0]].byte_count();
+        let prefetch = Prefetch::default();
+        std::thread::scope(|scope| {
+            let reader = scope.spawn(|| prefetch.run(&captured, &order, first));
+            let ready = || {
+                prefetch
+                    .lock()
+                    .sources
+                    .values()
+                    .filter(|source| matches!(source, Prefetched::Ready(_)))
+                    .count()
+            };
+            let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+            while ready() == 0 && std::time::Instant::now() < deadline {
+                std::thread::yield_now();
+            }
+            std::thread::sleep(std::time::Duration::from_millis(50));
+            assert_eq!(ready(), 1, "the budget holds one source");
+            assert!(prefetch.take(order[0]).is_some());
+            while !prefetch.lock().sources.contains_key(&order[1])
+                && std::time::Instant::now() < deadline
+            {
+                std::thread::yield_now();
+            }
+            assert!(
+                prefetch.take(order[1]).is_some(),
+                "decoding waits for a source being read"
+            );
+            prefetch.stop();
+            reader.join().unwrap();
+        });
+        assert!(
+            prefetch.take(order[0]).is_none(),
+            "a source decoded once is read from its file again"
+        );
     }
 
     #[test]

@@ -288,8 +288,9 @@ fn image_content_is_validated_only_when_opening_the_generated_project() {
     };
     // This is the same inspector used by project opening and Cache preparation.
     assert!(
-        crate::media_runtime::MediaResolver
-            .inspect_media_binding_in_plan(&binding, &paths.freeze())
+        crate::linked_files::LinkedFiles::new()
+            .inspect_decoded(&paths.freeze(), &binding.logical_path)
+            .and_then(|header| header.photo_metadata())
             .is_err()
     );
 }

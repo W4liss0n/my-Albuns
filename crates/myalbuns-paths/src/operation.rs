@@ -86,6 +86,25 @@ impl RootBindingPlan {
         self.resolve(logical_path).is_ok()
     }
 
+    /// Whether the path's captured root reaches a network share: a UNC root,
+    /// including a mapped drive already bound to its UNC root, or a drive the
+    /// system reports as remote. An uncovered path answers `false`.
+    pub fn is_remote(&self, logical_path: &Path) -> bool {
+        self.remote_root(logical_path).is_some()
+    }
+
+    /// The operational root of `logical_path` when it is remote (see
+    /// [`Self::is_remote`]): every path under it reaches the same server.
+    pub fn remote_root(&self, logical_path: &Path) -> Option<&Path> {
+        let root = self.operational_root_for(logical_path).ok()?;
+        let remote = match external_path_root(root) {
+            Ok((_, PathRootKind::Unc | PathRootKind::VerbatimUnc)) => true,
+            Ok((drive, PathRootKind::Disk | PathRootKind::VerbatimDisk)) => remote_drive(&drive),
+            _ => false,
+        };
+        remote.then_some(root)
+    }
+
     pub(crate) fn operational_root_for(&self, logical_path: &Path) -> Result<&Path, AppPathsError> {
         validate_external_path(logical_path)?;
         let (logical_root, _) = external_path_root(logical_path)?;
@@ -241,6 +260,25 @@ fn external_path_root(path: &Path) -> Result<(PathBuf, PathRootKind), AppPathsEr
     let mut root = PathBuf::from(prefix_component.as_os_str());
     root.push(Component::RootDir.as_os_str());
     Ok((root, kind))
+}
+
+#[cfg(windows)]
+fn remote_drive(drive: &Path) -> bool {
+    use std::os::windows::ffi::OsStrExt;
+    // `DRIVE_REMOTE` from WindowsProgramming, a feature this crate does not
+    // otherwise need.
+    const DRIVE_REMOTE: u32 = 4;
+    let wide = drive
+        .as_os_str()
+        .encode_wide()
+        .chain(std::iter::once(0))
+        .collect::<Vec<_>>();
+    unsafe { windows_sys::Win32::Storage::FileSystem::GetDriveTypeW(wide.as_ptr()) == DRIVE_REMOTE }
+}
+
+#[cfg(not(windows))]
+fn remote_drive(_drive: &Path) -> bool {
+    false
 }
 
 #[cfg(not(windows))]

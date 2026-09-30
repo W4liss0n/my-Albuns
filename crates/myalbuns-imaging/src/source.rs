@@ -188,6 +188,55 @@ impl OpenRenderSource {
         }
         .decode()
     }
+    /// The whole captured Original, read through the retained handle. It may
+    /// run on another thread while other sources decode, but never while this
+    /// same source decodes: both would move the shared file position.
+    pub(crate) fn read_captured(&self) -> Result<Vec<u8>, SourceFailure> {
+        let reader = match &self.reader {
+            SourceReader::File(reader) => reader,
+            SourceReader::Memory(reader) => return Ok(reader.get_ref().clone()),
+        };
+        let io_failure = |error: std::io::Error| {
+            SourceFailure::path(ImagingPathCode::from_io_error(&error), error.to_string())
+        };
+        let mut file = reader.get_ref().try_clone().map_err(io_failure)?;
+        file.seek(SeekFrom::Start(0)).map_err(io_failure)?;
+        let expected = usize::try_from(self.source_bytes).map_err(|_| {
+            SourceFailure::new(
+                ImagingFailureCode::ResourceLimitExceeded,
+                "o Original excede o intervalo seguro",
+            )
+        })?;
+        let mut bytes = Vec::new();
+        bytes.try_reserve_exact(expected).map_err(|_| {
+            SourceFailure::new(
+                ImagingFailureCode::ResourceLimitExceeded,
+                "não há memória suficiente para ler o Original",
+            )
+        })?;
+        file.take(self.source_bytes)
+            .read_to_end(&mut bytes)
+            .map_err(io_failure)?;
+        if bytes.len() != expected {
+            return Err(SourceFailure::path(
+                ImagingPathCode::IoFailure,
+                "o Original mudou durante a leitura",
+            ));
+        }
+        Ok(bytes)
+    }
+
+    /// Decodes bytes `read_captured` returned for this same source, with the
+    /// preflight already established for it.
+    pub(crate) fn decode_read(&self, bytes: Vec<u8>) -> Result<RgbaImage, SourceFailure> {
+        Self {
+            reader: SourceReader::Memory(Cursor::new(bytes)),
+            preflight: self.preflight.clone(),
+            source_bytes: self.source_bytes,
+        }
+        .decode()
+    }
+
     pub(crate) fn byte_count(&self) -> u64 {
         self.source_bytes
     }

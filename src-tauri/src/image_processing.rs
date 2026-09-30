@@ -571,10 +571,10 @@ async fn prepare_owned_cache(
 ) -> Result<PendingCachePublication, CacheFailure> {
     let estimated_work = work.clone();
     let estimate = tauri::async_runtime::spawn_blocking(move || {
-        ImageMemoryEstimate::in_plan(
+        ImageMemoryEstimate::from_headers(&crate::linked_files::LinkedFiles::new().headers(
             &estimated_work.root_bindings,
             [estimated_work.source.source_path()],
-        )
+        ))
     })
     .await
     .map_err(|_| {
@@ -583,6 +583,19 @@ async fn prepare_owned_cache(
             "Não foi possível estimar os recursos da imagem.",
         )
     })?;
+    // Before any Processor capacity: a job waiting for its turn on a share
+    // holds nothing another job could use.
+    let Some(_remote_turn) = crate::linked_files::LinkedFiles::new()
+        .remote_read_turn(&work.root_bindings, [work.source.source_path()], || {
+            cancellation.reason() == Some(CacheCancellationReason::Obsolete)
+        })
+        .await
+    else {
+        return Err(CacheFailure::new(
+            CacheFailureStage::Cancelled,
+            "A demanda de prévias temporárias ficou obsoleta.",
+        ));
+    };
     loop {
         let admission =
             crate::image_work_admission::ImageWorkAdmission::begin(engine, &cancellation)

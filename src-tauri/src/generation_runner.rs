@@ -425,26 +425,25 @@ fn discover_folders(
     let mut pending = vec![root.to_path_buf()];
     let mut seen = HashSet::new();
     let mut folders = Vec::new();
+    let files = crate::linked_files::LinkedFiles::new();
     while let Some(folder) = pending.pop() {
         ensure_running(cancellation)?;
-        let directory = paths
-            .resolve_existing(&folder, ExpectedObject::Directory)
+        paths
+            .capture(&folder)
             .map_err(|error| generation_path_failure(error, &folder))?;
-        let identity = directory
+        let listed = files
+            .list_folder(&paths.current_plan(), &folder)
+            .map_err(|error| generation_path_failure(error, &folder))?;
+        let identity = listed
             .physical_identity()
             .ok_or("Não foi possível confirmar a identidade da pasta de origem.")?;
         if !seen.insert(identity.to_local_token()) {
             continue;
         }
-        let entries = std::fs::read_dir(directory.operational_path())
-            .map_err(|error| generation_path_failure(error, &folder))?;
         let mut photos = Vec::new();
-        for entry in entries {
-            let entry = entry.map_err(|error| generation_path_failure(error, &folder))?;
-            let path = folder.join(entry.file_name());
-            let metadata = std::fs::metadata(entry.path())
-                .map_err(|error| generation_path_failure(error, &path))?;
-            if metadata.is_dir() {
+        for entry in listed.entries {
+            let path = folder.join(&entry.name);
+            if entry.directory {
                 pending.push(path);
             } else if path
                 .extension()

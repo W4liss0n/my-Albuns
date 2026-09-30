@@ -1,15 +1,12 @@
-use std::{
-    fs::{self, File},
-    io::{BufReader, BufWriter, Read, Write},
-    path::Path,
-};
+use std::{fs, io::Write, path::Path};
 
 use image::{
     ExtendedColorType, ImageEncoder, Rgba, RgbaImage,
     codecs::jpeg::{JpegEncoder, PixelDensity},
 };
 use myalbuns_imaging_protocol::ImagingFailureCode;
-use sha2::{Digest, Sha256};
+
+use crate::export_output::{HashingWriter, output_writer};
 
 const MICROMETERS_PER_INCH: i128 = 25_400;
 const ROUNDING_OFFSET: i128 = MICROMETERS_PER_INCH / 2;
@@ -145,7 +142,14 @@ pub(crate) fn write_verified_quality(
             JpegFailure::io("não foi possível criar a preparação da Exportação", &error)
         })?;
         created = true;
-        let mut writer = BufWriter::new(file);
+        // The structure is verified and the digest computed on the bytes as the
+        // file accepts them, so the prepared JPEG is never read back.
+        let mut writer = output_writer(CheckedJpeg::new(
+            HashingWriter::new(file),
+            image.width(),
+            image.height(),
+            density,
+        ));
         let mut encoder = JpegEncoder::new_with_quality(&mut writer, quality);
         encoder.set_pixel_density(PixelDensity::dpi(density));
         encoder.set_icc_profile(icc_profile).map_err(|error| {
@@ -154,7 +158,7 @@ pub(crate) fn write_verified_quality(
                 format!("não foi possível incorporar o perfil sRGB: {error}"),
             )
         })?;
-        encoder
+        let encoded = encoder
             .encode(&rgb, image.width(), image.height(), ExtendedColorType::Rgb8)
             .map_err(|error| {
                 if let image::ImageError::IoError(error) = error {
@@ -165,22 +169,29 @@ pub(crate) fn write_verified_quality(
                         format!("não foi possível codificar a imagem exportada: {error}"),
                     )
                 }
-            })?;
+            });
         drop(encoder);
-        writer.flush().map_err(|error| {
-            JpegFailure::io("não foi possível finalizar a imagem exportada", &error)
-        })?;
-        let file = writer.into_inner().map_err(|error| {
+        let flushed = encoded.and_then(|()| {
+            writer.flush().map_err(|error| {
+                JpegFailure::io("não foi possível finalizar a imagem exportada", &error)
+            })
+        });
+        // A structural failure stops the writer; report it, not the write error.
+        if let Some(failure) = writer.get_mut().failure.take() {
+            return Err(failure);
+        }
+        flushed?;
+        let checked = writer.into_inner().map_err(|error| {
             JpegFailure::io(
                 "não foi possível finalizar a imagem exportada",
                 error.error(),
             )
         })?;
+        let (file, receipt) = checked.finish()?.into_receipt();
         file.sync_all().map_err(|error| {
             JpegFailure::io("não foi possível sincronizar a imagem exportada", &error)
         })?;
-        drop(file);
-        verify_prepared_jpeg(prepared_output_path, image.width(), image.height(), density)
+        Ok(receipt)
     })();
     if write_result.is_err() && created {
         let _ = fs::remove_file(prepared_output_path);
@@ -231,71 +242,84 @@ pub(crate) fn opaque_rgb_bytes(image: &RgbaImage) -> Result<Vec<u8>, JpegFailure
     Ok(rgb)
 }
 
-fn verify_prepared_jpeg(
-    path: &Path,
+/// Verifies the JPEG contract on the bytes its inner writer accepts, in the
+/// order they reach the file. A violation stops the writer and is kept in
+/// `failure`, since `io::Write` can only report an I/O error.
+struct CheckedJpeg<W> {
+    inner: W,
     width: u32,
     height: u32,
     dpi: u16,
-) -> Result<VerifiedJpeg, JpegFailure> {
-    let metadata = fs::symlink_metadata(path).map_err(verify_io_failure)?;
-    if metadata.file_type().is_symlink() || !metadata.is_file() {
-        return Err(verify_failure("a preparação JPEG não é um arquivo regular"));
+    header: Vec<u8>,
+    entropy: Option<EntropyScanner>,
+    failure: Option<JpegFailure>,
+}
+
+impl<W> CheckedJpeg<W> {
+    fn new(inner: W, width: u32, height: u32, dpi: u16) -> Self {
+        Self {
+            inner,
+            width,
+            height,
+            dpi,
+            header: Vec::new(),
+            entropy: None,
+            failure: None,
+        }
     }
-    let file = File::open(path).map_err(verify_io_failure)?;
-    let mut reader = BufReader::new(file);
-    let mut hasher = Sha256::new();
-    let mut total_bytes = 0_u64;
-    let mut buffer = [0_u8; 64 * 1024];
-    let mut header = Vec::new();
-    let mut entropy: Option<EntropyScanner> = None;
 
-    loop {
-        let read = reader.read(&mut buffer).map_err(verify_io_failure)?;
-        if read == 0 {
-            break;
+    fn check(&mut self, chunk: &[u8]) -> Result<(), JpegFailure> {
+        if let Some(scanner) = self.entropy.as_mut() {
+            return scanner.feed(chunk);
         }
-        let chunk = &buffer[..read];
-        hasher.update(chunk);
-        total_bytes = total_bytes
-            .checked_add(read as u64)
-            .ok_or_else(|| verify_failure("o tamanho do JPEG excedeu o intervalo seguro"))?;
-
-        if let Some(scanner) = entropy.as_mut() {
-            scanner.feed(chunk)?;
-            continue;
-        }
-
-        let header_length = header
+        let header_length = self
+            .header
             .len()
-            .checked_add(read)
+            .checked_add(chunk.len())
             .ok_or_else(|| verify_failure("o cabeçalho JPEG excedeu o intervalo seguro"))?;
         if header_length > MAX_JPEG_HEADER_BYTES {
             return Err(verify_failure("o cabeçalho JPEG excedeu o limite seguro"));
         }
-        header
-            .try_reserve_exact(read)
+        self.header
+            .try_reserve_exact(chunk.len())
             .map_err(|_| resource_failure("não há memória suficiente para verificar o JPEG"))?;
-        header.extend_from_slice(chunk);
+        self.header.extend_from_slice(chunk);
         if let HeaderInspection::Complete { entropy_offset } =
-            inspect_header(&header, width, height, dpi)?
+            inspect_header(&self.header, self.width, self.height, self.dpi)?
         {
             let mut scanner = EntropyScanner::default();
-            scanner.feed(&header[entropy_offset..])?;
-            entropy = Some(scanner);
+            scanner.feed(&self.header[entropy_offset..])?;
+            self.entropy = Some(scanner);
         }
+        Ok(())
     }
 
-    let scanner = entropy.ok_or_else(|| verify_failure("o JPEG não contém scan de imagem"))?;
-    scanner.finish()?;
-    if total_bytes != metadata.len() {
-        return Err(verify_failure(
-            "o tamanho do JPEG mudou durante a verificação",
-        ));
+    /// The inner writer, once the whole JPEG satisfied the contract.
+    fn finish(self) -> Result<W, JpegFailure> {
+        let scanner = self
+            .entropy
+            .ok_or_else(|| verify_failure("o JPEG não contém scan de imagem"))?;
+        scanner.finish()?;
+        Ok(self.inner)
     }
-    Ok(VerifiedJpeg {
-        output_bytes: total_bytes,
-        output_sha256: format!("{:x}", hasher.finalize()),
-    })
+}
+
+impl<W: Write> Write for CheckedJpeg<W> {
+    fn write(&mut self, buffer: &[u8]) -> std::io::Result<usize> {
+        if self.failure.is_some() {
+            return Err(std::io::Error::other("a verificação do JPEG falhou"));
+        }
+        let written = self.inner.write(buffer)?;
+        if let Err(failure) = self.check(&buffer[..written]) {
+            self.failure = Some(failure);
+            return Err(std::io::Error::other("a verificação do JPEG falhou"));
+        }
+        Ok(written)
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        self.inner.flush()
+    }
 }
 
 enum HeaderInspection {
@@ -524,15 +548,40 @@ fn verify_failure(message: impl Into<String>) -> JpegFailure {
     JpegFailure::new(ImagingFailureCode::VerificationFailed, message)
 }
 
-fn verify_io_failure(error: std::io::Error) -> JpegFailure {
-    verify_failure(format!(
-        "não foi possível verificar a preparação JPEG: {error}"
-    ))
-}
-
 #[cfg(test)]
 mod tests {
     use super::{MAX_OUTPUT_PIXELS, RasterPlan};
+
+    #[test]
+    fn a_jpeg_outside_the_contract_is_refused_while_it_is_written() {
+        use std::io::Write;
+
+        use image::ImageEncoder;
+
+        // EXIF (APP1) is forbidden in a prepared output.
+        let mut jpeg = Vec::new();
+        let mut encoder = image::codecs::jpeg::JpegEncoder::new_with_quality(&mut jpeg, 90);
+        encoder
+            .set_exif_metadata(b"II*\0\x08\0\0\0\0\0".to_vec())
+            .unwrap();
+        encoder
+            .write_image(&[90; 16 * 8 * 3], 16, 8, image::ExtendedColorType::Rgb8)
+            .unwrap();
+
+        let mut checked = super::CheckedJpeg::new(Vec::new(), 16, 8, 72);
+        assert!(checked.write_all(&jpeg).is_err());
+        assert_eq!(
+            checked.failure.take().unwrap().code.as_str(),
+            "verification_failed"
+        );
+
+        let mut truncated = super::CheckedJpeg::new(Vec::new(), 16, 8, 72);
+        truncated.write_all(&jpeg[..10]).unwrap();
+        assert!(
+            truncated.finish().is_err(),
+            "a JPEG without its scan never becomes a receipt"
+        );
+    }
 
     #[test]
     fn raster_dimensions_use_checked_integer_rounding() {

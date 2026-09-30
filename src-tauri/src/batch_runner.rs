@@ -26,7 +26,8 @@ use crate::{
         BatchExportOptions, BatchExportView, BatchItemStatus, BatchItemView, BatchPhase,
         BatchProblem, BatchProblemKind, ExportConflictPolicy,
     },
-    media_runtime::{MediaAvailability, MediaBinding, MediaResolver},
+    linked_files::{LinkedFiles, ListFolderError},
+    media_runtime::{MediaAvailability, MediaBinding},
 };
 
 #[derive(Clone, Debug)]
@@ -408,6 +409,7 @@ fn inspect_and_plan(
     // The Processor draws each Photo in its composed rectangle, which depends
     // on the Photo's dimensions; read them from each header before composing.
     let mut photo_sources = HashMap::new();
+    let mut checked = Vec::new();
     for media in loaded.project().media() {
         originals.push(media.path().to_path_buf());
         if !paths.covers(media.path()) {
@@ -448,41 +450,71 @@ fn inspect_and_plan(
             });
             continue;
         }
-        let binding = MediaBinding {
-            media_id: id.clone(),
-            kind: media.kind(),
-            logical_path: path.to_path_buf(),
-        };
-        let observation = MediaResolver.observe_in_plan(paths, &binding);
         let file_name = media
             .path()
             .file_name()
             .unwrap_or_default()
-            .to_string_lossy();
-        match observation.availability {
+            .to_string_lossy()
+            .into_owned();
+        checked.push((
+            media_id,
+            file_name,
+            MediaBinding {
+                media_id: id,
+                kind: media.kind(),
+                logical_path: path.to_path_buf(),
+            },
+        ));
+    }
+    // Observe every Original, then read the headers of the available Photos;
+    // both keep the album's media order for the problems and sources.
+    let files = LinkedFiles::new();
+    let availability = files
+        .observe(paths, checked.iter().map(|(_, _, binding)| binding))
+        .into_iter()
+        .map(|observation| observation.availability)
+        .collect::<Vec<_>>();
+    let photos = checked
+        .iter()
+        .zip(&availability)
+        .filter(|((_, _, binding), availability)| {
+            **availability == MediaAvailability::Candidate && binding.kind == MediaKind::Photo
+        })
+        .map(|((_, _, binding), _)| binding.logical_path.as_path())
+        .collect::<Vec<_>>();
+    let headers = photos
+        .iter()
+        .copied()
+        .zip(files.headers(paths, photos.iter().copied()))
+        .map(|(path, header)| (path.to_path_buf(), header))
+        .collect::<HashMap<_, _>>();
+    for ((media_id, file_name, binding), availability) in checked.into_iter().zip(availability) {
+        let header = headers
+            .get(&binding.logical_path)
+            .map(|header| header.clone().and_then(|header| header.photo_metadata()));
+        let id = binding.media_id;
+        let path = binding.logical_path;
+        match availability {
             MediaAvailability::Candidate => {
-                if media.kind() == MediaKind::Photo {
-                    match MediaResolver.inspect_media_header_in_plan(&binding, paths) {
-                        Ok(metadata) => {
-                            photo_sources.insert(media_id, metadata);
-                        }
-                        Err(message) => {
-                            problems.push(BatchProblem {
-                                kind: BatchProblemKind::Unavailable,
-                                message,
-                                media_id: Some(id),
-                                file_name: Some(file_name.into_owned()),
-                            });
-                            continue;
-                        }
+                match header {
+                    Some(Ok(metadata)) => {
+                        photo_sources.insert(media_id, metadata);
                     }
+                    Some(Err(message)) => {
+                        problems.push(BatchProblem {
+                            kind: BatchProblemKind::Unavailable,
+                            message,
+                            media_id: Some(id),
+                            file_name: Some(file_name),
+                        });
+                        continue;
+                    }
+                    None => {}
                 }
-                originals.push(path.to_path_buf());
-                sources.push(
-                    RenderSource::new(media_id, path.to_path_buf()).map_err(|error| {
-                        vec![problem(BatchProblemKind::Unavailable, error.to_string())]
-                    })?,
-                );
+                originals.push(path.clone());
+                sources.push(RenderSource::new(media_id, path).map_err(|error| {
+                    vec![problem(BatchProblemKind::Unavailable, error.to_string())]
+                })?);
             }
             state => problems.push(BatchProblem {
                 kind: if state == MediaAvailability::Absent {
@@ -496,7 +528,7 @@ fn inspect_and_plan(
                     format!("Imagem indisponível: {file_name}")
                 },
                 media_id: Some(id),
-                file_name: Some(file_name.into_owned()),
+                file_name: Some(file_name),
             }),
         }
     }
@@ -558,29 +590,34 @@ fn walk_files(
     let mut directories = HashSet::new();
     let mut files = HashSet::new();
     let mut projects = vec![];
+    let linked = LinkedFiles::new();
     while let Some(directory) = pending.pop() {
-        let resolved = paths
-            .resolve_existing(&directory, ExpectedObject::Directory)
-            .map_err(|error| {
-                format!(
+        paths.capture(&directory).map_err(|error| {
+            format!(
+                "Não foi possível verificar {}: {error}",
+                directory.display()
+            )
+        })?;
+        let listed = match linked.list_folder(&paths.current_plan(), &directory) {
+            Ok(listed) => listed,
+            Err(ListFolderError::Resolve(error)) => {
+                return Err(format!(
                     "Não foi possível verificar {}: {error}",
                     directory.display()
-                )
-            })?;
-        if let Some(identity) = resolved.physical_identity()
+                ));
+            }
+            Err(ListFolderError::Io(error)) => return Err(error.to_string()),
+        };
+        if let Some(identity) = listed.physical_identity()
             && !directories.insert(identity.to_local_token())
         {
             continue;
         }
-        let mut entries = std::fs::read_dir(resolved.operational_path())
-            .map_err(|error| error.to_string())?
-            .collect::<Result<Vec<_>, _>>()
-            .map_err(|error| error.to_string())?;
-        entries.sort_by_key(|entry| entry.file_name());
+        let mut entries = listed.entries;
+        entries.sort_by(|left, right| left.name.cmp(&right.name));
         for entry in entries {
-            let logical = directory.join(entry.file_name());
-            let metadata = std::fs::metadata(entry.path()).map_err(|error| error.to_string())?;
-            if metadata.is_dir() {
+            let logical = directory.join(&entry.name);
+            if entry.directory {
                 pending.push(logical);
                 continue;
             }

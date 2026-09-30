@@ -41,7 +41,7 @@ use crate::{
         InvocationFailure, InvocationFailureStage, OperationFailure,
     },
     ipc_contract::{MediaPreview, MediaPreviewState},
-    media_runtime::{MediaBinding, MediaObservation, MediaResolver, MediaRuntimeUpdate},
+    media_runtime::{MediaBinding, MediaObservation, MediaRuntimeUpdate},
 };
 
 const CACHE_METADATA_SCHEMA_VERSION: u32 = 1;
@@ -466,19 +466,27 @@ impl CacheEngine {
             .iter()
             .map(|binding| (binding.media_id.as_str(), binding))
             .collect::<HashMap<_, _>>();
+        let candidates = artifacts
+            .iter()
+            .filter_map(|recovered| {
+                let binding = *bindings.get(recovered.artifact.media_id.as_str())?;
+                let preview_sha256 = recovered.preview_sha256?;
+                recovered
+                    .matches_source_path(&binding.logical_path)
+                    .then_some((recovered, binding, preview_sha256))
+            })
+            .collect::<Vec<_>>();
+        // Opening waits for one observation per recovered preview.
+        let sources = crate::linked_files::LinkedFiles::new()
+            .observe(roots, candidates.iter().map(|(_, binding, _)| *binding));
         let mut prepared = self
             .prepared
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
-        artifacts
-            .iter()
-            .filter_map(|recovered| {
-                let binding = bindings.get(recovered.artifact.media_id.as_str())?;
-                let preview_sha256 = recovered.preview_sha256?;
-                if !recovered.matches_source_path(&binding.logical_path) {
-                    return None;
-                }
-                let source = MediaResolver.observe_in_plan(roots, binding);
+        candidates
+            .into_iter()
+            .zip(sources)
+            .filter_map(|((recovered, binding, preview_sha256), source)| {
                 if !source.matches_fingerprint(&recovered.artifact.fingerprint)
                     || !source.same_source(&source)
                 {
@@ -1032,8 +1040,8 @@ impl CacheEngine {
         };
         for (work, prepared) in receipts {
             let source = &work.source;
-            let current =
-                MediaResolver.observe_in_plan(&work.root_bindings, &cache_source_binding(source));
+            let current = crate::linked_files::LinkedFiles::new()
+                .observe_one(&work.root_bindings, &cache_source_binding(source));
             if !prepared.source.same_source(&current)
                 || !index.entry(source.media_id()).is_some_and(|entry| {
                     entry.matches_source_path(source.source_path())
@@ -1478,7 +1486,8 @@ async fn prepare_cache<T: ImagingTransport>(
         return Err(cancelled_before_publication());
     }
     let source_binding = cache_source_binding(&work.source);
-    let observed_source = MediaResolver.observe_in_plan(&work.root_bindings, &source_binding);
+    let observed_source =
+        crate::linked_files::LinkedFiles::new().observe_one(&work.root_bindings, &source_binding);
     let request = {
         let _transition_and_publication_guard = engine
             .transition_and_publication_gate
@@ -3687,8 +3696,8 @@ mod tests {
                 kind: MediaKind::Photo,
                 logical_path: fixture.work.source.source_path().to_path_buf(),
             };
-            let expected = crate::media_runtime::MediaResolver
-                .observe_in_plan(&fixture.work.root_bindings, &binding);
+            let expected = crate::linked_files::LinkedFiles::new()
+                .observe_one(&fixture.work.root_bindings, &binding);
             {
                 let prepared = engine.prepared.lock().unwrap();
                 let receipt = prepared
@@ -4446,7 +4455,7 @@ mod tests {
 
     #[test]
     fn partial_external_jpeg_keeps_the_published_preview_until_full_image_confirmation() {
-        use crate::media_runtime::{MediaMonitor, MediaResolver, MediaRuntime};
+        use crate::media_runtime::{MediaMonitor, MediaRuntime};
         tauri::async_runtime::block_on(async {
             let fixture = fixture();
             let source = fixture.work.source.source_path();
@@ -4461,14 +4470,15 @@ mod tests {
             let roots = &fixture.work.root_bindings;
             let monitor = MediaMonitor::default();
             let runtime = MediaRuntime::default();
-            MediaResolver
-                .inspect_media_binding_in_plan(&binding, roots)
+            crate::linked_files::LinkedFiles::new()
+                .inspect_decoded(roots, &binding.logical_path)
+                .and_then(|header| header.photo_metadata())
                 .unwrap();
             monitor.adopt_prepared_inspections(
                 &runtime,
                 &bindings,
                 roots,
-                &[MediaResolver.observe_in_plan(roots, &binding)],
+                &[crate::linked_files::LinkedFiles::new().observe_one(roots, &binding)],
             );
             let before = runtime.snapshot().unwrap().observations().to_vec();
             let engine = CacheEngine::default();
@@ -4499,8 +4509,9 @@ mod tests {
             );
             let prepared = monitor.prepare_in_plan(&runtime, &bindings, roots).unwrap();
             assert!(
-                MediaResolver
-                    .inspect_media_binding_in_plan(&binding, roots)
+                crate::linked_files::LinkedFiles::new()
+                    .inspect_decoded(roots, &binding.logical_path)
+                    .and_then(|header| header.photo_metadata())
                     .is_err()
             );
             let rejected = monitor.commit_prepared(&runtime, prepared, &bindings, roots, &[]);
@@ -4526,8 +4537,9 @@ mod tests {
                     .is_none()
             );
             let prepared = monitor.prepare_in_plan(&runtime, &bindings, roots).unwrap();
-            MediaResolver
-                .inspect_media_binding_in_plan(&binding, roots)
+            crate::linked_files::LinkedFiles::new()
+                .inspect_decoded(roots, &binding.logical_path)
+                .and_then(|header| header.photo_metadata())
                 .unwrap();
             let confirmed =
                 monitor.commit_prepared(&runtime, prepared, &bindings, roots, &[binding.media_id]);
@@ -5979,8 +5991,8 @@ mod tests {
             kind: MediaKind::Photo,
             logical_path: candidate.path().to_path_buf(),
         };
-        let observation = crate::media_runtime::MediaResolver
-            .observe_in_plan(&fixture.work.root_bindings, &binding);
+        let observation = crate::linked_files::LinkedFiles::new()
+            .observe_one(&fixture.work.root_bindings, &binding);
         stage
             .record(candidate.clone(), observation, generation)
             .unwrap();

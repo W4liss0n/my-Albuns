@@ -104,10 +104,7 @@ mod tests {
             let admission = ImageWorkAdmission::begin(&engine, &cancellation)
                 .await
                 .unwrap();
-            let estimate = ImageMemoryEstimate::in_plan(
-                &myalbuns_paths::OperationPathContext::new().freeze(),
-                [],
-            );
+            let estimate = ImageMemoryEstimate::from_headers(&[]);
             let pending = admission.reserve(&processor, estimate, ImageWorkKind::Cache);
             tokio::pin!(pending);
             assert!(
@@ -140,10 +137,7 @@ mod tests {
                 let engine = CacheEngine::default();
                 let processor = ImagingProcessor::default();
                 let cancellation = CacheCancellation::default();
-                let estimate = ImageMemoryEstimate::in_plan(
-                    &myalbuns_paths::OperationPathContext::new().freeze(),
-                    [],
-                );
+                let estimate = ImageMemoryEstimate::from_headers(&[]);
                 let lease = ImageWorkAdmission::begin(&engine, &cancellation)
                     .await
                     .unwrap()

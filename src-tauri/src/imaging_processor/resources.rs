@@ -1,8 +1,6 @@
 //! Admission estimates belong to the Processor, independently of the caller.
 //! Codec limits remain authoritative; this budget preserves system headroom.
 use std::{
-    io::{BufReader, Seek},
-    path::Path,
     sync::{
         Arc, Mutex,
         atomic::{AtomicBool, Ordering},
@@ -10,8 +8,9 @@ use std::{
     time::Duration,
 };
 
-use myalbuns_paths::{ExpectedObject, RootBindingPlan};
 use tokio::sync::{Notify, Semaphore};
+
+use crate::linked_files::SourceHeader;
 
 const MIB: u64 = 1024 * 1024;
 const GIB: u64 = 1024 * MIB;
@@ -21,50 +20,35 @@ const RESOURCE_REFRESH: Duration = Duration::from_millis(100);
 pub(crate) struct ImageMemoryEstimate(u64);
 
 impl ImageMemoryEstimate {
-    pub(crate) fn in_plan<'a>(
-        plan: &RootBindingPlan,
-        paths: impl IntoIterator<Item = &'a Path>,
-    ) -> Self {
+    /// The largest estimate among the headers `LinkedFiles::headers` read. A
+    /// header that could not be read reserves 1 GiB; no header at all, 64 MiB.
+    pub(crate) fn from_headers(headers: &[Result<SourceHeader, String>]) -> Self {
         Self(
-            paths
-                .into_iter()
-                .map(|path| estimate_source(plan, path))
+            headers
+                .iter()
+                .map(|header| header.as_ref().ok().and_then(estimate).unwrap_or(GIB))
                 .max()
                 .unwrap_or(64 * MIB),
         )
     }
 }
 
-fn estimate_source(plan: &RootBindingPlan, path: &Path) -> u64 {
-    let inspected = (|| {
-        let source = plan
-            .resolve_existing(path, ExpectedObject::RegularFile)
-            .ok()?;
-        let file = source.reopen_for_read().ok()?;
-        let compressed = file.metadata().ok()?.len();
-        let mut reader = BufReader::new(file);
-        let sequential_color_jpeg =
-            myalbuns_imaging::source_memory::is_sequential_color_jpeg(&mut reader);
-        reader.rewind().ok()?;
-        let reader = image::ImageReader::new(reader).with_guessed_format().ok()?;
-        let (width, height) = reader.into_dimensions().ok()?;
-        let pixels = u64::from(width).checked_mul(u64::from(height))?;
-        // Includes concurrent decoder, conversion/orientation and reduced-image
-        // buffers. It is an admission estimate, not a replacement for codec limits.
-        // Measured peaks for one 24 MP preview were 4.3 bytes per pixel for a
-        // sequential colour JPEG, decoded straight to RGB, and 9.6 to 24 for the
-        // other paths; each estimate stays above them with margin.
-        let (bytes_per_pixel, fixed) = if sequential_color_jpeg {
-            (6, 32 * MIB)
-        } else {
-            (16, 64 * MIB)
-        };
-        pixels
-            .checked_mul(bytes_per_pixel)?
-            .checked_add(compressed.saturating_mul(2))?
-            .checked_add(fixed)
-    })();
-    inspected.unwrap_or(GIB)
+fn estimate(header: &SourceHeader) -> Option<u64> {
+    // Includes concurrent decoder, conversion/orientation and reduced-image
+    // buffers. It is an admission estimate, not a replacement for codec limits.
+    // Measured peaks for one 24 MP preview were 4.3 bytes per pixel for a
+    // sequential colour JPEG, decoded straight to RGB, and 9.6 to 24 for the
+    // other paths; each estimate stays above them with margin.
+    let (bytes_per_pixel, fixed) = if header.sequential_color_jpeg {
+        (6, 32 * MIB)
+    } else {
+        (16, 64 * MIB)
+    };
+    header
+        .pixels()?
+        .checked_mul(bytes_per_pixel)?
+        .checked_add(header.bytes.saturating_mul(2))?
+        .checked_add(fixed)
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -330,16 +314,29 @@ mod tests {
         context.capture(&color).unwrap();
         let plan = context.freeze();
         let pixels = 64 * 48;
-        let bytes = |path: &Path| std::fs::metadata(path).unwrap().len();
+        let bytes = |path: &std::path::Path| std::fs::metadata(path).unwrap().len();
+        let estimate = |paths: &[&std::path::Path]| {
+            ImageMemoryEstimate::from_headers(
+                &crate::linked_files::LinkedFiles::new().headers(&plan, paths.iter().copied()),
+            )
+            .0
+        };
 
         assert_eq!(
-            estimate_source(&plan, &color),
+            estimate(&[&color]),
             pixels * 6 + bytes(&color) * 2 + 32 * MIB
         );
         assert_eq!(
-            estimate_source(&plan, &gray),
+            estimate(&[&gray]),
             pixels * 16 + bytes(&gray) * 2 + 64 * MIB
         );
+        assert_eq!(
+            estimate(&[&color, &gray]),
+            pixels * 16 + bytes(&gray) * 2 + 64 * MIB,
+            "a batch reserves its largest image"
+        );
+        assert_eq!(estimate(&[&root.path().join("missing.jpg")]), GIB);
+        assert_eq!(estimate(&[]), 64 * MIB);
     }
 
     fn abundant() -> Option<Resources> {
@@ -551,7 +548,10 @@ mod tests {
             image::RgbImage::new(200, 100).save(&source).unwrap();
             let mut context = myalbuns_paths::OperationPathContext::new();
             context.capture(&source).unwrap();
-            let estimate = ImageMemoryEstimate::in_plan(&context.freeze(), [source.as_path()]);
+            let estimate = ImageMemoryEstimate::from_headers(
+                &crate::linked_files::LinkedFiles::new()
+                    .headers(&context.freeze(), [source.as_path()]),
+            );
             assert!(estimate.0 >= 200 * 100 * 6 + 32 * MIB);
             assert!(estimate.0 < 33 * MIB);
         });

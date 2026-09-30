@@ -6,8 +6,7 @@ use crate::{
     cache_previews::CachePreviewRegistry,
     imaging_processor::ImagingProcessor,
     media_runtime::{
-        MediaBinding, MediaMonitor, MediaMonitorPoll, MediaResolutionProposal, MediaResolver,
-        MediaRuntime,
+        MediaBinding, MediaMonitor, MediaMonitorPoll, MediaResolutionProposal, MediaRuntime,
     },
     project_host::ProjectHost,
 };
@@ -96,12 +95,16 @@ async fn refresh_media_header(
     let binding = binding.clone();
     let roots = roots.clone();
     tauri::async_runtime::spawn_blocking(move || {
-        let observation = MediaResolver.observe_in_plan(&roots, &binding);
+        let observation = crate::linked_files::LinkedFiles::new().observe_one(&roots, &binding);
         if host.adopt_imported_photo_inspection(&binding, &observation) {
             return Ok(());
         }
-        let metadata = MediaResolver.inspect_media_header_in_plan(&binding, &roots)?;
-        if !observation.same_source(&MediaResolver.observe_in_plan(&roots, &binding)) {
+        let metadata = crate::linked_files::LinkedFiles::new()
+            .header(&roots, &binding.logical_path)
+            .and_then(|header| header.photo_metadata())?;
+        if !observation
+            .same_source(&crate::linked_files::LinkedFiles::new().observe_one(&roots, &binding))
+        {
             return Err("A origem mudou durante a inspeção da imagem.".to_owned());
         }
         confirm_inspected_binding(&host, &binding, metadata)
@@ -132,13 +135,14 @@ async fn refresh_media_source(
         let observing_binding = binding.clone();
         let observing_roots = roots.clone();
         let observation = tauri::async_runtime::spawn_blocking(move || {
-            let observation = MediaResolver.observe_in_plan(&observing_roots, &observing_binding);
+            let observation = crate::linked_files::LinkedFiles::new()
+                .observe_one(&observing_roots, &observing_binding);
             if observing_host.adopt_imported_photo_inspection(&observing_binding, &observation) {
                 return None;
             }
-            let estimate = ImageMemoryEstimate::in_plan(
-                &observing_roots,
-                [observing_binding.logical_path.as_path()],
+            let estimate = ImageMemoryEstimate::from_headers(
+                &crate::linked_files::LinkedFiles::new()
+                    .headers(&observing_roots, [observing_binding.logical_path.as_path()]),
             );
             Some((observation, estimate))
         })
@@ -167,9 +171,11 @@ async fn refresh_media_source(
         // caller has already released its observation permit, so Export can
         // pause a resource wait without holding a nested activity alive.
         let inspected = tauri::async_runtime::spawn_blocking(move || {
-            let metadata = MediaResolver
-                .inspect_media_binding_in_plan(&inspecting_binding, &inspecting_roots)?;
-            let current = MediaResolver.observe_in_plan(&inspecting_roots, &inspecting_binding);
+            let metadata = crate::linked_files::LinkedFiles::new()
+                .inspect_decoded(&inspecting_roots, &inspecting_binding.logical_path)
+                .and_then(|header| header.photo_metadata())?;
+            let current = crate::linked_files::LinkedFiles::new()
+                .observe_one(&inspecting_roots, &inspecting_binding);
             if !observation.same_source(&current) {
                 return Err("A origem mudou durante a inspeção da imagem.".to_owned());
             }

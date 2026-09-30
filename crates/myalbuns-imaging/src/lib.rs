@@ -2,4 +2,5 @@
 //!
 //! Process execution and Original decoding remain in the Processor binary.
 pub mod preview;
+pub mod source_header;
 pub mod source_memory;

@@ -1,11 +1,13 @@
-use crate::jpeg_output::{JpegFailure, SRGB_2014, VerifiedJpeg, opaque_rgb_bytes};
+use crate::{
+    export_output::{HashingWriter, output_writer},
+    jpeg_output::{JpegFailure, SRGB_2014, VerifiedJpeg, opaque_rgb_bytes},
+};
 use image::RgbaImage;
 use myalbuns_imaging_protocol::ImagingFailureCode;
 use sha2::{Digest, Sha256};
 use std::{
     borrow::Cow,
-    fs::File,
-    io::{BufReader, BufWriter, Read, Seek, Write},
+    io::{BufWriter, Cursor, Read, Seek, Write},
     path::Path,
 };
 
@@ -24,33 +26,48 @@ fn png_failed(error: png::EncodingError) -> JpegFailure {
     }
 }
 
-pub(crate) fn receipt(path: &Path) -> Result<VerifiedJpeg, JpegFailure> {
-    let mut reader = BufReader::new(File::open(path).map_err(failed)?);
-    let mut hash = Sha256::new();
-    let mut bytes = 0;
-    let mut buffer = [0_u8; 65536];
-    loop {
-        let count = reader.read(&mut buffer).map_err(failed)?;
-        if count == 0 {
-            break;
-        }
-        hash.update(&buffer[..count]);
-        bytes += count as u64;
+/// Holds an encoded output in memory, growing only with memory it could
+/// reserve, so an oversized output fails as a resource limit instead of
+/// aborting the Processor.
+#[derive(Default)]
+struct EncodedOutput(Vec<u8>);
+
+impl Write for EncodedOutput {
+    fn write(&mut self, buffer: &[u8]) -> std::io::Result<usize> {
+        self.0
+            .try_reserve(buffer.len())
+            .map_err(|_| std::io::Error::from(std::io::ErrorKind::OutOfMemory))?;
+        self.0.extend_from_slice(buffer);
+        Ok(buffer.len())
     }
-    Ok(VerifiedJpeg {
-        output_bytes: bytes,
-        output_sha256: format!("{:x}", hash.finalize()),
-    })
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
+    }
 }
 
+fn png_encoding_failed(error: png::EncodingError) -> JpegFailure {
+    match error {
+        png::EncodingError::IoError(error) if error.kind() == std::io::ErrorKind::OutOfMemory => {
+            JpegFailure::new(
+                ImagingFailureCode::ResourceLimitExceeded,
+                "não há memória suficiente para codificar o PNG",
+            )
+        }
+        other => png_failed(other),
+    }
+}
+
+/// The PNG is encoded and decoded back in memory, then written once: the file
+/// is never read back, which on a network Destination was two more transfers.
+/// The Host compares the digest of the file with these bytes.
 pub(crate) fn write_png(
     image: &RgbaImage,
     path: &Path,
     dpi: u32,
 ) -> Result<VerifiedJpeg, JpegFailure> {
     let rgb = opaque_rgb_bytes(image)?;
-    let file = crate::export_output::create_output(path).map_err(io_failed)?;
-    let mut writer = BufWriter::new(file);
+    let mut writer = EncodedOutput::default();
     let mut info = png::Info::with_size(image.width(), image.height());
     info.color_type = png::ColorType::Rgb;
     info.bit_depth = png::BitDepth::Eight;
@@ -61,17 +78,17 @@ pub(crate) fn write_png(
         yppu: ppm,
         unit: png::Unit::Meter,
     });
-    let mut encoder = png::Encoder::with_info(&mut writer, info).map_err(png_failed)?;
+    let mut encoder = png::Encoder::with_info(&mut writer, info).map_err(png_encoding_failed)?;
     // Fast compression is still lossless; the Final Renderer contract records
     // the measured time and size trade-off. The decode below proves the pixels.
     encoder.set_compression(png::Compression::Fast);
-    let mut encoder = encoder.write_header().map_err(png_failed)?;
-    encoder.write_image_data(&rgb).map_err(png_failed)?;
-    encoder.finish().map_err(png_failed)?;
-    writer.flush().map_err(io_failed)?;
-    writer.get_ref().sync_all().map_err(io_failed)?;
-    drop(writer);
-    let mut decoder = png::Decoder::new(BufReader::new(File::open(path).map_err(failed)?))
+    let mut encoder = encoder.write_header().map_err(png_encoding_failed)?;
+    encoder
+        .write_image_data(&rgb)
+        .map_err(png_encoding_failed)?;
+    encoder.finish().map_err(png_encoding_failed)?;
+    let encoded = writer.0;
+    let mut decoder = png::Decoder::new(Cursor::new(encoded.as_slice()))
         .read_info()
         .map_err(failed)?;
     let header = decoder.info();
@@ -97,13 +114,23 @@ pub(crate) fn write_png(
             "o PNG não reproduziu o raster canônico",
         ));
     }
-    receipt(path)
+    drop(decoded);
+    let mut file = crate::export_output::create_output(path).map_err(io_failed)?;
+    file.write_all(&encoded).map_err(io_failed)?;
+    file.flush().map_err(io_failed)?;
+    file.sync_all().map_err(io_failed)?;
+    Ok(VerifiedJpeg {
+        output_bytes: encoded.len() as u64,
+        output_sha256: format!("{:x}", Sha256::digest(&encoded)),
+    })
 }
 
 /// A deliberately small PDF writer: one lossless, ICCBased raster per physical page.
 /// Streams are written page by page; the document never retains the album's rasters.
+/// Each page's compressed raster is proved before it is written, and the digest
+/// is computed as the file accepts the bytes, so the PDF is never read back.
 pub(crate) struct PdfOutput {
-    writer: BufWriter<crate::export_output::OutputFile>,
+    writer: BufWriter<HashingWriter<crate::export_output::OutputFile>>,
     offsets: Vec<u64>,
     pages: Vec<usize>,
 }
@@ -112,7 +139,7 @@ impl PdfOutput {
     pub(crate) fn create(path: &Path) -> Result<Self, JpegFailure> {
         let file = crate::export_output::create_output(path).map_err(io_failed)?;
         let mut result = Self {
-            writer: BufWriter::new(file),
+            writer: output_writer(HashingWriter::new(file)),
             offsets: vec![0; 4],
             pages: Vec::new(),
         };
@@ -196,7 +223,7 @@ impl PdfOutput {
         self.pages.push(id);
         Ok(())
     }
-    pub(crate) fn finish(mut self, path: &Path) -> Result<VerifiedJpeg, JpegFailure> {
+    pub(crate) fn finish(mut self) -> Result<VerifiedJpeg, JpegFailure> {
         let kids = self
             .pages
             .iter()
@@ -231,9 +258,17 @@ impl PdfOutput {
         )
         .map_err(io_failed)?;
         self.writer.flush().map_err(io_failed)?;
-        self.writer.get_ref().sync_all().map_err(io_failed)?;
-        drop(self);
-        receipt(path)
+        self.writer
+            .get_ref()
+            .get_ref()
+            .sync_all()
+            .map_err(io_failed)?;
+        let (_, receipt) = self
+            .writer
+            .into_inner()
+            .map_err(|error| io_failed(error.into_error()))?
+            .into_receipt();
+        Ok(receipt)
     }
 }
 
