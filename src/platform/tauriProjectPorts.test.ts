@@ -379,7 +379,7 @@ test("maps the Project and media ports to the desktop commands", async () => {
   await tauriProjectCorePort.load("project-load-1");
   await tauriProjectCorePort.validateAlbumInformation(information);
   await tauriProjectCorePort.apply(intent);
-  await tauriProjectCorePort.relink("media-a-001", vi.fn());
+  await tauriProjectCorePort.relink(["media-a-001", "media-b-001"], vi.fn());
   await tauriProjectCorePort.undo();
   await tauriProjectCorePort.redo();
   const retriedPreview = {
@@ -417,7 +417,7 @@ test("maps the Project and media ports to the desktop commands", async () => {
     onProgress: tauriBoundary.channels[0],
   });
   expect(invoke).toHaveBeenNthCalledWith(4, "relink_media", {
-    mediaId: "media-a-001",
+    mediaIds: ["media-a-001", "media-b-001"],
     onProgress: tauriBoundary.channels[1],
   });
   expect(invoke).toHaveBeenNthCalledWith(5, "undo_project", { onProgress: tauriBoundary.channels[2] });

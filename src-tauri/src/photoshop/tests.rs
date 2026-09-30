@@ -8,7 +8,7 @@ use super::*;
 #[derive(Default)]
 struct Platform {
     candidates: Mutex<Vec<PathBuf>>,
-    launched: Mutex<Vec<(PathBuf, PathBuf)>>,
+    launched: Mutex<Vec<(PathBuf, Vec<PathBuf>)>>,
     fail_launch: AtomicBool,
 }
 
@@ -23,14 +23,17 @@ impl PhotoshopPlatform for Platform {
             version,
         })
     }
-    fn launch(&self, executable: &Path, original: &Path) -> io::Result<()> {
+    fn launch(&self, executable: &Path, originals: &[&Path]) -> io::Result<()> {
         if self.fail_launch.load(Ordering::SeqCst) {
             return Err(io::Error::other("launch rejected"));
         }
-        self.launched
-            .lock()
-            .unwrap()
-            .push((executable.into(), original.into()));
+        self.launched.lock().unwrap().push((
+            executable.into(),
+            originals
+                .iter()
+                .map(|original| original.to_path_buf())
+                .collect(),
+        ));
         Ok(())
     }
 }
@@ -69,7 +72,7 @@ impl Fixture {
         fs::create_dir_all(path.parent().unwrap()).unwrap();
         fs::write(&path, b"original photo bytes").unwrap();
         MediaBinding {
-            media_id: "photo-a".into(),
+            media_id: path.file_name().unwrap().to_string_lossy().into_owned(),
             kind: MediaKind::Photo,
             logical_path: path,
         }
@@ -177,15 +180,60 @@ fn opens_the_original_with_unicode_spaces_metacharacters_and_a_long_native_path(
         .join("Foto (1) & 2.jpg");
     let photo = fixture.photo(original);
     assert!(photo.logical_path.as_os_str().len() > 260);
-    store.open_original(&photo).unwrap();
+    store.open_originals(std::slice::from_ref(&photo)).unwrap();
     let calls = fixture.platform.launched.lock().unwrap();
     assert_eq!(calls.len(), 1);
-    assert_eq!(fs::read(&calls[0].1).unwrap(), b"original photo bytes");
+    assert_eq!(calls[0].1.len(), 1);
+    assert_eq!(fs::read(&calls[0].1[0]).unwrap(), b"original photo bytes");
     assert_eq!(
-        fs::canonicalize(&calls[0].1).unwrap(),
+        fs::canonicalize(&calls[0].1[0]).unwrap(),
         fs::canonicalize(&photo.logical_path).unwrap()
     );
     assert_eq!(fs::read(&calls[0].0).unwrap(), b"[27,1,0,0]");
+}
+
+#[test]
+fn several_originals_open_in_one_launch_or_not_at_all() {
+    let fixture = Fixture::new();
+    fixture.install("2026", [27, 1, 0, 0], true);
+    let store = fixture.store();
+    store.status().unwrap();
+    let photos =
+        ["b.jpg", "a.jpg", "c.jpg"].map(|name| fixture.photo(fixture.root.path().join(name)));
+    store.open_originals(&photos).unwrap();
+    {
+        let calls = fixture.platform.launched.lock().unwrap();
+        assert_eq!(
+            calls.len(),
+            1,
+            "every original goes to a single Photoshop process"
+        );
+        let opened = calls[0]
+            .1
+            .iter()
+            .map(|path| fs::canonicalize(path).unwrap())
+            .collect::<Vec<_>>();
+        let selected = photos
+            .iter()
+            .map(|photo| fs::canonicalize(&photo.logical_path).unwrap())
+            .collect::<Vec<_>>();
+        assert_eq!(opened, selected, "the selection order is preserved");
+    }
+    fixture.platform.launched.lock().unwrap().clear();
+
+    fs::remove_file(&photos[1].logical_path).unwrap();
+    assert_eq!(
+        store.open_originals(&photos).unwrap_err().code,
+        PhotoshopErrorCode::OriginalAbsent
+    );
+    assert!(
+        fixture.platform.launched.lock().unwrap().is_empty(),
+        "a missing original prevents opening the others"
+    );
+    assert_eq!(
+        store.open_originals(&[]).unwrap_err().code,
+        PhotoshopErrorCode::InvalidContext
+    );
 }
 
 #[test]
@@ -199,7 +247,10 @@ fn removed_selected_installation_fails_the_attempt_without_switching_to_another(
     fs::remove_file(selected).unwrap();
     let photo = fixture.photo(fixture.root.path().join("photo.jpg"));
     assert_eq!(
-        store.open_original(&photo).unwrap_err().code,
+        store
+            .open_originals(std::slice::from_ref(&photo))
+            .unwrap_err()
+            .code,
         PhotoshopErrorCode::InstallationUnavailable
     );
     assert!(fixture.platform.launched.lock().unwrap().is_empty());
@@ -224,18 +275,27 @@ fn missing_unreadable_or_non_photo_originals_do_not_launch_or_rewrite_preference
         .open(&photo.logical_path)
         .unwrap();
     assert_eq!(
-        store.open_original(&photo).unwrap_err().code,
+        store
+            .open_originals(std::slice::from_ref(&photo))
+            .unwrap_err()
+            .code,
         PhotoshopErrorCode::OriginalUnavailable
     );
     drop(exclusive);
     fs::remove_file(&photo.logical_path).unwrap();
     assert_eq!(
-        store.open_original(&photo).unwrap_err().code,
+        store
+            .open_originals(std::slice::from_ref(&photo))
+            .unwrap_err()
+            .code,
         PhotoshopErrorCode::OriginalAbsent
     );
     photo.kind = MediaKind::Decorative;
     assert_eq!(
-        store.open_original(&photo).unwrap_err().code,
+        store
+            .open_originals(std::slice::from_ref(&photo))
+            .unwrap_err()
+            .code,
         PhotoshopErrorCode::InvalidContext
     );
     assert!(fixture.platform.launched.lock().unwrap().is_empty());
@@ -250,7 +310,9 @@ fn launch_failure_preserves_the_original_and_is_actionable() {
     store.status().unwrap();
     fixture.platform.fail_launch.store(true, Ordering::SeqCst);
     let photo = fixture.photo(fixture.root.path().join("photo.jpg"));
-    let error = store.open_original(&photo).unwrap_err();
+    let error = store
+        .open_originals(std::slice::from_ref(&photo))
+        .unwrap_err();
     assert_eq!(error.code, PhotoshopErrorCode::LaunchFailed);
     assert!(error.message.contains("Configurações"));
     assert_eq!(

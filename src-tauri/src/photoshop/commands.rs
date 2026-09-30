@@ -62,8 +62,8 @@ pub(crate) async fn open_in_photoshop(
     target: PhotoshopPhotoTarget,
 ) -> Result<(), PhotoshopCommandError> {
     tauri::async_runtime::spawn_blocking(move || {
-        let binding = app.state::<ProjectHost>().photoshop_photo(&target)?;
-        app.state::<PhotoshopStateStore>().open_original(&binding)
+        let bindings = app.state::<ProjectHost>().photoshop_photos(&target)?;
+        app.state::<PhotoshopStateStore>().open_originals(&bindings)
     })
     .await
     .map_err(|_| PhotoshopCommandError::new(PhotoshopErrorCode::LaunchFailed))?

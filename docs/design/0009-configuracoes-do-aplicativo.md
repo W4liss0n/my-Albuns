@@ -65,7 +65,7 @@ Erros de operação não usam caixa de aviso. A mensagem abre o tooltip de valid
 
 Sem preferência válida, a versão compatível mais recente começa selecionada. O usuário pode escolher outra instalação detectada ou usar `Localizar…` para indicar o executável. A mudança do nome da aba não altera o destino dos comandos existentes que abrem diretamente as preferências do Photoshop.
 
-`Abrir no Photoshop` aparece no menu de contexto de uma Foto do Painel e de um Frame preenchido. O atalho fixo da primeira versão é `Ctrl + E`, e a ação exige exatamente uma Foto contextual.
+`Abrir no Photoshop` aparece no menu de contexto de uma Foto do Painel e de um Frame preenchido. O atalho fixo da primeira versão é `Ctrl + E`, e a ação abre todas as Fotos selecionadas numa única inicialização do Photoshop, ou nenhuma quando algum original estiver ausente ou inacessível.
 
 A integração abre sempre o Arquivo vinculado original, inclusive quando ele está em UNC, unidade mapeada ou caminho longo aceito. Cache, recorte do Frame e ajustes do MyAlbuns não são incorporados. Ausência do Photoshop, Arquivo indisponível ou falha ao iniciá-lo desabilita somente aquela tentativa e não altera o Projeto.
 

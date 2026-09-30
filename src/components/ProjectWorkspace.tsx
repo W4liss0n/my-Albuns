@@ -406,6 +406,7 @@ export function ProjectWorkspace({
     viewer?.projectId === projectId;
   const selectedPhotoFrame = controller.selectedFrames.length === 1 && controller.selectedFrames[0].photo
     ? controller.selectedFrames[0] : null;
+  const selectedPhotoFrameIds = controller.selectedFrames.filter((frame) => frame.photo).map((frame) => frame.id);
   const openViewer = (source: "panel" | "sheet", mediaId: string, mediaIds: readonly string[], focus: HTMLElement | null) => {
     if (!imageViewerWindowPort || commandsBlocked || mediaDrag || !mediaIds.includes(mediaId)) return;
     setFrameContextMenu(null);
@@ -463,9 +464,9 @@ export function ProjectWorkspace({
       window.removeEventListener("blur", blur);
     };
   });
-  const canOpenFrameInPhotoshop = selectedPhotoFrame !== null && photoshop.available && !photoshop.opening && !commandsBlocked;
+  const canOpenFrameInPhotoshop = selectedPhotoFrameIds.length > 0 && photoshop.available && !photoshop.opening && !commandsBlocked;
   const openFrameInPhotoshop = () => {
-    if (canOpenFrameInPhotoshop && selectedPhotoFrame) void photoshop.open({ kind: "frames", frameIds: [selectedPhotoFrame.id] });
+    if (canOpenFrameInPhotoshop) void photoshop.open({ kind: "frames", frameIds: selectedPhotoFrameIds });
   };
   const workspaceInteractionBlocked =
     mediaRemoval.active || sessionBarrierActive || graphicsFailure !== null || viewerActive !== null;
@@ -668,7 +669,7 @@ export function ProjectWorkspace({
     selectAllFrames: controller.selectAllFrames,
     frameSelectionActive: sheetEditing && mediaDrag === null && sheetContextMenu === null && frameContextMenu === null,
     openPhotoInPhotoshop: openFrameInPhotoshop,
-    photoCommandActive: selectedPhotoFrame !== null && mediaDrag === null && sheetContextMenu === null && frameContextMenu === null,
+    photoCommandActive: selectedPhotoFrameIds.length > 0 && mediaDrag === null && sheetContextMenu === null && frameContextMenu === null,
     copyFrames: () => { void controller.copyFrames(); },
     pasteFrames: () => { void controller.pasteFrames(); },
     frameClipboardActive: mediaDrag === null && sheetContextMenu === null && frameContextMenu === null,
@@ -931,7 +932,7 @@ export function ProjectWorkspace({
         <MediaPanel
           onViewPhoto={imageViewerWindowPort ? (mediaId, mediaIds, trigger) => openViewer("panel", mediaId, mediaIds, trigger) : undefined}
           photoshopAvailable={photoshop.available && !photoshop.opening && !commandsBlocked}
-          onOpenInPhotoshop={(mediaId) => { if (!commandsBlocked) void photoshop.open({ kind: "panel", mediaIds: [mediaId] }); }}
+          onOpenInPhotoshop={(mediaIds) => { if (!commandsBlocked) void photoshop.open({ kind: "panel", mediaIds }); }}
           dropPort={mediaDropPort}
           key={`media-${projectId}`}
           mediaFiles={mediaFiles}

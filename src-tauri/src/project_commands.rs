@@ -382,21 +382,89 @@ pub(crate) async fn frame_drag_threshold(
 
 #[tauri::command]
 pub(crate) async fn relink_media(
-    media_id: String,
+    media_ids: Vec<String>,
     app: AppHandle,
     window: WebviewWindow,
     state: State<'_, ProjectHost>,
     on_progress: tauri::ipc::Channel<crate::ipc_contract::ImageProcessingProgress>,
 ) -> Result<EditorProjection, String> {
-    change_media_reference(
-        media_id,
-        app,
-        window,
-        state,
-        on_progress,
-        MediaChangeKind::Relink,
-    )
+    let _operation = crate::project_ui_operations::begin(&app)?;
+    if window.label() != PROJECT_WINDOW_LABEL {
+        return Err("A alteração de imagem só está disponível na Janela do projeto.".into());
+    }
+    let host = state.inner().clone();
+    let catalog = host.authorized_media_catalog()?;
+    let mut selected = Vec::<MediaBinding>::with_capacity(media_ids.len());
+    for media_id in media_ids {
+        if selected.iter().any(|binding| binding.media_id == media_id) {
+            continue;
+        }
+        selected.push(
+            catalog
+                .bindings
+                .iter()
+                .find(|binding| binding.media_id == media_id)
+                .cloned()
+                .ok_or_else(|| "A ocorrência de mídia não pertence a este projeto.".to_string())?,
+        );
+    }
+    // Only images still confirmed absent are searched; the others came back or are
+    // unavailable, and the Panel already offers another try for those.
+    let missing = tauri::async_runtime::spawn_blocking(move || {
+        selected
+            .into_iter()
+            .filter(occurrence_is_authoritatively_absent)
+            .collect::<Vec<_>>()
+    })
     .await
+    .map_err(|_| "Não foi possível reinspecionar o arquivo vinculado.".to_string())?;
+    if missing.is_empty() {
+        return host.projection();
+    }
+
+    let (sender, receiver) = tokio::sync::oneshot::channel();
+    app.dialog()
+        .file()
+        .set_parent(&window)
+        .set_title(if missing.len() == 1 {
+            "Escolher a pasta da imagem"
+        } else {
+            "Escolher a pasta das imagens"
+        })
+        .pick_folder(move |selection| {
+            let _ = sender.send(selection);
+        });
+    let selection = receiver
+        .await
+        .map_err(|_| "Não foi possível concluir a escolha da pasta.".to_string())?;
+    let Some(selection) = selection else {
+        return host.projection();
+    };
+    let FilePath::Path(folder) = selection else {
+        return Err("O local escolhido não é um caminho do Windows válido.".into());
+    };
+
+    let mut processing = ImageProcessingBatch::new(missing.len() as u32, |progress| {
+        let _ = on_progress.send(progress);
+    });
+    let relinked = project_media_reference::relink_in_folder(
+        &app,
+        folder,
+        missing,
+        "A imagem com o mesmo nome e extensão não foi encontrada na pasta selecionada. Subpastas não são pesquisadas.",
+        &mut processing,
+    )
+    .await?;
+    for media_id in &relinked {
+        tracing::info!(
+            target: "myalbuns.desktop",
+            process_role = ProcessRole::DesktopHost.as_str(),
+            window_label = window.label(),
+            media_id = safe_log_identifier(media_id),
+            event = "linked_media_relinked",
+        );
+    }
+    host.projection()
 }
 
 #[tauri::command]
@@ -406,25 +474,6 @@ pub(crate) async fn replace_media(
     window: WebviewWindow,
     state: State<'_, ProjectHost>,
     on_progress: tauri::ipc::Channel<crate::ipc_contract::ImageProcessingProgress>,
-) -> Result<EditorProjection, String> {
-    change_media_reference(
-        media_id,
-        app,
-        window,
-        state,
-        on_progress,
-        MediaChangeKind::Replace,
-    )
-    .await
-}
-
-async fn change_media_reference(
-    media_id: String,
-    app: AppHandle,
-    window: WebviewWindow,
-    state: State<'_, ProjectHost>,
-    on_progress: tauri::ipc::Channel<crate::ipc_contract::ImageProcessingProgress>,
-    kind: MediaChangeKind,
 ) -> Result<EditorProjection, String> {
     let _operation = crate::project_ui_operations::begin(&app)?;
     if window.label() != PROJECT_WINDOW_LABEL {
@@ -437,39 +486,19 @@ async fn change_media_reference(
         .into_iter()
         .find(|binding| binding.media_id == media_id)
         .ok_or_else(|| "A ocorrência de mídia não pertence a este projeto.".to_string())?;
-    if kind == MediaChangeKind::Relink {
-        let inspected_binding = binding.clone();
-        let absent = tauri::async_runtime::spawn_blocking(move || {
-            occurrence_is_authoritatively_absent(&inspected_binding)
-        })
-        .await
-        .map_err(|_| "Não foi possível reinspecionar o arquivo vinculado.".to_string())?;
-        if !absent {
-            return Err(
-            "Somente um arquivo comprovadamente ausente pode ser religado; tente novamente se a origem estiver indisponível."
-                .into(),
-        );
-        }
-    }
 
     let (sender, receiver) = tokio::sync::oneshot::channel();
-    let dialog = app.dialog().file().set_parent(&window);
-    match kind {
-        MediaChangeKind::Relink => dialog
-            .set_title("Escolher pasta para Religar Imagem")
-            .pick_folder(move |selection| {
-                let _ = sender.send(selection);
-            }),
-        MediaChangeKind::Replace => dialog
-            .set_title("Substituir Imagem")
-            .add_filter(
-                "Imagens JPEG, PNG e TIFF",
-                &["jpg", "jpeg", "png", "tif", "tiff"],
-            )
-            .pick_file(move |selection| {
-                let _ = sender.send(selection);
-            }),
-    }
+    app.dialog()
+        .file()
+        .set_parent(&window)
+        .set_title("Substituir Imagem")
+        .add_filter(
+            "Imagens JPEG, PNG e TIFF",
+            &["jpg", "jpeg", "png", "tif", "tiff"],
+        )
+        .pick_file(move |selection| {
+            let _ = sender.send(selection);
+        });
     let selection = receiver
         .await
         .map_err(|_| "Não foi possível concluir a seleção da imagem.".to_string())?;
@@ -479,7 +508,7 @@ async fn change_media_reference(
     let FilePath::Path(path) = selection else {
         return Err("O local escolhido não é um caminho do Windows válido.".into());
     };
-    if kind == MediaChangeKind::Replace && path == binding.logical_path {
+    if path == binding.logical_path {
         return host.projection();
     }
 
@@ -488,9 +517,6 @@ async fn change_media_reference(
         let _ = on_progress.send(progress);
     });
     let mut paths = myalbuns_paths::OperationPathContext::new();
-    let original_path = binding.logical_path.clone();
-    let candidate_path = path;
-    let search_binding = binding.clone();
     let catalog = host.authorized_media_catalog()?;
     let cache_root = app
         .state::<ActiveCacheNamespace>()
@@ -504,36 +530,29 @@ async fn change_media_reference(
             let _ = paths.capture(&media.logical_path);
         }
         // Replacement does not require the old storage root to be reachable.
-        if kind == MediaChangeKind::Relink {
-            paths.capture(&original_path).map_err(|error| error.to_string())?;
-        }
-        paths
-            .capture(&candidate_path)
-            .map_err(|error| error.to_string())?;
-        let roots = paths.freeze();
-        let path = match kind {
-            MediaChangeKind::Replace => candidate_path,
-            MediaChangeKind::Relink => MediaResolver.find_relink_candidates(
-                &candidate_path, std::slice::from_ref(&search_binding), &roots,
-            )?.remove(&search_binding.media_id).ok_or_else(||
-                "A imagem com o mesmo nome e extensão não foi encontrada na pasta selecionada. Subpastas não são pesquisadas.".to_string())?,
-        };
-        Ok::<_, String>((path, roots))
+        paths.capture(&path).map_err(|error| error.to_string())?;
+        Ok::<_, String>((path, paths.freeze()))
     })
     .await
     .map_err(|error| error.to_string())??;
-    let relinked =
-        project_media_reference::change_in_app(&app, binding, path, roots, kind, &mut processing)
-            .await?;
+    let replaced = project_media_reference::change_in_app(
+        &app,
+        binding,
+        path,
+        roots,
+        MediaChangeKind::Replace,
+        &mut processing,
+    )
+    .await?;
     tracing::info!(
         target: "myalbuns.desktop",
         process_role = ProcessRole::DesktopHost.as_str(),
         window_label = window.label(),
         media_id = safe_log_identifier(&selected_media_id),
-        revision = relinked.state.revision,
-        event = if kind == MediaChangeKind::Relink { "linked_media_relinked" } else { "linked_media_replaced" },
+        revision = replaced.state.revision,
+        event = "linked_media_replaced",
     );
-    Ok(relinked)
+    Ok(replaced)
 }
 
 fn occurrence_is_authoritatively_absent(binding: &MediaBinding) -> bool {

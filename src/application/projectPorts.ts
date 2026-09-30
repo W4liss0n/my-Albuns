@@ -312,7 +312,7 @@ export interface ProjectCorePort {
     xUm: number,
     yUm: number,
   ): Promise<PhotoDropTarget>;
-  relink(mediaId: string, onProgress: (progress: ImageProcessingProgress) => void): Promise<EditorProjection>;
+  relink(mediaIds: readonly string[], onProgress: (progress: ImageProcessingProgress) => void): Promise<EditorProjection>;
   replaceImage(mediaId: string, onProgress: (progress: ImageProcessingProgress) => void): Promise<EditorProjection>;
   undo(onProgress?: (progress: ImageProcessingProgress) => void): Promise<EditorProjection>;
   redo(onProgress?: (progress: ImageProcessingProgress) => void): Promise<EditorProjection>;

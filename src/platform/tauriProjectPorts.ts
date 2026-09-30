@@ -323,8 +323,8 @@ export const tauriProjectCorePort: ProjectCorePort = {
       xUm,
       yUm,
     }),
-  relink: (mediaId, onProgress) =>
-    invokeImageProcessing<EditorProjection>("relink_media", { mediaId }, onProgress),
+  relink: (mediaIds, onProgress) =>
+    invokeImageProcessing<EditorProjection>("relink_media", { mediaIds: [...mediaIds] }, onProgress),
   replaceImage: (mediaId, onProgress) =>
     invokeImageProcessing<EditorProjection>("replace_media", { mediaId }, onProgress),
   undo: (onProgress) => invokeImageProcessing<EditorProjection>("undo_project", {}, onProgress),

@@ -912,47 +912,64 @@ impl ProjectHost {
         })
     }
 
-    pub(crate) fn photoshop_photo(
+    /// Resolves the Photos of a Photoshop target in selection order, once per media.
+    pub(crate) fn photoshop_photos(
         &self,
         target: &crate::ipc_contract::PhotoshopPhotoTarget,
-    ) -> Result<MediaBinding, crate::ipc_contract::PhotoshopCommandError> {
+    ) -> Result<Vec<MediaBinding>, crate::ipc_contract::PhotoshopCommandError> {
         use crate::ipc_contract::{
             PhotoshopCommandError, PhotoshopErrorCode, PhotoshopPhotoTarget,
         };
         let invalid = || PhotoshopCommandError::new(PhotoshopErrorCode::InvalidContext);
         let project = self.project().map_err(|_| invalid())?;
-        let media_id = match target {
-            PhotoshopPhotoTarget::Panel { media_ids } if media_ids.len() == 1 => {
-                media_ids[0].clone()
+        let media_ids = match target {
+            PhotoshopPhotoTarget::Panel { media_ids } => media_ids.clone(),
+            PhotoshopPhotoTarget::Frames { frame_ids } => {
+                let projection = project.projection();
+                let frames = projection
+                    .state
+                    .album
+                    .sheets
+                    .iter()
+                    .flat_map(|sheet| &sheet.frames)
+                    .collect::<Vec<_>>();
+                frame_ids
+                    .iter()
+                    .map(|frame_id| {
+                        frames
+                            .iter()
+                            .find(|frame| frame.id == *frame_id)
+                            .and_then(|frame| frame.photo.as_ref())
+                            .map(|photo| photo.media_id.to_string())
+                            .ok_or_else(invalid)
+                    })
+                    .collect::<Result<Vec<_>, _>>()?
             }
-            PhotoshopPhotoTarget::Frames { frame_ids } if frame_ids.len() == 1 => project
-                .projection()
-                .state
-                .album
-                .sheets
-                .iter()
-                .flat_map(|sheet| &sheet.frames)
-                .find(|frame| frame.id == frame_ids[0])
-                .and_then(|frame| frame.photo.as_ref())
-                .ok_or_else(invalid)?
-                .media_id
-                .to_string(),
-            _ => return Err(invalid()),
         };
-        let media = project
-            .project()
-            .media()
-            .iter()
-            .find(|media| {
-                media.id().to_string() == media_id
-                    && media.kind() == myalbuns_core::MediaKind::Photo
-            })
-            .ok_or_else(invalid)?;
-        Ok(MediaBinding {
-            media_id,
-            kind: media.kind(),
-            logical_path: media.path().to_path_buf(),
-        })
+        if media_ids.is_empty() {
+            return Err(invalid());
+        }
+        let mut bindings = Vec::<MediaBinding>::with_capacity(media_ids.len());
+        for media_id in media_ids {
+            if bindings.iter().any(|binding| binding.media_id == media_id) {
+                continue;
+            }
+            let media = project
+                .project()
+                .media()
+                .iter()
+                .find(|media| {
+                    media.id().to_string() == media_id
+                        && media.kind() == myalbuns_core::MediaKind::Photo
+                })
+                .ok_or_else(invalid)?;
+            bindings.push(MediaBinding {
+                media_id,
+                kind: media.kind(),
+                logical_path: media.path().to_path_buf(),
+            });
+        }
+        Ok(bindings)
     }
 
     pub(crate) fn is_current_project(&self, project_id: &str) -> bool {
@@ -1470,7 +1487,7 @@ mod tests {
     }
 
     #[test]
-    fn photoshop_resolves_one_current_photo_without_changing_creative_state() {
+    fn photoshop_resolves_selected_photos_once_without_changing_creative_state() {
         use crate::ipc_contract::{PhotoshopErrorCode, PhotoshopPhotoTarget as Target};
         let fixture = fixture();
         let original = fixture._root.path().join("Foto original.jpg");
@@ -1511,35 +1528,41 @@ mod tests {
             .clone();
         fixture.host.save(before.state.revision).unwrap();
         let before = fixture.host.projection().unwrap();
+        // A repeated Photo, from the Panel or from Frames, opens its original once.
         for target in [
             Target::Panel {
                 media_ids: vec![media_id.clone()],
             },
+            Target::Panel {
+                media_ids: vec![media_id.clone(), media_id.clone()],
+            },
             Target::Frames {
                 frame_ids: vec![frame_id.clone()],
             },
+            Target::Frames {
+                frame_ids: vec![frame_id.clone(), frame_id.clone()],
+            },
         ] {
-            let binding = fixture.host.photoshop_photo(&target).unwrap();
-            assert_eq!(binding.media_id, media_id);
-            assert_eq!(binding.logical_path, original);
+            let bindings = fixture.host.photoshop_photos(&target).unwrap();
+            assert_eq!(bindings.len(), 1);
+            assert_eq!(bindings[0].media_id, media_id);
+            assert_eq!(bindings[0].logical_path, original);
         }
         for target in [
             Target::Panel { media_ids: vec![] },
+            Target::Frames { frame_ids: vec![] },
             Target::Panel {
                 media_ids: vec!["foreign".into()],
             },
             Target::Panel {
-                media_ids: vec![media_id.clone(), media_id],
+                media_ids: vec![media_id, "foreign".into()],
             },
             Target::Frames {
-                frame_ids: vec![frame_id.clone(), frame_id],
-            },
-            Target::Frames {
-                frame_ids: vec!["foreign".into()],
+                frame_ids: vec![frame_id, "foreign".into()],
             },
         ] {
             assert_eq!(
-                fixture.host.photoshop_photo(&target).unwrap_err().code,
+                fixture.host.photoshop_photos(&target).unwrap_err().code,
                 PhotoshopErrorCode::InvalidContext
             );
         }

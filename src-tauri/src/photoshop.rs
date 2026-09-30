@@ -36,13 +36,13 @@ impl PhotoshopCommandError {
                 "O arquivo escolhido não é uma instalação compatível do Adobe Photoshop."
             }
             PhotoshopErrorCode::OriginalAbsent => {
-                "A foto original não foi encontrada. Use Localizar imagem para indicar a pasta onde ela está."
+                "Uma foto original não foi encontrada, e nenhuma foto foi aberta. Use Localizar imagem para indicar a pasta onde ela está."
             }
             PhotoshopErrorCode::OriginalUnavailable => {
-                "Não foi possível acessar o original da foto. Verifique o acesso e tente novamente."
+                "Não foi possível acessar uma foto original, e nenhuma foto foi aberta. Verifique o acesso e tente novamente."
             }
             PhotoshopErrorCode::InvalidContext => {
-                "Selecione exatamente uma foto ou um quadro preenchido para abrir no Photoshop."
+                "Selecione uma ou mais fotos, ou quadros com foto, para abrir no Photoshop."
             }
             PhotoshopErrorCode::LaunchFailed => {
                 "Não foi possível iniciar o Photoshop selecionado. Abra Configurações para escolher ou localizar outra instalação."
@@ -70,7 +70,7 @@ struct ExecutableInfo {
 trait PhotoshopPlatform: Send + Sync {
     fn candidates(&self) -> Vec<PathBuf>;
     fn inspect(&self, executable: &Path) -> Option<ExecutableInfo>;
-    fn launch(&self, executable: &Path, original: &Path) -> std::io::Result<()>;
+    fn launch(&self, executable: &Path, originals: &[&Path]) -> std::io::Result<()>;
 }
 
 struct Installation {
@@ -201,11 +201,17 @@ impl PhotoshopStateStore {
         })
     }
 
-    pub(crate) fn open_original(
+    /// Opens every original in one Photoshop process, or none of them when any
+    /// original cannot be read.
+    pub(crate) fn open_originals(
         &self,
-        binding: &MediaBinding,
+        bindings: &[MediaBinding],
     ) -> Result<(), PhotoshopCommandError> {
-        if binding.kind != MediaKind::Photo {
+        if bindings.is_empty()
+            || bindings
+                .iter()
+                .any(|binding| binding.kind != MediaKind::Photo)
+        {
             return Err(PhotoshopCommandError::new(
                 PhotoshopErrorCode::InvalidContext,
             ));
@@ -228,23 +234,29 @@ impl PhotoshopStateStore {
                 PhotoshopErrorCode::InstallationUnavailable,
             ));
         }
-        let original = context
-            .resolve_existing(&binding.logical_path, ExpectedObject::RegularFile)
-            .map_err(|error| {
-                PhotoshopCommandError::new(match error {
-                    ResolveError::NotFound => PhotoshopErrorCode::OriginalAbsent,
-                    _ => PhotoshopErrorCode::OriginalUnavailable,
-                })
-            })?;
-        let _readable_original = original
-            .reopen_for_read()
-            .map_err(|_| PhotoshopCommandError::new(PhotoshopErrorCode::OriginalUnavailable))?;
-        // The native launcher receives only these two resolved paths, never a Cache representation.
+        let mut originals = Vec::with_capacity(bindings.len());
+        let mut _readable_originals = Vec::with_capacity(bindings.len());
+        for binding in bindings {
+            let original = context
+                .resolve_existing(&binding.logical_path, ExpectedObject::RegularFile)
+                .map_err(|error| {
+                    PhotoshopCommandError::new(match error {
+                        ResolveError::NotFound => PhotoshopErrorCode::OriginalAbsent,
+                        _ => PhotoshopErrorCode::OriginalUnavailable,
+                    })
+                })?;
+            _readable_originals.push(original.reopen_for_read().map_err(|_| {
+                PhotoshopCommandError::new(PhotoshopErrorCode::OriginalUnavailable)
+            })?);
+            originals.push(original);
+        }
+        let original_paths = originals
+            .iter()
+            .map(|original| original.operational_path())
+            .collect::<Vec<_>>();
+        // The native launcher receives only resolved paths, never a Cache representation.
         self.platform
-            .launch(
-                resolved_executable.operational_path(),
-                original.operational_path(),
-            )
+            .launch(resolved_executable.operational_path(), &original_paths)
             .map_err(|_| PhotoshopCommandError::new(PhotoshopErrorCode::LaunchFailed))
     }
 

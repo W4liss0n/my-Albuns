@@ -584,9 +584,9 @@ export function useProjectMutations({
         dpi,
       });
     },
-    relinkMedia: (mediaId: string) =>
+    relinkMedia: (mediaIds: readonly string[]) =>
       void runWithErrorFeedback((port) =>
-        imageProcessing.run((publish) => port.relink(mediaId, publish)),
+        imageProcessing.run((publish) => port.relink(mediaIds, publish)),
       ),
     replaceMedia: (mediaId: string) =>
       void runWithErrorFeedback((port) =>
