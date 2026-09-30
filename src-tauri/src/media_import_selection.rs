@@ -1,6 +1,9 @@
 //! File and folder selections converge before the single native import attempt.
-use crate::ipc_contract::ImageProcessingProblem;
-use myalbuns_paths::{ExpectedObject, RootBindingPlan};
+use crate::{
+    ipc_contract::ImageProcessingProblem,
+    linked_files::{LinkedFiles, ListFolderError},
+};
+use myalbuns_paths::RootBindingPlan;
 use std::{
     collections::HashSet,
     path::{Path, PathBuf},
@@ -19,37 +22,27 @@ pub(crate) fn expand(
         }
         candidates.push(path);
     }
+    // Every selected path is checked for being a folder; on a network share
+    // each check waits for the server, so they run together.
+    let listed = LinkedFiles::new().list_folders(plan, candidates.iter().map(PathBuf::as_path));
     let mut files = Vec::new();
-    for path in candidates {
-        match plan.resolve_existing(&path, ExpectedObject::Directory) {
-            Ok(directory) => match std::fs::read_dir(directory.operational_path()) {
-                Ok(entries) => {
-                    let mut children = Vec::new();
-                    for entry in entries {
-                        match entry {
-                            Ok(entry) => match entry.file_type() {
-                                Ok(kind)
-                                    if !kind.is_dir() && supported_extension(&entry.path()) =>
-                                {
-                                    children.push(path.join(entry.file_name()))
-                                }
-                                Ok(_) => {}
-                                Err(error) => problems.push(problem(
-                                    &path.join(entry.file_name()),
-                                    error.to_string(),
-                                )),
-                            },
-                            Err(error) => problems.push(problem(&path, error.to_string())),
-                        }
-                    }
-                    children.sort();
-                    files.extend(children);
-                }
-                Err(error) => problems.push(problem(&path, error.to_string())),
-            },
+    for (path, listed) in candidates.into_iter().zip(listed) {
+        match listed {
+            Ok(listed) => {
+                let mut children = listed
+                    .entries
+                    .iter()
+                    .map(|entry| (entry, path.join(&entry.name)))
+                    .filter(|(entry, child)| !entry.directory && supported_extension(child))
+                    .map(|(_, child)| child)
+                    .collect::<Vec<_>>();
+                children.sort();
+                files.extend(children);
+            }
+            Err(ListFolderError::Io(error)) => problems.push(problem(&path, error.to_string())),
             // Files, including missing or invalid ones, reach the shared inspector;
             // it can preserve an existing link without rereading its Original.
-            Err(_) => files.push(path),
+            Err(ListFolderError::Resolve(_)) => files.push(path),
         }
     }
     let mut seen = HashSet::new();

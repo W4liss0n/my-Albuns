@@ -6,9 +6,10 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use myalbuns_paths::{ExpectedObject, RootBindingPlan};
+use myalbuns_paths::RootBindingPlan;
 
 use super::{MediaBinding, MediaResolver};
+use crate::linked_files::LinkedFiles;
 
 impl MediaResolver {
     pub(crate) fn find_relink_candidates(
@@ -22,23 +23,18 @@ impl MediaResolver {
             .filter_map(|binding| binding.logical_path.file_name())
             .map(|name| (name.to_owned(), Vec::new()))
             .collect();
-        let directory = roots
-            .resolve_existing(folder, ExpectedObject::Directory)
+        let listed = LinkedFiles::new()
+            .list_folder(roots, folder)
             .map_err(folder_inspection_failure)?;
-        let entries =
-            std::fs::read_dir(directory.operational_path()).map_err(folder_inspection_failure)?;
-        for entry in entries {
-            let entry = entry.map_err(folder_inspection_failure)?;
-            let Some(found) = matches.get_mut(&entry.file_name()) else {
+        for entry in listed.entries {
+            let Some(found) = matches.get_mut(&entry.name) else {
                 continue;
             };
-            let metadata =
-                std::fs::symlink_metadata(entry.path()).map_err(folder_inspection_failure)?;
-            if is_link(&metadata) {
+            if entry.link {
                 return Err("A imagem encontrada é um atalho ou redirecionamento. Escolha a pasta que contém o arquivo original.".into());
             }
-            if metadata.is_file() {
-                found.push(folder.join(entry.file_name()));
+            if !entry.directory {
+                found.push(folder.join(&entry.name));
             }
         }
         Ok(bindings
@@ -52,22 +48,10 @@ impl MediaResolver {
 }
 
 fn folder_inspection_failure(error: impl std::fmt::Display) -> String {
-    super::media_inspection_failure(
+    crate::linked_files::inspection_failure(
         error,
         "Não foi possível verificar todos os arquivos da pasta. Confira se ela está disponível e se você tem permissão para acessá-la.",
     )
-}
-
-fn is_link(metadata: &std::fs::Metadata) -> bool {
-    #[cfg(windows)]
-    {
-        use std::os::windows::fs::MetadataExt;
-        metadata.file_attributes() & 0x400 != 0
-    }
-    #[cfg(not(windows))]
-    {
-        metadata.file_type().is_symlink()
-    }
 }
 
 #[cfg(test)]

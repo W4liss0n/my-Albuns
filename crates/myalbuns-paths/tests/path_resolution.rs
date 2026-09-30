@@ -315,3 +315,41 @@ fn opens_and_publishes_beyond_the_legacy_windows_path_limit() {
         b"published"
     );
 }
+
+#[cfg(windows)]
+#[test]
+fn a_root_bound_to_a_share_is_remote_and_a_local_disk_is_not() {
+    let root = tempfile::tempdir().expect("temporary path root");
+    let local = root.path().join("Foto.jpg");
+    let shared = std::path::PathBuf::from(r"\\servidor\Fotos\Cliente\Foto.jpg");
+    let mapped = std::path::PathBuf::from(r"Z:\Cliente\Foto.jpg");
+
+    let mut owner = OperationPathContext::new();
+    owner.capture(&local).expect("the local root is captured");
+    owner
+        .capture_with_binding(&shared, std::path::Path::new(r"\\servidor\Fotos\"))
+        .expect("the share keeps its own root");
+    owner
+        .capture_with_binding(&mapped, std::path::Path::new(r"\\servidor\Mapeado\"))
+        .expect("a mapped drive is bound to its current share");
+    let plan = owner.freeze();
+
+    assert!(!plan.is_remote(&local));
+    assert!(plan.is_remote(&shared));
+    assert!(
+        plan.is_remote(&mapped),
+        "the operational root decides, not the drive letter"
+    );
+    assert!(
+        !plan.is_remote(std::path::Path::new(r"Y:\Fora\Foto.jpg")),
+        "an uncovered path is not classified"
+    );
+    assert_eq!(plan.remote_root(&local), None);
+    assert!(plan.remote_root(&shared).is_some());
+    assert_eq!(
+        plan.remote_root(&shared),
+        plan.remote_root(std::path::Path::new(r"\\servidor\Fotos\Outro\Foto.jpg")),
+        "every path on a share reaches the same root"
+    );
+    assert_ne!(plan.remote_root(&shared), plan.remote_root(&mapped));
+}

@@ -87,7 +87,19 @@ impl CacheEngine {
         let mut superseded = Vec::new();
         let mut accepted = Vec::new();
         let mut results = Vec::with_capacity(pending.len());
-        for (position, item) in pending.iter().enumerate() {
+        // The gate is held while each Original is observed again; observe the
+        // batch together, each item in its own attempt's plan.
+        let sources = pending
+            .iter()
+            .map(|item| cache_source_binding(&item.work.source))
+            .collect::<Vec<_>>();
+        let current_sources = crate::linked_files::LinkedFiles::new().observe_in_plans(
+            pending
+                .iter()
+                .zip(&sources)
+                .map(|(item, source)| (&item.work.root_bindings, source)),
+        );
+        for ((position, item), current) in pending.iter().enumerate().zip(current_sources) {
             let result = (|| {
                 if item.work.namespace.project_id() != namespace.project_id()
                     || item.work.namespace.paths() != namespace.paths()
@@ -100,10 +112,6 @@ impl CacheEngine {
                 if item.cancellation.flag().load(Ordering::Acquire) {
                     return Err(cancelled_before_publication());
                 }
-                let current = MediaResolver.observe_in_plan(
-                    &item.work.root_bindings,
-                    &cache_source_binding(&item.work.source),
-                );
                 let artifact = item.execution.artifact();
                 if !item.observed_source.same_source(&current)
                     || !current.matches_fingerprint(&artifact.fingerprint)

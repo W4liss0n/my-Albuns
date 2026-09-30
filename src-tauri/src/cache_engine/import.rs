@@ -122,7 +122,27 @@ impl CacheEngine {
         let mut published_paths = Vec::new();
         let mut adopted_ids = Vec::new();
         let mut storage_full = false;
-        for prepared in std::mem::take(&mut stage.prepared) {
+        let stage_prepared = std::mem::take(&mut stage.prepared);
+        // Each preview's Original is observed again before it is published;
+        // observe them together rather than one server round trip after another.
+        let mut current_sources = crate::linked_files::LinkedFiles::new()
+            .observe(
+                root_bindings,
+                stage_prepared.iter().filter_map(|prepared| {
+                    by_path
+                        .get(&(prepared.source.kind, prepared.candidate.path()))
+                        .copied()
+                }),
+            )
+            .into_iter()
+            .map(|current| {
+                (
+                    (current.kind, current.logical_path().to_path_buf()),
+                    current,
+                )
+            })
+            .collect::<HashMap<_, _>>();
+        for prepared in stage_prepared {
             let source_id = prepared.candidate.source_id.clone();
             if storage_full {
                 problems.push((source_id, ImportCacheFailure::StorageFull));
@@ -132,7 +152,11 @@ impl CacheEngine {
                 let binding = by_path
                     .get(&(prepared.source.kind, prepared.candidate.path()))
                     .ok_or("A imagem não pertence mais ao Projeto.")?;
-                let current = MediaResolver.observe_in_plan(root_bindings, binding);
+                let current = current_sources
+                    .remove(&(binding.kind, binding.logical_path.clone()))
+                    .unwrap_or_else(|| {
+                        crate::linked_files::LinkedFiles::new().observe_one(root_bindings, binding)
+                    });
                 if !prepared.source.same_source(&current)
                     || !current.matches_fingerprint(&prepared.generation.fingerprint)
                 {

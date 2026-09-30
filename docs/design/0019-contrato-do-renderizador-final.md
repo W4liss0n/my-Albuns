@@ -2,7 +2,7 @@
 status: accepted
 document: design
 date: 2026-09-01
-updated: 2026-09-24
+updated: 2026-09-29
 ticket: 3-programa-04-renderizador-final
 ---
 
@@ -501,7 +501,15 @@ qualquer evidência mudar durante a captura, a preparação inteira termina com
 `SourceIdentityIndeterminate` ou `SourceChanged`; nenhum nome final é tocado.
 
 Todas as Unidades de Exportação leem a mesma captura. Uma edição externa não
-pode fazer a primeira Página usar uma versão e a segunda usar outra. Depois que
+pode fazer a primeira Página usar uma versão e a segunda usar outra.
+
+Quando alguma fonte está num compartilhamento de rede, uma thread lê
+antecipadamente os bytes comprimidos das próximas fontes, pela captura e na ordem
+em que as camadas os usam pela primeira vez. Assim a transferência acontece
+enquanto as unidades anteriores são compostas e codificadas. Só bytes comprimidos
+ficam retidos, até 128 MiB ainda não decodificados. O teto de pixels não muda e o
+decode desses bytes produz os mesmos rasters. Uma fonte não lida antes, ou lida de
+novo depois de sair da memória, é lida da própria captura, como antes. Depois que
 os arquivos preparados foram sincronizados e verificados, seus bytes já são a
 representação da captura e não voltam ao pathname. Uma nova tentativa sempre
 captura novamente a versão então corrente.
@@ -557,6 +565,8 @@ O encoder usa a compressão `Fast` do crate `png`. Exportar três lâminas de
 levar de 5,2 a 7,2 s, com arquivos 7% maiores. Os pixels continuam idênticos e
 a decodificação de conferência continua obrigatória. Decisão aceita em
 2026-09-23; medição refeita em 2026-09-24 com fotos distribuídas na lâmina.
+Desde 2026-09-29 essa decodificação usa os bytes codificados em memória, antes
+de gravar o arquivo (ver [Verificação sem releitura](#verificação-sem-releitura)).
 
 ### PDF
 
@@ -620,6 +630,31 @@ ao adaptador escolhido e sincroniza e verifica todas as saídas na mesma pasta
 de preparação da tentativa. PDF prepara um arquivo com todas as páginas;
 JPEG/PNG preparam um arquivo por unidade. Falha ou cancelamento nesta fase
 preserva todos os nomes finais.
+
+### Verificação sem releitura
+
+A preparação fica no próprio Destino, que pode ser uma pasta de rede. Ali, cada
+releitura de uma saída é outra transferência completa: antes de 2026-09-29, um
+JPEG atravessava a rede três vezes (gravação, verificação do Processador e
+conferência do Host) e um PNG, quatro. A verificação passou a acontecer sobre os
+mesmos bytes que o arquivo recebe:
+
+- **JPEG**: a estrutura (SOI, JFIF/DPI, perfil ICC, SOF0 baseline, ausência de
+  metadados, marcadores do scan e EOI) e o SHA-256 são verificados à medida que
+  o encoder grava, sobre exatamente os bytes aceitos pelo arquivo. Uma violação
+  interrompe a gravação e a tentativa falha com `VerificationFailed`.
+- **PNG**: o arquivo é codificado em memória, decodificado de volta e comparado
+  ao raster canônico antes de ser gravado de uma vez. A memória da codificação
+  cresce só com reservas bem-sucedidas; faltar memória falha como
+  `ResourceLimitExceeded`, sem derrubar o Processador.
+- **PDF**: cada raster de página já era descomprimido e comparado antes de ser
+  gravado; o SHA-256 do documento é calculado durante a gravação.
+
+O recibo do Processador descreve esses bytes. O Host continua relendo cada
+arquivo preparado uma vez e comparando tamanho e SHA-256 com o recibo antes de
+qualquer promoção; é essa conferência que prova que o disco guarda os bytes
+verificados. Cada saída passa a atravessar a rede uma vez para ser gravada e uma
+vez para ser conferida. Bytes e pixels exportados não mudam.
 
 Antes da primeira promoção, o Destino passa por uma prova descartável de
 criação atômica e, quando o plano contém `ReplaceConfirmed`, também de

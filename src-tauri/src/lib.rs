@@ -37,6 +37,7 @@ pub mod ipc_contract;
 mod layout_catalog_store;
 mod layout_commands;
 mod legacy_layouts;
+mod linked_files;
 mod local_store_io;
 mod logging;
 mod media_confirmation;
@@ -49,6 +50,8 @@ mod named_mutex;
 mod native_dialog_taskbar;
 mod native_dialog_window;
 mod native_project_dialog;
+#[cfg(test)]
+mod network_bench;
 mod opaque_image_protocol;
 mod operation_gate;
 mod operation_lease;

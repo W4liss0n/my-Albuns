@@ -171,11 +171,18 @@ fn run_real_import_flow_with_memory(
     let source_directory = fixture.path().join("originals");
     std::fs::create_dir(&source_directory).unwrap();
     let inputs = build_inputs(&source_directory);
-    let original_hashes = inputs
-        .paths
-        .iter()
-        .map(|path| digest(path))
-        .collect::<Vec<_>>();
+    // Hashing the Originals would bring them into the client's cache right
+    // before a measured import from a network share.
+    let cold = std::env::var_os("MYALBUNS_IMPORT_MEASUREMENT_COLD").is_some();
+    let original_hashes = if cold {
+        Vec::new()
+    } else {
+        inputs
+            .paths
+            .iter()
+            .map(|path| digest(path))
+            .collect::<Vec<_>>()
+    };
     let rounds: usize = std::env::var("MYALBUNS_IMPORT_MEASUREMENT_ROUNDS")
         .ok()
         .map(|value| value.parse().unwrap())
@@ -237,7 +244,13 @@ fn run_real_import_flow_with_memory(
                 &candidates,
             )
             .unwrap();
-        let requests = attempt.requests(processor.cache_capacity());
+        // As import_selected_media: fewer batch processes for Originals on a share.
+        let requests =
+            attempt.requests(crate::linked_files::LinkedFiles::new().full_read_capacity(
+                &attempt.roots,
+                attempt.sources.iter().map(|source| source.candidate.path()),
+                processor.cache_capacity(),
+            ));
         let process_count = requests.len();
         let capture_ms = milliseconds(total_started);
         let native_started = Instant::now();
@@ -282,11 +295,20 @@ fn run_real_import_flow_with_memory(
                         &import_progress,
                     );
                     scope.spawn(move || {
-                        let estimate = ImageMemoryEstimate::in_plan(
-                            &request.root_bindings,
-                            request.candidates.iter().map(PhotoImportCandidate::path),
+                        let estimate = ImageMemoryEstimate::from_headers(
+                            &crate::linked_files::LinkedFiles::new().headers(
+                                &request.root_bindings,
+                                request.candidates.iter().map(PhotoImportCandidate::path),
+                            ),
                         );
                         tauri::async_runtime::block_on(async {
+                            let _remote_turn = crate::linked_files::LinkedFiles::new()
+                                .remote_read_turn(
+                                    &request.root_bindings,
+                                    request.candidates.iter().map(PhotoImportCandidate::path),
+                                    || false,
+                                )
+                                .await;
                             let cancellation = CacheCancellation::default();
                             let _permit = engine.begin_cancellable_work(cancellation.clone()).await;
                             let _reservation = processor
@@ -354,7 +376,7 @@ fn run_real_import_flow_with_memory(
         let inspection_started = Instant::now();
         let bindings = attempt.catalog.bindings.clone();
         let roots = attempt.roots.clone();
-        let decoded_before = crate::media_runtime::photo_source_decode_count();
+        let decoded_before = crate::linked_files::photo_source_decode_count();
         import_progress.begin_inspection(outcomes.iter().filter_map(|(source, outcome)| {
             matches!(outcome, PhotoImportOutcome::Validated { .. }).then_some(source)
         }));
@@ -382,7 +404,7 @@ fn run_real_import_flow_with_memory(
         .unwrap();
         active.fetch_sub(1, Ordering::AcqRel);
         assert_eq!(
-            crate::media_runtime::photo_source_decode_count() - decoded_before,
+            crate::linked_files::photo_source_decode_count() - decoded_before,
             inputs.host_decodes
         );
         let inspection_ms = milliseconds(inspection_started);
@@ -576,7 +598,7 @@ fn run_real_import_flow_with_memory(
             inputs.previews
         );
         assert_eq!(
-            crate::media_runtime::photo_source_decode_count() - decoded_before,
+            crate::linked_files::photo_source_decode_count() - decoded_before,
             inputs.host_decodes
         );
         if inputs.imported > 0 {
@@ -592,14 +614,16 @@ fn run_real_import_flow_with_memory(
             "previewSha256": preview_hashes, "progress": progress_samples
         }));
     }
-    assert_eq!(
-        inputs
-            .paths
-            .iter()
-            .map(|path| digest(path))
-            .collect::<Vec<_>>(),
-        original_hashes
-    );
+    if !cold {
+        assert_eq!(
+            inputs
+                .paths
+                .iter()
+                .map(|path| digest(path))
+                .collect::<Vec<_>>(),
+            original_hashes
+        );
+    }
     if let Some(output) = std::env::var_os("MYALBUNS_IMPORT_MEASUREMENT_OUTPUT") {
         let report = serde_json::json!({ "schemaVersion": 1, "protocolVersion": IMAGING_PROTOCOL_VERSION,
             "profile": "debug", "processorSha256": digest(&executable), "originalsUnchanged": true,

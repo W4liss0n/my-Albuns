@@ -105,17 +105,21 @@ impl PhotoImportAttempt {
         }
         let roots = context.freeze();
         let (paths, selection_problems) = crate::media_import_selection::expand(paths, &roots);
-        let sources = paths
+        let selected = paths
             .iter()
             .filter(|path| !existing.contains(path.as_path()))
-            .map(|path| {
+            .map(|path| source_binding(kind, path))
+            .collect::<Vec<_>>();
+        let sources = selected
+            .iter()
+            .zip(crate::linked_files::LinkedFiles::new().observe(&roots, &selected))
+            .map(|(binding, before)| {
                 let candidate = PhotoImportCandidate {
                     source_id: PhotoImportSourceId::new(uuid::Uuid::new_v4().simple().to_string())
                         .expect("a UUID is a valid import source key"),
-                    source_path: NativePathDto::from(path.clone()),
+                    source_path: NativePathDto::from(binding.logical_path.clone()),
                     generation_id: uuid::Uuid::new_v4().simple().to_string(),
                 };
-                let before = MediaResolver.observe_in_plan(&roots, &source_binding(kind, path));
                 SelectedSource { candidate, before }
             })
             .collect();
@@ -243,8 +247,16 @@ pub(crate) async fn import_selected_media(
     let total = attempt.paths.len() + unsupported_count;
     let progress = ImageProcessingBatch::new(total as u32, publish);
 
+    // Each batch process reads its Originals one after another; on a network
+    // share fewer processes deliver the same bytes and the first previews sooner.
+    let files = crate::linked_files::LinkedFiles::new();
+    let capacity = files.full_read_capacity(
+        &attempt.roots,
+        attempt.sources.iter().map(|source| source.candidate.path()),
+        app.state::<ImagingProcessor>().cache_capacity(),
+    );
     let requests = if stage.is_some() {
-        attempt.requests(app.state::<ImagingProcessor>().cache_capacity())
+        attempt.requests(capacity)
     } else {
         Vec::new()
     };
@@ -258,6 +270,14 @@ pub(crate) async fn import_selected_media(
             let interrupted = &interrupted;
             let storage_interrupted = &storage_interrupted;
             async move {
+                // Shares the turns of Cache jobs reading from the same shares.
+                let _remote_turn = files
+                    .remote_read_turn(
+                        &request.root_bindings,
+                        request.candidates.iter().map(PhotoImportCandidate::path),
+                        || false,
+                    )
+                    .await;
                 let result = if storage_interrupted.load(Ordering::Acquire) {
                     Err(BatchFailure::StorageFull)
                 } else if interrupted.load(Ordering::Acquire) {
@@ -287,7 +307,7 @@ pub(crate) async fn import_selected_media(
                 (request, result)
             }
         })
-        .buffer_unordered(app.state::<ImagingProcessor>().cache_capacity())
+        .buffer_unordered(capacity)
         .collect::<Vec<_>>()
         .await;
     if let Some(message) = batches.iter().find_map(|(_, result)| match result {
@@ -446,6 +466,24 @@ fn prepare_proposal_with_inspection(
     let mut accepted_paths = Vec::new();
     let stage_full = matches!(stage_error, Some(ImportCacheFailure::StorageFull));
     let mut storage_full = stage_full;
+    // Every validated Original is observed again before its decode counts;
+    // observe them together rather than one server round trip after another.
+    let validated = attempt
+        .sources
+        .iter()
+        .filter(|source| {
+            matches!(
+                outcomes.get(&source.candidate.source_id),
+                Some(PhotoImportOutcome::Validated { .. })
+            )
+        })
+        .map(|source| source_binding(attempt.kind, source.candidate.path()))
+        .collect::<Vec<_>>();
+    let mut current_observations = crate::linked_files::LinkedFiles::new()
+        .observe(&attempt.roots, &validated)
+        .into_iter()
+        .map(|observation| (observation.logical_path().to_path_buf(), observation))
+        .collect::<HashMap<_, _>>();
     for path in &attempt.paths {
         let Some(source) = sources.get(path.as_path()) else {
             proposal
@@ -470,8 +508,12 @@ fn prepare_proposal_with_inspection(
             preview,
         }) = outcome
         {
-            let current =
-                MediaResolver.observe_in_plan(&attempt.roots, &source_binding(attempt.kind, path));
+            let current = current_observations
+                .remove(path.as_path())
+                .unwrap_or_else(|| {
+                    crate::linked_files::LinkedFiles::new()
+                        .observe_one(&attempt.roots, &source_binding(attempt.kind, path))
+                });
             if source.before.same_source(&current) && current.matches_fingerprint(&fingerprint) {
                 let metadata = PhotoSourceMetadata::new(
                     dimensions.width_px,
@@ -577,19 +619,30 @@ fn commit_prepared_import(
             )
         })
         .collect::<HashMap<_, _>>();
-    let rejected = prepared
+    let evidenced = prepared
         .proposal
         .commands
         .iter()
         .filter(|command| {
-            new_paths.contains(command.path())
-                && !evidence.get(command.path()).is_some_and(|observed| {
-                    observed.same_source(&MediaResolver.observe_in_plan(
-                        &attempt.roots,
-                        &source_binding(attempt.kind, command.path()),
-                    ))
-                })
+            new_paths.contains(command.path()) && evidence.contains_key(command.path())
         })
+        .map(|command| source_binding(attempt.kind, command.path()))
+        .collect::<Vec<_>>();
+    let unchanged = crate::linked_files::LinkedFiles::new()
+        .observe(&attempt.roots, &evidenced)
+        .into_iter()
+        .filter(|current| {
+            evidence
+                .get(current.logical_path())
+                .is_some_and(|observed| observed.same_source(current))
+        })
+        .map(|current| current.logical_path().to_path_buf())
+        .collect::<HashSet<_>>();
+    let rejected = prepared
+        .proposal
+        .commands
+        .iter()
+        .filter(|command| new_paths.contains(command.path()) && !unchanged.contains(command.path()))
         .map(|command| command.path().to_path_buf())
         .collect::<HashSet<_>>();
     prepared
@@ -727,12 +780,14 @@ async fn execute_import_batch(
     let context = InvocationContext::new(&request.request_id, Some(&request.project_id));
     let estimated_request = request.clone();
     let estimate = tauri::async_runtime::spawn_blocking(move || {
-        ImageMemoryEstimate::in_plan(
-            &estimated_request.root_bindings,
-            estimated_request
-                .candidates
-                .iter()
-                .map(PhotoImportCandidate::path),
+        ImageMemoryEstimate::from_headers(
+            &crate::linked_files::LinkedFiles::new().headers(
+                &estimated_request.root_bindings,
+                estimated_request
+                    .candidates
+                    .iter()
+                    .map(PhotoImportCandidate::path),
+            ),
         )
     })
     .await
@@ -848,7 +903,9 @@ fn inspect_with_capacity(
     bindings: &[MediaBinding],
     roots: &RootBindingPlan,
 ) -> PhotoImportsProposal {
-    let estimate = ImageMemoryEstimate::in_plan(roots, [path]);
+    let estimate = ImageMemoryEstimate::from_headers(
+        &crate::linked_files::LinkedFiles::new().headers(roots, [path]),
+    );
     let cancellation = CacheCancellation::default();
     let result = tauri::async_runtime::block_on(async {
         loop {
@@ -1165,10 +1222,10 @@ mod tests {
             .rev()
             .map(|source| (source.candidate.source_id.clone(), validated(source)))
             .collect();
-        let before = crate::media_runtime::photo_source_decode_count();
+        let before = crate::linked_files::photo_source_decode_count();
         let prepared =
             prepare_proposal(attempt, None, outcomes, HashMap::new(), None, Vec::new()).unwrap();
-        assert_eq!(crate::media_runtime::photo_source_decode_count(), before);
+        assert_eq!(crate::linked_files::photo_source_decode_count(), before);
         assert_eq!(prepared.accepted_paths, [second, first]);
         assert_eq!(prepared.cache_problems.len(), 2);
         assert_eq!(prepared.proposal.problems.len(), 1);

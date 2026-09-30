@@ -1395,8 +1395,9 @@ fn real_processor_exports_old_myalbuns_projects_without_writing_them() {
                         kind: media.kind(),
                         logical_path: media.path().to_path_buf(),
                     };
-                    MediaResolver
-                        .inspect_media_header_in_plan(&binding, &media_paths)
+                    crate::linked_files::LinkedFiles::new()
+                        .header(&media_paths, &binding.logical_path)
+                        .and_then(|header| header.photo_metadata())
                         .ok()
                         .map(|metadata| (MediaId::try_from(media.id()).unwrap(), metadata))
                 })

@@ -2,29 +2,18 @@ mod relink;
 
 use std::{
     collections::{HashMap, HashSet},
-    io::{BufReader, Read},
-    path::PathBuf,
-    sync::{Arc, Mutex},
-    time::{SystemTime, UNIX_EPOCH},
+    path::{Path, PathBuf},
+    sync::{Arc, Mutex, atomic::AtomicBool},
+    time::SystemTime,
 };
 
-use image::{DynamicImage, ImageDecoder, ImageFormat, ImageReader, metadata::Orientation};
 use myalbuns_core::{ImportPhoto, MediaKind, PhotoSourceMetadata};
-use myalbuns_paths::{
-    ExpectedObject, OperationPathContext, PhysicalFileIdentity, ResolveError, RootBindingPlan,
-};
+use myalbuns_paths::{OperationPathContext, RootBindingPlan};
 
 use crate::ipc_contract::ImageProcessingProblem;
-
-#[cfg(test)]
-std::thread_local! {
-    static PHOTO_SOURCE_DECODES: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
-}
-
-#[cfg(test)]
-pub(crate) fn photo_source_decode_count() -> usize {
-    PHOTO_SOURCE_DECODES.get()
-}
+use crate::linked_files::{LinkedFiles, map_concurrently};
+/// The Monitor's vocabulary; `linked_files` produces these observations.
+pub(crate) use crate::linked_files::{MediaAvailability, MediaObservation};
 
 pub(crate) struct PhotoImportsProposal {
     pub(crate) kind: MediaKind,
@@ -61,17 +50,52 @@ struct ListedFile {
 }
 
 impl MediaListingHint {
-    pub(crate) fn read(bindings: &[MediaBinding]) -> Self {
-        let mut folders = HashMap::<&std::path::Path, Option<HashMap<String, ListedFile>>>::new();
+    pub(crate) fn read(
+        files: &LinkedFiles,
+        plan: &RootBindingPlan,
+        bindings: &[MediaBinding],
+    ) -> Self {
+        let mut folders = Vec::<&Path>::new();
+        for folder in bindings
+            .iter()
+            .filter_map(|binding| binding.logical_path.parent())
+        {
+            if !folders.contains(&folder) {
+                folders.push(folder);
+            }
+        }
+        let listings = folders
+            .iter()
+            .copied()
+            .zip(files.list_folders(plan, folders.iter().copied()))
+            .map(|(folder, listed)| {
+                let entries = listed.ok().map(|listed| {
+                    listed
+                        .entries
+                        .into_iter()
+                        .map(|entry| {
+                            (
+                                listing_key(&entry.name),
+                                ListedFile {
+                                    bytes: entry.bytes,
+                                    created: entry.created,
+                                    modified: entry.modified,
+                                },
+                            )
+                        })
+                        .collect::<HashMap<_, _>>()
+                });
+                (folder, entries)
+            })
+            .collect::<HashMap<_, _>>();
         Self(
             bindings
                 .iter()
                 .map(|binding| {
                     let path = binding.logical_path.as_path();
                     let (folder, name) = (path.parent()?, path.file_name()?);
-                    folders
-                        .entry(folder)
-                        .or_insert_with(|| list_folder(folder))
+                    listings
+                        .get(folder)?
                         .as_ref()?
                         .get(&listing_key(name))
                         .copied()
@@ -81,82 +105,9 @@ impl MediaListingHint {
     }
 }
 
-fn list_folder(folder: &std::path::Path) -> Option<HashMap<String, ListedFile>> {
-    // On Windows the listing already carries each entry's size and dates.
-    let entries = std::fs::read_dir(folder).ok()?;
-    Some(
-        entries
-            .filter_map(|entry| {
-                let entry = entry.ok()?;
-                let metadata = entry.metadata().ok()?;
-                Some((
-                    listing_key(&entry.file_name()),
-                    ListedFile {
-                        bytes: metadata.len(),
-                        created: metadata.created().ok(),
-                        modified: metadata.modified().ok(),
-                    },
-                ))
-            })
-            .collect(),
-    )
-}
-
 /// Windows names compare without case.
 fn listing_key(name: &std::ffi::OsStr) -> String {
     name.to_string_lossy().to_lowercase()
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(crate) enum MediaAvailability {
-    Candidate,
-    Absent,
-    Unavailable,
-}
-
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub(crate) struct MediaObservation {
-    pub(crate) media_id: String,
-    pub(crate) kind: MediaKind,
-    logical_path: PathBuf,
-    pub(crate) availability: MediaAvailability,
-    physical_identity: Option<PhysicalFileIdentity>,
-    source_bytes: Option<u64>,
-    source_created_unix_ms: Option<u64>,
-    source_modified_unix_ms: Option<u64>,
-}
-
-impl MediaObservation {
-    pub(crate) fn same_source(&self, current: &Self) -> bool {
-        self.availability == MediaAvailability::Candidate
-            && current.availability == MediaAvailability::Candidate
-            && self.physical_identity.is_some()
-            && self.source_modified_unix_ms.is_some()
-            && self.kind == current.kind
-            && self.logical_path == current.logical_path
-            && self.physical_identity == current.physical_identity
-            && self.source_bytes == current.source_bytes
-            && self.source_created_unix_ms == current.source_created_unix_ms
-            && self.source_modified_unix_ms == current.source_modified_unix_ms
-    }
-
-    pub(crate) fn matches_fingerprint(
-        &self,
-        fingerprint: &myalbuns_imaging_protocol::CacheFingerprint,
-    ) -> bool {
-        self.availability == MediaAvailability::Candidate
-            && self.source_bytes == Some(fingerprint.source_bytes)
-            && self.source_created_unix_ms == fingerprint.source_created_unix_ms
-            && self.source_modified_unix_ms == fingerprint.source_modified_unix_ms
-    }
-
-    pub(crate) fn logical_path(&self) -> &std::path::Path {
-        &self.logical_path
-    }
-
-    pub(crate) fn source_bytes(&self) -> Option<u64> {
-        self.source_bytes
-    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -418,7 +369,8 @@ impl MediaResolver {
                 (path, capture)
             })
             .collect::<Vec<_>>();
-        let inspected = inspect_photo_candidates(
+        let files = LinkedFiles::new();
+        let inspected = map_concurrently(
             candidates,
             |(path, capture)| {
                 if existing.contains(path.as_path()) {
@@ -431,9 +383,11 @@ impl MediaResolver {
                             kind,
                             logical_path: path.clone(),
                         };
-                        let before = self.observe_in_plan(plan, &binding);
-                        let metadata = inspect_media_source_in_plan(plan, &path, false)?;
-                        let after = self.observe_in_plan(plan, &binding);
+                        let before = files.observe_one(plan, &binding);
+                        let metadata = files
+                            .inspect_decoded(plan, &path)
+                            .and_then(|header| header.photo_metadata())?;
+                        let after = files.observe_one(plan, &binding);
                         if !before.same_source(&after) {
                             return Err("O Original mudou durante a inspeção.".into());
                         }
@@ -489,26 +443,13 @@ impl MediaResolver {
         if binding.kind != MediaKind::Photo {
             return Err("A ocorrência escolhida não é uma foto.".into());
         }
-        inspect_media_source(&binding.logical_path, false)
-    }
-
-    pub(crate) fn inspect_media_binding_in_plan(
-        &self,
-        binding: &MediaBinding,
-        plan: &RootBindingPlan,
-    ) -> Result<PhotoSourceMetadata, String> {
-        inspect_media_source_in_plan(plan, &binding.logical_path, false)
-    }
-
-    /// Reads format, dimensions and orientation without decoding pixels. Only
-    /// for Originals the Processor decodes right after to prepare their
-    /// preview, which rejects a damaged image body there.
-    pub(crate) fn inspect_media_header_in_plan(
-        &self,
-        binding: &MediaBinding,
-        plan: &RootBindingPlan,
-    ) -> Result<PhotoSourceMetadata, String> {
-        inspect_media_source_with(plan, &binding.logical_path, false, false)
+        let mut context = OperationPathContext::new();
+        context
+            .capture(&binding.logical_path)
+            .map_err(|error| format!("O caminho escolhido é inválido: {error}"))?;
+        LinkedFiles::new()
+            .inspect_decoded(&context.freeze(), &binding.logical_path)
+            .and_then(|header| header.photo_metadata())
     }
 
     #[cfg(test)]
@@ -533,7 +474,8 @@ impl MediaResolver {
         replacement_path: PathBuf,
         roots: &RootBindingPlan,
     ) -> Result<MediaRelinkProposal, String> {
-        if self.observe_in_plan(roots, binding).availability != MediaAvailability::Absent {
+        if LinkedFiles::new().observe_one(roots, binding).availability != MediaAvailability::Absent
+        {
             return Err("Somente um Arquivo comprovadamente ausente pode ser religado.".into());
         }
         self.propose_replacement_in_plan(binding, replacement_path, roots)
@@ -549,9 +491,12 @@ impl MediaResolver {
             logical_path: replacement_path.clone(),
             ..binding.clone()
         };
-        let before = self.observe_in_plan(roots, &candidate);
-        let inspected = inspect_media_source_in_plan(roots, &replacement_path, false)?;
-        if !before.same_source(&self.observe_in_plan(roots, &candidate)) {
+        let files = LinkedFiles::new();
+        let before = files.observe_one(roots, &candidate);
+        let inspected = files
+            .inspect_decoded(roots, &replacement_path)
+            .and_then(|header| header.photo_metadata())?;
+        if !before.same_source(&files.observe_one(roots, &candidate)) {
             return Err("O Original mudou durante a inspeção. Tente novamente.".into());
         }
 
@@ -564,247 +509,28 @@ impl MediaResolver {
         })
     }
 
+    /// Observes bindings through a plan captured for them alone. A binding
+    /// whose root cannot be captured is observed as unavailable.
     pub(crate) fn observe(
         &self,
         generation: u64,
         bindings: &[MediaBinding],
     ) -> MediaResolutionProposal {
         let mut context = OperationPathContext::new();
-        let mut capture_failures = HashMap::new();
         for binding in bindings {
-            if context.capture(&binding.logical_path).is_err() {
-                capture_failures.insert(binding.media_id.as_str(), MediaAvailability::Unavailable);
-            }
+            let _ = context.capture(&binding.logical_path);
         }
-        let plan = context.freeze();
-        let observations = bindings
-            .iter()
-            .map(|binding| {
-                let resolved = if capture_failures.contains_key(binding.media_id.as_str()) {
-                    Err(ResolveError::Unavailable)
-                } else {
-                    plan.resolve_existing(&binding.logical_path, ExpectedObject::RegularFile)
-                };
-                observe_resolved_source(binding, resolved)
-            })
-            .collect();
         MediaResolutionProposal {
             generation,
-            observations,
+            observations: LinkedFiles::new().observe(&context.freeze(), bindings),
         }
     }
-
-    pub(crate) fn observe_in_plan(
-        &self,
-        plan: &RootBindingPlan,
-        binding: &MediaBinding,
-    ) -> MediaObservation {
-        observe_resolved_source(
-            binding,
-            plan.resolve_existing(&binding.logical_path, ExpectedObject::RegularFile),
-        )
-    }
 }
 
-fn observe_resolved_source(
-    binding: &MediaBinding,
-    resolved: Result<myalbuns_paths::ResolvedObject, ResolveError>,
-) -> MediaObservation {
-    let (
-        availability,
-        physical_identity,
-        source_bytes,
-        source_created_unix_ms,
-        source_modified_unix_ms,
-    ) = match resolved {
-        Ok(resolved) => match readable_source_metadata(&resolved) {
-            Ok(metadata) => (
-                MediaAvailability::Candidate,
-                resolved.physical_identity(),
-                Some(metadata.len()),
-                file_time_millis(metadata.created()),
-                file_time_millis(metadata.modified()),
-            ),
-            Err(_) => (MediaAvailability::Unavailable, None, None, None, None),
-        },
-        Err(ResolveError::NotFound) => (MediaAvailability::Absent, None, None, None, None),
-        Err(
-            ResolveError::InvalidPath
-            | ResolveError::UnsupportedNamespace
-            | ResolveError::UnboundRoot
-            | ResolveError::AccessDenied
-            | ResolveError::Unavailable
-            | ResolveError::UnexpectedObjectType { .. }
-            | ResolveError::IoFailure,
-        ) => (MediaAvailability::Unavailable, None, None, None, None),
-    };
-    MediaObservation {
-        media_id: binding.media_id.clone(),
-        kind: binding.kind,
-        logical_path: binding.logical_path.clone(),
-        availability,
-        physical_identity,
-        source_bytes,
-        source_created_unix_ms,
-        source_modified_unix_ms,
-    }
-}
-
-fn readable_source_metadata(
-    resolved: &myalbuns_paths::ResolvedObject,
-) -> std::io::Result<std::fs::Metadata> {
-    // A metadata-only handle may succeed while Photoshop holds the original
-    // against readers. Such a sample cannot revoke the last usable preview.
-    let mut file = resolved.reopen_for_read()?;
-    file.read_exact(&mut [0u8; 1])?;
-    file.metadata()
-}
-
-/// Inspection can finish out of order; the proposal preserves the user's
-/// selection order so the eventual single creative command stays deterministic.
-fn inspect_photo_candidates<T: Send, R: Send>(
-    candidates: Vec<T>,
-    inspect: impl Fn(T) -> R + Sync,
-    mut completed: impl FnMut(u32),
-) -> Vec<R> {
-    let total = candidates.len();
-    if total <= 1 {
-        return candidates
-            .into_iter()
-            .map(|candidate| {
-                let result = inspect(candidate);
-                completed(1);
-                result
-            })
-            .collect();
-    }
-    let candidates = Mutex::new(candidates.into_iter().enumerate());
-    let (sender, receiver) = std::sync::mpsc::channel();
-    std::thread::scope(|scope| {
-        for _ in 0..total.min(crate::imaging_processor::IMAGE_PROCESSING_CONCURRENCY) {
-            let candidates = &candidates;
-            let inspect = &inspect;
-            let sender = sender.clone();
-            scope.spawn(move || {
-                loop {
-                    let Some((index, candidate)) = candidates
-                        .lock()
-                        .expect("the photo inspection queue is healthy")
-                        .next()
-                    else {
-                        break;
-                    };
-                    if sender.send((index, inspect(candidate))).is_err() {
-                        break;
-                    }
-                }
-            });
-        }
-        drop(sender);
-        let mut results = Vec::with_capacity(total);
-        for result in receiver {
-            results.push(result);
-            completed(results.len() as u32);
-        }
-        results.sort_unstable_by_key(|(index, _)| *index);
-        results.into_iter().map(|(_, result)| result).collect()
-    })
-}
-
-#[cfg(test)]
-fn inspect_media_source(
-    path: &std::path::Path,
-    require_jpeg: bool,
-) -> Result<PhotoSourceMetadata, String> {
-    let mut context = OperationPathContext::new();
-    context
-        .capture(path)
-        .map_err(|error| format!("O caminho escolhido é inválido: {error}"))?;
-    inspect_media_source_in_plan(&context.freeze(), path, require_jpeg)
-}
-
-fn inspect_media_source_in_plan(
-    plan: &RootBindingPlan,
-    path: &std::path::Path,
-    require_jpeg: bool,
-) -> Result<PhotoSourceMetadata, String> {
-    inspect_media_source_with(plan, path, require_jpeg, true)
-}
-
-fn inspect_media_source_with(
-    plan: &RootBindingPlan,
-    path: &std::path::Path,
-    require_jpeg: bool,
-    decode_pixels: bool,
-) -> Result<PhotoSourceMetadata, String> {
-    let resolved = plan
-        .resolve_existing(path, ExpectedObject::RegularFile)
-        .map_err(|error| media_inspection_failure(error, "O arquivo escolhido não está disponível. Confira se ele continua no mesmo local e pode ser aberto."))?;
-    let file = resolved.reopen_for_read().map_err(|error| {
-        media_inspection_failure(error, "Não foi possível abrir o arquivo escolhido.")
-    })?;
-    let reader = ImageReader::new(BufReader::new(file))
-        .with_guessed_format()
-        .map_err(|error| {
-            media_inspection_failure(error, "Não foi possível ler a imagem escolhida.")
-        })?;
-    let compatible = if require_jpeg {
-        reader.format() == Some(ImageFormat::Jpeg)
-    } else {
-        matches!(
-            reader.format(),
-            Some(ImageFormat::Jpeg | ImageFormat::Png | ImageFormat::Tiff)
-        )
-    };
-    if !compatible {
-        return Err(if require_jpeg {
-            "Escolha um arquivo JPEG válido (.jpg ou .jpeg).".into()
-        } else {
-            "O arquivo escolhido não usa um formato de mídia compatível.".into()
-        });
-    }
-    let mut decoder = reader.into_decoder().map_err(|error| {
-        media_inspection_failure(error, "Não foi possível ler a imagem escolhida.")
-    })?;
-    let (mut width, mut height) = decoder.dimensions();
-    let orientation = decoder.orientation().map_err(|error| {
-        media_inspection_failure(
-            error,
-            "Não foi possível ler a orientação da imagem escolhida.",
-        )
-    })?;
-    if matches!(
-        orientation,
-        Orientation::Rotate90
-            | Orientation::Rotate270
-            | Orientation::Rotate90FlipH
-            | Orientation::Rotate270FlipH
-    ) {
-        std::mem::swap(&mut width, &mut height);
-    }
-    if decode_pixels {
-        #[cfg(test)]
-        PHOTO_SOURCE_DECODES.set(PHOTO_SOURCE_DECODES.get() + 1);
-        DynamicImage::from_decoder(decoder).map_err(|_| {
-            if require_jpeg {
-                "Não foi possível ler o JPEG. O arquivo pode estar danificado.".to_string()
-            } else {
-                "Não foi possível ler a imagem. O arquivo pode estar danificado.".to_string()
-            }
-        })?;
-    }
-    PhotoSourceMetadata::new(
-        width,
-        height,
-        ["#D8DEE2".into(), "#BBC4CA".into(), "#929EA6".into()],
-    )
-    .map_err(crate::project_error_message::project_error_message)
-}
-
-fn media_inspection_failure(error: impl std::fmt::Display, message: &str) -> String {
-    tracing::warn!(target: "myalbuns.desktop", %error, event = "media_inspection_failed");
-    message.into()
-}
+/// The Monitor abandoned an observation of the catalogue because Cache work
+/// was asked to pause.
+#[derive(Debug, Eq, PartialEq)]
+pub(crate) struct MediaObservationInterrupted;
 
 #[derive(Clone, Debug, Default)]
 pub(crate) struct MediaRuntime {
@@ -831,7 +557,7 @@ impl MediaRuntime {
             .iter()
             .filter_map(|binding| {
                 let file = by_id.get(binding.media_id.as_str())?;
-                if file.logical_path != binding.logical_path || file.kind != binding.kind {
+                if file.logical_path() != binding.logical_path || file.kind != binding.kind {
                     return None;
                 }
                 Some(MediaFileInfo {
@@ -841,8 +567,8 @@ impl MediaRuntime {
                         MediaAvailability::Absent => MediaFileState::Absent,
                         MediaAvailability::Unavailable => MediaFileState::Unavailable,
                     },
-                    created_at_ms: file.source_created_unix_ms,
-                    modified_at_ms: file.source_modified_unix_ms,
+                    created_at_ms: file.created_unix_ms(),
+                    modified_at_ms: file.modified_unix_ms(),
                 })
             })
             .collect()
@@ -886,7 +612,7 @@ impl MediaRuntime {
             .filter(|observation| {
                 previous
                     .get(observation.media_id.as_str())
-                    .is_some_and(|previous| invalidates_cache(previous, observation))
+                    .is_some_and(|previous| observation.changes_content_of(previous))
             })
             .map(|observation| observation.media_id.clone())
             .collect::<Vec<_>>();
@@ -910,7 +636,7 @@ impl MediaRuntime {
 
 #[derive(Clone, Debug, Default)]
 pub(crate) struct MediaMonitor {
-    resolver: MediaResolver,
+    files: LinkedFiles,
     transition: Arc<Mutex<MediaMonitorTransition>>,
 }
 
@@ -921,6 +647,15 @@ struct MediaMonitorTransition {
 }
 
 impl MediaMonitor {
+    /// A Monitor observing through a test adapter, such as a slow share.
+    #[cfg(test)]
+    pub(crate) fn with_linked_files(files: LinkedFiles) -> Self {
+        Self {
+            files,
+            ..Self::default()
+        }
+    }
+
     /// A changed source needs two equal observations before it is confirmed.
     pub(crate) fn has_pending_observation(&self) -> bool {
         self.transition
@@ -951,7 +686,7 @@ impl MediaMonitor {
             .ok_or(MediaRetryError::NotUnavailable)?;
         // Explicit retry observes only its requested occurrence. Every other
         // observation remains unchanged while image inspection is admitted.
-        *observation = self.resolver.observe_in_plan(plan, binding);
+        *observation = self.files.observe_one(plan, binding);
         proposal.generation =
             next_observation_generation(&mut transition, Some(proposal.generation));
         Ok(proposal)
@@ -965,35 +700,52 @@ impl MediaMonitor {
         bindings: &[MediaBinding],
         plan: &RootBindingPlan,
     ) -> Option<MediaResolutionProposal> {
+        self.prepare_in_plan_unless(runtime, bindings, plan, &AtomicBool::new(false))
+            .expect("an observation nobody interrupts completes")
+    }
+
+    /// `prepare_in_plan` for the periodic Monitor, which holds Cache work while
+    /// it observes every Original. Once `interrupted` is set it stops waiting,
+    /// even for observations already running, and leaves the pending
+    /// stabilization untouched, so a Cache pause does not wait for the
+    /// catalogue nor for a server that is switched off.
+    pub(crate) fn prepare_in_plan_unless(
+        &self,
+        runtime: &MediaRuntime,
+        bindings: &[MediaBinding],
+        plan: &RootBindingPlan,
+        interrupted: &AtomicBool,
+    ) -> Result<Option<MediaResolutionProposal>, MediaObservationInterrupted> {
         let mut transition = self
             .transition
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
         let current = runtime.snapshot();
+        let observations = self
+            .files
+            .observe_unless(plan, bindings, interrupted)
+            .ok_or(MediaObservationInterrupted)?;
         let generation = next_observation_generation(
             &mut transition,
             current.as_ref().map(|current| current.generation),
         );
         let proposal = MediaResolutionProposal {
             generation,
-            observations: bindings
-                .iter()
-                .map(|binding| self.resolver.observe_in_plan(plan, binding))
-                .collect(),
+            observations,
         };
         if current
             .as_ref()
             .is_some_and(|current| current.observations == proposal.observations)
         {
             transition.pending = None;
-            return None;
+            return Ok(None);
         }
         let stable = transition
             .pending
             .as_ref()
             .is_some_and(|pending| pending.observations == proposal.observations);
         transition.pending = Some(proposal.clone());
-        stable.then_some(proposal)
+        Ok(stable.then_some(proposal))
     }
 
     pub(crate) fn commit_prepared(
@@ -1022,20 +774,39 @@ impl MediaMonitor {
             .as_ref()
             .map(|current| current.observations.as_slice())
             .unwrap_or_default();
-        for observation in &mut proposal.observations {
-            let old = previous
+        let previous_of = |observation: &MediaObservation| {
+            previous
                 .iter()
-                .find(|old| old.media_id == observation.media_id);
+                .find(|old| old.media_id == observation.media_id)
+        };
+        let rechecked = self.files.observe(
+            plan,
+            proposal
+                .observations
+                .iter()
+                .filter(|observation| {
+                    observation.availability == MediaAvailability::Candidate
+                        && previous_of(observation) != Some(*observation)
+                })
+                .filter_map(|observation| {
+                    bindings
+                        .iter()
+                        .find(|binding| binding.media_id == observation.media_id)
+                }),
+        );
+        let rechecked = rechecked
+            .iter()
+            .map(|current| (current.media_id.as_str(), current))
+            .collect::<HashMap<_, _>>();
+        for observation in &mut proposal.observations {
+            let old = previous_of(observation);
             if old == Some(observation) {
                 continue;
             }
             if observation.availability == MediaAvailability::Candidate {
-                let source_unchanged = bindings
-                    .iter()
-                    .find(|binding| binding.media_id == observation.media_id)
-                    .is_some_and(|binding| {
-                        observation.same_source(&self.resolver.observe_in_plan(plan, binding))
-                    });
+                let source_unchanged = rechecked
+                    .get(observation.media_id.as_str())
+                    .is_some_and(|current| observation.same_source(current));
                 let readable = readable_media.contains(&observation.media_id);
                 if !source_unchanged || !readable {
                     if let Some(old) = old {
@@ -1085,14 +856,18 @@ impl MediaMonitor {
             })
             .unwrap_or_default();
         let mut adopted = false;
-        for binding in bindings {
-            let Some(expected) = evidence.get(binding.media_id.as_str()) else {
-                continue;
-            };
-            if binding.kind != expected.kind || binding.logical_path != expected.logical_path {
-                continue;
-            }
-            let observed = self.resolver.observe_in_plan(plan, binding);
+        let evidenced = bindings
+            .iter()
+            .filter_map(|binding| {
+                let expected = evidence.get(binding.media_id.as_str())?;
+                (binding.kind == expected.kind && binding.logical_path == expected.logical_path())
+                    .then_some((binding, *expected))
+            })
+            .collect::<Vec<_>>();
+        let observations = self
+            .files
+            .observe(plan, evidenced.iter().map(|(binding, _)| *binding));
+        for ((binding, expected), observed) in evidenced.into_iter().zip(observations) {
             if expected.same_source(&observed) {
                 adopted = true;
                 merged.insert(binding.media_id.clone(), observed);
@@ -1204,23 +979,6 @@ fn next_observation_generation(
     transition.next_generation
 }
 
-fn invalidates_cache(previous: &MediaObservation, current: &MediaObservation) -> bool {
-    current.availability == MediaAvailability::Candidate
-        && (previous.availability != MediaAvailability::Candidate
-            || previous.kind != current.kind
-            || previous.logical_path != current.logical_path
-            || previous.physical_identity != current.physical_identity
-            || previous.source_bytes != current.source_bytes
-            || previous.source_created_unix_ms != current.source_created_unix_ms
-            || previous.source_modified_unix_ms != current.source_modified_unix_ms)
-}
-
-fn file_time_millis(time: std::io::Result<SystemTime>) -> Option<u64> {
-    time.ok()
-        .and_then(|time| time.duration_since(UNIX_EPOCH).ok())
-        .and_then(|duration| u64::try_from(duration.as_millis()).ok())
-}
-
 #[cfg(test)]
 mod tests {
     #[test]
@@ -1249,12 +1007,22 @@ mod tests {
             },
         ];
 
-        let first = super::MediaListingHint::read(&bindings);
-        assert_eq!(first, super::MediaListingHint::read(&bindings));
+        let mut paths = myalbuns_paths::OperationPathContext::new();
+        paths.capture(root.path()).unwrap();
+        let plan = paths.freeze();
+        let read = || {
+            super::MediaListingHint::read(
+                &crate::linked_files::LinkedFiles::new(),
+                &plan,
+                &bindings,
+            )
+        };
+        let first = read();
+        assert_eq!(first, read());
         assert!(first.0[0].is_some() && first.0[1].is_some() && first.0[2].is_none());
 
         std::fs::write(&photo, b"edited photo").unwrap();
-        assert_ne!(first, super::MediaListingHint::read(&bindings));
+        assert_ne!(first, read());
     }
 
     #[test]
@@ -1288,8 +1056,9 @@ mod tests {
             Some(prior.clone()),
             "preparation cannot adopt uninspected bytes"
         );
-        MediaResolver
-            .inspect_media_binding_in_plan(&bindings[0], &roots)
+        crate::linked_files::LinkedFiles::new()
+            .inspect_decoded(&roots, &bindings[0].logical_path)
+            .and_then(|header| header.photo_metadata())
             .unwrap();
         let poll = monitor.commit_prepared(
             &runtime,
@@ -1335,16 +1104,18 @@ mod tests {
         write(60);
         monitor.prepare_in_plan(&runtime, bindings, &roots);
         let older = monitor.prepare_in_plan(&runtime, bindings, &roots).unwrap();
-        MediaResolver
-            .inspect_media_binding_in_plan(&binding, &roots)
+        crate::linked_files::LinkedFiles::new()
+            .inspect_decoded(&roots, &binding.logical_path)
+            .and_then(|header| header.photo_metadata())
             .unwrap();
         write(120);
         monitor.commit_prepared(&runtime, older.clone(), bindings, &roots, &["photo".into()]);
         assert_eq!(runtime.snapshot().unwrap().observations, before);
         monitor.prepare_in_plan(&runtime, bindings, &roots);
         let newer = monitor.prepare_in_plan(&runtime, bindings, &roots).unwrap();
-        MediaResolver
-            .inspect_media_binding_in_plan(&binding, &roots)
+        crate::linked_files::LinkedFiles::new()
+            .inspect_decoded(&roots, &binding.logical_path)
+            .and_then(|header| header.photo_metadata())
             .unwrap();
         monitor.commit_prepared(&runtime, newer, bindings, &roots, &["photo".into()]);
         let committed = runtime.snapshot();
@@ -1384,12 +1155,12 @@ mod tests {
         runtime.apply(MediaResolver.observe(1, &bindings[..1]));
         let observations = bindings[1..]
             .iter()
-            .map(|binding| MediaResolver.observe_in_plan(&roots, binding))
+            .map(|binding| crate::linked_files::LinkedFiles::new().observe_one(&roots, binding))
             .collect::<Vec<_>>();
         std::fs::write(&paths[2], b"changed after decode").unwrap();
-        let before = super::photo_source_decode_count();
+        let before = crate::linked_files::photo_source_decode_count();
         let poll = monitor.adopt_prepared_inspections(&runtime, &bindings, &roots, &observations);
-        assert_eq!(super::photo_source_decode_count(), before);
+        assert_eq!(crate::linked_files::photo_source_decode_count(), before);
         assert_eq!(poll.update().unwrap().changed_media_ids(), &["photo-1"]);
         let current = poll.confirmed_observation().unwrap();
         assert_eq!(
@@ -1410,29 +1181,108 @@ mod tests {
     }
 
     #[test]
-    fn photo_inspections_overlap_with_two_workers_and_preserve_selection_order() {
-        use std::sync::atomic::{AtomicUsize, Ordering};
-        let active = AtomicUsize::new(0);
-        let peak = AtomicUsize::new(0);
-        let first_pair = std::sync::Barrier::new(2);
-        let mut progress = Vec::new();
-        let results = super::inspect_photo_candidates(
-            vec![0, 1, 2, 3, 4],
-            |index| {
-                let count = active.fetch_add(1, Ordering::AcqRel) + 1;
-                peak.fetch_max(count, Ordering::AcqRel);
-                if index < 2 {
-                    first_pair.wait();
-                }
-                active.fetch_sub(1, Ordering::AcqRel);
-                if index == 1 { Err(index) } else { Ok(index) }
-            },
-            |completed| progress.push(completed),
+    fn an_interrupted_monitor_observation_keeps_the_pending_stabilization() {
+        use std::sync::atomic::AtomicBool;
+        let root = tempfile::tempdir().unwrap();
+        let source = root.path().join("photo.jpg");
+        std::fs::write(&source, b"photo").unwrap();
+        let bindings = vec![MediaBinding {
+            media_id: "photo".into(),
+            kind: MediaKind::Photo,
+            logical_path: source.clone(),
+        }];
+        let mut paths = myalbuns_paths::OperationPathContext::new();
+        paths.capture(&source).unwrap();
+        let roots = paths.freeze();
+        let runtime = MediaRuntime::default();
+        let monitor = MediaMonitor::default();
+
+        assert!(
+            monitor
+                .prepare_in_plan(&runtime, &bindings, &roots)
+                .is_none(),
+            "a first sample is not stable yet"
         );
-        assert_eq!(peak.load(Ordering::Acquire), 2);
-        assert_eq!(results, [Ok(0), Err(1), Ok(2), Ok(3), Ok(4)]);
-        assert_eq!(progress, [1, 2, 3, 4, 5]);
+        assert_eq!(
+            monitor.prepare_in_plan_unless(&runtime, &bindings, &roots, &AtomicBool::new(true)),
+            Err(super::MediaObservationInterrupted)
+        );
+        assert!(monitor.has_pending_observation());
+        assert!(
+            monitor
+                .prepare_in_plan(&runtime, &bindings, &roots)
+                .is_some(),
+            "the next sample still stabilizes against the one before the interruption"
+        );
     }
+
+    #[test]
+    fn a_cache_pause_waits_neither_for_a_monitor_sweep_nor_for_one_slow_access() {
+        use crate::{cache_activity_gate::CacheCancellation, cache_engine::CacheEngine};
+        let root = tempfile::tempdir().unwrap();
+        let bindings = (0..80)
+            .map(|index| {
+                let logical_path = root.path().join(format!("{index}.jpg"));
+                std::fs::write(&logical_path, b"photo").unwrap();
+                MediaBinding {
+                    media_id: format!("photo-{index}"),
+                    kind: MediaKind::Photo,
+                    logical_path,
+                }
+            })
+            .collect::<Vec<_>>();
+        let mut paths = myalbuns_paths::OperationPathContext::new();
+        paths.capture(root.path()).unwrap();
+        let roots = paths.freeze();
+        // Like a server that is switched off: each access waits a long time.
+        let latency = std::time::Duration::from_secs(1);
+        let monitor = MediaMonitor::with_linked_files(
+            crate::linked_files::LinkedFiles::with_latency(latency),
+        );
+        let runtime = MediaRuntime::default();
+        let engine = CacheEngine::default();
+
+        tauri::async_runtime::block_on(async {
+            let cancellation = CacheCancellation::default();
+            let permit = engine.begin_cancellable_work(cancellation.clone()).await;
+            let sweeping = std::thread::spawn({
+                let (monitor, runtime, bindings, roots) = (
+                    monitor.clone(),
+                    runtime.clone(),
+                    bindings.clone(),
+                    roots.clone(),
+                );
+                let cancellation = cancellation.clone();
+                move || {
+                    let result = monitor.prepare_in_plan_unless(
+                        &runtime,
+                        &bindings,
+                        &roots,
+                        cancellation.flag(),
+                    );
+                    drop(permit);
+                    result
+                }
+            });
+            tokio::time::sleep(latency / 10).await;
+            let started = std::time::Instant::now();
+            let _pause = engine.pause().await;
+            let waited = started.elapsed();
+            assert_eq!(
+                sweeping.join().unwrap(),
+                Err(super::MediaObservationInterrupted)
+            );
+            assert!(
+                waited < latency / 2,
+                "the pause waited {waited:?}; one access takes {latency:?}"
+            );
+        });
+        assert!(
+            !monitor.has_pending_observation(),
+            "an interrupted sweep proposes nothing"
+        );
+    }
+
     use std::{sync::mpsc, time::Duration};
 
     use image::{ImageFormat, Rgb, RgbImage};
@@ -1595,11 +1445,7 @@ mod tests {
             .iter_mut()
             .find(|observation| observation.media_id == selected.media_id)
             .expect("the selected observation is present in the fixture");
-        selected_prior.availability = MediaAvailability::Unavailable;
-        selected_prior.physical_identity = None;
-        selected_prior.source_bytes = None;
-        selected_prior.source_created_unix_ms = None;
-        selected_prior.source_modified_unix_ms = None;
+        *selected_prior = MediaObservation::unavailable_for_test(&selected);
         runtime.apply(prior);
         let untouched_before = runtime
             .snapshot()
@@ -1629,7 +1475,7 @@ mod tests {
                 .iter()
                 .find(|observation| observation.media_id == "photo-a")
                 .expect("the selected observation remains present")
-                .logical_path,
+                .logical_path(),
             selected_path
         );
         assert_eq!(
@@ -1679,16 +1525,7 @@ mod tests {
         let runtime = MediaRuntime::default();
         runtime.apply(MediaResolutionProposal {
             generation: 4,
-            observations: vec![MediaObservation {
-                media_id: binding.media_id.clone(),
-                kind: binding.kind,
-                logical_path: binding.logical_path.clone(),
-                availability: MediaAvailability::Unavailable,
-                physical_identity: None,
-                source_bytes: None,
-                source_created_unix_ms: None,
-                source_modified_unix_ms: None,
-            }],
+            observations: vec![MediaObservation::unavailable_for_test(&binding)],
         });
 
         let retried = MediaMonitor::default()
@@ -1864,14 +1701,13 @@ mod tests {
             crate::ipc_contract::MediaFileState::Available
         );
         let metadata = std::fs::metadata(&bindings[0].logical_path).unwrap();
-        assert_eq!(
-            files[0].created_at_ms,
-            super::file_time_millis(metadata.created())
-        );
-        assert_eq!(
-            files[0].modified_at_ms,
-            super::file_time_millis(metadata.modified())
-        );
+        let millis = |time: std::io::Result<std::time::SystemTime>| {
+            time.ok()
+                .and_then(|time| time.duration_since(std::time::UNIX_EPOCH).ok())
+                .and_then(|duration| u64::try_from(duration.as_millis()).ok())
+        };
+        assert_eq!(files[0].created_at_ms, millis(metadata.created()));
+        assert_eq!(files[0].modified_at_ms, millis(metadata.modified()));
         assert_eq!(files[1].state, crate::ipc_contract::MediaFileState::Absent);
         assert_eq!(files[1].created_at_ms, None);
         let mut relinked = bindings.clone();

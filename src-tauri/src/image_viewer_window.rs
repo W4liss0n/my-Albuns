@@ -10,7 +10,6 @@ use crate::{
     eye_correction::{self, Face, PreparedEyes},
     image_processing::ImageProcessingBatch,
     ipc_contract::{ViewerAction, ViewerCorrectionAction, ViewerPresentation},
-    media_runtime::MediaResolver,
     native_dialog_window,
     product_runtime::PROJECT_WINDOW_LABEL,
     project_host::ProjectHost,
@@ -708,7 +707,7 @@ pub(crate) async fn apply_eye_correction(
     };
     let refreshed = (|| {
         for media in &affected {
-            let metadata = MediaResolver.inspect_media_binding_in_plan(media, &roots)?;
+            let metadata = crate::linked_files::LinkedFiles::new().inspect_decoded(&roots, &media.logical_path).and_then(|header| header.photo_metadata())?;
             host.observe_photo_source(media, metadata)?;
         }
         host.projection()
@@ -719,7 +718,7 @@ pub(crate) async fn apply_eye_correction(
             tracing::warn!(target: "myalbuns.desktop", error = %error, event = "eye_correction_project_refresh_failed");
             eye_correction::restore_original(&pending.source.target, &backup)?;
             for media in &affected {
-                if let Ok(metadata) = MediaResolver.inspect_media_binding_in_plan(media, &roots) {
+                if let Ok(metadata) = crate::linked_files::LinkedFiles::new().inspect_decoded(&roots, &media.logical_path).and_then(|header| header.photo_metadata()) {
                     let _ = host.observe_photo_source(media, metadata);
                 }
             }
@@ -744,7 +743,7 @@ pub(crate) async fn apply_eye_correction(
         eye_correction::restore_original(&pending.source.target, &backup)?;
         let repair_result: Result<(), String> = async {
             for media in &affected {
-                let metadata = MediaResolver.inspect_media_binding_in_plan(media, &roots)?;
+                let metadata = crate::linked_files::LinkedFiles::new().inspect_decoded(&roots, &media.logical_path).and_then(|header| header.photo_metadata())?;
                 host.observe_photo_source(media, metadata)?;
             }
             let repair_pause = engine.pause().await;
