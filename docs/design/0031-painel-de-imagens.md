@@ -53,15 +53,16 @@ Na miniatura, a ausência aparece somente como um ícone quadrado no canto
 superior direito, com descrição acessível e ao passar o mouse. Não há texto
 `Ausente` nem botão de Religação sobre a imagem. Com Cache, a miniatura real
 continua disponível; sem Cache, o mesmo ícone aparece sobre o placeholder
-genérico. A ação `Religar` fica exclusivamente no menu do botão direito da
-imagem ausente e atua no item clicado, preservando uma seleção múltipla
-existente. A ação respeita os bloqueios de operação e deixa de aparecer quando
-o Original retorna. A nova tentativa para Arquivo indisponível mantém seu fluxo.
+genérico. A ação `Localizar imagem…` fica exclusivamente no menu do botão
+direito e aparece quando alguma imagem selecionada está ausente. Ela age em
+todas as ausentes da seleção e passa a se chamar `Localizar imagens…` quando há
+mais de uma. A ação respeita os bloqueios de operação e deixa de aparecer quando
+os Originais retornam. A nova tentativa para Arquivo indisponível mantém seu fluxo.
 
-`Religar` solicita a pasta que contém o Original e procura somente entre os
-arquivos diretamente nessa pasta, pelo mesmo nome e extensão, sem pesquisar
-subpastas. A ausência de correspondência é informada e preserva o vínculo.
-O menu atua somente na imagem clicada, mesmo quando há várias selecionadas.
+`Localizar imagem…` solicita uma única pasta e, para cada imagem, procura
+somente entre os arquivos diretamente nessa pasta, pelo mesmo nome e extensão,
+sem pesquisar subpastas. Cada imagem religada é uma etapa de Undo/Redo; cada
+imagem sem correspondência é informada pelo nome e preserva o vínculo.
 A Religação da Exportação normal usa a mesma busca restrita à pasta escolhida.
 
 `Substituir Imagem` aparece no menu do botão direito de todas as Fotos e
@@ -73,7 +74,8 @@ ajustes e os usos como Fundo ou Overlay. Inspeciona o novo Original e renova
 o Cache. Cancelar ou escolher o mesmo caminho não altera a sessão; um arquivo
 inválido não substitui a imagem. As duas ações respeitam os bloqueios de
 operação, participam de Undo/Redo e exigem Salvamento manual. Nenhuma delas
-move ou sobrescreve o arquivo original.
+move ou sobrescreve o arquivo original. `Substituir Imagem` fica desabilitado
+quando há mais de uma imagem selecionada.
 
 Ao atualizar ou substituir uma imagem, a prévia anterior continua visível no
 Painel e na Lâmina até a nova representação estar carregada. A troca ocorre

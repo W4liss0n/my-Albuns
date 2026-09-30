@@ -133,11 +133,11 @@ impl PhotoshopPlatform for WindowsPhotoshop {
         None
     }
 
-    fn launch(&self, executable: &Path, original: &Path) -> std::io::Result<()> {
+    fn launch(&self, executable: &Path, originals: &[&Path]) -> std::io::Result<()> {
         // The application is external: it must outlive MyAlbuns and its development Job.
         // Windows closes the Child handles on drop without terminating the application.
         let child = Command::new(executable)
-            .arg(original)
+            .args(originals)
             .current_dir(executable.parent().unwrap_or(executable))
             .creation_flags(CREATE_BREAKAWAY_FROM_JOB | CREATE_NO_WINDOW)
             .stdin(Stdio::null())

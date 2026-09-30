@@ -916,7 +916,7 @@ test.each(["Importar", "Filtro, ordem e tamanho"])("the open %s popup owns short
   expect(remove).toHaveBeenCalledExactlyOnceWith(["photo-retrato"]);
 });
 
-test("Photoshop opens only one contextual Photo and never a multi-selection or Decorative", () => {
+test("Photoshop opens every selected Photo and never a Decorative", () => {
   const open = vi.fn();
   render(<MediaPanel {...mediaPanelInteractions} mediaItems={mediaItems} mediaUsage={mediaUsage}
     onFillPhoto={vi.fn()} previewSource={{ kind: "static" }} preferences={{ kind: "local" }}
@@ -924,21 +924,23 @@ test("Photoshop opens only one contextual Photo and never a multi-selection or D
   const photo = screen.getByRole("button", { name: /Retrato/ });
   fireEvent.click(photo);
   fireEvent.keyDown(photo, { key: "e", ctrlKey: true });
-  expect(open).toHaveBeenCalledExactlyOnceWith("photo-retrato");
+  expect(open).toHaveBeenCalledExactlyOnceWith(["photo-retrato"]);
   fireEvent.keyDown(photo, { key: "e", ctrlKey: true, repeat: true });
   expect(open).toHaveBeenCalledTimes(1);
   fireEvent.click(screen.getByRole("button", { name: /Álbum 10/ }), { ctrlKey: true });
-  fireEvent.contextMenu(photo);
-  expect(screen.getByRole("menuitem", { name: /Abrir no Photoshop/ })).toBeDisabled();
   fireEvent.keyDown(photo, { key: "e", ctrlKey: true });
-  expect(open).toHaveBeenCalledTimes(1);
+  expect(open).toHaveBeenLastCalledWith(["photo-album-10", "photo-retrato"]);
+  fireEvent.contextMenu(photo);
+  fireEvent.click(screen.getByRole("menuitem", { name: /Abrir no Photoshop/ }));
+  expect(open).toHaveBeenLastCalledWith(["photo-album-10", "photo-retrato"]);
+  expect(open).toHaveBeenCalledTimes(3);
   fireEvent.click(screen.getByRole("button", { name: "Decorativos" }));
   const decorative = screen.getByRole("button", { name: /Overlay dourado/ });
   fireEvent.click(decorative);
   fireEvent.keyDown(decorative, { key: "e", ctrlKey: true });
   fireEvent.contextMenu(decorative);
   expect(screen.queryByRole("menuitem", { name: /Abrir no Photoshop/ })).not.toBeInTheDocument();
-  expect(open).toHaveBeenCalledTimes(1);
+  expect(open).toHaveBeenCalledTimes(3);
 });
 
 test.each([
@@ -969,7 +971,7 @@ test.each([
   else expect(onApplyDecorative).toHaveBeenCalledWith("missing", "background");
   fireEvent.contextMenu(card);
   fireEvent.click(screen.getByRole("menuitem", { name: "Localizar imagem…" }));
-  expect(onRelinkMedia).toHaveBeenCalledExactlyOnceWith("missing");
+  expect(onRelinkMedia).toHaveBeenCalledExactlyOnceWith(["missing"]);
   expect(screen.queryByRole("menu", { name: "Ações das imagens" })).not.toBeInTheDocument();
 });
 
@@ -981,10 +983,10 @@ test.each(["photo", "decorative"] as const)("Substituir Imagem is available for 
     onFillPhoto={vi.fn()} preferences={{ kind: "local" }} previewSource={{ kind: "static", previews:
       Object.fromEntries(states.map((state) => [state, { mediaId: state, state, url: null }])) }} />);
   if (kind === "decorative") fireEvent.click(screen.getByRole("button", { name: "Decorativos" }));
-  fireEvent.click(screen.getByRole("button", { name: /^ready/ }));
-  fireEvent.click(screen.getByRole("button", { name: /^absent/ }), { ctrlKey: true });
   for (const state of states) {
-    fireEvent.contextMenu(screen.getByRole("button", { name: new RegExp(`^${state}`) }));
+    const card = screen.getByRole("button", { name: new RegExp(`^${state}`) });
+    fireEvent.click(card);
+    fireEvent.contextMenu(card);
     fireEvent.click(screen.getByRole("menuitem", { name: "Substituir imagem" }));
     expect(onReplaceMedia).toHaveBeenLastCalledWith(state);
     expect(screen.queryByRole("menu", { name: "Ações das imagens" })).not.toBeInTheDocument();
@@ -992,30 +994,49 @@ test.each(["photo", "decorative"] as const)("Substituir Imagem is available for 
   expect(onReplaceMedia).toHaveBeenCalledTimes(4);
 });
 
-test("Religar targets the right-clicked absent item while preserving a selected group", () => {
+test("Substituir Imagem is disabled while several images are selected", () => {
+  const onReplaceMedia = vi.fn();
+  render(<MediaPanel {...mediaPanelInteractions} onReplaceMedia={onReplaceMedia} mediaItems={mediaItems}
+    mediaUsage={mediaUsage} onFillPhoto={vi.fn()} previewSource={{ kind: "static" }} preferences={{ kind: "local" }} />);
+  const photo = screen.getByRole("button", { name: /Retrato/ });
+  fireEvent.click(photo);
+  fireEvent.click(screen.getByRole("button", { name: /Álbum 10/ }), { ctrlKey: true });
+  fireEvent.contextMenu(photo);
+  const replace = screen.getByRole("menuitem", { name: "Substituir imagem" });
+  expect(replace).toBeDisabled();
+  fireEvent.click(replace);
+  expect(onReplaceMedia).not.toHaveBeenCalled();
+});
+
+test("Localizar acts on every absent image of the selection and names it by their count", () => {
   const onRelinkMedia = vi.fn();
+  const absent = (mediaId: string) => ({ mediaId, state: "absent" as const, createdAtMs: null, modifiedAtMs: null });
   const props = { ...mediaPanelInteractions, onRelinkMedia, onFillPhoto: vi.fn(), mediaUsage: [],
-    mediaItems: [media("first", "photo", "Imagem 1"), media("second", "photo", "Imagem 2")],
+    mediaItems: [media("first", "photo", "Imagem 1"), media("second", "photo", "Imagem 2"), media("third", "photo", "Imagem 3")],
     preferences: { kind: "local" as const }, previewSource: { kind: "static" as const },
-    mediaFiles: {
-      first: { mediaId: "first", state: "absent" as const, createdAtMs: null, modifiedAtMs: null },
-      second: { mediaId: "second", state: "absent" as const, createdAtMs: null, modifiedAtMs: null },
-    } };
+    mediaFiles: { first: absent("first"), second: absent("second") } };
   const view = render(<MediaPanel {...props} />);
   const first = screen.getByRole("button", { name: /^Imagem 1/ });
   const second = screen.getByRole("button", { name: /^Imagem 2/ });
+  const third = screen.getByRole("button", { name: /^Imagem 3/ });
   fireEvent.click(first);
   fireEvent.click(second, { ctrlKey: true });
-  fireEvent.contextMenu(second);
-  expect(first).toHaveAttribute("aria-pressed", "true");
-  expect(second).toHaveAttribute("aria-pressed", "true");
-  fireEvent.click(screen.getByRole("menuitem", { name: "Localizar imagem…" }));
-  expect(onRelinkMedia).toHaveBeenCalledExactlyOnceWith("second");
-  fireEvent.contextMenu(first);
+  fireEvent.click(third, { ctrlKey: true });
+  fireEvent.contextMenu(third);
+  expect([first, second, third].map((card) => card.getAttribute("aria-pressed"))).toEqual(["true", "true", "true"]);
+  fireEvent.click(screen.getByRole("menuitem", { name: "Localizar imagens…" }));
+  expect(onRelinkMedia).toHaveBeenCalledExactlyOnceWith(["first", "second"]);
+
   view.rerender(<MediaPanel {...props} mediaFiles={{ ...props.mediaFiles,
     first: { ...props.mediaFiles.first, state: "available" },
   }} />);
-  expect(screen.queryByRole("menuitem", { name: "Localizar imagem…" })).not.toBeInTheDocument();
+  fireEvent.contextMenu(third);
+  fireEvent.click(screen.getByRole("menuitem", { name: "Localizar imagem…" }));
+  expect(onRelinkMedia).toHaveBeenLastCalledWith(["second"]);
+
+  fireEvent.click(third);
+  fireEvent.contextMenu(third);
+  expect(screen.queryByRole("menuitem", { name: /Localizar imagem/ })).not.toBeInTheDocument();
 });
 
 test.each(["relinkDisabled", "importPending"] as const)("Religar remains disabled during %s", (busyProp) => {

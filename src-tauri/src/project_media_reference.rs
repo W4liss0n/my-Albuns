@@ -1,7 +1,7 @@
 use std::{future::Future, path::PathBuf};
 
 use myalbuns_core::EditorProjection;
-use myalbuns_paths::{AppPaths, RootBindingPlan};
+use myalbuns_paths::{AppPaths, OperationPathContext, RootBindingPlan};
 use tauri::{AppHandle, Manager};
 
 use crate::{
@@ -11,7 +11,7 @@ use crate::{
     cache_service::ActiveCacheNamespace,
     image_processing::ImageProcessingBatch,
     imaging_processor::{ImageMemoryEstimate, ImagingProcessor},
-    ipc_contract::ImageProcessingProgress,
+    ipc_contract::{ImageProcessingProblem, ImageProcessingProgress},
     media_runtime::{MediaBinding, MediaResolver},
     project_host::ProjectHost,
 };
@@ -63,6 +63,73 @@ pub(crate) async fn change_in_app(
         },
     )
     .await
+}
+
+/// Relinks each absent binding to its unique same-name file directly inside `folder`.
+/// A binding without a match, or whose change fails, becomes a processing problem
+/// named after its file without stopping the others. Returns the relinked media ids.
+pub(crate) async fn relink_in_folder(
+    app: &AppHandle,
+    folder: PathBuf,
+    missing: Vec<MediaBinding>,
+    not_found: &str,
+    processing: &mut ImageProcessingBatch<impl FnMut(ImageProcessingProgress)>,
+) -> Result<Vec<String>, String> {
+    let catalog = app.state::<ProjectHost>().authorized_media_catalog()?;
+    let cache_root = app
+        .state::<ActiveCacheNamespace>()
+        .namespace()
+        .paths()
+        .root()
+        .to_path_buf();
+    let (candidates, roots, missing) = tauri::async_runtime::spawn_blocking(move || {
+        let mut context = OperationPathContext::new();
+        let _ = context.capture(&cache_root);
+        for media in &catalog.bindings {
+            let _ = context.capture(&media.logical_path);
+        }
+        context
+            .capture(&folder)
+            .map_err(|error| error.to_string())?;
+        for binding in &missing {
+            context
+                .capture(&binding.logical_path)
+                .map_err(|error| error.to_string())?;
+        }
+        let roots = context.freeze();
+        let candidates = MediaResolver.find_relink_candidates(&folder, &missing, &roots)?;
+        Ok::<_, String>((candidates, roots, missing))
+    })
+    .await
+    .map_err(|error| error.to_string())??;
+    let mut relinked = Vec::new();
+    for binding in missing {
+        let file_name = binding
+            .logical_path
+            .file_name()
+            .unwrap_or_default()
+            .to_string_lossy()
+            .into_owned();
+        let media_id = binding.media_id.clone();
+        let result = match candidates.get(&binding.media_id) {
+            Some(path) => change_in_app(
+                app,
+                binding,
+                path.clone(),
+                roots.clone(),
+                MediaChangeKind::Relink,
+                processing,
+            )
+            .await
+            .map(|_| ()),
+            None => Err(not_found.to_string()),
+        };
+        match result {
+            Ok(()) => relinked.push(media_id),
+            Err(reason) => processing.complete(Some(ImageProcessingProblem { file_name, reason })),
+        }
+    }
+    Ok(relinked)
 }
 
 async fn complete<F: Future<Output = ()>>(

@@ -322,7 +322,7 @@ Quando a Lâmina alvo possui Layout travado, a preview aplicada permanece destac
 - `Delete` e `Excluir` no menu de contexto removem, sem confirmação, todos os Frames selecionados e suas Fotos quando o Layout está destravado; os Frames restantes preservam suas geometrias.
 - Em Layout travado, a mesma ação remove somente as Fotos, mantém os Frames como placeholders e não altera placeholders já vazios.
 - O menu de contexto de um Frame preenchido oferece `Abrir no Photoshop`. A ação envia somente o Arquivo vinculado original da Foto, sem aplicar seu enquadramento ou efeitos do MyAlbuns; o atalho fixo do MVP é `Ctrl + E`.
-- `Abrir no Photoshop` exige exatamente uma Foto contextual. Quando houver vários Frames selecionados, o comando e seu atalho ficam indisponíveis e nunca abrem vários arquivos em massa.
+- `Abrir no Photoshop` e seu atalho agem nas Fotos de todos os Frames preenchidos selecionados; Frames vazios são ignorados. Se algum original estiver ausente ou inacessível, nenhuma Foto é aberta.
 - `Editar > Adicionar Frame` e `Adicionar Frame` no menu de contexto da área vazia do Canvas criam imediatamente um único placeholder centralizado e selecionado.
 - O Frame novo usa proporção `3:2` e largura de `40%` da superfície ativa, reduzida somente quando a altura disponível exigir; nunca usa um tamanho físico fixo. Em Lâmina dupla, é centralizado na Lâmina inteira e pode atravessar a divisão; em Página única, é centralizado somente na Página ativa.
 - Não existe modo de desenho nem ferramenta persistente para essa criação. O comando gera uma ação de Undo/Redo e fica indisponível em Layout travado.

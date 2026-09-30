@@ -18,7 +18,7 @@ import type {
   MediaFileInfo,
   MediaPreviewDemand,
 } from "../application/projectPorts";
-import { matchProjectCommandShortcut, projectCommandDescriptor, projectCommandShortcutLabel } from "../application/projectCommandCatalog";
+import { matchProjectCommandShortcut, projectCommandDescriptor, projectCommandLabel, projectCommandShortcutLabel } from "../application/projectCommandCatalog";
 import { ContextMenuSurface } from "../ui/ContextMenuSurface";
 import { AppIcon } from "../ui/AppIcon";
 import type { MediaPanelPersistentPreference } from "../application/workspacePreferences";
@@ -97,7 +97,7 @@ interface MediaPanelProps {
   mediaFolders?: readonly MediaFolder[];
   onEditMediaFolder?(edit: MediaFolderEdit): Promise<boolean>;
   photoshopAvailable?: boolean;
-  onOpenInPhotoshop?(mediaId: string): void;
+  onOpenInPhotoshop?(mediaIds: readonly string[]): void;
   onViewPhoto?(mediaId: string, mediaIds: readonly string[], trigger: HTMLElement | null): void;
   ref?: Ref<MediaPanelHandle>;
   hidden?: boolean;
@@ -113,7 +113,7 @@ interface MediaPanelProps {
   dropPort?: import("../application/projectPorts").MediaDropPort;
   onMediaDragChange(drag: MediaDrag | null): void;
   dragThreshold?: import("../application/projectPorts").PointerDragThreshold | null;
-  onRelinkMedia(mediaId: string): void;
+  onRelinkMedia(mediaIds: readonly string[]): void;
   onReplaceMedia(mediaId: string): void;
   onRetryUnavailableMedia(mediaId: string): Promise<void>;
   relinkDisabled?: boolean;
@@ -265,6 +265,14 @@ export function MediaPanel({
   const visibleMediaIdSet = useMemo(
     () => new Set(visibleMediaIds),
     [visibleMediaIds],
+  );
+  const selectedPhotoIds = useMemo(
+    () => mediaItems.filter((media) => selectedMediaIds.has(media.id) && media.kind === "photo").map(({ id }) => id),
+    [mediaItems, selectedMediaIds],
+  );
+  const selectedAbsentIds = useMemo(
+    () => mediaItems.filter((media) => selectedMediaIds.has(media.id) && fileInformation[media.id]?.state === "absent").map(({ id }) => id),
+    [mediaItems, selectedMediaIds, fileInformation],
   );
   const emptyStateReason = activeFolder?.mediaIds.length === 0 ? "folder" :
     activeMediaItems.length === 0
@@ -556,9 +564,9 @@ export function MediaPanel({
     if (event.defaultPrevented || folderPrompt || folderMenu || contextMenu || ownsEditingKeys(event.target)) return;
     if (matchProjectCommandShortcut(event, "media-photo") === "open-in-photoshop") {
       event.preventDefault(); event.stopPropagation();
-      const selected = selectedMediaIds.size === 1 ? [...selectedMediaIds][0] : null;
-      if (!event.repeat && !relinkDisabled && !importPending && photoshopAvailable && selected &&
-          mediaItems.some((media) => media.id === selected && media.kind === "photo")) onOpenInPhotoshop?.(selected);
+      if (!event.repeat && !relinkDisabled && !importPending && photoshopAvailable && selectedPhotoIds.length > 0) {
+        onOpenInPhotoshop?.(selectedPhotoIds);
+      }
       setContextMenu(null);
       return;
     }
@@ -757,27 +765,26 @@ export function MediaPanel({
             setContextMenu(null);
             onViewPhoto(id, visibleMediaIds, trigger ?? null);
           }} />}
-        {fileInformation[contextMenu.mediaId]?.state === "absent" && (
-          <MenuItem label={projectCommandDescriptor("relink-media").label}
+        {selectedAbsentIds.length > 0 && (
+          <MenuItem label={projectCommandLabel("relink-media", selectedAbsentIds.length)}
           disabled={relinkDisabled || importPending}
           onClick={() => {
-              const mediaId = contextMenu.mediaId;
               setContextMenu(null);
               panelHostRef.current?.focus({ preventScroll: true });
-              onRelinkMedia(mediaId);
+              onRelinkMedia(selectedAbsentIds);
             }} />
         )}
         <MenuItem label={projectCommandDescriptor("replace-media").label}
-          disabled={relinkDisabled || importPending}
+          disabled={relinkDisabled || importPending || selectedMediaIds.size > 1}
           onClick={() => {
             const mediaId = contextMenu.mediaId;
             setContextMenu(null);
             panelHostRef.current?.focus({ preventScroll: true });
             onReplaceMedia(mediaId);
           }} />
-        {mediaItems.some((media) => selectedMediaIds.has(media.id) && media.kind === "photo") && <MenuItem label={projectCommandDescriptor("open-in-photoshop").label} shortcut={projectCommandShortcutLabel("open-in-photoshop")}
-          disabled={!photoshopAvailable || relinkDisabled || importPending || selectedMediaIds.size !== 1}
-          onClick={() => { const id = [...selectedMediaIds][0]; if (id) onOpenInPhotoshop?.(id); setContextMenu(null); panelHostRef.current?.focus({ preventScroll: true }); }} />}
+        {selectedPhotoIds.length > 0 && <MenuItem label={projectCommandDescriptor("open-in-photoshop").label} shortcut={projectCommandShortcutLabel("open-in-photoshop")}
+          disabled={!photoshopAvailable || relinkDisabled || importPending}
+          onClick={() => { onOpenInPhotoshop?.(selectedPhotoIds); setContextMenu(null); panelHostRef.current?.focus({ preventScroll: true }); }} />}
         {onEditMediaFolder && <MenuItem label={projectCommandDescriptor("move-media-to-folder").label}
           disabled={foldersDisabled || selectedMediaIds.size === 0}
           onClick={() => {

@@ -944,6 +944,31 @@ test.each(["normal", "edit", "locked"])("opens the original of a single filled F
   expect(apply).not.toHaveBeenCalled();
 });
 
+test("opens the originals of every selected filled Frame and skips empty ones", async () => {
+  const current = structuredClone(projection);
+  const [frame] = current.state.album.sheets[0].frames;
+  const [composed] = current.composition.sheets[0].frames;
+  current.state.album.sheets[0].frames.push(
+    { ...frame, id: "frame-002", zIndex: 1 },
+    { ...frame, id: "frame-003", zIndex: 2, photo: null },
+  );
+  current.composition.sheets[0].frames.push(
+    { ...composed, frameId: "frame-002", zIndex: 1 },
+    { ...composed, frameId: "frame-003", zIndex: 2, photo: null },
+  );
+  const openPhoto = vi.fn(async () => undefined);
+  const photoshopPort = { status: vi.fn(async () => ({ revision: 1, installations: [], selectedInstallationId: "photoshop" })), openPhoto, openSettings: vi.fn(async () => undefined) };
+  useEditorView.setState({ editingSheetId: "sheet-001", selectedFrameIds: ["frame-001", "frame-002", "frame-003"] });
+  render(<ProjectWorkspace projection={current} projectCorePort={projectCorePortWithApply(vi.fn(async () => current))}
+    photoshopPort={photoshopPort} onProjectionChange={vi.fn()} />);
+  await waitFor(() => expect(photoshopPort.status).toHaveBeenCalled());
+  act(() => canvasHarness.props?.onOpenFrameContextMenu?.("frame-002", { x: 320, y: 200 }));
+  const command = screen.getByRole("menuitem", { name: /Abrir no Photoshop/ });
+  await waitFor(() => expect(command).toBeEnabled());
+  fireEvent.click(command);
+  await waitFor(() => expect(openPhoto).toHaveBeenCalledExactlyOnceWith({ kind: "frames", frameIds: ["frame-001", "frame-002"] }));
+});
+
 test.each(["keyboard", "context"])("deletes the entire Frame selection via %s without confirmation", async (entry) => {
   const grouped = structuredClone(projection);
   grouped.state.album.sheets[0].frames.push({
@@ -5918,7 +5943,7 @@ test("offers retry only for an unavailable occurrence and keeps Relink exclusive
     screen.getByRole("button", { name: /Tentar novamente o arquivo de/i }),
   );
 
-  await waitFor(() => expect(relink).toHaveBeenCalledWith("media-001", expect.any(Function)));
+  await waitFor(() => expect(relink).toHaveBeenCalledWith(["media-001"], expect.any(Function)));
   expect(onRetryUnavailableMedia).toHaveBeenCalledWith("media-002", expect.any(Function));
   expect(onProjectionChange).toHaveBeenLastCalledWith(relinkedProjection);
 });

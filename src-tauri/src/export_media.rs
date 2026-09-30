@@ -1,4 +1,3 @@
-use myalbuns_paths::OperationPathContext;
 use tauri::{AppHandle, Manager, State, WebviewWindow};
 use tauri_plugin_dialog::{DialogExt, FilePath};
 
@@ -9,7 +8,7 @@ use crate::{
     media_runtime::{MediaAvailability, MediaBinding, MediaResolver},
     product_runtime::PROJECT_WINDOW_LABEL,
     project_host::ProjectHost,
-    project_media_reference::{self, MediaChangeKind},
+    project_media_reference,
 };
 
 fn required_bindings_for(
@@ -123,33 +122,6 @@ pub(crate) async fn relink_export_media(
             });
         let selection = receiver.await.map_err(|error| error.to_string())?;
         if let Some(FilePath::Path(folder)) = selection {
-            let catalog = host.authorized_media_catalog()?;
-            let cache_root = app
-                .state::<crate::cache_service::ActiveCacheNamespace>()
-                .namespace()
-                .paths()
-                .root()
-                .to_path_buf();
-            let (candidates, roots, missing) = tauri::async_runtime::spawn_blocking(move || {
-                let mut context = OperationPathContext::new();
-                let _ = context.capture(&cache_root);
-                for media in &catalog.bindings {
-                    let _ = context.capture(&media.logical_path);
-                }
-                context
-                    .capture(&folder)
-                    .map_err(|error| error.to_string())?;
-                for binding in &missing {
-                    context
-                        .capture(&binding.logical_path)
-                        .map_err(|error| error.to_string())?;
-                }
-                let roots = context.freeze();
-                let candidates = MediaResolver.find_relink_candidates(&folder, &missing, &roots)?;
-                Ok::<_, String>((candidates, roots, missing))
-            })
-            .await
-            .map_err(|error| error.to_string())??;
             let mut processing = crate::image_processing::ImageProcessingBatch::new(
                 missing.len() as u32,
                 |progress| {
@@ -167,33 +139,14 @@ pub(crate) async fn relink_export_media(
                     let _ = on_progress.send(progress);
                 },
             );
-            for binding in missing {
-                let file_name = binding
-                    .logical_path
-                    .file_name()
-                    .unwrap_or_default()
-                    .to_string_lossy()
-                    .into_owned();
-                let result = match candidates.get(&binding.media_id) {
-                    Some(path) => project_media_reference::change_in_app(
-                        &app,
-                        binding,
-                        path.clone(),
-                        roots.clone(),
-                        MediaChangeKind::Relink,
-                        &mut processing,
-                    )
-                    .await
-                    .map(|_| ()),
-                    None => Err(
-                        "Nenhuma correspondência única de nome e extensão foi encontrada na pasta."
-                            .into(),
-                    ),
-                };
-                if let Err(reason) = result {
-                    processing.complete(Some(ImageProcessingProblem { file_name, reason }));
-                }
-            }
+            project_media_reference::relink_in_folder(
+                &app,
+                folder,
+                missing,
+                "Nenhuma correspondência única de nome e extensão foi encontrada na pasta.",
+                &mut processing,
+            )
+            .await?;
         }
     }
     let inspecting_host = host.clone();
@@ -217,6 +170,7 @@ mod tests {
         CreateAuthorization, CreateProjectRequest, InitialProject, PhotoPlacementMode, ProjectCore,
         ProjectIntent, ProjectLocation,
     };
+    use myalbuns_paths::OperationPathContext;
 
     #[test]
     fn recovery_scopes_dependencies_and_exports_unsaved_relinks_with_undo() {

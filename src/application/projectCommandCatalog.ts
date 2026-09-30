@@ -46,6 +46,7 @@ export interface ProjectCommandDefinition<Id extends string = string> {
   id: Id;
   kind: ProjectCommandKind;
   label: string;
+  pluralLabel?: string;
   shortcuts: readonly ProjectCommandShortcut[];
 }
 
@@ -54,6 +55,7 @@ interface ProjectCommandDefinitionBase<Id extends string> {
   id: Id;
   kind: ProjectCommandKind;
   label: string;
+  pluralLabel?: string;
   shortcuts: readonly ProjectCommandShortcut[];
 }
 
@@ -262,6 +264,7 @@ const DEFINITIONS = [
   command({
     id: "relink-media",
     label: "Localizar imagem…",
+    pluralLabel: "Localizar imagens…",
     description: "Escolha a pasta onde está a imagem.",
     kind: "application", contexts: ["media-panel"], availability: "implemented", shortcuts: [],
   }),
@@ -521,7 +524,7 @@ const DEFINITIONS = [
   command({
     id: "open-in-photoshop",
     label: "Abrir no Photoshop",
-    description: "Abre a foto contextual original no Photoshop.",
+    description: "Abre as fotos originais selecionadas no Photoshop.",
     kind: "application",
     contexts: ["frame-photo", "media-photo"],
     availability: "implemented",
@@ -549,6 +552,11 @@ export function projectCommandDescriptor(commandId: ProjectCommandId) {
     throw new Error(`Comando canônico ausente: ${commandId}`);
   }
   return definition as ProjectCommandDefinition<ProjectCommandId>;
+}
+
+export function projectCommandLabel(commandId: ProjectCommandId, count = 1) {
+  const definition = projectCommandDescriptor(commandId);
+  return count > 1 ? definition.pluralLabel ?? definition.label : definition.label;
 }
 
 export function projectCommandShortcutLabel(commandId: ProjectCommandId) {
@@ -620,6 +628,7 @@ function command<const Id extends string>(
     id: definition.id,
     kind: definition.kind,
     label: definition.label,
+    ...(definition.pluralLabel ? { pluralLabel: definition.pluralLabel } : {}),
     shortcuts: definition.shortcuts,
   };
 }

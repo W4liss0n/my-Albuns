@@ -4,6 +4,7 @@ import {
   PROJECT_COMMAND_CATALOG,
   matchProjectCommandShortcut,
   projectCommandBinding,
+  projectCommandLabel,
   projectCommandShortcutAria,
   projectCommandShortcutLabel,
 } from "../application/projectCommandCatalog";
@@ -164,6 +165,12 @@ test("registers Photoshop and its fixed shortcut in both Photo contexts", () => 
       "frame-photo",
     ),
   ).toBe("open-in-photoshop");
+});
+
+test("names Locate image in the plural only when it acts on several images", () => {
+  expect(projectCommandLabel("relink-media", 1)).toBe("Localizar imagem…");
+  expect(projectCommandLabel("relink-media", 2)).toBe("Localizar imagens…");
+  expect(projectCommandLabel("replace-media", 2)).toBe("Substituir imagem");
 });
 
 test("shares New and Open metadata with the Welcome surface without borrowing the Project context", () => {
