@@ -253,6 +253,21 @@ levaram milissegundos. Religado o servidor, as fotos voltaram a ficar disponíve
 compartilhamento de arquivos. Com o servidor ligado, as 90 fotos continuaram
 disponíveis e nenhuma raiz foi marcada.
 
+### Abrir um Projeto no servidor desligado
+
+Medido em 30/09/2026 no app real (build de desenvolvimento, dados isolados), com um
+Projeto aberto como num duplo clique e o servidor desligado havia mais de um minuto:
+
+| Momento | Tempo desde o pedido |
+| --- | ---: |
+| Progresso "Abrindo projeto — Preparando a Janela do projeto…" na tela | 0,4 s |
+| Falha registrada | 37,2 s |
+| Aviso "O local do projeto está indisponível. Reconecte a unidade ou o compartilhamento e tente novamente." | 37,7 s |
+
+A espera é o primeiro contato do Windows com o servidor desligado. Durante ela, o
+progresso não pode ser fechado e diz que está preparando a janela, não que espera a
+rede. A mensagem final descreve o problema certo.
+
 ## Recomendações
 
 - **Manter o limite de três leituras remotas por enquanto**: ele troca ~5% do tempo
