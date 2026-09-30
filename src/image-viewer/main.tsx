@@ -19,11 +19,11 @@ const qa = import.meta.env.DEV && new URLSearchParams(location.search).has("qa")
 const qaError = import.meta.env.DEV ? new URLSearchParams(location.search).get("error") : null;
 const qaMultipleFaces = import.meta.env.DEV && new URLSearchParams(location.search).get("fixture") === "faces-multi";
 const qaDelayedPreparation = import.meta.env.DEV && new URLSearchParams(location.search).get("delay") === "prepare";
-const qaTarget = qaMultipleFaces ? "/.scratch/face-detection-debug-20260923/inputs/IMG_6246.JPG" : "/.scratch/eye-correction/qa/nikki-closed.jpg";
-const qaReference = qaMultipleFaces ? "/.scratch/face-detection-debug-20260923/inputs/IMG_6252.JPG" : "/.scratch/eye-correction/qa/nikki-open-a.jpg";
+const qaTarget = qaMultipleFaces ? "/.scratch/fixtures/correcao-de-olhos/rostos/IMG_6246.JPG" : "/.scratch/fixtures/correcao-de-olhos/nikki-closed.jpg";
+const qaReference = qaMultipleFaces ? "/.scratch/fixtures/correcao-de-olhos/rostos/IMG_6252.JPG" : "/.scratch/fixtures/correcao-de-olhos/nikki-open-a.jpg";
 const qaReferences = qaMultipleFaces
-  ? ["IMG_6252.JPG", "IMG_6276.JPG", "IMG_6300.JPG"].map((name) => ({ name, url: `/.scratch/face-detection-debug-20260923/inputs/${name}` }))
-  : [{ name: "Referência.jpg", url: qaReference }, { name: "Outra referência.jpg", url: "/.scratch/face-detection-debug-20260923/inputs/reference.jpg" }];
+  ? ["IMG_6252.JPG", "IMG_6276.JPG", "IMG_6300.JPG"].map((name) => ({ name, url: `/.scratch/fixtures/correcao-de-olhos/rostos/${name}` }))
+  : [{ name: "Referência.jpg", url: qaReference }, { name: "Outra referência.jpg", url: "/.scratch/fixtures/correcao-de-olhos/rostos/reference.jpg" }];
 const referenceIndex = (correction: ViewerPresentation["correction"]) => Number(correction?.referenceMediaId?.split("-")[1] ?? 0);
 const previewPhase = (value: string | null): ViewerCorrectionPhase | null => {
   switch (value) {
@@ -36,7 +36,7 @@ const previewCorrection = (phase: ViewerCorrectionPhase, version = 0, index = 0)
   phase, referenceMediaId: `reference-${index}`, referenceName: qa ? qaReferences[index].name : "Referência.jpg",
   referenceUrl: qa ? qaReferences[index].url : sizedPreview(portraitPreview, 800, 1200),
   referenceState: "ready" as const, canPreviousReference: phase === "browse" && index > 0, canNextReference: phase === "browse" && index < qaReferences.length - 1,
-  resultUrl: phase === "preview" || phase === "applying" ? qaMultipleFaces ? `${qaTarget}?v=${version}` : qa ? `/.scratch/eye-correction/qa/nikki-corrected.png${version ? `?v=${version}` : ""}` : sizedPreview(landscapePreview, 1200, 800) : null,
+  resultUrl: phase === "preview" || phase === "applying" ? qaMultipleFaces ? `${qaTarget}?v=${version}` : qa ? `/.scratch/fixtures/correcao-de-olhos/nikki-corrected.png${version ? `?v=${version}` : ""}` : sizedPreview(landscapePreview, 1200, 800) : null,
   error: qaError === "prepare" && phase === "select" ? "Os olhos da referência precisam estar abertos."
     : qaError === "save" && phase === "preview" ? "Não foi possível atualizar a prévia da foto. A foto original foi restaurada." : null,
 });
