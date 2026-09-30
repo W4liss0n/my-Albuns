@@ -4,6 +4,7 @@ This repository uses a single domain context.
 
 ## Before working
 
+- Use `docs/README.md` to find the documents for a topic.
 - Read `CONTEXT.md` for domain vocabulary.
 - Read the accepted ADRs relevant to the change.
 - Read the canonical product specification before changing product behaviour.

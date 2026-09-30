@@ -14,13 +14,15 @@ precisam, em lote, e **nenhum fluxo decide sozinho se um arquivo está em disco 
 ou num compartilhamento de rede**.
 
 Numa pasta de rede, cada acesso espera várias idas e voltas ao servidor e cada byte
-atravessa a rede. As medições de 2026-09-29, em Wi‑Fi, estão no plano
-`.scratch/planos/2026-09-29-desempenho-com-projetos-e-imagens-em-rede.md`:
+atravessa a rede. Nas medições locais de 2026-09-29, em Wi‑Fi:
 
 - observar um Original custava de 48 a 50 ms um por vez e de 13 a 15 ms com oito ao
   mesmo tempo;
-- o cliente SMB não guarda o arquivo depois de fechado, então toda releitura baixa o
-  arquivo de novo.
+- o cliente SMB guardou em memória arquivos lidos pouco antes, mas isso não é
+  garantido: com o cache frio, toda releitura baixa o arquivo de novo.
+
+A pesquisa [Desempenho com Projetos e imagens em rede](../research/2026-09-29-desempenho-em-rede.md)
+registra as demais medições.
 
 As regras que tornam isso aceitável ficam no módulo, e corrigir uma delas corrige
 todos os fluxos. Antes da centralização, a inspeção de cabeçalho deixou de ler o corpo
