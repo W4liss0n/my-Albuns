@@ -1468,7 +1468,7 @@ fn bootstrap_failure(failure: BootstrapFailure) -> ProjectLaunchFailure {
         (_, Some(FailureCode::LegacyProjectOldVersion)) => (
             "legacy_project_old_version",
             "Este projeto usa uma versão muito antiga do myAlbuns.",
-            "Abra e salve o projeto no myAlbuns antigo antes de abri-lo aqui.",
+            "Abra e salve o projeto no myAlbuns antigo. Depois, abra o projeto aqui.",
         ),
         (_, Some(FailureCode::LegacyProjectUnsupportedStructure)) => (
             "legacy_project_unsupported_structure",
