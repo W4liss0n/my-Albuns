@@ -42,6 +42,11 @@ opt-level = 3
 [profile.dev.package.myalbuns-desktop]
 opt-level = 1
 
+# The Layout Generator enumerates thousands of compositions per query; unoptimized,
+# the Layouts panel of a 20-Frame Sheet waits about a second in the local build.
+[profile.dev.package.myalbuns-core]
+opt-level = 2
+
 # image 0.25 encodes the prepared full-resolution PNG through png 0.18.
 [profile.dev.package."png:0.18.1"]
 opt-level = 3

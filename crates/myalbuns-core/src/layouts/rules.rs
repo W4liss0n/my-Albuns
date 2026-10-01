@@ -82,19 +82,20 @@ impl LayoutRules {
     }
 
     pub fn list_for_lock(query: &LayoutQuery, sources: LayoutSources<'_>) -> LayoutListing {
-        Self::listing(query, sources, true)
+        Self::listing(&generate_layouts(query), query, sources, true)
     }
 
     pub fn list(query: &LayoutQuery, sources: LayoutSources<'_>) -> LayoutListing {
-        Self::listing(query, sources, false)
+        Self::listing(&generate_layouts(query), query, sources, false)
     }
 
-    fn listing(
+    /// Lists a Generator result obtained for this same query, possibly earlier.
+    pub(crate) fn listing(
+        generation: &LayoutGeneration,
         query: &LayoutQuery,
         sources: LayoutSources<'_>,
         allow_larger: bool,
     ) -> LayoutListing {
-        let generation = generate_layouts(query);
         let mut listing = LayoutListing {
             algorithm_version: generation.algorithm_version,
             generation_status: generation.status,
@@ -159,7 +160,7 @@ impl LayoutRules {
                 favorite_id: None,
             });
         }
-        for candidate in generation.candidates {
+        for candidate in &generation.candidates {
             if listing.candidates.iter().any(|item| {
                 item.layout.origin == LayoutOrigin::Automatic
                     && Self::same_definition(&item.layout.definition, &candidate.definition)
@@ -168,7 +169,7 @@ impl LayoutRules {
             }
             listing.candidates.push(LayoutCandidate {
                 layout: StoredLayout {
-                    definition: candidate.definition,
+                    definition: candidate.definition.clone(),
                     origin: LayoutOrigin::Automatic,
                 },
                 is_last_applied: false,
@@ -224,7 +225,21 @@ impl LayoutRules {
         if listing.generation_status == LayoutGenerationStatus::InvalidQuery {
             return Err(CoreError::InvalidLayoutQuery);
         }
-        if let Some(candidate) = listing.candidates.first() {
+        // Saved layouts remain available for explicit selection. Automatic
+        // arrangement must preserve the orientation of each current Frame.
+        if let Some(candidate) = listing.candidates.iter().find(|candidate| {
+            candidate
+                .layout
+                .definition
+                .positions
+                .iter()
+                .zip(&query.frame_orientations)
+                .all(|(rect, orientation)| match orientation {
+                    FrameOrientation::Vertical => rect.width < rect.height,
+                    FrameOrientation::Horizontal => rect.width > rect.height,
+                    FrameOrientation::Square => rect.width == rect.height,
+                })
+        }) {
             Self::resolve(
                 &candidate.layout,
                 &query.surface,

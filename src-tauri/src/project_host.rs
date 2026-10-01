@@ -2475,15 +2475,19 @@ mod tests {
                 "the red translucent sobreposição is composed over the blue right fundo"
             );
             if !lock_layout {
-                let outside_resized_frame = rendered.get_pixel(
-                    (((original_rect.x + 10_000) as f64 / 600_000.0) * f64::from(rendered.width()))
-                        as u32,
-                    rendered.height() / 2,
-                );
+                let removed_x = (((original_rect.x + 10_000) as f64 / 600_000.0)
+                    * f64::from(rendered.width())) as u32;
+                let outside_resized_frame = rendered.get_pixel(removed_x, rendered.height() / 2);
+                // The applied Layout may place the quadro on either página; compare with that side.
+                let same_side = if removed_x < rendered.width() / 2 {
+                    left
+                } else {
+                    right
+                };
                 assert!(
-                    (0..3).all(
-                        |channel| outside_resized_frame[channel].abs_diff(left[channel]) <= 12
-                    ),
+                    (0..3).all(|channel| {
+                        outside_resized_frame[channel].abs_diff(same_side[channel]) <= 12
+                    }),
                     "the area removed by resize contains the fundo and sobreposição, not the previous Photo"
                 );
             }
