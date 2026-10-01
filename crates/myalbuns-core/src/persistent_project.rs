@@ -637,7 +637,9 @@ impl EditableProject {
         if !self.session_valid {
             return Err(CoreError::EditableSessionInvalidated);
         }
-        self.session.query_layouts(sheet_id, frame_request)
+        let dimensions = self.observed_photo_dimensions();
+        self.session
+            .query_layouts(sheet_id, frame_request, &dimensions)
     }
 
     pub fn preview_layout(
@@ -805,16 +807,9 @@ impl EditableProject {
         if !self.session_valid {
             return Err(CoreError::EditableSessionInvalidated);
         }
-        let sources = match &intent {
-            ProjectIntent::SetAlbumInformation { .. } => self.observed_photo_dimensions(),
-            // A Frame created for a Photo takes the Photo's orientation.
-            ProjectIntent::AddPhoto { media_id, .. }
-            | ProjectIntent::DropPhoto { media_id, .. } => self
-                .observed_dimensions(media_id.into_uuid())
-                .map(|dimensions| HashMap::from([(media_id.into_uuid(), dimensions)]))
-                .unwrap_or_default(),
-            _ => HashMap::new(),
-        };
+        // Photo dimensions orient the Frames created for Photos and give
+        // every automatic arrangement the proportions the Photos are shown at.
+        let sources = self.observed_photo_dimensions();
         let intent_outcome = self.session.apply(intent, &sources)?;
         let affected_frame_id = intent_outcome
             .affected_frame_id

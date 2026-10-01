@@ -6,6 +6,7 @@ mod families;
 mod parallel;
 mod quantization;
 mod repetition;
+mod trees;
 
 const EPSILON: f64 = 1e-10;
 const ORIENTATIONS: [FrameOrientation; 3] = [
@@ -15,11 +16,19 @@ const ORIENTATIONS: [FrameOrientation; 3] = [
 ];
 /// Largest deduction for Page blocks that do not share a top and bottom line.
 const HORIZON_PENALTY: f64 = 8.0;
+/// Share of the surface height below which a Frame's short side reads poorly.
+const READABLE_HEIGHT: f64 = 0.15;
+/// Largest group in which more than three Frame sizes cost points.
+const HARMONY_GROUP: usize = 6;
 /// Ceiling of one query; the list may end earlier when nothing distinct remains.
 const MAXIMUM_SUGGESTIONS: usize = 20;
+/// Width over height a vertical Frame may take; horizontal ones take the inverse.
+const VERTICAL_RATIOS: std::ops::RangeInclusive<f64> = 0.45..=0.92;
 /// Work handed to each extra thread at least; below it, starting one costs more.
 const DIVISIONS_PER_THREAD: usize = 4;
 const CANDIDATES_PER_THREAD: usize = 64;
+/// Most shares of verticals searched among the Frames left free.
+const FREE_PROFILES: usize = 7;
 
 #[derive(Clone, Copy, Debug)]
 struct Bounds {
@@ -44,6 +53,11 @@ impl Bounds {
 struct Slot {
     index: usize,
     orientation: FrameOrientation,
+    /// Width over height this Frame aims at: its Photo's, or the reference one.
+    ratio: f64,
+    /// Covers a whole Page, or a single page's whole surface: the Photo reaches
+    /// the edges, past the Margin, whatever the Frame's orientation.
+    full_page: bool,
     bounds: Bounds,
 }
 
@@ -85,6 +99,7 @@ struct Search<'a> {
     minimum: f64,
     /// Uniform grids are admitted only when nothing else fits.
     repetition_allowed: bool,
+    trees: trees::Solved,
 }
 
 impl Search<'_> {
@@ -104,6 +119,10 @@ impl Search<'_> {
         slots.iter().all(|slot| {
             let r = slot.bounds;
             let ratio = r.w / r.h;
+            if slot.full_page {
+                return [r.x, r.y, r.w, r.h].iter().all(|v| v.is_finite())
+                    && r.w.min(r.h) >= self.minimum - EPSILON;
+            }
             [r.x, r.y, r.w, r.h].iter().all(|v| v.is_finite())
                 && r.w.min(r.h) >= self.minimum - EPSILON
                 && r.x >= bounds.x - EPSILON
@@ -111,8 +130,10 @@ impl Search<'_> {
                 && r.x + r.w <= bounds.x + bounds.w + EPSILON
                 && r.y + r.h <= bounds.y + bounds.h + EPSILON
                 && match slot.orientation {
-                    FrameOrientation::Vertical => (0.45..=0.92).contains(&ratio),
-                    FrameOrientation::Horizontal => (1.0 / 0.92..=1.0 / 0.45).contains(&ratio),
+                    FrameOrientation::Vertical => VERTICAL_RATIOS.contains(&ratio),
+                    FrameOrientation::Horizontal => (1.0 / VERTICAL_RATIOS.end()
+                        ..=1.0 / VERTICAL_RATIOS.start())
+                        .contains(&ratio),
                     FrameOrientation::Square => (ratio - 1.0).abs() < 1e-8,
                 }
         })
@@ -172,6 +193,11 @@ impl Search<'_> {
                 }
                 continue;
             }
+            if let [only] = page.as_slice()
+                && only.full_page
+            {
+                continue;
+            }
             let bounds = Bounds {
                 x: side + inset,
                 y: self.margin,
@@ -190,44 +216,51 @@ impl Search<'_> {
     }
 
     /// Ranks a composition within its own region, such as one Page or group.
-    fn score(&self, candidate: &Candidate) -> f64 {
+    fn score(&self, slots: &[Slot], scope: LayoutScope) -> f64 {
         let usable = self.bounds().w * self.bounds().h;
-        let occupation = (frame_area(&candidate.slots) / usable / 0.86).clamp(0.0, 1.0);
-        self.score_with(candidate, occupation)
+        let occupation = (frame_area(slots) / usable / 0.86).clamp(0.0, 1.0);
+        self.score_with(slots, scope, occupation)
     }
 
     /// Ranks a complete suggestion against the fullest one of the same scope,
     /// so a Page layout or a lone Frame is not judged by the whole Sheet.
     fn final_score(&self, candidate: &Candidate, fullest: f64) -> f64 {
         let occupation = (frame_area(&candidate.slots) / fullest).clamp(0.0, 1.0);
-        self.score_with(candidate, occupation)
+        self.score_with(&candidate.slots, candidate.scope, occupation)
     }
 
-    fn score_with(&self, candidate: &Candidate, occupation: f64) -> f64 {
-        let slots = &candidate.slots;
+    fn score_with(&self, slots: &[Slot], scope: LayoutScope, occupation: f64) -> f64 {
         if slots.is_empty() {
             return 0.0;
         }
         let area = frame_area(slots);
-        let proportion = slots
-            .iter()
-            .map(|s| {
-                let actual = s.bounds.w / s.bounds.h;
-                let ideal = base_ratio(s.orientation);
-                (actual / ideal).min(ideal / actual)
-            })
-            .sum::<f64>()
-            / slots.len() as f64;
+        let fit = |s: &Slot| {
+            let actual = s.bounds.w / s.bounds.h;
+            (actual / s.ratio).min(s.ratio / actual)
+        };
+        // The crop of a whole Page's Photo shows as much as the Page is large.
+        let proportion = if slots.iter().any(|s| s.full_page) {
+            slots
+                .iter()
+                .map(|s| fit(s) * s.bounds.w * s.bounds.h)
+                .sum::<f64>()
+                / area
+        } else {
+            slots.iter().map(fit).sum::<f64>() / slots.len() as f64
+        };
         let shortest = slots
             .iter()
             .map(|s| s.bounds.w.min(s.bounds.h))
             .fold(f64::INFINITY, f64::min);
+        // A Frame reads well from twice the minimum side and 15% of the height.
+        let readable = (2.0 * self.minimum).max(READABLE_HEIGHT * self.height);
         let mut quality = 100.0
-            * (0.45 * proportion
-                + 0.4 * occupation
-                + 0.15 * (shortest / (2.0 * self.minimum)).clamp(0.0, 1.0));
-        let by_page = self.double() && candidate.scope == LayoutScope::Page;
-        if by_page && slots.len() > 1 {
+            * (0.45 * proportion + 0.4 * occupation + 0.15 * (shortest / readable).clamp(0.0, 1.0));
+        let by_page = self.double() && scope == LayoutScope::Page;
+        // A whole Page beside a composition is meant to be uneven and has no
+        // block of its own to align with the facing Page.
+        let full_page = slots.iter().any(|s| s.full_page);
+        if by_page && !full_page && slots.len() > 1 {
             let left: f64 = slots
                 .iter()
                 .filter(|s| s.bounds.x + s.bounds.w <= 0.5 + EPSILON)
@@ -249,7 +282,7 @@ impl Search<'_> {
         } else {
             vec![slots.iter().collect()]
         };
-        if by_page && pages.iter().all(|page| !page.is_empty()) {
+        if by_page && !full_page && pages.iter().all(|page| !page.is_empty()) {
             let heights: Vec<f64> = pages
                 .iter()
                 .map(|page| {
@@ -268,14 +301,32 @@ impl Search<'_> {
             quality -= HORIZON_PENALTY.min(40.0 * (heights[0] - heights[1]).abs() / usable);
         }
         for page in pages {
-            if page.len() < 5 {
+            if page.len() < 3 {
                 continue;
             }
             let areas: Vec<_> = page.iter().map(|s| s.bounds.w * s.bounds.h).collect();
             let largest = areas.iter().copied().fold(0.0, f64::max);
             let smallest = areas.iter().copied().fold(f64::INFINITY, f64::min);
-            quality -= (12.0_f64).min((largest / areas.iter().sum::<f64>() - 0.4).max(0.0) * 35.0)
-                + (10.0_f64).min((largest / smallest - 6.0).max(0.0) * 1.2);
+            // In a small group, more than three sizes read as disorder; large
+            // groups are graduated on purpose.
+            if page.len() <= HARMONY_GROUP {
+                let mut sides: Vec<_> = areas.iter().map(|a| a.sqrt()).collect();
+                sides.sort_by(f64::total_cmp);
+                let mut sizes = 0_usize;
+                let mut last = f64::NEG_INFINITY;
+                for side in sides {
+                    if side > last * 1.04 {
+                        sizes += 1;
+                        last = side;
+                    }
+                }
+                quality -= 4.0 * sizes.saturating_sub(3) as f64;
+            }
+            quality -= (10.0_f64).min((largest / smallest - 6.0).max(0.0) * 1.2);
+            if page.len() >= 5 {
+                quality -=
+                    (12.0_f64).min((largest / areas.iter().sum::<f64>() - 0.4).max(0.0) * 35.0);
+            }
         }
         rounded(quality)
     }
@@ -290,6 +341,25 @@ fn base_ratio(orientation: FrameOrientation) -> f64 {
         FrameOrientation::Vertical => 2.0 / 3.0,
         FrameOrientation::Horizontal => 1.5,
         FrameOrientation::Square => 1.0,
+    }
+}
+
+/// The proportion Frame `index` aims at: its Photo's when the query gives one
+/// of the same orientation, kept a little inside the shapes that orientation
+/// allows, or the reference proportion.
+fn target_ratio(query: &LayoutQuery, index: usize, orientation: FrameOrientation) -> f64 {
+    let proportion = query.frame_proportions.get(index).copied().flatten();
+    match proportion.filter(|p| p.orientation() == orientation) {
+        Some(p) if orientation != FrameOrientation::Square => {
+            let ratio = f64::from(p.width) / f64::from(p.height);
+            let (low, high) = (VERTICAL_RATIOS.start() * 1.01, VERTICAL_RATIOS.end() / 1.01);
+            if orientation == FrameOrientation::Vertical {
+                ratio.clamp(low, high)
+            } else {
+                ratio.clamp(1.0 / high, 1.0 / low)
+            }
+        }
+        _ => base_ratio(orientation),
     }
 }
 
@@ -328,10 +398,11 @@ fn geometry_rows(slots: &[Slot], height: f64) -> Vec<(char, [i64; 4])> {
         .iter()
         .map(|s| {
             let r = s.bounds;
-            let orientation = match s.orientation {
-                FrameOrientation::Vertical => 'V',
-                FrameOrientation::Horizontal => 'H',
-                FrameOrientation::Square => 'Q',
+            let orientation = match (s.full_page, s.orientation) {
+                (true, _) => 'P',
+                (_, FrameOrientation::Vertical) => 'V',
+                (_, FrameOrientation::Horizontal) => 'H',
+                (_, FrameOrientation::Square) => 'Q',
             };
             (
                 orientation,
@@ -341,6 +412,16 @@ fn geometry_rows(slots: &[Slot], height: f64) -> Vec<(char, [i64; 4])> {
         .collect();
     rows.sort();
     rows
+}
+
+/// What a position is compared by: its Frame's orientation, or a whole Page,
+/// whose shape is the Page's whatever the Frame's orientation.
+fn shape(slot: &Slot) -> u8 {
+    if slot.full_page {
+        3
+    } else {
+        slot.orientation as u8
+    }
 }
 
 fn geometry_key(slots: &[Slot], height: f64) -> String {
@@ -387,7 +468,7 @@ fn mirror_key(candidate: &Candidate, surface: &LayoutSurface) -> MirrorKey {
                         if vertical {
                             y = 2 * height - y - h;
                         }
-                        (slot.orientation as u8, [x, y, w, h])
+                        (shape(slot), [x, y, w, h])
                     })
                     .collect();
                 rows.sort_unstable();
@@ -409,7 +490,7 @@ fn distance(a: &Candidate, b: &Candidate) -> f64 {
         let mut best = None;
         let mut value = -1.0;
         for (i, other) in b.slots.iter().enumerate() {
-            if paired & (1 << i) != 0 || slot.orientation != other.orientation {
+            if paired & (1 << i) != 0 || shape(slot) != shape(other) {
                 continue;
             }
             let a = slot.bounds;
@@ -529,13 +610,27 @@ fn query_is_valid(query: &LayoutQuery) -> bool {
     query.surface.is_valid() && query.parameters.is_valid()
 }
 
-/// Every valid composition, scored and in ranking order.
-fn candidates(frames: &[Slot], search: &Search<'_>) -> Vec<Candidate> {
+/// Compositions judged against each other for occupation and the window:
+/// Page layouts, layouts across the fold, and a whole Page beside the others.
+const CATEGORIES: usize = 3;
+
+fn category(candidate: &Candidate) -> usize {
+    if candidate.slots.iter().any(|s| s.full_page) {
+        2
+    } else {
+        usize::from(candidate.scope == LayoutScope::Sheet)
+    }
+}
+
+/// Every valid composition of these Frames, checked and placed in micrometres.
+fn compositions(frames: &[Slot], search: &Search<'_>) -> Vec<Candidate> {
     let query = search.query;
     let mut pool = if search.double() {
-        families::pages(frames, search)
+        let mut pool = families::pages(frames, search);
+        pool.extend(families::full_pages(frames, search));
+        pool
     } else {
-        Vec::new()
+        families::full_surface(frames, search)
     };
     if !search.double() || query.permission == LayoutPermission::PagesAndSheet {
         pool.extend(families::local(frames, search.bounds(), search));
@@ -545,8 +640,7 @@ fn candidates(frames: &[Slot], search: &Search<'_>) -> Vec<Candidate> {
             search,
         ));
     }
-    // Each composition is checked and converted on its own; duplicates are then
-    // dropped in pool order, so the first of equal geometries stays.
+    // Each composition is checked and converted on its own.
     let accepted = parallel::map_in_order(&mut pool, CANDIDATES_PER_THREAD, |c| {
         c.scope = search.scope(&c.slots);
         if !search.valid_candidate(c) {
@@ -561,30 +655,64 @@ fn candidates(frames: &[Slot], search: &Search<'_>) -> Vec<Candidate> {
         true
     });
     let mut accepted = accepted.into_iter();
-    let mut seen = BTreeSet::new();
-    pool.retain(|c| accepted.next() == Some(true) && seen.insert(c.key.clone()));
-    let fullest = |scope: LayoutScope| {
-        pool.iter()
-            .filter(|c| c.scope == scope)
-            .map(|c| frame_area(&c.slots))
-            .fold(0.0, f64::max)
-    };
-    let fullest = [fullest(LayoutScope::Page), fullest(LayoutScope::Sheet)];
+    pool.retain(|_| accepted.next() == Some(true));
+    pool
+}
+
+/// The compositions scored against the fullest of their category, in ranking
+/// order. Of equal geometries, the first ranked stays.
+fn ranked(mut pool: Vec<Candidate>, search: &Search<'_>) -> Vec<Candidate> {
+    let mut fullest = [0.0_f64; CATEGORIES];
+    for c in &pool {
+        fullest[category(c)] = fullest[category(c)].max(frame_area(&c.slots));
+    }
     for c in &mut pool {
-        c.quality = search.final_score(c, fullest[usize::from(c.scope == LayoutScope::Sheet)]);
+        c.quality = search.final_score(c, fullest[category(c)]);
     }
     pool.sort_by(|a, b| {
         b.quality
             .total_cmp(&a.quality)
             .then_with(|| a.key.cmp(&b.key))
     });
+    let mut seen = BTreeSet::new();
+    pool.retain(|c| seen.insert(c.key.clone()));
     pool
+}
+
+/// The orientations searched: the query's own when every Frame has one;
+/// otherwise up to `FREE_PROFILES` shares of verticals among the free Frames,
+/// evenly spaced from none to all, the others horizontal.
+fn profiles(query: &LayoutQuery) -> Vec<Vec<FrameOrientation>> {
+    let free: Vec<_> = query
+        .frame_orientations
+        .iter()
+        .enumerate()
+        .filter_map(|(index, orientation)| orientation.is_none().then_some(index))
+        .collect();
+    let steps = free.len().min(FREE_PROFILES - 1);
+    let shares: BTreeSet<_> = (0..=steps)
+        .map(|k| (k * free.len() + steps / 2).checked_div(steps).unwrap_or(0))
+        .collect();
+    shares
+        .into_iter()
+        .map(|vertical| {
+            let mut orientations: Vec<_> = query
+                .frame_orientations
+                .iter()
+                .map(|orientation| orientation.unwrap_or(FrameOrientation::Horizontal))
+                .collect();
+            for &index in &free[..vertical] {
+                orientations[index] = FrameOrientation::Vertical;
+            }
+            orientations
+        })
+        .collect()
 }
 
 /// Pure, bounded generation. Positions always follow the caller's Frame order.
 pub fn generate_layouts(query: &LayoutQuery) -> LayoutGeneration {
     let mut result = LayoutGeneration {
-        algorithm_version: 2,
+        algorithm_version: 3,
         status: LayoutGenerationStatus::NoCandidates,
         candidates: Vec::new(),
     };
@@ -608,38 +736,46 @@ pub fn generate_layouts(query: &LayoutQuery) -> LayoutGeneration {
         gap: rounded(query.parameters.gap_um as f64 / scale),
         minimum: rounded(query.parameters.minimum_side_um as f64 / scale),
         repetition_allowed: false,
+        trees: Default::default(),
     };
     if search.bounds().w <= 0.0 || search.bounds().h <= 0.0 {
         return result;
     }
-    let frames: Vec<_> = query
-        .frame_orientations
-        .iter()
-        .enumerate()
-        .map(|(index, orientation)| Slot {
-            index,
-            orientation: *orientation,
-            bounds: search.bounds(),
-        })
-        .collect();
-    let mut pool = candidates(&frames, &search);
+    let profiles = profiles(query);
+    // Frames left free are searched in each profile; all compete in one ranking.
+    let search_all = |search: &Search<'_>| {
+        let mut pool = Vec::new();
+        for orientations in &profiles {
+            let frames: Vec<_> = orientations
+                .iter()
+                .enumerate()
+                .map(|(index, &orientation)| Slot {
+                    index,
+                    orientation,
+                    ratio: target_ratio(query, index, orientation),
+                    full_page: false,
+                    bounds: search.bounds(),
+                })
+                .collect();
+            pool.extend(compositions(&frames, search));
+        }
+        ranked(pool, search)
+    };
+    let mut pool = search_all(&search);
     if pool.is_empty() {
         // A uniform grid keeps orientations, margins and gaps, unlike the
         // arrangement of reserve that automations would apply otherwise.
         search.repetition_allowed = true;
-        pool = candidates(&frames, &search);
+        pool = search_all(&search);
         pool.truncate(1);
     }
-    // Each scope keeps its own ten-point window: a Page layout and a panorama
-    // across the fold are judged against their own kind, not against each other.
-    let window = |scope: LayoutScope| {
-        pool.iter()
-            .filter(|c| c.scope == scope)
-            .map(|c| c.quality - 10.0)
-            .fold(72.0, f64::max)
-    };
-    let cutoffs = [window(LayoutScope::Page), window(LayoutScope::Sheet)];
-    pool.retain(|c| c.quality >= cutoffs[usize::from(c.scope == LayoutScope::Sheet)]);
+    // Each category keeps its own ten-point window: a Page layout, a panorama
+    // across the fold and a whole Page are judged against their own kind.
+    let mut cutoffs = [72.0_f64; CATEGORIES];
+    for c in &pool {
+        cutoffs[category(c)] = cutoffs[category(c)].max(c.quality - 10.0);
+    }
+    pool.retain(|c| c.quality >= cutoffs[category(c)]);
     parallel::map_in_order(&mut pool, CANDIDATES_PER_THREAD, |c| {
         c.mirror_key = mirror_key(c, &query.surface)
     });

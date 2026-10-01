@@ -50,6 +50,7 @@ impl ProjectDocument {
         desired_offset_um: u64,
         mode: PhotoPlacementMode,
         custom: &[crate::CustomLayout],
+        sources: &PhotoDimensions,
     ) -> Result<(Self, Vec<Uuid>), CoreError> {
         let id =
             Uuid::parse_str(sheet_id).map_err(|_| CoreError::SheetNotFound(sheet_id.into()))?;
@@ -131,7 +132,7 @@ impl ProjectDocument {
         let ids = frames.iter().map(|frame| frame.id).collect();
         candidate.sheets[index].frames.extend(frames);
         if mode == PhotoPlacementMode::Normal {
-            candidate.reorganize_sheet(id, custom)?;
+            candidate.reorganize_sheet(id, custom, sources)?;
         }
         validate_project_state(&candidate).map_err(|()| CoreError::InvalidFramePaste)?;
         Ok((candidate, ids))

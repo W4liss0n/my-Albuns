@@ -175,14 +175,31 @@ fn assert_geometry(
     use myalbuns_core::{FrameOrientation, LayoutPermission, LayoutSurfaceKind};
     let positions = &definition.positions;
     assert_eq!(positions.len(), query.frame_orientations.len(), "{case}");
+    // A whole Page takes its Photo to the edges, past the Margin, whatever
+    // the Frame's orientation; everything else keeps both.
+    let whole = |r: &myalbuns_core::RectUm| {
+        if query.surface.kind == LayoutSurfaceKind::DoubleSheet {
+            fills_a_page(r, query.surface.width_um, query.surface.height_um)
+        } else {
+            *r == myalbuns_core::RectUm {
+                x: 0,
+                y: 0,
+                width: query.surface.width_um,
+                height: query.surface.height_um,
+            }
+        }
+    };
     for (r, orientation) in positions.iter().zip(&query.frame_orientations) {
         assert!(
             r.width.min(r.height) >= query.parameters.minimum_side_um - 1,
             "{case}: minimum {r:?}"
         );
+        if whole(r) {
+            continue;
+        }
         assert!(
             r.x >= query.parameters.margin_um - 1 && r.y >= query.parameters.margin_um - 1,
-            "{case}: margin"
+            "{case}: margin {r:?}"
         );
         assert!(
             r.x + r.width <= query.surface.width_um - query.parameters.margin_um + 1,
@@ -192,11 +209,13 @@ fn assert_geometry(
             r.y + r.height <= query.surface.height_um - query.parameters.margin_um + 1,
             "{case}: bottom margin"
         );
+        // A free Frame becomes vertical or horizontal, never square.
         assert!(
             match orientation {
-                FrameOrientation::Vertical => r.width < r.height,
-                FrameOrientation::Horizontal => r.width > r.height,
-                FrameOrientation::Square => r.width == r.height,
+                Some(FrameOrientation::Vertical) => r.width < r.height,
+                Some(FrameOrientation::Horizontal) => r.width > r.height,
+                Some(FrameOrientation::Square) => r.width == r.height,
+                None => r.width != r.height,
             },
             "{case}: orientation {r:?}"
         );
@@ -235,6 +254,12 @@ fn assert_geometry(
                 .collect();
             if positions.len() > 1 {
                 assert!(!page.is_empty(), "{case}: both pages");
+            }
+            if let [only] = page.as_slice()
+                && whole(only)
+            {
+                groups.push(page);
+                continue;
             }
             if !page.is_empty() {
                 let left = page.iter().map(|r| r.x).min().unwrap();
@@ -407,10 +432,11 @@ fn page_blocks_share_a_top_and_bottom_line_in_the_first_suggestion() {
 #[test]
 fn mirrored_forms_follow_the_distinct_structures() {
     let (width, height) = (600000, 300000);
+    // Six verticals now fill the list with distinct structures alone.
     let query = double_sheet_query(
         width,
         height,
-        &[FrameOrientation::Vertical; 6],
+        &[FrameOrientation::Vertical; 8],
         LayoutPermission::PagesOnly,
     );
     // Smallest sorted rectangle list among the flips of both axes, of each
@@ -502,5 +528,231 @@ fn assert_no_internal_vacancy(rects: &[&myalbuns_core::RectUm], gap: i64, case: 
             edge = edge.max(end);
         }
         assert_eq!(edge, bottom, "{case}: incomplete column");
+    }
+}
+
+fn ratio(rect: &myalbuns_core::RectUm) -> f64 {
+    rect.width as f64 / rect.height as f64
+}
+
+fn page_query(orientations: serde_json::Value, proportions: serde_json::Value) -> LayoutQuery {
+    serde_json::from_value(serde_json::json!({
+        "surface": {"type":"singlePage", "widthUm":300000, "heightUm":300000},
+        "frameOrientations": orientations,
+        "frameProportions": proportions,
+        "permission":"pagesAndSheet", "marginUm":15000, "gapUm":5000,
+        "minimumSideUm":20000
+    }))
+    .unwrap()
+}
+
+#[test]
+fn frames_take_the_proportions_of_their_photos() {
+    let single = |proportions: serde_json::Value| {
+        let result = generate_layouts(&page_query(serde_json::json!(["vertical"]), proportions));
+        ratio(&result.candidates[0].definition.positions[0])
+    };
+    // A phone portrait is 3:4, wider than the reference 2:3.
+    assert!((single(serde_json::json!([{"width":3, "height":4}])) - 0.75).abs() < 0.002);
+    assert!((single(serde_json::json!([])) - 2.0 / 3.0).abs() < 0.002);
+    // A proportion of the other orientation does not describe this Frame.
+    assert!((single(serde_json::json!([{"width":4, "height":3}])) - 2.0 / 3.0).abs() < 0.002);
+    // A very tall Photo stays within the shapes a vertical Frame may take.
+    assert!((0.45..0.92).contains(&single(serde_json::json!([{"width":1, "height":3}]))));
+
+    // Side by side, each Frame keeps its own Photo's proportion.
+    let pair = generate_layouts(&page_query(
+        serde_json::json!(["vertical", "vertical"]),
+        serde_json::json!([{"width":3, "height":4}, {"width":9, "height":16}]),
+    ));
+    assert!(pair.candidates.iter().any(|candidate| {
+        let positions = &candidate.definition.positions;
+        (ratio(&positions[0]) - 0.75).abs() < 0.005 && (ratio(&positions[1]) - 0.5625).abs() < 0.005
+    }));
+}
+
+fn fills_a_page(rect: &myalbuns_core::RectUm, width: i64, height: i64) -> bool {
+    rect.y == 0
+        && rect.height == height
+        && (rect.x == 0 || rect.x + rect.width == width)
+        && (2 * rect.width - width).abs() <= 1
+}
+
+#[test]
+fn a_whole_page_may_take_one_photo_to_the_edges_beside_the_others() {
+    let query: LayoutQuery = serde_json::from_value(serde_json::json!({
+        "surface": {"type":"doubleSheet", "widthUm":600000, "heightUm":300000},
+        "frameOrientations":["vertical", "vertical", "horizontal"],
+        "permission":"pagesAndSheet", "marginUm":15000, "gapUm":5000,
+        "minimumSideUm":20000
+    }))
+    .unwrap();
+    let result = generate_layouts(&query);
+    let whole: Vec<_> = result
+        .candidates
+        .iter()
+        .filter(|c| {
+            c.definition
+                .positions
+                .iter()
+                .any(|r| fills_a_page(r, 600_000, 300_000))
+        })
+        .collect();
+    assert!(!whole.is_empty());
+    for candidate in whole {
+        assert_eq!(candidate.definition.scope, LayoutScope::Page);
+        let positions = &candidate.definition.positions;
+        let page = positions
+            .iter()
+            .find(|r| fills_a_page(r, 600_000, 300_000))
+            .unwrap();
+        // The Page is square, whatever the orientation of the Frame it holds.
+        assert_eq!(page.width, page.height);
+        // The other Frames keep the Margin and stay on the facing Page.
+        for other in positions.iter().filter(|r| *r != page) {
+            assert!(other.y >= 15_000 && other.y + other.height <= 285_000);
+            if page.x == 0 {
+                assert!(other.x >= 300_000 + 15_000 && other.x + other.width <= 585_000);
+            } else {
+                assert!(other.x >= 15_000 && other.x + other.width <= 300_000 - 15_000);
+            }
+        }
+    }
+
+    let single: LayoutQuery = serde_json::from_value(serde_json::json!({
+        "surface": {"type":"singlePage", "widthUm":300000, "heightUm":300000},
+        "frameOrientations":["horizontal"],
+        "permission":"pagesAndSheet", "marginUm":15000, "gapUm":5000,
+        "minimumSideUm":20000
+    }))
+    .unwrap();
+    assert!(generate_layouts(&single).candidates.iter().any(|c| {
+        c.definition.positions[0]
+            == myalbuns_core::RectUm {
+                x: 0,
+                y: 0,
+                width: 300_000,
+                height: 300_000,
+            }
+    }));
+}
+
+#[test]
+fn automatic_arrangement_never_takes_a_whole_page_on_its_own() {
+    // On 20 × 30 cm Pages a vertical Photo fills a whole Page without a crop,
+    // so such a suggestion leads the list; automations still keep the Margin.
+    let query: LayoutQuery = serde_json::from_value(serde_json::json!({
+        "surface": {"type":"doubleSheet", "widthUm":400000, "heightUm":300000},
+        "frameOrientations":["vertical", "vertical", "vertical"],
+        "permission":"pagesAndSheet", "marginUm":15000, "gapUm":5000,
+        "minimumSideUm":20000
+    }))
+    .unwrap();
+    let first = &generate_layouts(&query).candidates[0];
+    assert!(
+        first
+            .definition
+            .positions
+            .iter()
+            .any(|r| fills_a_page(r, 400_000, 300_000))
+    );
+    let ids: Vec<_> = (0..3).map(|_| uuid::Uuid::new_v4()).collect();
+    let patch = myalbuns_core::LayoutRules::automatic(&query, Default::default(), &ids).unwrap();
+    assert!(
+        !patch
+            .definition()
+            .positions
+            .iter()
+            .any(|r| fills_a_page(r, 400_000, 300_000))
+    );
+}
+
+#[test]
+fn free_frames_are_vertical_in_some_suggestions_and_horizontal_in_others() {
+    for (width, height) in [(600000, 300000), (400000, 300000), (300000, 300000)] {
+        let kind = if width == height {
+            "singlePage"
+        } else {
+            "doubleSheet"
+        };
+        let query: LayoutQuery = serde_json::from_value(serde_json::json!({
+            "surface": {"type":kind, "widthUm":width, "heightUm":height},
+            "frameOrientations":[null, null, "square", null, null],
+            "permission":"pagesAndSheet", "marginUm":15000, "gapUm":5000,
+            "minimumSideUm":20000
+        }))
+        .unwrap();
+        let case = format!("{kind} {width}x{height}");
+        let result = generate_layouts(&query);
+        assert_eq!(result.status, LayoutGenerationStatus::Candidates, "{case}");
+        let mut verticals = std::collections::BTreeSet::new();
+        for candidate in &result.candidates {
+            assert_generated_geometry(&query, &candidate.definition, &case);
+            let positions = &candidate.definition.positions;
+            verticals.insert(
+                [0, 1, 3, 4]
+                    .iter()
+                    .filter(|&&i| positions[i].width < positions[i].height)
+                    .count(),
+            );
+        }
+        // The Frame with an orientation keeps it; the free ones are mixed.
+        assert!(verticals.len() >= 3, "{case}: {verticals:?}");
+    }
+}
+
+#[test]
+fn blocks_cut_across_keep_every_frame_at_its_photo_proportion() {
+    let proportions = serde_json::json!([
+        {"width":3, "height":4}, {"width":2, "height":3}, {"width":3, "height":2},
+        {"width":9, "height":16}, {"width":4, "height":3}
+    ]);
+    let query = page_query(
+        serde_json::json!([
+            "vertical",
+            "vertical",
+            "horizontal",
+            "vertical",
+            "horizontal"
+        ]),
+        proportions,
+    );
+    let targets = [0.75, 2.0 / 3.0, 1.5, 9.0 / 16.0, 4.0 / 3.0];
+    let result = generate_layouts(&query);
+    let blocks: Vec<_> = result
+        .candidates
+        .iter()
+        .filter(|c| c.family == "Blocos encaixados")
+        .collect();
+    assert!(!blocks.is_empty());
+    for candidate in blocks {
+        assert_generated_geometry(&query, &candidate.definition, "blocks");
+        for (rect, target) in candidate.definition.positions.iter().zip(targets) {
+            assert!(
+                (ratio(rect) / target - 1.0).abs() < 0.002,
+                "{rect:?} {target}"
+            );
+        }
+    }
+}
+
+#[test]
+fn the_first_suggestion_keeps_a_small_group_in_harmony() {
+    // Version 2 led these with a hero beside Frames under 5 cm and over 14
+    // times smaller; a small group now keeps its sizes within six times and
+    // every short side at 15% of the height.
+    for orientations in [
+        ["vertical", "vertical", "vertical", "horizontal"],
+        ["vertical", "horizontal", "horizontal", "horizontal"],
+    ] {
+        let query = page_query(serde_json::json!(orientations), serde_json::json!([]));
+        let first = &generate_layouts(&query).candidates[0].definition.positions;
+        let areas: Vec<_> = first.iter().map(|r| r.width * r.height).collect();
+        let (largest, smallest) = (areas.iter().max().unwrap(), areas.iter().min().unwrap());
+        assert!(*largest <= 6 * smallest, "{orientations:?}: {first:?}");
+        assert!(
+            first.iter().all(|r| r.width.min(r.height) >= 45_000),
+            "{orientations:?}: {first:?}"
+        );
     }
 }

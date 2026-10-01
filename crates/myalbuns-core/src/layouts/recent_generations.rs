@@ -52,7 +52,11 @@ mod tests {
                 width_um: 600_000,
                 height_um: 300_000,
             },
-            frame_orientations: vec![FrameOrientation::Vertical, FrameOrientation::Horizontal],
+            frame_orientations: vec![
+                Some(FrameOrientation::Vertical),
+                Some(FrameOrientation::Horizontal),
+            ],
+            frame_proportions: Vec::new(),
             permission: LayoutPermission::PagesAndSheet,
             parameters: LayoutParameters {
                 margin_um,

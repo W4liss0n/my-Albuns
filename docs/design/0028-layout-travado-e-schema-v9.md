@@ -2,7 +2,7 @@
 status: accepted
 document: design
 date: 2026-09-09
-updated: 2026-09-25
+updated: 2026-10-01
 ticket: 26
 ---
 
@@ -22,7 +22,10 @@ Undo/Redo e passam pela fila compartilhada de mutações, inclusive quando
 Salvar ou Desfazer chegam enquanto uma confirmação está pendente.
 
 Por padrão, as sugestões usam a quantidade e as orientações dos Frames
-existentes. O seletor de quantidade de Frames, no título `Layouts com N
+existentes; na versão 3 do Gerador, cada sugestão escolhe a orientação dos
+placeholders
+([ADR 0015](../adr/0015-ampliar-as-sugestoes-com-pagina-inteira-e-proporcoes-reais.md)).
+O seletor de quantidade de Frames, no título `Layouts com N
 quadros` do Painel (refinamento de 25/09/2026 no design 0001), permite pedir uma quantidade
 entre a quantidade de Frames com Foto e o limite de 30 posições do Gerador,
 ignorando placeholders no mínimo permitido. Conforme decisão de 10/09/2026,
@@ -36,8 +39,9 @@ na ordem atual são conservados. Uma nova Foto inserida após a consulta
 invalida a prévia anterior. A quantidade explícita filtra as sugestões pelo
 total solicitado. Zero posições não produz uma miniatura aplicável.
 
-As posições adicionais adotam
-a orientação horizontal padrão. Elas só podem ser confirmadas pelo
+As posições adicionais, como os demais placeholders, ficam verticais ou
+horizontais conforme a sugestão; até a versão 2 do Gerador, adotavam a
+orientação horizontal padrão. Elas só podem ser confirmadas pelo
 cadeado; clicar no corpo de uma preview não cria estruturas adicionais.
 Os IDs dos placeholders são reservados na consulta e reutilizados pela prévia
 e pelo comando. Seu estilo é herdado do Álbum. Nenhuma Foto, estilo ou ajuste

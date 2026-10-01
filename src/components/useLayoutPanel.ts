@@ -61,7 +61,7 @@ export function useLayoutPanel(input: LayoutPanelInput) {
       const outcome = await latest.current.runner.waitForIdle();
       if (!current() || outcome?.status === "obsolete") return null;
       if (outcome?.status === "failed") throw outcome.error;
-      return explicitPositionCount !== null ? latest.current.port.queryLayouts(sheetId, { frameCount: explicitPositionCount, orientation: "horizontal" })
+      return explicitPositionCount !== null ? latest.current.port.queryLayouts(sheetId, { frameCount: explicitPositionCount })
         : latest.current.port.queryLayouts(sheetId);
     });
     queries.current = task;

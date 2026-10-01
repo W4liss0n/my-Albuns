@@ -2,7 +2,7 @@
 status: accepted
 document: design
 date: 2026-09-09
-updated: 2026-09-24
+updated: 2026-10-01
 ticket: 28
 ---
 
@@ -54,7 +54,9 @@ disposição manual dos demais.
 
 O Último Layout compatível tem prioridade na escolha automática somente se
 conservar as orientações atuais; a mesma condição vale para Favoritos e
-Personalizados. Sem candidato adequado, vale a primeira sugestão do Gerador;
+Personalizados. Sem candidato adequado, vale a primeira sugestão do Gerador
+que não leve uma Foto até as bordas de uma Página inteira
+([ADR 0015](../adr/0015-ampliar-as-sugestoes-com-pagina-inteira-e-proporcoes-reais.md));
 sem sugestão, a reserva do ADR 0008 reorganiza os Frames.
 A reserva não aparece no painel e não substitui o Último Layout registrado.
 A aplicação preserva ordem, IDs, conteúdo, Borda, Opacidade e ajustes das Fotos.

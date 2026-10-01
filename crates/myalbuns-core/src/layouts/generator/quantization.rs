@@ -16,7 +16,8 @@ pub(super) fn resolve(
             let mut height = ((r.y + r.h) * scale).round() as i64 - y;
             // Rounding independent origins can put the two square extents one unit
             // apart. Shrink the farther edge within the declared 1 µm tolerance.
-            if s.orientation == FrameOrientation::Square {
+            // A whole Page keeps the Page's own shape.
+            if s.orientation == FrameOrientation::Square && !s.full_page {
                 width = width.min(height);
                 height = width;
             }
@@ -28,18 +29,32 @@ pub(super) fn resolve(
             }
         })
         .collect();
-    if valid(&positions, scope, query) {
+    if valid(&positions, slots, scope, query) {
         Some(positions)
     } else {
         None
     }
 }
 
-fn valid(positions: &[RectUm], scope: LayoutScope, query: &LayoutQuery) -> bool {
+/// Each position keeps the orientation of its slot, chosen for the Frames the
+/// query leaves free. One covering a whole Page reaches past the Margin and
+/// need not keep it.
+fn valid(positions: &[RectUm], slots: &[Slot], scope: LayoutScope, query: &LayoutQuery) -> bool {
     let p = &query.parameters;
     let w = query.surface.width_um;
     let h = query.surface.height_um;
-    for (r, o) in positions.iter().zip(&query.frame_orientations) {
+    for (r, slot) in positions.iter().zip(slots) {
+        if slot.full_page {
+            if r.width.min(r.height) < p.minimum_side_um - 1
+                || r.x < 0
+                || r.y < 0
+                || r.x + r.width > w
+                || r.y + r.height > h
+            {
+                return false;
+            }
+            continue;
+        }
         if r.width <= 0
             || r.height <= 0
             || r.width.min(r.height) < p.minimum_side_um - 1
@@ -54,7 +69,7 @@ fn valid(positions: &[RectUm], scope: LayoutScope, query: &LayoutQuery) -> bool 
         {
             return false;
         }
-        let preserves_orientation = match o {
+        let preserves_orientation = match slot.orientation {
             FrameOrientation::Vertical => r.width < r.height,
             FrameOrientation::Horizontal => r.width > r.height,
             FrameOrientation::Square => r.width == r.height,
@@ -89,7 +104,8 @@ fn valid(positions: &[RectUm], scope: LayoutScope, query: &LayoutQuery) -> bool 
     for side in [0, w] {
         let page: Vec<_> = positions
             .iter()
-            .filter(|r| 2 * r.x >= side && 2 * (r.x + r.width) <= side + w)
+            .zip(slots)
+            .filter(|(r, _)| 2 * r.x >= side && 2 * (r.x + r.width) <= side + w)
             .collect();
         if page.is_empty() {
             if positions.len() > 1 {
@@ -97,6 +113,12 @@ fn valid(positions: &[RectUm], scope: LayoutScope, query: &LayoutQuery) -> bool 
             }
             continue;
         }
+        if let [(_, slot)] = page.as_slice()
+            && slot.full_page
+        {
+            continue;
+        }
+        let page: Vec<_> = page.into_iter().map(|(r, _)| r).collect();
         let left = page.iter().map(|r| r.x).min().unwrap();
         let right = page.iter().map(|r| r.x + r.width).max().unwrap();
         let top = page.iter().map(|r| r.y).min().unwrap();

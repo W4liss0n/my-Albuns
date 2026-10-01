@@ -840,6 +840,7 @@ impl ProjectDocument {
         &self,
         sheet_id: Uuid,
         custom: &[crate::CustomLayout],
+        sources: &PhotoDimensions,
     ) -> Result<Self, ()> {
         let mut candidate = self.clone();
         let sheet_index = candidate
@@ -851,7 +852,7 @@ impl ProjectDocument {
         let sheet = &mut candidate.sheets[sheet_index];
         sheet.convert_active_sides(active_sides);
         candidate
-            .reorganize_sheet(sheet_id, custom)
+            .reorganize_sheet(sheet_id, custom, sources)
             .map_err(|_| ())?;
         validate_project_state(&candidate)?;
         Ok(candidate)
@@ -978,7 +979,7 @@ impl ProjectDocument {
         ] {
             if candidate.sheets[index].active_sides != sides {
                 candidate.sheets[index].convert_active_sides(sides);
-                candidate.reorganize_sheet(candidate.sheets[index].id, custom).map_err(|_| vec![error])?;
+                candidate.reorganize_sheet(candidate.sheets[index].id, custom, sources).map_err(|_| vec![error])?;
             }
         }
         validate_project_state(&candidate).map_err(|()| {
@@ -1026,11 +1027,12 @@ impl ProjectDocument {
         &self,
         sheet_id: Uuid,
         media_id: Uuid,
-        source_dimensions: Option<(u32, u32)>,
+        sources: &PhotoDimensions,
         mode: PhotoPlacementMode,
         custom: &[crate::CustomLayout],
     ) -> Result<(Self, Uuid), ()> {
         self.ensure_photo(media_id)?;
+        let source_dimensions = sources.get(&media_id).copied();
         let mut candidate = self.clone();
         let sheet_index = candidate
             .sheets
@@ -1058,7 +1060,7 @@ impl ProjectDocument {
             && candidate.sheets[sheet_index].frames.len() != self.sheets[sheet_index].frames.len()
         {
             candidate
-                .reorganize_sheet(sheet_id, custom)
+                .reorganize_sheet(sheet_id, custom, sources)
                 .map_err(|_| ())?;
         }
         validate_project_state(&candidate)?;
@@ -1069,12 +1071,13 @@ impl ProjectDocument {
         &self,
         sheet_id: Uuid,
         media_id: Uuid,
-        source_dimensions: Option<(u32, u32)>,
+        sources: &PhotoDimensions,
         (x_um, y_um): (i64, i64),
         mode: PhotoPlacementMode,
         custom: &[crate::CustomLayout],
     ) -> Result<(Self, Uuid), ()> {
         self.ensure_photo(media_id)?;
+        let source_dimensions = sources.get(&media_id).copied();
         let mut candidate = self.clone();
         let sheet_index = candidate
             .sheets
@@ -1113,7 +1116,7 @@ impl ProjectDocument {
             && candidate.sheets[sheet_index].frames.len() != self.sheets[sheet_index].frames.len()
         {
             candidate
-                .reorganize_sheet(sheet_id, custom)
+                .reorganize_sheet(sheet_id, custom, sources)
                 .map_err(|_| ())?;
         }
         validate_project_state(&candidate)?;
@@ -1414,6 +1417,7 @@ impl ProjectDocument {
         frame_ids: &[String],
         mode: PhotoPlacementMode,
         custom: &[crate::CustomLayout],
+        sources: &PhotoDimensions,
     ) -> Result<Self, crate::CoreError> {
         let (sheet_index, selected) = self
             .frame_selection(frame_ids)
@@ -1431,7 +1435,7 @@ impl ProjectDocument {
             .frames
             .retain(|frame| !selected.contains(&frame.id));
         if mode == PhotoPlacementMode::Normal {
-            candidate.reorganize_sheet(candidate.sheets[sheet_index].id, custom)?;
+            candidate.reorganize_sheet(candidate.sheets[sheet_index].id, custom, sources)?;
         }
         Ok(candidate)
     }

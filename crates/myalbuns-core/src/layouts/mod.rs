@@ -87,12 +87,12 @@ pub struct LayoutSelection {
     pub candidate_index: usize,
 }
 
-/// An explicit target count; orientation applies only to newly reserved placeholders.
+/// An explicit target count. Newly reserved placeholders, like the other empty
+/// Frames, take the orientation of the suggestion chosen.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
 pub struct LayoutFrameRequest {
     pub frame_count: usize,
-    pub orientation: FrameOrientation,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, TS)]
@@ -137,11 +137,48 @@ impl Default for LayoutParameters {
     }
 }
 
+/// Width and height of a Frame's Photo as it is shown, in lowest terms.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub struct FrameProportion {
+    pub width: u32,
+    pub height: u32,
+}
+
+impl FrameProportion {
+    /// The shown proportion of a `width` × `height` Photo, or `None` without pixels.
+    pub fn reduced(width: u32, height: u32) -> Option<Self> {
+        fn divisor(a: u32, b: u32) -> u32 {
+            if b == 0 { a } else { divisor(b, a % b) }
+        }
+        let common = divisor(width, height);
+        (width > 0 && height > 0).then(|| Self {
+            width: width / common,
+            height: height / common,
+        })
+    }
+
+    pub fn orientation(self) -> FrameOrientation {
+        match self.width.cmp(&self.height) {
+            std::cmp::Ordering::Less => FrameOrientation::Vertical,
+            std::cmp::Ordering::Greater => FrameOrientation::Horizontal,
+            std::cmp::Ordering::Equal => FrameOrientation::Square,
+        }
+    }
+}
+
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
 pub struct LayoutQuery {
     pub surface: LayoutSurface,
-    pub frame_orientations: Vec<FrameOrientation>,
+    /// One entry per Frame. `None` leaves the orientation to the Generator,
+    /// which may make that Frame vertical or horizontal.
+    pub frame_orientations: Vec<Option<FrameOrientation>>,
+    /// The Photo proportion each Frame aims at, aligned with
+    /// `frame_orientations`. A missing entry, or one whose orientation differs
+    /// from the Frame's, falls back to the reference proportion.
+    #[serde(default)]
+    pub frame_proportions: Vec<Option<FrameProportion>>,
     pub permission: LayoutPermission,
     #[serde(flatten)]
     pub parameters: LayoutParameters,

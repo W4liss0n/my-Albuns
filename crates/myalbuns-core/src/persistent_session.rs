@@ -233,6 +233,7 @@ impl PersistentProjectSession {
                     desired_offset_um,
                     mode,
                     custom,
+                    sources,
                 )?;
                 outcome.affected_frame_ids = Some(ids);
                 publication = EditPublication::GuardedAlways;
@@ -258,7 +259,7 @@ impl PersistentProjectSession {
                 project.with_removed_media(&media_ids, mode)
             }
             ProjectIntent::DeleteFrames { frame_ids, mode } => {
-                project.with_deleted_frames(&frame_ids, mode, custom)
+                project.with_deleted_frames(&frame_ids, mode, custom, sources)
             }
             ProjectIntent::EditFrameGeometry { edit } => project.with_edited_frame_geometry(&edit),
             ProjectIntent::SetAlbumDesign {
@@ -334,7 +335,7 @@ impl PersistentProjectSession {
                     return Err(CoreError::SheetNotFound(sheet_id));
                 }
                 let next = project
-                    .with_converted_edge_sheet(parsed, custom)
+                    .with_converted_edge_sheet(parsed, custom, sources)
                     .map_err(|()| CoreError::InvalidEdgeConversion)?;
                 outcome.affected_sheet_id = Some(parsed);
                 Ok(next)
@@ -399,13 +400,7 @@ impl PersistentProjectSession {
                     return Err(CoreError::LockedLayoutHasNoPlaceholder);
                 }
                 let (next, frame_id) = project
-                    .with_added_photo(
-                        parsed_sheet,
-                        media_id.into_uuid(),
-                        sources.get(&media_id.into_uuid()).copied(),
-                        mode,
-                        custom,
-                    )
+                    .with_added_photo(parsed_sheet, media_id.into_uuid(), sources, mode, custom)
                     .map_err(|()| {
                         CoreError::InvalidProject(
                             "não foi possível adicionar a Foto à Lâmina".into(),
@@ -428,7 +423,7 @@ impl PersistentProjectSession {
                     .with_dropped_photo(
                         parsed_sheet,
                         media_id.into_uuid(),
-                        sources.get(&media_id.into_uuid()).copied(),
+                        sources,
                         (x_um, y_um),
                         mode,
                         custom,
@@ -486,11 +481,12 @@ impl PersistentProjectSession {
         &mut self,
         sheet_id: &str,
         frame_request: Option<crate::LayoutFrameRequest>,
+        dimensions: &crate::project_document::PhotoDimensions,
     ) -> Result<crate::LayoutQueryResult, CoreError> {
         let parsed = parse_uuid(sheet_id).map_err(|_| CoreError::SheetNotFound(sheet_id.into()))?;
         // Field borrows let the recent generations update while the Project is read.
         let project = &self.current.project;
-        let mut query = project.layout_query(parsed)?;
+        let mut query = project.layout_query(parsed, dimensions)?;
         let frame_count = query.frame_orientations.len();
         let sheet = project.sheets().iter().find(|s| s.id() == parsed).unwrap();
         let locked = sheet.layout_locked();
@@ -508,21 +504,34 @@ impl PersistentProjectSession {
         let captured_ids: Vec<_> = sheet.frames().iter().map(|frame| frame.id()).collect();
         let mut ids = Vec::new();
         let mut orientations = Vec::new();
+        let mut proportions = Vec::new();
         let mut remaining_placeholders = requested_count.saturating_sub(filled_count);
-        for (frame, orientation) in sheet.frames().iter().zip(&query.frame_orientations) {
-            if frame.photo().is_none() {
+        for ((frame, orientation), proportion) in sheet
+            .frames()
+            .iter()
+            .zip(&query.frame_orientations)
+            .zip(&query.frame_proportions)
+        {
+            // An empty Frame takes whichever orientation the suggestion gives it.
+            let orientation = if frame.photo().is_none() {
                 if remaining_placeholders == 0 {
                     continue;
                 }
                 remaining_placeholders -= 1;
-            }
+                None
+            } else {
+                *orientation
+            };
             ids.push(frame.id());
-            orientations.push(*orientation);
+            orientations.push(orientation);
+            proportions.push(*proportion);
         }
-        if let Some(request) = &frame_request {
-            orientations.resize(requested_count, request.orientation);
+        if frame_request.is_some() {
+            orientations.resize(requested_count, None);
+            proportions.resize(requested_count, None);
         }
         query.frame_orientations = orientations;
+        query.frame_proportions = proportions;
         let sources = crate::LayoutSources {
             last: sheet.last_layout(),
             custom: &self.layout_catalog.entries,
@@ -791,7 +800,9 @@ mod tests {
         .unwrap();
         let mut session = PersistentProjectSession::from_persisted(revision);
         let sheet_id = session.project().sheets()[0].id().to_string();
-        let first = session.query_layouts(&sheet_id, None).unwrap();
+        let first = session
+            .query_layouts(&sheet_id, None, &Default::default())
+            .unwrap();
         assert!(first.listing.candidates.len() > 1);
         session
             .apply(
@@ -805,9 +816,13 @@ mod tests {
             )
             .unwrap();
 
-        let repeated = session.query_layouts(&sheet_id, None).unwrap();
+        let repeated = session
+            .query_layouts(&sheet_id, None, &Default::default())
+            .unwrap();
         let mut fresh = PersistentProjectSession::from_persisted(session.current_revision());
-        let expected = fresh.query_layouts(&sheet_id, None).unwrap();
+        let expected = fresh
+            .query_layouts(&sheet_id, None, &Default::default())
+            .unwrap();
 
         assert_eq!(session.layout_generations.stored_queries(), 1);
         assert!(repeated.listing.candidates[0].is_last_applied);

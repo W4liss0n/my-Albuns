@@ -256,7 +256,6 @@ fn layout_panel_corpus_is_produced_by_the_public_core() {
             let extra = matches!(name, "expanded" | "empty-lock").then_some(
                 myalbuns_core::LayoutFrameRequest {
                     frame_count: project.projection().state.album.sheets[0].frames.len() + 2,
-                    orientation: myalbuns_core::FrameOrientation::Horizontal,
                 },
             );
             let (ready, selection) =
@@ -302,10 +301,7 @@ fn layout_panel_corpus_is_produced_by_the_public_core() {
                 .unwrap();
             entry["unlocked"] = record(&mut project, &format!("{name}-unlocked"));
             if name == "expanded" {
-                let request = Some(myalbuns_core::LayoutFrameRequest {
-                    frame_count: 2,
-                    orientation: myalbuns_core::FrameOrientation::Horizontal,
-                });
+                let request = Some(myalbuns_core::LayoutFrameRequest { frame_count: 2 });
                 entry["reducedReady"] =
                     record_expansion(&mut project, "expanded-reduced-ready", request.clone()).0;
                 for lock in [false, true] {
