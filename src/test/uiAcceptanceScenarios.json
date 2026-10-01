@@ -12435,7 +12435,7 @@
           "type": "context-click",
           "selector": ".canvas-host canvas",
           "offsetX": -350,
-          "offsetY": 0
+          "offsetY": 218
         }
       ]
     },

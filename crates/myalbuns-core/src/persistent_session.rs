@@ -51,6 +51,7 @@ pub(crate) struct PersistentProjectSession {
     history_budget: usize,
     frame_clipboard: Option<FrameClipboard>,
     prepared_layout_query: Option<PreparedLayoutQuery>,
+    layout_generations: crate::layouts::RecentLayoutGenerations,
     layout_catalog: crate::LayoutCatalogSnapshot,
 }
 
@@ -78,6 +79,7 @@ impl PersistentProjectSession {
             history_budget: HISTORY_BUDGET_BYTES,
             frame_clipboard: None,
             prepared_layout_query: None,
+            layout_generations: Default::default(),
             layout_catalog: crate::LayoutCatalogSnapshot::default(),
         }
     }
@@ -102,6 +104,7 @@ impl PersistentProjectSession {
             history_budget: HISTORY_BUDGET_BYTES,
             frame_clipboard: None,
             prepared_layout_query: None,
+            layout_generations: Default::default(),
             layout_catalog: crate::LayoutCatalogSnapshot::default(),
         }
     }
@@ -396,7 +399,13 @@ impl PersistentProjectSession {
                     return Err(CoreError::LockedLayoutHasNoPlaceholder);
                 }
                 let (next, frame_id) = project
-                    .with_added_photo(parsed_sheet, media_id.into_uuid(), mode, custom)
+                    .with_added_photo(
+                        parsed_sheet,
+                        media_id.into_uuid(),
+                        sources.get(&media_id.into_uuid()).copied(),
+                        mode,
+                        custom,
+                    )
                     .map_err(|()| {
                         CoreError::InvalidProject(
                             "não foi possível adicionar a Foto à Lâmina".into(),
@@ -419,8 +428,8 @@ impl PersistentProjectSession {
                     .with_dropped_photo(
                         parsed_sheet,
                         media_id.into_uuid(),
-                        x_um,
-                        y_um,
+                        sources.get(&media_id.into_uuid()).copied(),
+                        (x_um, y_um),
                         mode,
                         custom,
                     )
@@ -479,14 +488,11 @@ impl PersistentProjectSession {
         frame_request: Option<crate::LayoutFrameRequest>,
     ) -> Result<crate::LayoutQueryResult, CoreError> {
         let parsed = parse_uuid(sheet_id).map_err(|_| CoreError::SheetNotFound(sheet_id.into()))?;
-        let mut query = self.project().layout_query(parsed)?;
+        // Field borrows let the recent generations update while the Project is read.
+        let project = &self.current.project;
+        let mut query = project.layout_query(parsed)?;
         let frame_count = query.frame_orientations.len();
-        let sheet = self
-            .project()
-            .sheets()
-            .iter()
-            .find(|s| s.id() == parsed)
-            .unwrap();
+        let sheet = project.sheets().iter().find(|s| s.id() == parsed).unwrap();
         let locked = sheet.layout_locked();
         let requested_count = frame_request
             .as_ref()
@@ -520,15 +526,13 @@ impl PersistentProjectSession {
         let sources = crate::LayoutSources {
             last: sheet.last_layout(),
             custom: &self.layout_catalog.entries,
-            favorites: self.project().favorite_layouts(),
+            favorites: project.favorite_layouts(),
         };
-        let mut listing = if frame_request.is_some() {
-            crate::LayoutRules::list(&query, sources)
-        } else {
-            crate::LayoutRules::list_for_lock(&query, sources)
-        };
+        let generation = self.layout_generations.generate(&query);
+        let mut listing =
+            crate::LayoutRules::listing(&generation, &query, sources, frame_request.is_none());
         if locked {
-            let current = self.project().current_layout(parsed)?;
+            let current = project.current_layout(parsed)?;
             listing.candidates.retain(|candidate| {
                 candidate.layout.origin != current.origin
                     || !crate::LayoutRules::same_definition(
@@ -777,5 +781,40 @@ mod tests {
         }
         assert_eq!(session.current, latest);
         assert!(session.history_bytes <= session.history_budget);
+    }
+
+    #[test]
+    fn a_layout_query_repeated_after_applying_reuses_the_generation() {
+        let revision = crate::project_store::decode(include_bytes!(
+            "../tests/fixtures/project_file_v1/photo.myalbuns"
+        ))
+        .unwrap();
+        let mut session = PersistentProjectSession::from_persisted(revision);
+        let sheet_id = session.project().sheets()[0].id().to_string();
+        let first = session.query_layouts(&sheet_id, None).unwrap();
+        assert!(first.listing.candidates.len() > 1);
+        session
+            .apply(
+                ProjectIntent::ApplyLayout {
+                    selection: crate::LayoutSelection {
+                        query_id: first.query_id,
+                        candidate_index: 1,
+                    },
+                },
+                &Default::default(),
+            )
+            .unwrap();
+
+        let repeated = session.query_layouts(&sheet_id, None).unwrap();
+        let mut fresh = PersistentProjectSession::from_persisted(session.current_revision());
+        let expected = fresh.query_layouts(&sheet_id, None).unwrap();
+
+        assert_eq!(session.layout_generations.stored_queries(), 1);
+        assert!(repeated.listing.candidates[0].is_last_applied);
+        assert_eq!(repeated.listing, expected.listing);
+        assert_eq!(
+            repeated.candidate_requires_lock,
+            expected.candidate_requires_lock
+        );
     }
 }

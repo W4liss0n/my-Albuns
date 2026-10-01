@@ -2,7 +2,7 @@
 status: accepted
 document: design
 date: 2026-09-09
-updated: 2026-09-11
+updated: 2026-09-30
 ticket: 28
 ---
 
@@ -14,6 +14,10 @@ preservar ao consumir uma sugestão. A primeira integração no aplicativo e
 o formato persistido estão registrados no [design 0027](0027-integracao-dos-layouts-e-schema-v8.md).
 
 A decisão é do [ADR 0010](../adr/0010-gerar-layouts-por-composicoes-deterministicas.md).
+A versão 2 do algoritmo, com a classificação por escopo, é do
+[ADR 0013](../adr/0013-diversificar-e-harmonizar-as-sugestoes-do-gerador.md); a
+orientação dos Frames criados por Foto é do
+[ADR 0014](../adr/0014-orientar-novos-frames-pela-foto-inserida.md).
 A [SPEC](../specs/programa-de-diagramacao-de-albuns.md#layouts) possui o
 comportamento observável; o [ADR 0008](../adr/0008-garantir-layout-compativel-por-arranjo-de-reserva.md)
 possui a garantia das automações; o
@@ -24,7 +28,7 @@ possui a sessão e suas responsabilidades.
 
 | Responsável | Contrato |
 | --- | --- |
-| Gerador de Layouts | Recebe uma consulta imutável e devolve de zero a dez geometrias ordenadas; concentra famílias, classificação e diversidade |
+| Gerador de Layouts | Recebe uma consulta imutável e devolve de zero a vinte geometrias ordenadas; concentra famílias, classificação e diversidade |
 | `LayoutRules` | Resolve compatibilidade, identidade, prioridade entre origens, Mapeamento, arranjo de reserva e `LayoutPatch` |
 | `ProjectSession` | Valida a revisão vigente e confirma o patch como um comando de Histórico |
 | `CompositionCore` | Recalcula o enquadramento com o caminho já compartilhado por editor e Exportação |
@@ -44,6 +48,12 @@ flowchart LR
 O Gerador não abre arquivos, não consulta Cache, não mantém sessão, não salva
 catálogo e não confirma escolhas. A busca e suas famílias ficam internas
 ao mesmo módulo; não há uma interface pública para cada família.
+
+A `ProjectSession` guarda, só em memória, as gerações das últimas 32 consultas
+do Projeto aberto. Como a mesma consulta e versão produzem o mesmo resultado,
+uma consulta igual reaproveita a geração em vez de repetir a busca; a consulta
+inteira é a chave. Último Layout, favoritos, Layouts personalizados e
+Mapeamento continuam resolvidos a cada consulta.
 
 ## Consulta
 
@@ -75,7 +85,8 @@ existente nem fazem parte da consulta inicial do Gerador.
 
 Criar um Frame continua sendo responsabilidade do fluxo de edição. O
 perfil só pode ser consultado depois de existir uma geometria inicial
-válida. O retângulo temporário de 1 × 1 µm usado hoje durante a inserção
+válida. Um Frame criado por uma Foto começa na orientação observada da Foto
+(ADR 0014). O retângulo temporário de 1 × 1 µm usado hoje durante a inserção
 normal não representa uma decisão de criar um Frame quadrado e não pode
 ser usado como perfil do Gerador. A integração deve atribuir a geometria
 inicial pelo mesmo caminho da criação manual antes de solicitar organização.
@@ -97,7 +108,7 @@ reposicionar Frames existentes.
 
 | Resultado | Significado |
 | --- | --- |
-| `candidates` | Uma a dez sugestões válidas, ordenadas |
+| `candidates` | Uma a vinte sugestões válidas, ordenadas (até dez na versão 1) |
 | `empty` | Consulta sem Frames; não há organização a aplicar |
 | `noCandidates` | A busca não encontrou um padrão que satisfaça as restrições |
 | `outsideCoverage` | Quantidade acima de 30; preserva todos os Frames e permite que `LayoutRules` use outras origens ou a reserva |
@@ -138,7 +149,7 @@ Prévia e confirmação recebem exatamente os mesmos retângulos finais.
 
 `pagesAndSheet` reúne candidatos por Página e da superfície conjunta antes
 da seleção. `pagesOnly` exclui qualquer candidato com Travessia central.
-A lista combinada compartilha o teto de dez; não há cota fixa por tipo.
+A lista combinada compartilha o teto de vinte; não há cota fixa por tipo.
 
 O tipo efetivo é inferido da geometria. A família de origem não autoriza
 rotular como por Lâmina um candidato sem travessia. No Gerador, um candidato
@@ -153,6 +164,11 @@ blocos deslocados em 6,25 mm e margem interna de 2,5 mm, com 15 mm solicitados.
 Ele é um exemplo negativo do contrato, não uma geometria a copiar para a
 produção. Rejeitá-lo antes da seleção permite escolher candidatos por Página
 que já respeitam as margens e a centralização, sem esticar seus Frames.
+
+A Travessia central depende somente da permissão: com `pagesAndSheet`, um
+Frame de qualquer orientação pode atravessar o centro em qualquer posição.
+Uma regra que limitava a travessia a horizontais largas foi avaliada na
+versão 2 e descartada pelo autor (ADR 0013).
 
 Para uma Lâmina dupla por Página, cada lado usa metade da largura total.
 A margem interna de cada Página é pelo menos a margem pedida e metade do
@@ -176,7 +192,8 @@ já possui sua própria regra de recorte de Frames atravessados.
 - Frames não se sobrepõem; cada grupo mantém alinhamentos e intervalos uniformes.
 - Não há células vazias dentro dos grupos. Margens, intervalos e espaço externo
   de um bloco centralizado continuam permitidos.
-- Grades uniformes e trilhas repetidas são excluídas segundo o perfil aprovado.
+- Grades uniformes e trilhas repetidas são excluídas segundo o perfil aprovado;
+  a melhor grade uniforme volta somente quando nenhuma outra composição cabe.
 - Em Layouts gerados por Página, nenhum Frame atravessa o centro e cada bloco é centralizado. A captura de Layouts personalizados conserva os ajustes manuais conforme o design 0029.
 
 Essas exigências estéticas pertencem às sugestões do Gerador. Elas não
@@ -190,10 +207,14 @@ faixas, colunas, bandas com tamanhos graduados, destaque e apoio, grupos
 complementares e combinações por Página. A enumeração usa somente grades
 completas e repartições definidas. O algoritmo não sorteia retângulos.
 
-O perfil numérico inicial mantém a V9: 45% de afinidade de proporção, 40%
-de ocupação e 15% de tamanho; nota mínima de 72 e até dez pontos abaixo da
-melhor. Preserva as penalidades de dominância, contraste e desequilíbrio
-por Página, além dos limites de enumeração documentados no protótipo.
+O perfil numérico mantém os pesos da V9: 45% de afinidade de proporção, 40%
+de ocupação e 15% de tamanho; nota mínima de 72. Na versão 2, a janela de dez
+pontos abaixo da melhor nota é calculada dentro de cada escopo, e a ocupação
+de uma sugestão é comparada com a maior área de Frames do mesmo escopo. Assim,
+um Frame único ou uma composição por Página não é julgado pela Lâmina inteira,
+e uma composição que atravessa o centro não expulsa as opções por Página.
+Preserva as penalidades de dominância, contraste e desequilíbrio por Página,
+acrescenta a de horizonte comum e mantém os limites de enumeração do protótipo.
 Os pesos são detalhes versionados da implementação; não passam a integrar
 o documento de Projeto ou o formato de um Layout salvo.
 
@@ -206,13 +227,15 @@ de reconstruir escolhas a partir das imagens do protótipo:
 | Faixas regulares | Até quatro bandas; quantidades repetidas por orientação |
 | Bandas graduadas | Para quatro ou mais Frames, até quatro bandas de até quatro Frames, no máximo três da mesma orientação em cada banda; quantidades não decrescentes |
 | Mais de 12 da mesma orientação | Até quatro bandas; quantidades não decrescentes e no máximo metade do total arredondada para cima em uma banda |
-| Destaque | Fração 1/3, 0,4, 0,5, 0,6 ou 2/3 da dimensão livre; área pelo menos 1,5 vez a do maior apoio |
+| Destaque | Fração 1/3, 0,4, 0,5, 0,6 ou 2/3 da dimensão livre; na versão 2, também destaque e apoio resolvidos juntos nas proporções de referência e centralizados; área pelo menos 1,5 vez a do maior apoio |
 | Grupos complementares | Para oito ou mais Frames; duas regiões em 40/60, 50/50 ou 60/40; primeiro grupo com três, metade arredondada para baixo ou total menos três |
 | Candidatos locais | Até quatro por região de grupo complementar; até seis por Página para cada distribuição de orientações |
 | Afinidade de proporção | Média de `min(proporção / referência, referência / proporção)` |
-| Ocupação | Área dos Frames dividida pela área útil externa; normalizada por 0,86 e limitada a 1 |
+| Ocupação | Na classificação final, área dos Frames dividida pela maior área do mesmo escopo, limitada a 1; nas escolhas internas de cada Página ou grupo, área dividida pela área útil externa, normalizada por 0,86 e limitada a 1 |
+| Janela de nota | Por escopo: até dez pontos abaixo da melhor nota do mesmo escopo, com piso de 72 |
 | Tamanho | Menor lado dividido por duas vezes o mínimo pedido, limitado a 1 |
 | Desequilíbrio por Página | Subtrair até seis pontos conforme a diferença entre as áreas ocupadas dos lados |
+| Horizonte comum | Por Página, subtrair `min(8, 40 × diferença de altura dos blocos / altura útil)` |
 | Dominância, em grupos com ao menos cinco Frames | Subtrair `min(12, max(0, maior área / soma das áreas − 0,4) × 35)` |
 | Contraste, em grupos com ao menos cinco Frames | Subtrair `min(10, max(0, maior área / menor área − 6) × 1,2)` |
 
@@ -223,14 +246,22 @@ quatro ou mais iguais cobrindo ao menos 75% do conjunto, duas metades
 idênticas por translação e trilhas repetidas que cubram todo o conjunto
 ou 75% dele quando houver ao menos três trilhas.
 
-Uma orientação com quatro ou mais Frames exige relação de área maior/menor
-de pelo menos 1,35. Em conjuntos de seis ou mais, rejeita a ausência dessa
+Na versão 2, a regra das trilhas cobrindo 75% só conta trilhas com dois ou mais
+Frames: uma pilha de Frames iguais ao lado de um Frame maior é um apoio, não uma
+trilha repetida. Sem essa distinção, quatro Frames da mesma orientação numa
+Página ficavam sem sugestão. Uma orientação com quatro ou mais Frames exige
+relação de área maior/menor de pelo menos 1,35. Em conjuntos de seis ou mais, rejeita a ausência dessa
 variação em todas as orientações. Também rejeita cinco Frames iguais
 alinhados junto a um Frame com pelo menos 2,5 vezes a área de cada um.
 Esses filtros concretizam o perfil aprovado; novas versões podem afiná-los
 sem alterar a definição persistida de um Layout já escolhido.
 
-A seleção incremental combina 85% de nota e 15% de novidade geométrica.
+A seleção incremental combina 85% de nota e 15% de novidade geométrica. Na
+versão 2 ela faz duas passadas: na primeira, pula candidatos iguais a uma
+sugestão já escolhida do mesmo escopo por espelhamento horizontal ou vertical,
+por espelhamento de um bloco dentro da sua Página ou por troca das Páginas; a
+segunda preenche as vagas restantes com as regras abaixo. A comparação usa os
+micrômetros resolvidos, dobrados para que toda reflexão seja exata.
 A novidade mínima de 0,25 é comparada somente com sugestões do mesmo
 escopo efetivo. Assim, a semelhança de posições não elimina a escolha
 entre atravessar ou preservar o centro. Permanecem os limites de até duas
@@ -246,14 +277,23 @@ distâncias; sem sugestão anterior do mesmo escopo, vale 1.
 Empates usam a representação geométrica normalizada em ordem estável.
 Nenhuma decisão depende da ordem de um mapa hash, do relógio ou do tempo
 que a máquina levou. A mesma consulta e versão produzem o mesmo resultado.
+O trabalho independente — as divisões dos Frames entre Páginas e entre grupos
+complementares, e a validação e a chave de espelhamento de cada composição — é
+feito em paralelo quando há mais de um processador; os resultados entram na
+ordem da busca sequencial, e o número de processadores não muda a lista. A
+seleção só recalcula a novidade de quem ainda pode ser escolhida, o que dá as
+mesmas escolhas de recalcular todas as candidatas a cada rodada.
 Renomear IDs, mudar DPI ou Unidade de apresentação não muda a consulta.
 Escalar conjuntamente superfície, margem, intervalo e menor lado conserva
 a composição normalizada, dentro da quantização física declarada.
 
 Espelhamentos e troca das Páginas são variações legítimas. O agrupamento
 de espelhados usado na demonstração não altera a identidade de Layouts.
-Na primeira integração, esses candidatos participam da seleção normal;
-não há filtro de apresentação obrigatório herdado do HTML.
+Na versão 2 eles continuam na lista, depois das estruturas distintas.
+
+Sem nenhuma composição válida, a versão 2 refaz a busca admitindo grades
+uniformes e devolve só a melhor. Ela conserva orientações, margem, intervalo e
+centralização; a reserva do ADR 0008 fica para o que nem assim tem solução.
 
 ## Compatibilidade, prioridade e reserva
 
@@ -276,7 +316,8 @@ sugestão automática também a apresenta em Personalizados. A deduplicação
 não atravessa as origens, inclusive para cópias favoritas.
 
 A prioridade de aplicação automática é Último Layout, primeiro Favorito,
-primeiro Personalizado e primeira sugestão do Gerador. Sem opção nessas
+primeiro Personalizado e primeira sugestão do Gerador, considerando somente os
+Layouts que conservam as orientações dos Frames atuais (ADR 0014). Sem opção nessas
 origens, `LayoutRules` produz a reserva derivada da quantidade e superfície
 ativa. Ela pode sempre respeitar o escopo mais restritivo, sem consultar
 Foto, orientação, prévia ou escolhas anteriores. Não aparece no painel,
@@ -312,7 +353,7 @@ O Gerador inicial produz a quantidade exata. Posições excedentes de candidatos
 de travamento vêm de definições apropriadas de outras origens ou consultas
 explícitas. O corpo da preview não confirma esses excedentes; somente
 o cadeado cria placeholders e trava, seguindo a SPEC. A busca comum não inventa
-Fotos ou orientações futuras para preencher dez sugestões.
+Fotos ou orientações futuras para preencher vinte sugestões.
 
 ## Persistência e integração existente
 
@@ -355,6 +396,7 @@ com tolerância de 1 µm por borda ao comparar uma implementação numérica.
 | 1, 3, 4, 5, 8, 12, 15, 20 e 30 Frames; superfícies variadas | Sugestões dentro das invariantes ou ausência explícita |
 | Mais de 30 Frames | `outsideCoverage`; sem truncamento de Frames nem falha das automações |
 | 2 V + 1 H em 600 × 240 mm | A opção por Página não é excluída por parecer com uma que atravessa o centro |
+| Lâminas de 600, 400 e 800 × 300 mm com 1 a 8 Frames, nas duas permissões | Sempre há sugestões válidas; somente Páginas não atravessa o centro |
 | 5 V + 3 H e grupo de quatro verticais | Nenhuma grade de apoio incompleta |
 | Lâmina dupla restrita | Zero travessias; blocos centralizados em cada Página |
 | Fontes de candidatos vazias | Reserva válida para automações, sem preview ou Último Layout falso |

@@ -44,13 +44,18 @@ extremidade consultam `LayoutRules`. A conversão funciona tanto pelo comando
 da Lâmina quanto por Informações do Álbum. Converter as duas extremidades
 nesse formulário continua sendo uma só ação de Histórico.
 
-Um Frame começa com a proporção manual de 3:2; a consulta não usa um quadrado
-temporário nem a proporção da Foto. Preencher um placeholder ou substituir
-sua Foto conserva a geometria. Na edição da Lâmina, adicionar ou excluir
-Frames conserva a disposição manual dos demais.
+Conforme o [ADR 0014](../adr/0014-orientar-novos-frames-pela-foto-inserida.md),
+um novo Frame criado por uma Foto começa com 2:3, 3:2 ou 1:1 conforme sua
+orientação observada. A criação manual e a ausência de dimensões observadas
+mantêm 3:2. A consulta usa a geometria inicial real, nunca um quadrado
+temporário. Preencher um placeholder ou substituir sua Foto conserva a
+geometria. Na edição da Lâmina, adicionar ou excluir Frames conserva a
+disposição manual dos demais.
 
-O Último Layout compatível tem prioridade. Sem ele, vale a primeira sugestão
-do Gerador; sem sugestão, a reserva do ADR 0008 reorganiza os Frames.
+O Último Layout compatível tem prioridade na escolha automática somente se
+conservar as orientações atuais; a mesma condição vale para Favoritos e
+Personalizados. Sem candidato adequado, vale a primeira sugestão do Gerador;
+sem sugestão, a reserva do ADR 0008 reorganiza os Frames.
 A reserva não aparece no painel e não substitui o Último Layout registrado.
 A aplicação preserva ordem, IDs, conteúdo, Borda, Opacidade e ajustes das Fotos.
 

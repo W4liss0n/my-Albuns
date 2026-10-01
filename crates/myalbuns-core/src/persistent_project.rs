@@ -805,10 +805,15 @@ impl EditableProject {
         if !self.session_valid {
             return Err(CoreError::EditableSessionInvalidated);
         }
-        let sources = if matches!(&intent, ProjectIntent::SetAlbumInformation { .. }) {
-            self.observed_photo_dimensions()
-        } else {
-            HashMap::new()
+        let sources = match &intent {
+            ProjectIntent::SetAlbumInformation { .. } => self.observed_photo_dimensions(),
+            // A Frame created for a Photo takes the Photo's orientation.
+            ProjectIntent::AddPhoto { media_id, .. }
+            | ProjectIntent::DropPhoto { media_id, .. } => self
+                .observed_dimensions(media_id.into_uuid())
+                .map(|dimensions| HashMap::from([(media_id.into_uuid(), dimensions)]))
+                .unwrap_or_default(),
+            _ => HashMap::new(),
         };
         let intent_outcome = self.session.apply(intent, &sources)?;
         let affected_frame_id = intent_outcome
@@ -968,17 +973,18 @@ impl EditableProject {
         self.project()
             .media()
             .iter()
-            .filter_map(|media| {
-                let source = self
-                    .photo_sources
-                    .get(&MediaId::from_uuid(media.id()))?
-                    .get(media.path())?;
-                Some((
-                    media.id(),
-                    (source.source_width_px(), source.source_height_px()),
-                ))
-            })
+            .filter_map(|media| Some((media.id(), self.observed_dimensions(media.id())?)))
             .collect()
+    }
+
+    /// Pixel dimensions already observed for the Photo's current link.
+    fn observed_dimensions(&self, media_id: Uuid) -> Option<(u32, u32)> {
+        let media = self.project().media().iter().find(|m| m.id() == media_id)?;
+        let source = self
+            .photo_sources
+            .get(&MediaId::from_uuid(media_id))?
+            .get(media.path())?;
+        Some((source.source_width_px(), source.source_height_px()))
     }
 
     pub fn undo(&mut self) -> Option<EditorProjection> {

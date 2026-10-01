@@ -171,6 +171,80 @@ fn unknown_sheet_cannot_create_history_or_clear_redo() {
 }
 
 #[test]
+fn photo_creation_keeps_its_orientation_for_clicks_and_drops_on_each_surface() {
+    use std::cmp::Ordering::{Equal, Greater, Less};
+    for (source_width, source_height, orientation) in
+        [(800, 1200, Less), (1200, 800, Greater), (800, 800, Equal)]
+    {
+        for mode in [PhotoPlacementMode::Normal, PhotoPlacementMode::Edit] {
+            for drop in [false, true] {
+                for sheet_index in 0..3 {
+                    let root = tempfile::tempdir().unwrap();
+                    let core = ProjectCore::new().with_identity_storage_roots(
+                        root.path().join("leases"),
+                        root.path().join("identities"),
+                    );
+                    let mut project = project(
+                        &core,
+                        &root.path().join("Orientação.myalbuns"),
+                        600_000,
+                        300_000,
+                    );
+                    let photo = project
+                        .import_photo(ImportPhoto::new(
+                            root.path().join("Foto.jpg"),
+                            PhotoSourceMetadata::new(
+                                source_width,
+                                source_height,
+                                ["#173B4B", "#84AAA7", "#E7C58B"].map(String::from),
+                            )
+                            .unwrap(),
+                        ))
+                        .unwrap();
+                    let before = project.projection();
+                    let sheet_id = before.state.album.sheets[sheet_index].id.clone();
+                    let outcome = project
+                        .apply_with_outcome(if drop {
+                            ProjectIntent::DropPhoto {
+                                sheet_id,
+                                media_id: photo.media_id,
+                                x_um: 10_000,
+                                y_um: 10_000,
+                                mode,
+                            }
+                        } else {
+                            ProjectIntent::AddPhoto {
+                                sheet_id,
+                                media_id: photo.media_id,
+                                mode,
+                            }
+                        })
+                        .unwrap();
+                    let sheet = &outcome.projection.state.album.sheets[sheet_index];
+                    let frame = &sheet.frames[0];
+                    assert_eq!(
+                        frame.rect.width.cmp(&frame.rect.height),
+                        orientation,
+                        "{mode:?} drop={drop} sheet={sheet_index}"
+                    );
+                    assert_eq!(frame.photo.as_ref().unwrap().media_id, photo.media_id);
+                    assert_eq!(
+                        outcome.affected_frame_id.as_deref(),
+                        Some(frame.id.as_str())
+                    );
+                    assert!(frame.rect.x >= 0 && frame.rect.y >= 0);
+                    assert!(frame.rect.x + frame.rect.width <= sheet.width_um);
+                    assert!(frame.rect.y + frame.rect.height <= sheet.height_um);
+                    assert_eq!(outcome.projection.state.revision, before.state.revision + 1);
+                    assert_eq!(project.undo().unwrap().state.album, before.state.album);
+                    assert_eq!(project.redo().unwrap(), outcome.projection);
+                }
+            }
+        }
+    }
+}
+
+#[test]
 fn adding_a_photo_fills_the_manual_placeholder_and_keeps_its_geometry() {
     let root = tempfile::tempdir().unwrap();
     let core = ProjectCore::new()
@@ -193,8 +267,9 @@ fn adding_a_photo_fills_the_manual_placeholder_and_keeps_its_geometry() {
         .import_photo(ImportPhoto::new(
             source,
             PhotoSourceMetadata::new(
-                600,
+                // A portrait fills the landscape placeholder without reshaping it.
                 400,
+                600,
                 ["#173B4B".into(), "#84AAA7".into(), "#E7C58B".into()],
             )
             .unwrap(),

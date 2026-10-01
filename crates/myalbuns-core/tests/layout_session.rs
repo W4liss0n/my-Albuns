@@ -1028,7 +1028,69 @@ fn stored_layouts_require_complete_payloads_and_reject_corrupt_geometry() {
 }
 
 #[test]
-fn normal_insertion_uses_real_initial_frame_profiles_and_remembers_the_chosen_layout() {
+fn inserting_a_portrait_does_not_automatically_choose_a_landscape_favorite() {
+    use myalbuns_core::{ImportPhoto, PhotoPlacementMode, PhotoSourceMetadata};
+    let root = tempfile::tempdir().unwrap();
+    let mut project = project(root.path());
+    let media: Vec<_> = [("Landscape.jpg", 1200, 800), ("Portrait.jpg", 800, 1200)]
+        .into_iter()
+        .map(|(name, width, height)| {
+            project
+                .import_photo(ImportPhoto::new(
+                    root.path().join(name),
+                    PhotoSourceMetadata::new(
+                        width,
+                        height,
+                        ["#FF0000", "#00FF00", "#0000FF"].map(String::from),
+                    )
+                    .unwrap(),
+                ))
+                .unwrap()
+                .media_id
+        })
+        .collect();
+    let sheets = project.projection().state.album.sheets;
+    project
+        .apply(ProjectIntent::AddPhoto {
+            sheet_id: sheets[0].id.clone(),
+            media_id: media[0],
+            mode: PhotoPlacementMode::Normal,
+        })
+        .unwrap();
+    let query = project.query_layouts(&sheets[0].id).unwrap();
+    project
+        .apply(ProjectIntent::ToggleLayoutFavorite {
+            selection: LayoutSelection {
+                query_id: query.query_id,
+                candidate_index: 0,
+            },
+        })
+        .unwrap();
+    let added = project
+        .apply(ProjectIntent::AddPhoto {
+            sheet_id: sheets[1].id.clone(),
+            media_id: media[1],
+            mode: PhotoPlacementMode::Normal,
+        })
+        .unwrap();
+    let frame = &added.state.album.sheets[1].frames[0];
+    assert!(
+        frame.rect.width < frame.rect.height,
+        "an automatic favorite must not turn the newly inserted portrait into landscape"
+    );
+    let query = project.query_layouts(&sheets[1].id).unwrap();
+    assert!(
+        query
+            .listing
+            .candidates
+            .iter()
+            .any(|candidate| candidate.favorite_id.is_some()),
+        "the saved layout remains available for an explicit choice"
+    );
+}
+
+#[test]
+fn normal_insertion_uses_the_photo_orientation_and_remembers_the_chosen_layout() {
     use myalbuns_core::{ImportPhoto, PhotoPlacementMode, PhotoSourceMetadata};
     let directory = tempfile::tempdir().unwrap();
     let mut project = project(directory.path());
@@ -1061,8 +1123,8 @@ fn normal_insertion_uses_real_initial_frame_profiles_and_remembers_the_chosen_la
     let frames = &current.state.album.sheets[0].frames;
     assert_eq!(frames.len(), 2);
     assert!(
-        frames.iter().all(|f| f.rect.width > f.rect.height),
-        "new Frames start with the canonical manual 3:2 profile"
+        frames.iter().all(|f| f.rect.width < f.rect.height),
+        "a portrait Photo creates a vertical Frame"
     );
     let query = project.query_layouts(&sheet).unwrap();
     assert!(query.listing.candidates[0].is_last_applied);

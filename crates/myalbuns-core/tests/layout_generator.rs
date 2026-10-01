@@ -1,4 +1,7 @@
-use myalbuns_core::{LayoutGenerationStatus, LayoutQuery, LayoutScope, generate_layouts};
+use myalbuns_core::{
+    FrameOrientation, LayoutGenerationStatus, LayoutPermission, LayoutQuery, LayoutScope,
+    generate_layouts,
+};
 
 #[test]
 fn one_vertical_frame_uses_the_approved_centered_geometry() {
@@ -59,7 +62,7 @@ fn approved_counts_and_surfaces_produce_complete_varied_compositions() {
             "{}",
             example["id"]
         );
-        assert!((1..=10).contains(&result.candidates.len()));
+        assert!((1..=20).contains(&result.candidates.len()));
         for candidate in &result.candidates {
             assert_generated_geometry(
                 &query,
@@ -158,6 +161,17 @@ fn assert_generated_geometry(
     definition: &myalbuns_core::LayoutDefinition,
     case: &str,
 ) {
+    assert_geometry(query, definition, case, false);
+}
+
+/// `uniform_allowed` admits the uniform grid the Generator returns only when
+/// nothing else fits, instead of leaving the Frames to the reserve.
+fn assert_geometry(
+    query: &LayoutQuery,
+    definition: &myalbuns_core::LayoutDefinition,
+    case: &str,
+    uniform_allowed: bool,
+) {
     use myalbuns_core::{FrameOrientation, LayoutPermission, LayoutSurfaceKind};
     let positions = &definition.positions;
     assert_eq!(positions.len(), query.frame_orientations.len(), "{case}");
@@ -251,7 +265,7 @@ fn assert_generated_geometry(
         if group.is_empty() {
             continue;
         }
-        if group.len() >= 4 {
+        if group.len() >= 4 && !uniform_allowed {
             let first = group[0];
             assert!(
                 group
@@ -263,6 +277,195 @@ fn assert_generated_geometry(
         }
         assert_no_internal_vacancy(&group, query.parameters.gap_um, case);
     }
+}
+
+fn double_sheet_query(
+    width_um: i64,
+    height_um: i64,
+    orientations: &[FrameOrientation],
+    permission: LayoutPermission,
+) -> LayoutQuery {
+    serde_json::from_value(serde_json::json!({
+        "surface": {"type":"doubleSheet", "widthUm":width_um, "heightUm":height_um},
+        "frameOrientations": orientations,
+        "permission": permission,
+        "marginUm":15000, "gapUm":5000, "minimumSideUm":20000
+    }))
+    .unwrap()
+}
+
+fn mixes(count: usize) -> impl Iterator<Item = Vec<FrameOrientation>> {
+    (0..=count).map(move |vertical| {
+        let mut orientations = vec![FrameOrientation::Vertical; vertical];
+        orientations.resize(count, FrameOrientation::Horizontal);
+        orientations
+    })
+}
+
+#[test]
+fn double_sheets_offer_valid_suggestions_under_both_permissions() {
+    for (width, height) in [(600000, 300000), (400000, 300000), (800000, 300000)] {
+        for count in 1..=8 {
+            for orientations in mixes(count) {
+                for permission in [LayoutPermission::PagesAndSheet, LayoutPermission::PagesOnly] {
+                    let query = double_sheet_query(width, height, &orientations, permission);
+                    let case = format!("{width}x{height} {orientations:?} {permission:?}");
+                    let result = generate_layouts(&query);
+                    assert_eq!(result.status, LayoutGenerationStatus::Candidates, "{case}");
+                    for candidate in &result.candidates {
+                        assert_generated_geometry(&query, &candidate.definition, &case);
+                    }
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn common_frame_counts_are_not_left_to_the_reserve() {
+    use FrameOrientation::{Horizontal, Vertical};
+    let page = |width, height, orientations: Vec<FrameOrientation>| -> LayoutQuery {
+        serde_json::from_value(serde_json::json!({
+            "surface": {"type":"singlePage", "widthUm":width, "heightUm":height},
+            "frameOrientations": orientations,
+            "permission": "pagesOnly",
+            "marginUm":15000, "gapUm":5000, "minimumSideUm":20000
+        }))
+        .unwrap()
+    };
+    // Version 1 left these to the reserve, which also changed orientations.
+    let queries = [
+        page(300000, 300000, vec![Vertical; 4]),
+        page(300000, 300000, vec![Horizontal; 4]),
+        page(200000, 300000, vec![Vertical; 4]),
+        page(200000, 300000, vec![Vertical; 6]),
+        page(200000, 300000, vec![Horizontal; 12]),
+        page(200000, 300000, vec![Horizontal; 15]),
+        double_sheet_query(800000, 300000, &[Vertical], LayoutPermission::PagesAndSheet),
+        double_sheet_query(800000, 300000, &[Vertical], LayoutPermission::PagesOnly),
+        double_sheet_query(400000, 300000, &[Horizontal], LayoutPermission::PagesOnly),
+    ];
+    for query in queries {
+        let result = generate_layouts(&query);
+        let case = format!("{query:?}");
+        assert_eq!(result.status, LayoutGenerationStatus::Candidates, "{case}");
+        for candidate in &result.candidates {
+            assert_geometry(&query, &candidate.definition, &case, true);
+        }
+    }
+}
+
+#[test]
+fn a_hero_may_be_supported_by_a_stack_of_equal_frames() {
+    let query: LayoutQuery = serde_json::from_value(serde_json::json!({
+        "surface": {"type":"singlePage", "widthUm":300000, "heightUm":300000},
+        "frameOrientations": ["vertical", "vertical", "vertical", "vertical"],
+        "permission": "pagesOnly", "marginUm":15000, "gapUm":5000, "minimumSideUm":20000
+    }))
+    .unwrap();
+    let result = generate_layouts(&query);
+    assert!(result.candidates.iter().any(|candidate| {
+        let mut areas: Vec<_> = candidate
+            .definition
+            .positions
+            .iter()
+            .map(|r| r.width * r.height)
+            .collect();
+        areas.sort();
+        // Equal up to the 1 µm rounding of each edge.
+        1000 * (areas[2] - areas[0]) <= areas[0] && areas[3] > 2 * areas[0]
+    }));
+}
+
+#[test]
+fn page_blocks_share_a_top_and_bottom_line_in_the_first_suggestion() {
+    for orientations in [
+        vec![FrameOrientation::Vertical; 3],
+        vec![FrameOrientation::Vertical; 4],
+        vec![FrameOrientation::Vertical; 8],
+    ] {
+        let query = double_sheet_query(600000, 300000, &orientations, LayoutPermission::PagesOnly);
+        let first = &generate_layouts(&query).candidates[0].definition.positions;
+        let lines = |left: bool| {
+            let page: Vec<_> = first
+                .iter()
+                .filter(|r| (2 * (r.x + r.width) <= 600000) == left)
+                .collect();
+            (
+                page.iter().map(|r| r.y).min().unwrap(),
+                page.iter().map(|r| r.y + r.height).max().unwrap(),
+            )
+        };
+        let (left, right) = (lines(true), lines(false));
+        assert!(
+            (left.0 - right.0).abs() <= 1 && (left.1 - right.1).abs() <= 1,
+            "{orientations:?}: {left:?} x {right:?}"
+        );
+    }
+}
+
+#[test]
+fn mirrored_forms_follow_the_distinct_structures() {
+    let (width, height) = (600000, 300000);
+    let query = double_sheet_query(
+        width,
+        height,
+        &[FrameOrientation::Vertical; 6],
+        LayoutPermission::PagesOnly,
+    );
+    // Smallest sorted rectangle list among the flips of both axes, of each
+    // Page block and of the Page swap, in doubled micrometres.
+    let structure = |definition: &myalbuns_core::LayoutDefinition| {
+        let mut smallest: Option<Vec<[i64; 4]>> = None;
+        for vertical in [false, true] {
+            for horizontal in [false, true] {
+                for (left, right) in [(false, false), (true, false), (false, true), (true, true)] {
+                    let mut rects: Vec<_> = definition
+                        .positions
+                        .iter()
+                        .map(|r| {
+                            let (mut x, mut y) = (2 * r.x, 2 * r.y);
+                            let (w, h) = (2 * r.width, 2 * r.height);
+                            if x + w <= width {
+                                if left {
+                                    x = width - x - w;
+                                }
+                            } else if right {
+                                x = 3 * width - x - w;
+                            }
+                            if horizontal {
+                                x = 2 * width - x - w;
+                            }
+                            if vertical {
+                                y = 2 * height - y - h;
+                            }
+                            [x, y, w, h]
+                        })
+                        .collect();
+                    rects.sort();
+                    if smallest.as_ref().is_none_or(|s| rects < *s) {
+                        smallest = Some(rects);
+                    }
+                }
+            }
+        }
+        smallest.unwrap()
+    };
+    let structures: Vec<_> = generate_layouts(&query)
+        .candidates
+        .iter()
+        .map(|c| structure(&c.definition))
+        .collect();
+    let repeated: Vec<_> = structures
+        .iter()
+        .enumerate()
+        .map(|(i, s)| structures[..i].contains(s))
+        .collect();
+    assert!(repeated.contains(&true), "the case has mirrored forms");
+    assert!(
+        repeated.windows(2).all(|pair| pair[1] || !pair[0]),
+        "a new structure after a mirrored form: {repeated:?}"
+    );
 }
 
 fn assert_no_internal_vacancy(rects: &[&myalbuns_core::RectUm], gap: i64, case: &str) {

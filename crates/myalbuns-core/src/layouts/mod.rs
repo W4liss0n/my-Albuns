@@ -7,11 +7,13 @@ mod catalog;
 mod favorites;
 mod generator;
 mod identity;
+mod recent_generations;
 mod rules;
 
 pub use catalog::{CustomLayout, CustomLayoutId, LayoutCatalogSnapshot, SaveCustomLayoutResult};
 pub use favorites::{FavoriteLayout, LayoutFavoriteId};
 pub use generator::generate_layouts;
+pub(crate) use recent_generations::RecentLayoutGenerations;
 pub use rules::{LayoutPatch, LayoutRules, LayoutSources};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize, TS)]

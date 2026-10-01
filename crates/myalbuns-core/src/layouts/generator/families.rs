@@ -70,8 +70,33 @@ fn band_patterns(frames: &[Slot]) -> Vec<Vec<Band>> {
     result
 }
 
+/// Bands at their reference proportions, with the gap fixed: rows are
+/// `a * width + b` tall and columns are `a * height + b` wide.
+fn band_line(pattern: &[Band], axis: Axis, gap: f64) -> (f64, f64) {
+    let rows = matches!(axis, Axis::Rows);
+    let weights: Vec<_> = pattern
+        .iter()
+        .map(|p| {
+            if rows {
+                1.0 / (p.count as f64 * base_ratio(p.orientation))
+            } else {
+                base_ratio(p.orientation) / p.count as f64
+            }
+        })
+        .collect();
+    let a: f64 = weights.iter().sum();
+    let b = gap
+        * ((pattern.len() - 1) as f64
+            - pattern
+                .iter()
+                .zip(&weights)
+                .map(|(p, w)| (p.count - 1) as f64 * w)
+                .sum::<f64>());
+    (a, b)
+}
+
 fn bands(
-    frames: &[Slot],
+    groups: &[Vec<Slot>; 3],
     bounds: Bounds,
     pattern: &[Band],
     axis: Axis,
@@ -81,24 +106,7 @@ fn bands(
     let rows = matches!(axis, Axis::Rows);
     let mut region = bounds;
     if fit {
-        let weights: Vec<_> = pattern
-            .iter()
-            .map(|p| {
-                if rows {
-                    1.0 / (p.count as f64 * base_ratio(p.orientation))
-                } else {
-                    base_ratio(p.orientation) / p.count as f64
-                }
-            })
-            .collect();
-        let a: f64 = weights.iter().sum();
-        let b = gap
-            * ((pattern.len() - 1) as f64
-                - pattern
-                    .iter()
-                    .zip(&weights)
-                    .map(|(p, w)| (p.count - 1) as f64 * w)
-                    .sum::<f64>());
+        let (a, b) = band_line(pattern, axis, gap);
         if rows {
             let w = bounds.w.min((bounds.h - b) / a);
             region = bounds.centered(w, a * w + b);
@@ -107,7 +115,6 @@ fn bands(
             region = bounds.centered(a * h + b, h);
         }
     }
-    let groups = grouped(frames);
     let mut used = [0; 3];
     let weights: Vec<_> = pattern
         .iter()
@@ -213,11 +220,14 @@ pub(super) fn local(frames: &[Slot], bounds: Bounds, search: &Search<'_>) -> Vec
     }
     let mut candidates = Vec::new();
     let mut add = |slots: Vec<Slot>, family: &str, kind: &str| {
-        if search.valid_local(&slots, bounds) && !repetition::repetitive(&slots) {
+        if search.valid_local(&slots, bounds)
+            && (search.repetition_allowed || !repetition::repetitive(&slots))
+        {
             candidates.push(Candidate::new(slots, family, kind));
         }
     };
     let patterns = band_patterns(frames);
+    let groups = grouped(frames);
     for fit in [false, true] {
         for slots in grids(frames, bounds, search.gap, fit) {
             let label = match frames.len() {
@@ -236,7 +246,7 @@ pub(super) fn local(frames: &[Slot], bounds: Bounds, search: &Search<'_>) -> Vec
                     ("Colunas alinhadas", "columns")
                 };
                 add(
-                    bands(frames, bounds, pattern, axis, search.gap, fit),
+                    bands(&groups, bounds, pattern, axis, search.gap, fit),
                     label,
                     kind,
                 );
@@ -252,7 +262,7 @@ pub(super) fn local(frames: &[Slot], bounds: Bounds, search: &Search<'_>) -> Vec
                     ("Colunas com tamanhos graduados", "varied-columns")
                 };
                 add(
-                    varied_bands(frames, bounds, &pattern, axis, search.gap),
+                    varied_bands(&groups, bounds, &pattern, axis, search.gap),
                     label,
                     kind,
                 );
@@ -270,6 +280,7 @@ pub(super) fn local(frames: &[Slot], bounds: Bounds, search: &Search<'_>) -> Vec
                 .copied()
                 .collect();
             let support_patterns = band_patterns(&support);
+            let support_groups = grouped(&support);
             for side in ["left", "right", "top", "bottom"] {
                 for share in [1.0 / 3.0, 0.4, 0.5, 0.6, 2.0 / 3.0] {
                     let (large, small) = split(bounds, search.gap, side, share);
@@ -280,12 +291,7 @@ pub(super) fn local(frames: &[Slot], bounds: Bounds, search: &Search<'_>) -> Vec
                     if !search.valid_local(&[hero], bounds) {
                         continue;
                     }
-                    let label = match side {
-                        "left" => "Destaque à esquerda",
-                        "right" => "Destaque à direita",
-                        "top" => "Destaque acima",
-                        _ => "Destaque abaixo",
-                    };
+                    let label = hero_label(side);
                     let mut accept = |mut slots: Vec<Slot>| {
                         let largest = slots
                             .iter()
@@ -301,7 +307,38 @@ pub(super) fn local(frames: &[Slot], bounds: Bounds, search: &Search<'_>) -> Vec
                     }
                     for pattern in &support_patterns {
                         for axis in [Axis::Rows, Axis::Columns] {
-                            accept(bands(&support, small, pattern, axis, search.gap, false));
+                            accept(bands(
+                                &support_groups,
+                                small,
+                                pattern,
+                                axis,
+                                search.gap,
+                                false,
+                            ));
+                        }
+                    }
+                }
+                // Besides the fixed shares, solve the hero and its support
+                // together at their reference proportions and centre the block.
+                for pattern in &support_patterns {
+                    for axis in [Axis::Rows, Axis::Columns] {
+                        let Some((large, small)) =
+                            natural_hero(bounds, search.gap, side, *hero, pattern, axis)
+                        else {
+                            continue;
+                        };
+                        let slots = bands(&support_groups, small, pattern, axis, search.gap, false);
+                        let largest = slots
+                            .iter()
+                            .map(|s| s.bounds.w * s.bounds.h)
+                            .fold(0.0, f64::max);
+                        if !slots.is_empty() && large.w * large.h >= 1.5 * largest {
+                            let mut all = vec![Slot {
+                                bounds: large,
+                                ..*hero
+                            }];
+                            all.extend(slots);
+                            add(all, hero_label(side), &format!("hero-{side}"));
                         }
                     }
                 }
@@ -309,7 +346,11 @@ pub(super) fn local(frames: &[Slot], bounds: Bounds, search: &Search<'_>) -> Vec
         }
     }
     let mut seen = BTreeSet::new();
-    candidates.retain(|c| seen.insert(geometry_key(&c.slots, search.height)));
+    // The key is kept: Page and group rankings reuse it to break ties.
+    candidates.retain_mut(|c| {
+        c.key = geometry_key(&c.slots, search.height);
+        seen.insert(c.key.clone())
+    });
     candidates
 }
 
@@ -393,13 +434,12 @@ fn varied_patterns(frames: &[Slot]) -> Vec<Vec<[usize; 3]>> {
 }
 
 fn varied_bands(
-    frames: &[Slot],
+    groups: &[Vec<Slot>; 3],
     bounds: Bounds,
     pattern: &[[usize; 3]],
     axis: Axis,
     gap: f64,
 ) -> Vec<Slot> {
-    let groups = grouped(frames);
     let mut used = [0; 3];
     let rows = matches!(axis, Axis::Rows);
     let bands: Vec<Vec<Slot>> = pattern
@@ -476,9 +516,46 @@ pub(super) fn complementary_groups(
     }
     let groups = grouped(frames);
     let amounts = [3, frames.len() / 2, frames.len() - 3];
-    let mut pool = Vec::new();
+    let mut divisions = Vec::new();
     for axis in [Axis::Columns, Axis::Rows] {
         for share in [0.4, 0.5, 0.6] {
+            for v in 0..=groups[0].len() {
+                for h in 0..=groups[1].len() {
+                    for q in 0..=groups[2].len() {
+                        if amounts.contains(&(v + h + q)) {
+                            divisions.push((axis, share, [v, h, q]));
+                        }
+                    }
+                }
+            }
+        }
+    }
+    let select = |frames: &[Slot], region: Bounds| {
+        let mut candidates = local(frames, region, search);
+        candidates.retain(|c| {
+            let block = bounding_box(&c.slots);
+            (block.x - region.x).abs() < 1e-8
+                && (block.y - region.y).abs() < 1e-8
+                && (block.x + block.w - region.x - region.w).abs() < 1e-8
+                && (block.y + block.h - region.y - region.h).abs() < 1e-8
+        });
+        for c in &mut candidates {
+            c.scope = LayoutScope::Sheet;
+            c.quality = search.score(c);
+        }
+        candidates.sort_by(|a, b| {
+            b.quality
+                .total_cmp(&a.quality)
+                .then_with(|| a.key.cmp(&b.key))
+        });
+        candidates.truncate(4);
+        candidates
+    };
+    // Each division into two groups is searched independently.
+    parallel::map_in_order(
+        &mut divisions,
+        DIVISIONS_PER_THREAD,
+        |&mut (axis, share, counts)| {
             let columns = matches!(axis, Axis::Columns);
             let (first, second) = split(
                 bounds,
@@ -486,74 +563,125 @@ pub(super) fn complementary_groups(
                 if columns { "left" } else { "top" },
                 share,
             );
-            let select = |frames: &[Slot], region: Bounds| {
-                let mut candidates = local(frames, region, search);
-                candidates.retain(|c| {
-                    let block = bounding_box(&c.slots);
-                    (block.x - region.x).abs() < 1e-8
-                        && (block.y - region.y).abs() < 1e-8
-                        && (block.x + block.w - region.x - region.w).abs() < 1e-8
-                        && (block.y + block.h - region.y - region.h).abs() < 1e-8
-                });
-                for c in &mut candidates {
-                    c.scope = LayoutScope::Sheet;
-                    c.quality = search.score(c);
-                    c.key = geometry_key(&c.slots, search.height);
-                }
-                candidates.sort_by(|a, b| {
-                    b.quality
-                        .total_cmp(&a.quality)
-                        .then_with(|| a.key.cmp(&b.key))
-                });
-                candidates.truncate(4);
-                candidates
-            };
-            for v in 0..=groups[0].len() {
-                for h in 0..=groups[1].len() {
-                    for q in 0..=groups[2].len() {
-                        if !amounts.contains(&(v + h + q)) {
-                            continue;
-                        }
-                        let counts = [v, h, q];
-                        let a: Vec<_> = groups
-                            .iter()
-                            .zip(counts)
-                            .flat_map(|(g, n)| g[..n].iter().copied())
-                            .collect();
-                        let b: Vec<_> = groups
-                            .iter()
-                            .zip(counts)
-                            .flat_map(|(g, n)| g[n..].iter().copied())
-                            .collect();
-                        let first = select(&a, first);
-                        let second = select(&b, second);
-                        for ca in &first {
-                            for cb in &second {
-                                let slots: Vec<_> =
-                                    ca.slots.iter().chain(&cb.slots).copied().collect();
-                                if !repetition::repetitive(&slots) {
-                                    pool.push(Candidate::new(
-                                        slots,
-                                        if columns {
-                                            "Grupos lado a lado com tamanhos variados"
-                                        } else {
-                                            "Grupos acima e abaixo com tamanhos variados"
-                                        },
-                                        if columns {
-                                            "group-columns"
-                                        } else {
-                                            "group-rows"
-                                        },
-                                    ));
-                                }
-                            }
-                        }
+            let a: Vec<_> = groups
+                .iter()
+                .zip(counts)
+                .flat_map(|(g, n)| g[..n].iter().copied())
+                .collect();
+            let b: Vec<_> = groups
+                .iter()
+                .zip(counts)
+                .flat_map(|(g, n)| g[n..].iter().copied())
+                .collect();
+            let first = select(&a, first);
+            let second = select(&b, second);
+            let mut pool = Vec::new();
+            for ca in &first {
+                for cb in &second {
+                    let slots: Vec<_> = ca.slots.iter().chain(&cb.slots).copied().collect();
+                    if search.repetition_allowed || !repetition::repetitive(&slots) {
+                        pool.push(Candidate::new(
+                            slots,
+                            if columns {
+                                "Grupos lado a lado com tamanhos variados"
+                            } else {
+                                "Grupos acima e abaixo com tamanhos variados"
+                            },
+                            if columns {
+                                "group-columns"
+                            } else {
+                                "group-rows"
+                            },
+                        ));
                     }
                 }
             }
-        }
+            pool
+        },
+    )
+    .into_iter()
+    .flatten()
+    .collect()
+}
+
+fn hero_label(side: &str) -> &'static str {
+    match side {
+        "left" => "Destaque à esquerda",
+        "right" => "Destaque à direita",
+        "top" => "Destaque acima",
+        _ => "Destaque abaixo",
     }
-    pool
+}
+
+/// A hero beside its support block, both at reference proportions and sharing
+/// the dimension across `side`, as large as `bounds` allows and centred in it.
+fn natural_hero(
+    bounds: Bounds,
+    gap: f64,
+    side: &str,
+    hero: Slot,
+    pattern: &[Band],
+    axis: Axis,
+) -> Option<(Bounds, Bounds)> {
+    let ratio = base_ratio(hero.orientation);
+    let (a, b) = band_line(pattern, axis, gap);
+    let across = side == "left" || side == "right";
+    // Support extent along the split as `k * shared + c`.
+    let (k, c) = if matches!(axis, Axis::Rows) == across {
+        (1.0 / a, -b / a)
+    } else {
+        (a, b)
+    };
+    let (large, small, block) = if across {
+        let h = bounds.h.min((bounds.w - gap - c) / (ratio + k));
+        let (hero_w, support_w) = (ratio * h, k * h + c);
+        let block = bounds.centered(hero_w + gap + support_w, h);
+        let (hero_x, support_x) = if side == "left" {
+            (block.x, block.x + hero_w + gap)
+        } else {
+            (block.x + support_w + gap, block.x)
+        };
+        (
+            Bounds {
+                x: hero_x,
+                y: block.y,
+                w: hero_w,
+                h,
+            },
+            Bounds {
+                x: support_x,
+                y: block.y,
+                w: support_w,
+                h,
+            },
+            block,
+        )
+    } else {
+        let w = bounds.w.min((bounds.h - gap - c) / (1.0 / ratio + k));
+        let (hero_h, support_h) = (w / ratio, k * w + c);
+        let block = bounds.centered(w, hero_h + gap + support_h);
+        let (hero_y, support_y) = if side == "top" {
+            (block.y, block.y + hero_h + gap)
+        } else {
+            (block.y + support_h + gap, block.y)
+        };
+        (
+            Bounds {
+                x: block.x,
+                y: hero_y,
+                w,
+                h: hero_h,
+            },
+            Bounds {
+                x: block.x,
+                y: support_y,
+                w,
+                h: support_h,
+            },
+            block,
+        )
+    };
+    (block.w > 0.0 && block.h > 0.0 && small.w > 0.0 && small.h > 0.0).then_some((large, small))
 }
 
 fn split(bounds: Bounds, gap: f64, side: &str, share: f64) -> (Bounds, Bounds) {
@@ -617,52 +745,58 @@ pub(super) fn pages(frames: &[Slot], search: &Search<'_>) -> Vec<Candidate> {
         ..left
     };
     let groups = grouped(frames);
-    let mut pool = Vec::new();
+    let mut divisions = Vec::new();
     for v in 0..=groups[0].len() {
         for h in 0..=groups[1].len() {
             for q in 0..=groups[2].len() {
-                let counts = [v, h, q];
-                let a: Vec<_> = groups
-                    .iter()
-                    .zip(counts)
-                    .flat_map(|(g, n)| g[..n].iter().copied())
-                    .collect();
-                let b: Vec<_> = groups
-                    .iter()
-                    .zip(counts)
-                    .flat_map(|(g, n)| g[n..].iter().copied())
-                    .collect();
-                if frames.len() > 1 && (a.is_empty() || b.is_empty()) {
-                    continue;
-                }
-                let select = |frames: &[Slot], region| {
-                    let mut candidates = local(frames, region, search);
-                    for c in &mut candidates {
-                        c.quality = search.score(c);
-                        c.key = geometry_key(&c.slots, search.height);
-                    }
-                    candidates.sort_by(|a, b| {
-                        b.quality
-                            .total_cmp(&a.quality)
-                            .then_with(|| a.key.cmp(&b.key))
-                    });
-                    candidates.truncate(6);
-                    candidates
-                };
-                let first = select(&a, left);
-                let second = select(&b, right);
-                for ca in &first {
-                    for cb in &second {
-                        let slots = ca.slots.iter().chain(&cb.slots).copied().collect();
-                        pool.push(Candidate::new(
-                            slots,
-                            &format!("Por Página · {} + {}", a.len(), b.len()),
-                            "page",
-                        ));
-                    }
-                }
+                divisions.push([v, h, q]);
             }
         }
     }
-    pool
+    let select = |frames: &[Slot], region| {
+        let mut candidates = local(frames, region, search);
+        for c in &mut candidates {
+            c.quality = search.score(c);
+        }
+        candidates.sort_by(|a, b| {
+            b.quality
+                .total_cmp(&a.quality)
+                .then_with(|| a.key.cmp(&b.key))
+        });
+        candidates.truncate(6);
+        candidates
+    };
+    // Each division of the Frames between the Pages is searched independently.
+    parallel::map_in_order(&mut divisions, DIVISIONS_PER_THREAD, |&mut counts| {
+        let a: Vec<_> = groups
+            .iter()
+            .zip(counts)
+            .flat_map(|(g, n)| g[..n].iter().copied())
+            .collect();
+        let b: Vec<_> = groups
+            .iter()
+            .zip(counts)
+            .flat_map(|(g, n)| g[n..].iter().copied())
+            .collect();
+        let mut pool = Vec::new();
+        if frames.len() > 1 && (a.is_empty() || b.is_empty()) {
+            return pool;
+        }
+        let first = select(&a, left);
+        let second = select(&b, right);
+        for ca in &first {
+            for cb in &second {
+                let slots = ca.slots.iter().chain(&cb.slots).copied().collect();
+                pool.push(Candidate::new(
+                    slots,
+                    &format!("Por Página · {} + {}", a.len(), b.len()),
+                    "page",
+                ));
+            }
+        }
+        pool
+    })
+    .into_iter()
+    .flatten()
+    .collect()
 }

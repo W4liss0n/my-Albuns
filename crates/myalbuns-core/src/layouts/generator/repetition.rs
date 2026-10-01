@@ -23,7 +23,7 @@ pub(super) fn repetitive(slots: &[Slot]) -> bool {
             return true;
         }
     }
-    let uniform = |group: Vec<&Slot>| {
+    let uniform = |group: &[&Slot]| {
         group.len() < 2
             || group.iter().map(|s| area(s)).fold(0.0, f64::max)
                 / group.iter().map(|s| area(s)).fold(f64::INFINITY, f64::min)
@@ -35,8 +35,8 @@ pub(super) fn repetitive(slots: &[Slot]) -> bool {
             .filter(|s| s.orientation == o)
             .collect::<Vec<_>>()
     });
-    if groups.iter().any(|g| g.len() >= 4 && uniform(g.clone()))
-        || slots.len() >= 6 && groups.iter().all(|g| uniform(g.clone()))
+    if groups.iter().any(|g| g.len() >= 4 && uniform(g))
+        || slots.len() >= 6 && groups.iter().all(|g| uniform(g))
     {
         return true;
     }
@@ -65,8 +65,8 @@ pub(super) fn repetitive(slots: &[Slot]) -> bool {
     {
         return true;
     }
+    let bounds = bounding_box(slots);
     for rows in [false, true] {
-        let bounds = bounding_box(slots);
         let middle = if rows {
             bounds.y + bounds.h / 2.0
         } else {
@@ -91,7 +91,7 @@ pub(super) fn repetitive(slots: &[Slot]) -> bool {
         {
             let local_key = |group: &[Slot]| {
                 let bounds = bounding_box(group);
-                geometry_key(
+                geometry_rows(
                     &group
                         .iter()
                         .map(|s| Slot {
@@ -129,7 +129,7 @@ pub(super) fn repetitive(slots: &[Slot]) -> bool {
             track.sort_by(|a, b| cross(a.bounds).total_cmp(&cross(b.bounds)));
         }
         for a in &tracks {
-            let repeated: Vec<_> = tracks
+            let (repeated, covered) = tracks
                 .iter()
                 .filter(|b| {
                     a.len() == b.len()
@@ -140,10 +140,13 @@ pub(super) fn repetitive(slots: &[Slot]) -> bool {
                                 && similar(cross_extent(r.bounds), cross_extent(s.bounds))
                         })
                 })
-                .collect();
-            let covered: usize = repeated.iter().map(|t| t.len()).sum();
-            if repeated.len() >= 2 && covered == slots.len()
-                || repeated.len() >= 3 && covered as f64 / slots.len() as f64 >= 0.75
+                .fold((0, 0), |(count, covered), track| {
+                    (count + 1, covered + track.len())
+                });
+            // Single-Frame tracks beside a larger Frame form a support stack,
+            // not a repeated track; they only count when they cover everything.
+            if repeated >= 2 && covered == slots.len()
+                || a.len() >= 2 && repeated >= 3 && covered as f64 / slots.len() as f64 >= 0.75
             {
                 return true;
             }
