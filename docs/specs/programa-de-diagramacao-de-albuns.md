@@ -2,7 +2,7 @@
 status: ready-for-agent
 document: product-spec
 implementation-readiness: decision-tickets-required
-updated: 2026-09-13
+updated: 2026-10-01
 ---
 
 # Programa de Diagramação de Álbuns
@@ -840,7 +840,7 @@ validação das superfícies descritas nesta seção.
 - Em Lâmina dupla, o Frame usa a Lâmina inteira como referência e pode atravessar a divisão; em Página única, usa somente a Página ativa.
 - A geometria inicial usa proporção `3:2` e largura de `40%` da superfície ativa, reduzida somente quando a altura disponível exigir; nunca representa um tamanho físico fixo. A criação é uma única ação de Undo/Redo e fica indisponível em Layout travado.
 - Criar um Frame a partir de uma Foto usa sua orientação observada: perfil inicial 2:3 para vertical, 3:2 para horizontal e 1:1 para quadrada. Na ausência de dimensões observadas, conserva o perfil manual 3:2; a observação posterior não muda Frames existentes. A criação manual de placeholders continua em 3:2, conforme o ADR 0014.
-- Fora do Modo de edição, inserir uma Foto em área livre cria um Frame e aplica o primeiro Layout compatível que conserva as orientações dos Frames quando a organização está destravada. Essa condição vale também para a escolha automática de Último Layout, Favoritos e Personalizados; sem composição adequada, mantém-se a reserva do ADR 0008.
+- Fora do Modo de edição, inserir uma Foto em área livre cria um Frame e aplica o primeiro Layout compatível que conserva as orientações dos Frames e não leva nenhuma Foto até as bordas de uma Página inteira, quando a organização está destravada. Essa condição vale também para a escolha automática de Último Layout, Favoritos e Personalizados; sem composição adequada, mantém-se a reserva do ADR 0008.
 - Inserir uma Foto sobre um placeholder preenche o Frame existente sem mudar sua geometria.
 - Arrastar uma Foto sobre qualquer Frame usa somente esse alvo: preenche um placeholder ou substitui a Foto existente, preservando geometria e estilo.
 - Se vários Frames contiverem o ponto da soltura, somente o mais acima na Pilha visual é atingido, ainda que esteja vazio, transparente ou com Opacidade reduzida.
@@ -904,9 +904,11 @@ validação das superfícies descritas nesta seção.
 - Dentro de cada seção, a ordem é: Último Layout aplicado, quando pertencer à categoria; Favoritos do Projeto; e demais candidatos. Uma definição possui somente uma preview por seção, mesmo quando é simultaneamente a última aplicada e favorita. A mesma geometria pode aparecer em `Automáticos` e `Personalizados`; a deduplicação ocorre somente dentro de cada origem.
 - Para aplicação automática, a prioridade global é: Último Layout aplicado compatível, primeiro Favorito do Projeto, primeiro Layout personalizado global e primeiro Layout do sistema. Dentro de cada grupo, prevalece a ordem exibida em sua seção.
 - Layouts do sistema são produzidos pelo Gerador de Layouts.
-- O Gerador considera quantidade, orientações dos Frames, formato e dimensões da superfície, margem e intervalo. Cada sugestão conserva as orientações vertical, horizontal ou quadrada dos Frames consultados, podendo variar tamanhos, proporções dentro da orientação e posições espaciais sem reordenar a Pilha visual.
+- O Gerador considera quantidade, orientações dos Frames, a proporção de cada Foto colocada, formato e dimensões da superfície, margem e intervalo. Cada sugestão conserva as orientações vertical, horizontal ou quadrada dos Frames consultados e procura dar a cada Frame com Foto a proporção da Foto como ela é mostrada, podendo variar tamanhos, proporções dentro da orientação e posições espaciais sem reordenar a Pilha visual.
+- No Painel de Layouts, um Frame vazio é consultado sem orientação: cada sugestão o faz vertical ou horizontal. Isso vale também para os Frames pedidos pelo seletor de quantidade. Nas automações, os Frames vazios conservam a orientação atual.
 - O intervalo do Gerador é o mesmo Espaço entre Frames usado pelos snaps de espaçamento padrão. É configurado em `Personalização` na criação e em `Design do Álbum` depois dela. Projetos existentes conservam o valor já salvo; novos Projetos começam com `5 mm`. Alterar esse valor orienta novas consultas, sem modificar composições existentes, Últimos Layouts aplicados, Favoritos ou definições do catálogo.
 - Uma consulta do Gerador oferece até vinte sugestões de qualidade e estrutura diferentes, sem completar a lista com variações quase iguais. As composições seguem padrões de alinhamento, espaçamento uniforme e grupos completos; não deixam células vazias dentro dos grupos.
+- Uma sugestão pode levar a Foto de um Frame até as bordas de uma Página inteira, sem margem, com os demais Frames compostos na outra Página. Numa Lâmina de página única com um só Frame, ele pode ocupar toda a área ativa. A escolha automática de Layout nunca aplica essas sugestões; elas ficam disponíveis no Painel de Layouts.
 - Uma sugestão por Página não é descartada como repetição de outra que atravessa o centro apenas por suas posições serem parecidas. A diversidade e a janela de nota são comparadas dentro do mesmo escopo efetivo; não há quantidade fixa de sugestões de cada tipo.
 - Espelhamentos de uma sugestão, inclusive a troca das Páginas, entram na lista somente depois das estruturas distintas.
 - A cobertura inicial do Gerador é de um a trinta Frames. Uma consulta fora dessa cobertura ou sem padrões adequados não elimina Frames nem impede o uso de Layouts de outras origens ou do arranjo de reserva. Esse teto não limita a quantidade de Frames editáveis no Projeto.
@@ -929,7 +931,7 @@ validação das superfícies descritas nesta seção.
 - Desfavoritar remove apenas a cópia do Projeto e não altera Organizações aplicadas. Sem origem disponível, a preview só permanece no painel de uma Lâmina que ainda a conserva como Último Layout aplicado.
 - Layouts copiados para um Projeto acompanham Cópias de Projeto e Geração de Projetos em lote.
 - Layout por Lâmina pode permitir Travessia central.
-- Layout por Página nunca permite que um Frame atravesse o centro. O Gerador centraliza seus Blocos de Frames nas Páginas; Layouts personalizados preservam o posicionamento manual capturado.
+- Layout por Página nunca permite que um Frame atravesse o centro. O Gerador centraliza seus Blocos de Frames nas Páginas, exceto na Página ocupada inteira por um Frame; Layouts personalizados preservam o posicionamento manual capturado.
 - Um Projeto que permite Travessia central admite Layouts por Lâmina e por Página. Essa permissão amplia os candidatos compatíveis; não exige que uma sugestão atravesse o centro.
 - Um Projeto explicitamente restrito a Layouts por Página não oferece nem aplica Layouts com Travessia central. Essa restrição vale para candidatos do Gerador, personalizados, Favoritos e Último Layout aplicado, além dos demais critérios de compatibilidade.
 - Ao salvar um Layout personalizado, a existência de qualquer Travessia central determina escopo por Lâmina; se todos os Frames estiverem integralmente em um dos lados, o escopo é por Página.

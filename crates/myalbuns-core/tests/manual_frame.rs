@@ -355,3 +355,57 @@ fn manual_creation_preview_corpus_matches_the_core() {
         fs::read_to_string(fixture).unwrap().replace("\r\n", "\n")
     );
 }
+
+#[test]
+fn automatic_arrangement_and_suggestions_follow_the_shown_photo_proportion() {
+    let root = tempfile::tempdir().unwrap();
+    let core = ProjectCore::new()
+        .with_identity_storage_roots(root.path().join("leases"), root.path().join("identities"));
+    let mut project = project(
+        &core,
+        &root.path().join("Proporção.myalbuns"),
+        600_000,
+        300_000,
+    );
+    // A phone portrait: 3:4, wider than the reference 2:3.
+    let photo = project
+        .import_photo(ImportPhoto::new(
+            root.path().join("Celular.jpg"),
+            PhotoSourceMetadata::new(
+                3000,
+                4000,
+                ["#173B4B", "#84AAA7", "#E7C58B"].map(String::from),
+            )
+            .unwrap(),
+        ))
+        .unwrap();
+    let sheet_id = project.projection().state.album.sheets[1].id.clone();
+    let added = project
+        .apply_with_outcome(ProjectIntent::AddPhoto {
+            sheet_id: sheet_id.clone(),
+            media_id: photo.media_id,
+            mode: PhotoPlacementMode::Normal,
+        })
+        .unwrap();
+    let frame = &added.projection.state.album.sheets[1].frames[0];
+    let shown = frame.rect.width as f64 / frame.rect.height as f64;
+    assert!((shown - 0.75).abs() < 0.002, "{shown}");
+
+    // Turned a quarter, the Photo shows horizontal in the vertical Frame, so
+    // its proportion no longer applies and the suggestions use the reference one.
+    project
+        .apply_with_outcome(ProjectIntent::OrientPhotos {
+            frame_ids: vec![frame.id.clone()],
+            action: myalbuns_core::PhotoOrientationAction::RotateCounterClockwise,
+        })
+        .unwrap();
+    let listing = project.query_layouts(&sheet_id).unwrap().listing;
+    let suggestion = listing
+        .candidates
+        .iter()
+        .find(|candidate| !candidate.is_last_applied)
+        .unwrap();
+    let suggested = &suggestion.layout.definition.positions[0];
+    let suggested = suggested.width as f64 / suggested.height as f64;
+    assert!((suggested - 2.0 / 3.0).abs() < 0.002, "{suggested}");
+}

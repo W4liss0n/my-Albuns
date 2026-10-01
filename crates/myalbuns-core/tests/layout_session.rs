@@ -210,10 +210,7 @@ fn export_rejects_placeholders_after_unlock_and_on_manual_frames() {
             let query = project
                 .query_layouts_with_frame_request(
                     &sheet,
-                    Some(myalbuns_core::LayoutFrameRequest {
-                        frame_count: 3,
-                        orientation: myalbuns_core::FrameOrientation::Horizontal,
-                    }),
+                    Some(myalbuns_core::LayoutFrameRequest { frame_count: 3 }),
                 )
                 .unwrap();
             project
@@ -555,7 +552,7 @@ fn the_locked_preview_tracks_frame_order_and_remains_available_after_permission_
 
 #[test]
 fn expanded_preview_creates_inherited_placeholders_only_when_confirmed_by_the_lock() {
-    use myalbuns_core::{CoreError, FrameOrientation, FrameStyleSource, LayoutFrameRequest};
+    use myalbuns_core::{CoreError, FrameStyleSource, LayoutFrameRequest};
     let directory = tempfile::tempdir().unwrap();
     let mut project = project(directory.path());
     let sheet = project.projection().state.album.sheets[0].id.clone();
@@ -566,13 +563,7 @@ fn expanded_preview_creates_inherited_placeholders_only_when_confirmed_by_the_lo
         .unwrap();
     let before = project.projection();
     let query = project
-        .query_layouts_with_frame_request(
-            &sheet,
-            Some(LayoutFrameRequest {
-                frame_count: 3,
-                orientation: FrameOrientation::Horizontal,
-            }),
-        )
+        .query_layouts_with_frame_request(&sheet, Some(LayoutFrameRequest { frame_count: 3 }))
         .unwrap();
     assert_eq!(query.frame_count, 1);
     assert!(

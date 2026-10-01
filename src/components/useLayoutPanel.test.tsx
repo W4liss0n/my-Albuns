@@ -106,11 +106,11 @@ test("changing extra positions discards a late query and its preview", async () 
   act(() => view.result.current.panel.configurePositions(frames.length + 2));
   expect(view.result.current.panel.query).toBeNull();
   await act(async () => { delayed.resolve(query("obsolete")); });
-  await waitFor(() => expect(queryLayouts).toHaveBeenLastCalledWith(sheetId, { frameCount: frames.length + 2, orientation: "horizontal" }));
+  await waitFor(() => expect(queryLayouts).toHaveBeenLastCalledWith(sheetId, { frameCount: frames.length + 2 }));
   await waitFor(() => expect(view.result.current.panel.query?.queryId).toBe(`query-${sheetId}`));
   expect(view.result.current.panel.composition).toBe(initial.composition);
   act(() => view.result.current.panel.configurePositions(frames.length));
-  await waitFor(() => expect(queryLayouts).toHaveBeenLastCalledWith(sheetId, { frameCount: frames.length, orientation: "horizontal" }));
+  await waitFor(() => expect(queryLayouts).toHaveBeenLastCalledWith(sheetId, { frameCount: frames.length }));
 });
 
 test("after unlocking, the requested count may drop to filled Frames and apply the smaller prepared Layout", async () => {
@@ -128,7 +128,7 @@ test("after unlocking, the requested count may drop to filled Frames and apply t
   h.queryLayouts.mockResolvedValue(reduced.query);
   h.previewLayout.mockResolvedValue(reduced.previews[0]);
   act(() => h.view.result.current.panel.configurePositions(2));
-  await waitFor(() => expect(h.queryLayouts).toHaveBeenLastCalledWith(sheetId, { frameCount: 2, orientation: "horizontal" }));
+  await waitFor(() => expect(h.queryLayouts).toHaveBeenLastCalledWith(sheetId, { frameCount: 2 }));
   await waitFor(() => expect(h.view.result.current.panel.query?.queryId).toBe(reduced.query.queryId));
   expect(h.view.result.current.panel.positionCount).toBe(2);
   act(() => h.view.result.current.panel.configurePositions(1));
@@ -147,7 +147,7 @@ test("after unlocking, the requested count may drop to filled Frames and apply t
     queryId: reduced.query.queryId, candidateIndex: 0,
   } });
   await waitFor(() => expect(h.view.result.current.panel.query?.revision).toBe(applied.projection.state.revision));
-  expect(h.queryLayouts).toHaveBeenLastCalledWith(sheetId, { frameCount: 2, orientation: "horizontal" });
+  expect(h.queryLayouts).toHaveBeenLastCalledWith(sheetId, { frameCount: 2 });
 });
 
 test("the count remains fixed while the Layout is locked, including its placeholders", async () => {
@@ -183,7 +183,7 @@ test("adding Photos beyond automatic coverage releases an earlier count request"
   const h = harness();
   act(() => h.view.result.current.panel.toggle(sheetId));
   act(() => h.view.result.current.panel.configurePositions(30));
-  await waitFor(() => expect(h.queryLayouts).toHaveBeenLastCalledWith(sheetId, { frameCount: 30, orientation: "horizontal" }));
+  await waitFor(() => expect(h.queryLayouts).toHaveBeenLastCalledWith(sheetId, { frameCount: 30 }));
   const expanded = structuredClone(initial);
   const sheet = expanded.state.album.sheets[0];
   const filled = sheet.frames.find((frame) => frame.photo !== null)!;
@@ -240,7 +240,7 @@ test("position choices consume the Core range instead of reconstructing photo co
   expect(h.view.result.current.panel.positionRange).toEqual({ minimum: 7, maximum: 9 });
   expect(h.view.result.current.panel.positionCount).toBe(7);
   act(() => h.view.result.current.panel.configurePositions(8));
-  await waitFor(() => expect(h.queryLayouts).toHaveBeenLastCalledWith(sheetId, { frameCount: 8, orientation: "horizontal" }));
+  await waitFor(() => expect(h.queryLayouts).toHaveBeenLastCalledWith(sheetId, { frameCount: 8 }));
   act(() => h.view.result.current.panel.configurePositions(10));
   expect(h.view.result.current.panel.positionCount).toBe(8);
 });

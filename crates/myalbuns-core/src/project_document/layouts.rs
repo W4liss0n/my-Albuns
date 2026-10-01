@@ -152,7 +152,7 @@ impl ProjectDocument {
     }
 
     pub(crate) fn current_layout(&self, sheet_id: Uuid) -> Result<StoredLayout, CoreError> {
-        let query = self.layout_query(sheet_id)?;
+        let query = self.layout_query(sheet_id, &PhotoDimensions::new())?;
         let sheet = self
             .sheets
             .iter()
@@ -229,7 +229,14 @@ impl ProjectDocument {
         Ok(self)
     }
 
-    pub(crate) fn layout_query(&self, sheet_id: Uuid) -> Result<LayoutQuery, CoreError> {
+    /// The Generator's query for a Sheet, keeping every Frame's orientation.
+    /// Observed Photo dimensions in `sources` give each filled Frame the
+    /// proportion its Photo is shown at.
+    pub(crate) fn layout_query(
+        &self,
+        sheet_id: Uuid,
+        sources: &PhotoDimensions,
+    ) -> Result<LayoutQuery, CoreError> {
         let sheet = self
             .sheets
             .iter()
@@ -248,10 +255,26 @@ impl ProjectDocument {
             frame_orientations: sheet
                 .frames
                 .iter()
-                .map(|f| match f.rect.width.cmp(&f.rect.height) {
-                    std::cmp::Ordering::Less => FrameOrientation::Vertical,
-                    std::cmp::Ordering::Greater => FrameOrientation::Horizontal,
-                    std::cmp::Ordering::Equal => FrameOrientation::Square,
+                .map(|f| {
+                    Some(match f.rect.width.cmp(&f.rect.height) {
+                        std::cmp::Ordering::Less => FrameOrientation::Vertical,
+                        std::cmp::Ordering::Greater => FrameOrientation::Horizontal,
+                        std::cmp::Ordering::Equal => FrameOrientation::Square,
+                    })
+                })
+                .collect(),
+            frame_proportions: sheet
+                .frames
+                .iter()
+                .map(|f| {
+                    let photo = f.photo.as_ref()?;
+                    let &(width, height) = sources.get(&photo.media_id())?;
+                    // A quarter turn shows the Photo the other way round.
+                    if photo.transform().quarter_turns() % 2 == 0 {
+                        crate::FrameProportion::reduced(width, height)
+                    } else {
+                        crate::FrameProportion::reduced(height, width)
+                    }
                 })
                 .collect(),
             permission: self.layout_settings.permission,
@@ -299,8 +322,9 @@ impl ProjectDocument {
         &mut self,
         sheet_id: Uuid,
         custom: &[crate::CustomLayout],
+        sources: &PhotoDimensions,
     ) -> Result<(), CoreError> {
-        let query = self.layout_query(sheet_id)?;
+        let query = self.layout_query(sheet_id, sources)?;
         let sheet = self.sheets.iter().find(|s| s.id == sheet_id).unwrap();
         let ids = sheet.frames.iter().map(|f| f.id).collect::<Vec<_>>();
         let patch = crate::LayoutRules::automatic(

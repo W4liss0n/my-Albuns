@@ -2,7 +2,7 @@
 status: accepted
 document: design
 date: 2026-09-09
-updated: 2026-09-30
+updated: 2026-10-01
 ticket: 28
 ---
 
@@ -17,7 +17,10 @@ A decisão é do [ADR 0010](../adr/0010-gerar-layouts-por-composicoes-determinis
 A versão 2 do algoritmo, com a classificação por escopo, é do
 [ADR 0013](../adr/0013-diversificar-e-harmonizar-as-sugestoes-do-gerador.md); a
 orientação dos Frames criados por Foto é do
-[ADR 0014](../adr/0014-orientar-novos-frames-pela-foto-inserida.md).
+[ADR 0014](../adr/0014-orientar-novos-frames-pela-foto-inserida.md). A versão 3,
+com Página inteira, proporção da Foto, Frames vazios livres no Painel, blocos
+encaixados e harmonia na nota, é do
+[ADR 0015](../adr/0015-ampliar-as-sugestoes-com-pagina-inteira-e-proporcoes-reais.md).
 A [SPEC](../specs/programa-de-diagramacao-de-albuns.md#layouts) possui o
 comportamento observável; o [ADR 0008](../adr/0008-garantir-layout-compativel-por-arranjo-de-reserva.md)
 possui a garantia das automações; o
@@ -65,7 +68,8 @@ de Frames reconstruída independentemente pelo frontend.
 | --- | --- |
 | Superfície | Tipo `singlePage` ou `doubleSheet`, largura e altura físicas da área ativa |
 | Perfis dos Frames | Lista na ordem atual da Pilha visual; a quantidade é derivada da lista |
-| Orientação | Vertical, horizontal ou quadrada, derivada das dimensões externas do Frame |
+| Orientação | Vertical, horizontal ou quadrada, derivada das dimensões externas do Frame; na versão 3, ausente (livre) para Frames vazios nas consultas do Painel |
+| Proporção da Foto | Na versão 3, largura e altura da Foto como é mostrada, em termos mínimos, quando a sessão observou suas dimensões; ausente nos demais Frames |
 | Permissão | `pagesOnly` ou `pagesAndSheet`; Página única admite somente o primeiro comportamento |
 | Margem | Distância física mínima das bordas da composição à superfície ou à sua Página |
 | Intervalo | Distância física entre Frames vizinhos de um grupo |
@@ -79,9 +83,26 @@ ordenadas diferentes, ainda que tenham as mesmas contagens.
 Vertical significa largura menor que altura; horizontal, largura maior;
 quadrado, medidas iguais. A primeira versão conserva quadrados como
 quadrados, sem convertê-los silenciosamente em V ou H. A referência de
-proporção para a classificação é 2:3, 3:2 ou 1:1. A razão da Foto, EXIF,
-Giro, Ângulo, Pan, Zoom e efeitos não alteram a orientação de um Frame já
-existente nem fazem parte da consulta inicial do Gerador.
+proporção para a classificação é 2:3, 3:2 ou 1:1. Ângulo, Pan, Zoom e efeitos
+não fazem parte da consulta, e nada na consulta altera a orientação de um
+Frame já existente.
+
+Na versão 3, um Frame com Foto mira a proporção da Foto como é mostrada:
+dimensões observadas pela sessão, já corrigidas pela orientação EXIF, trocadas
+por um Giro de um quarto de volta. Ela só vale quando tem a orientação do
+Frame e é mantida 1% dentro das proporções admitidas para essa orientação.
+Sem dimensões observadas, com uma Foto de outra orientação ou com uma Foto
+quadrada, vale a referência. A automação e o Painel montam a consulta com as
+mesmas dimensões observadas.
+
+Também na versão 3, as consultas do Painel deixam livre a orientação de cada
+Frame vazio, inclusive os placeholders pedidos pelo seletor de quantidade: em
+cada sugestão, o Gerador o faz vertical ou horizontal, nunca quadrado. Frames
+com Foto conservam a orientação, e a escolha automática continua consultando a
+orientação atual de todos os Frames (ADR 0014). O Gerador busca até sete
+divisões, que são quantos Frames livres ficam na vertical, de nenhum a todos em
+passos iguais, e todas competem numa única classificação. O pedido de quantidade
+leva apenas o total; não carrega orientação.
 
 Criar um Frame continua sendo responsabilidade do fluxo de edição. O
 perfil só pode ser consultado depois de existir uma geometria inicial
@@ -187,8 +208,14 @@ já possui sua própria regra de recorte de Frames atravessados.
 
 ## Invariantes das sugestões geradas
 
-- Todos os perfis aparecem uma única vez e conservam V/H ou a forma quadrada.
-- Retângulos finitos e positivos respeitam a superfície, a margem e o menor lado.
+- Todos os perfis aparecem uma única vez e conservam V/H ou a forma quadrada;
+  um perfil livre fica vertical ou horizontal.
+- Retângulos finitos e positivos respeitam a superfície, a margem e o menor lado,
+  exceto o Frame de Página inteira da versão 3: ele cobre uma Página inteira de
+  uma Lâmina dupla, ou toda a área de uma Página única com um só Frame, até a
+  borda externa e na forma da Página, qualquer que seja sua orientação. A Página
+  que ele ocupa dispensa a centralização de bloco; a outra Página segue as
+  regras normais.
 - Frames não se sobrepõem; cada grupo mantém alinhamentos e intervalos uniformes.
 - Não há células vazias dentro dos grupos. Margens, intervalos e espaço externo
   de um bloco centralizado continuam permitidos.
@@ -204,8 +231,17 @@ nem acrescentam restrições ao arranjo de reserva do ADR 0008.
 
 A primeira versão parte das famílias aprovadas: composições pequenas,
 faixas, colunas, bandas com tamanhos graduados, destaque e apoio, grupos
-complementares e combinações por Página. A enumeração usa somente grades
-completas e repartições definidas. O algoritmo não sorteia retângulos.
+complementares e combinações por Página. A versão 3 acrescenta os blocos
+encaixados e a Página inteira. A enumeração usa somente grades completas e
+repartições definidas. O algoritmo não sorteia retângulos.
+
+Um bloco encaixado é cortado em partes por linhas retas de lado a lado, e cada
+parte é cortada na direção oposta, até três níveis. Com o intervalo fixo, a
+largura de cada parte é linear na sua altura (`a × altura + b`), calculada das
+folhas para a raiz; o bloco inteiro fica tão grande quanto a região permite,
+centralizado, e as medidas descem da raiz para as folhas. Cada Frame fica
+exatamente na proporção que mira. Os Frames de cada orientação entram na ordem
+dos perfis.
 
 O perfil numérico mantém os pesos da V9: 45% de afinidade de proporção, 40%
 de ocupação e 15% de tamanho; nota mínima de 72. Na versão 2, a janela de dez
@@ -228,16 +264,19 @@ de reconstruir escolhas a partir das imagens do protótipo:
 | Bandas graduadas | Para quatro ou mais Frames, até quatro bandas de até quatro Frames, no máximo três da mesma orientação em cada banda; quantidades não decrescentes |
 | Mais de 12 da mesma orientação | Até quatro bandas; quantidades não decrescentes e no máximo metade do total arredondada para cima em uma banda |
 | Destaque | Fração 1/3, 0,4, 0,5, 0,6 ou 2/3 da dimensão livre; na versão 2, também destaque e apoio resolvidos juntos nas proporções de referência e centralizados; área pelo menos 1,5 vez a do maior apoio |
+| Blocos encaixados | Na versão 3, em regiões de três a seis Frames; cortes de até quatro partes, até três níveis; até seis por região, pela nota do bloco julgado como um grupo |
+| Página inteira | Na versão 3, em cada orientação, o Frame cuja Foto a Página corta menos ocupa a Página da esquerda ou da direita, junto às seis melhores composições dos demais na outra Página; numa Página única, só com um Frame |
 | Grupos complementares | Para oito ou mais Frames; duas regiões em 40/60, 50/50 ou 60/40; primeiro grupo com três, metade arredondada para baixo ou total menos três |
 | Candidatos locais | Até quatro por região de grupo complementar; até seis por Página para cada distribuição de orientações |
-| Afinidade de proporção | Média de `min(proporção / referência, referência / proporção)` |
+| Afinidade de proporção | Média de `min(proporção / referência, referência / proporção)`, com a referência de cada Frame; na versão 3, ponderada pela área quando há uma Página inteira |
 | Ocupação | Na classificação final, área dos Frames dividida pela maior área do mesmo escopo, limitada a 1; nas escolhas internas de cada Página ou grupo, área dividida pela área útil externa, normalizada por 0,86 e limitada a 1 |
-| Janela de nota | Por escopo: até dez pontos abaixo da melhor nota do mesmo escopo, com piso de 72 |
-| Tamanho | Menor lado dividido por duas vezes o mínimo pedido, limitado a 1 |
-| Desequilíbrio por Página | Subtrair até seis pontos conforme a diferença entre as áreas ocupadas dos lados |
-| Horizonte comum | Por Página, subtrair `min(8, 40 × diferença de altura dos blocos / altura útil)` |
+| Janela de nota | Por escopo: até dez pontos abaixo da melhor nota do mesmo escopo, com piso de 72; na versão 3, sugestões com Página inteira formam uma terceira categoria, com sua própria ocupação máxima e janela |
+| Tamanho | Menor lado dividido por duas vezes o mínimo pedido, limitado a 1; na versão 3, pelo maior entre esse valor e 15% da altura da superfície |
+| Desequilíbrio por Página | Subtrair até seis pontos conforme a diferença entre as áreas ocupadas dos lados; não se aplica com Página inteira |
+| Horizonte comum | Por Página, subtrair `min(8, 40 × diferença de altura dos blocos / altura útil)`; não se aplica com Página inteira |
 | Dominância, em grupos com ao menos cinco Frames | Subtrair `min(12, max(0, maior área / soma das áreas − 0,4) × 35)` |
-| Contraste, em grupos com ao menos cinco Frames | Subtrair `min(10, max(0, maior área / menor área − 6) × 1,2)` |
+| Contraste, em grupos com ao menos cinco Frames (três na versão 3) | Subtrair `min(10, max(0, maior área / menor área − 6) × 1,2)` |
+| Tamanhos distintos, em grupos de três a seis Frames | Na versão 3, subtrair quatro pontos por tamanho além de três; lados equivalentes (raiz da área) iguais até 4% |
 
 Dominância e contraste são avaliados separadamente em cada Página quando
 esse for o escopo. A comparação de tamanhos para repetição admite diferença
@@ -270,7 +309,9 @@ combinações por Página usam a diversidade geométrica.
 
 A novidade inicial usa `1 − média das interseções sobre uniões` entre
 retângulos da mesma orientação, emparelhados sem reutilização na ordem dos
-perfis. Cada retângulo escolhe o maior valor disponível; empate conserva
+perfis. Na versão 3, um Frame de Página inteira é comparado só com outro de
+Página inteira, qualquer que seja a orientação dos dois, e de duas geometrias
+iguais fica a de nota maior. Cada retângulo escolhe o maior valor disponível; empate conserva
 a primeira posição. A novidade em relação à seleção é a menor dessas
 distâncias; sem sugestão anterior do mesmo escopo, vale 1.
 
@@ -282,7 +323,10 @@ complementares, e a validação e a chave de espelhamento de cada composição �
 feito em paralelo quando há mais de um processador; os resultados entram na
 ordem da busca sequencial, e o número de processadores não muda a lista. A
 seleção só recalcula a novidade de quem ainda pode ser escolhida, o que dá as
-mesmas escolhas de recalcular todas as candidatas a cada rodada.
+mesmas escolhas de recalcular todas as candidatas a cada rodada. Na versão 3,
+os blocos encaixados de uma região são resolvidos uma vez por busca para cada
+combinação de Frames, proporções e tamanho de região, sempre a partir da origem
+da região; o resultado não depende de qual divisão os calculou primeiro.
 Renomear IDs, mudar DPI ou Unidade de apresentação não muda a consulta.
 Escalar conjuntamente superfície, margem, intervalo e menor lado conserva
 a composição normalizada, dentro da quantização física declarada.
@@ -304,7 +348,7 @@ usa escopo, tipo/proporção e sequência ordenada de retângulos normalizados.
 Trocar posições entre índices continua representando outra definição.
 
 Preservar V/H é uma invariante da geração de sugestões para os perfis
-consultados. Não acrescenta um filtro retroativo ao Último Layout ou aos
+consultados com orientação; os perfis livres da versão 3 não têm uma a preservar. Não acrescenta um filtro retroativo ao Último Layout ou aos
 Personalizados: reaplicar um Layout continua recuperando a geometria
 original, mesmo depois de uma edição manual dos Frames.
 
@@ -317,7 +361,8 @@ não atravessa as origens, inclusive para cópias favoritas.
 
 A prioridade de aplicação automática é Último Layout, primeiro Favorito,
 primeiro Personalizado e primeira sugestão do Gerador, considerando somente os
-Layouts que conservam as orientações dos Frames atuais (ADR 0014). Sem opção nessas
+Layouts que conservam as orientações dos Frames atuais (ADR 0014) e, na versão 3,
+nenhum que leve uma Foto até as bordas de uma Página inteira. Sem opção nessas
 origens, `LayoutRules` produz a reserva derivada da quantidade e superfície
 ativa. Ela pode sempre respeitar o escopo mais restritivo, sem consultar
 Foto, orientação, prévia ou escolhas anteriores. Não aparece no painel,
@@ -353,7 +398,8 @@ O Gerador inicial produz a quantidade exata. Posições excedentes de candidatos
 de travamento vêm de definições apropriadas de outras origens ou consultas
 explícitas. O corpo da preview não confirma esses excedentes; somente
 o cadeado cria placeholders e trava, seguindo a SPEC. A busca comum não inventa
-Fotos ou orientações futuras para preencher vinte sugestões.
+Fotos para preencher vinte sugestões; na versão 3, só escolhe a orientação de
+Frames vazios consultados pelo Painel.
 
 ## Persistência e integração existente
 

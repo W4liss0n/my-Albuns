@@ -33,8 +33,8 @@ pub use frame_snap::{
     FrameSnapRequest,
 };
 pub use layouts::{
-    CustomLayout, CustomLayoutId, FavoriteLayout, FrameOrientation, GeneratedLayout,
-    LayoutCandidate, LayoutCatalogSnapshot, LayoutDefinition, LayoutExportProblem,
+    CustomLayout, CustomLayoutId, FavoriteLayout, FrameOrientation, FrameProportion,
+    GeneratedLayout, LayoutCandidate, LayoutCatalogSnapshot, LayoutDefinition, LayoutExportProblem,
     LayoutFavoriteId, LayoutFrameRequest, LayoutGeneration, LayoutGenerationStatus, LayoutListing,
     LayoutOrigin, LayoutParameters, LayoutPatch, LayoutPermission, LayoutPositionRange,
     LayoutQuery, LayoutQueryResult, LayoutRules, LayoutScope, LayoutSelection, LayoutSettings,

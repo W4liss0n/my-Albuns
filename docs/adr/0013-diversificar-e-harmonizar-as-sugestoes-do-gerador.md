@@ -70,3 +70,6 @@ implementou. Detalhes e parâmetros estão no
 [design 0026](../design/0026-contrato-do-gerador-e-da-aplicacao-de-layouts.md).
 Penalizar mais de três tamanhos e Frames muito pequenos foi avaliado e adiado:
 reduzia o contraste, mas aumentava o corte das Fotos e diminuía a variedade.
+A versão 3, do
+[ADR 0015](0015-ampliar-as-sugestoes-com-pagina-inteira-e-proporcoes-reais.md),
+retoma essas penalidades junto com composições que não cortam as Fotos.

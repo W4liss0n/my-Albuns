@@ -2242,9 +2242,25 @@ mod tests {
                 .affected_frame_id
                 .expect("the added quadro is returned to the UI boundary");
             let layouts = host.query_layouts(&sheet_id, None).unwrap();
+            // The fundo is sampled at the outer edges, where a whole Page would
+            // print the Photo; take the last suggestion that keeps the Margin.
+            let candidate_index = layouts
+                .listing
+                .candidates
+                .iter()
+                .rposition(|candidate| {
+                    let definition = &candidate.layout.definition;
+                    definition.positions.iter().all(|r| {
+                        r.x > 0
+                            && r.y > 0
+                            && r.x + r.width < definition.surface.width_um
+                            && r.y + r.height < definition.surface.height_um
+                    })
+                })
+                .expect("a suggestion keeps the Margin");
             let selection = myalbuns_core::LayoutSelection {
                 query_id: layouts.query_id,
-                candidate_index: layouts.listing.candidates.len() - 1,
+                candidate_index,
             };
             let layout_preview = host.preview_layout(&selection).unwrap();
             assert_eq!(host.projection().unwrap(), placed.projection);
@@ -2306,7 +2322,6 @@ mod tests {
                         &sheet_id,
                         Some(myalbuns_core::LayoutFrameRequest {
                             frame_count: resized.projection.state.album.sheets[1].frames.len() + 1,
-                            orientation: myalbuns_core::FrameOrientation::Horizontal,
                         }),
                     )
                     .unwrap();

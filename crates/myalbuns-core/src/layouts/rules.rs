@@ -226,19 +226,22 @@ impl LayoutRules {
             return Err(CoreError::InvalidLayoutQuery);
         }
         // Saved layouts remain available for explicit selection. Automatic
-        // arrangement must preserve the orientation of each current Frame.
+        // arrangement must preserve the orientation of each current Frame and
+        // never prints a Photo to the edges of a whole Page on its own.
         if let Some(candidate) = listing.candidates.iter().find(|candidate| {
-            candidate
-                .layout
-                .definition
-                .positions
+            let positions = &candidate.layout.definition.positions;
+            positions
                 .iter()
                 .zip(&query.frame_orientations)
                 .all(|(rect, orientation)| match orientation {
-                    FrameOrientation::Vertical => rect.width < rect.height,
-                    FrameOrientation::Horizontal => rect.width > rect.height,
-                    FrameOrientation::Square => rect.width == rect.height,
+                    Some(FrameOrientation::Vertical) => rect.width < rect.height,
+                    Some(FrameOrientation::Horizontal) => rect.width > rect.height,
+                    Some(FrameOrientation::Square) => rect.width == rect.height,
+                    None => true,
                 })
+                && !positions
+                    .iter()
+                    .any(|rect| fills_a_page(rect, &candidate.layout.definition.surface))
         }) {
             Self::resolve(
                 &candidate.layout,
@@ -360,6 +363,20 @@ fn same_proportion(a: &LayoutSurface, b: &LayoutSurface) -> bool {
         && b.is_valid()
         && i128::from(a.width_um) * i128::from(b.height_um)
             == i128::from(b.width_um) * i128::from(a.height_um)
+}
+
+/// A position covering a whole Page of a double Sheet, or a single page's whole
+/// surface, within the rounding of half a Sheet.
+fn fills_a_page(rect: &crate::RectUm, surface: &LayoutSurface) -> bool {
+    let (w, h) = (surface.width_um, surface.height_um);
+    rect.y == 0
+        && rect.height == h
+        && match surface.kind {
+            LayoutSurfaceKind::DoubleSheet => {
+                (rect.x == 0 || rect.x + rect.width == w) && (2 * rect.width - w).abs() <= 1
+            }
+            LayoutSurfaceKind::SinglePage => rect.x == 0 && rect.width == w,
+        }
 }
 
 fn compatible(definition: &LayoutDefinition, query: &LayoutQuery) -> bool {

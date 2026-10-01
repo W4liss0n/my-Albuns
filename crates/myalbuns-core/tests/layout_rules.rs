@@ -190,7 +190,7 @@ fn last_layout_keeps_its_original_geometry_and_priority_after_manual_frame_edits
         definition: original.candidates[0].layout.definition.clone(),
         origin: LayoutOrigin::Automatic,
     };
-    query.frame_orientations[0] = FrameOrientation::Horizontal;
+    query.frame_orientations[0] = Some(FrameOrientation::Horizontal);
     query.surface.width_um *= 2;
     query.surface.height_um *= 2;
     let options = LayoutRules::list(

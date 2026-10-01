@@ -1,12 +1,7 @@
-use myalbuns_core::{
-    CoreError, FrameOrientation, LayoutFrameRequest, LayoutSelection, ProjectIntent,
-};
+use myalbuns_core::{CoreError, LayoutFrameRequest, LayoutSelection, ProjectIntent};
 
 fn request(frame_count: usize) -> Option<LayoutFrameRequest> {
-    Some(LayoutFrameRequest {
-        frame_count,
-        orientation: FrameOrientation::Horizontal,
-    })
+    Some(LayoutFrameRequest { frame_count })
 }
 
 #[test]
@@ -264,5 +259,39 @@ fn projected_layout_eligibility_matches_prepared_patches_and_execution_guards() 
                 .map(|range| range.minimum),
             expected_minimum
         );
+    }
+}
+
+#[test]
+fn empty_frames_take_the_orientation_each_suggestion_gives_them() {
+    let root = tempfile::tempdir().unwrap();
+    let mut project = super::visual_corpus::fixture_project(root.path(), 4);
+    let sheet = project.projection().state.album.sheets[0].id.clone();
+    // Frames 0 and 2 show Photos, vertical and square; 1 and 3 are empty.
+    for (frame_request, empty) in [(None, vec![1, 3]), (request(6), vec![1, 3, 4, 5])] {
+        let query = project
+            .query_layouts_with_frame_request(&sheet, frame_request)
+            .unwrap();
+        let mut verticals = std::collections::BTreeSet::new();
+        for candidate in &query.listing.candidates {
+            if candidate.layout.origin != myalbuns_core::LayoutOrigin::Automatic {
+                continue;
+            }
+            let positions = &candidate.layout.definition.positions;
+            assert!(positions[0].width < positions[0].height);
+            assert_eq!(positions[2].width, positions[2].height);
+            assert!(
+                empty
+                    .iter()
+                    .all(|&i| positions[i].width != positions[i].height)
+            );
+            verticals.insert(
+                empty
+                    .iter()
+                    .filter(|&&i| positions[i].width < positions[i].height)
+                    .count(),
+            );
+        }
+        assert!(verticals.len() >= 2, "{empty:?}: {verticals:?}");
     }
 }

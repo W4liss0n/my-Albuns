@@ -1,7 +1,7 @@
 ---
 status: accepted
 date: 2026-09-17
-updated: 2026-09-30
+updated: 2026-10-01
 ---
 
 # Orientar novos Frames pela Foto inserida
@@ -34,6 +34,10 @@ adequada mantém o contrato do [ADR 0008](0008-garantir-layout-compativel-por-ar
 A correção reutiliza as dimensões já observadas pelo Core; não adiciona
 metadados ao documento, schema, comando IPC ou parâmetros no Gerador.
 Criação, reorganização e seleção continuam sendo uma única ação de Histórico.
+A versão 3 do Gerador, do
+[ADR 0015](0015-ampliar-as-sugestoes-com-pagina-inteira-e-proporcoes-reais.md),
+passa a enviar essas mesmas dimensões na consulta, como proporção de cada Foto,
+sem mudar a orientação inicial decidida aqui.
 
 Esta decisão atualiza a regra inicial do
 [design 0027](../design/0027-integracao-dos-layouts-e-schema-v8.md) e distingue

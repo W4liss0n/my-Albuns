@@ -12,7 +12,7 @@ struct Band {
     count: usize,
 }
 
-fn grouped(frames: &[Slot]) -> [Vec<Slot>; 3] {
+pub(super) fn grouped(frames: &[Slot]) -> [Vec<Slot>; 3] {
     ORIENTATIONS.map(|o| {
         frames
             .iter()
@@ -70,43 +70,61 @@ fn band_patterns(frames: &[Slot]) -> Vec<Vec<Band>> {
     result
 }
 
-/// Bands at their reference proportions, with the gap fixed: rows are
-/// `a * width + b` tall and columns are `a * height + b` wide.
-fn band_line(pattern: &[Band], axis: Axis, gap: f64) -> (f64, f64) {
-    let rows = matches!(axis, Axis::Rows);
-    let weights: Vec<_> = pattern
+/// The frames of each band, taken in order from their orientation groups.
+fn band_members(groups: &[Vec<Slot>; 3], pattern: &[Band]) -> Vec<Vec<Slot>> {
+    let mut used = [0; 3];
+    pattern
         .iter()
-        .map(|p| {
-            if rows {
-                1.0 / (p.count as f64 * base_ratio(p.orientation))
+        .map(|band| {
+            let kind = ORIENTATIONS
+                .iter()
+                .position(|o| *o == band.orientation)
+                .unwrap();
+            let members = groups[kind][used[kind]..used[kind] + band.count].to_vec();
+            used[kind] += band.count;
+            members
+        })
+        .collect()
+}
+
+/// How far a band's frames reach along it per unit of its thickness: their
+/// widths per unit of height in a row, their heights per unit of width in a column.
+fn reach(members: &[Slot], axis: Axis) -> f64 {
+    members
+        .iter()
+        .map(|s| {
+            if matches!(axis, Axis::Rows) {
+                s.ratio
             } else {
-                base_ratio(p.orientation) / p.count as f64
+                1.0 / s.ratio
             }
         })
+        .sum()
+}
+
+/// Bands at their target proportions, with the gap fixed: rows are
+/// `a * width + b` tall and columns are `a * height + b` wide.
+fn band_line(bands: &[Vec<Slot>], axis: Axis, gap: f64) -> (f64, f64) {
+    let weights: Vec<_> = bands
+        .iter()
+        .map(|members| 1.0 / reach(members, axis))
         .collect();
     let a: f64 = weights.iter().sum();
     let b = gap
-        * ((pattern.len() - 1) as f64
-            - pattern
+        * ((bands.len() - 1) as f64
+            - bands
                 .iter()
                 .zip(&weights)
-                .map(|(p, w)| (p.count - 1) as f64 * w)
+                .map(|(members, w)| (members.len() - 1) as f64 * w)
                 .sum::<f64>());
     (a, b)
 }
 
-fn bands(
-    groups: &[Vec<Slot>; 3],
-    bounds: Bounds,
-    pattern: &[Band],
-    axis: Axis,
-    gap: f64,
-    fit: bool,
-) -> Vec<Slot> {
+fn bands(members: &[Vec<Slot>], bounds: Bounds, axis: Axis, gap: f64, fit: bool) -> Vec<Slot> {
     let rows = matches!(axis, Axis::Rows);
     let mut region = bounds;
     if fit {
-        let (a, b) = band_line(pattern, axis, gap);
+        let (a, b) = band_line(members, axis, gap);
         if rows {
             let w = bounds.w.min((bounds.h - b) / a);
             region = bounds.centered(w, a * w + b);
@@ -115,57 +133,33 @@ fn bands(
             region = bounds.centered(a * h + b, h);
         }
     }
-    let mut used = [0; 3];
-    let weights: Vec<_> = pattern
+    let along = if rows { region.w } else { region.h };
+    let weights: Vec<_> = members
         .iter()
-        .map(|p| {
-            if rows {
-                (region.w - (p.count - 1) as f64 * gap) / p.count as f64 / base_ratio(p.orientation)
-            } else {
-                (region.h - (p.count - 1) as f64 * gap) / p.count as f64 * base_ratio(p.orientation)
-            }
-        })
+        .map(|band| (along - (band.len() - 1) as f64 * gap) / reach(band, axis))
         .collect();
-    let room = (if rows { region.h } else { region.w }) - (pattern.len() - 1) as f64 * gap;
+    let room = (if rows { region.h } else { region.w }) - (members.len() - 1) as f64 * gap;
     let total: f64 = weights.iter().sum();
     let mut position = if rows { region.y } else { region.x };
     let mut slots = Vec::new();
-    for (p, weight) in pattern.iter().zip(weights) {
+    for (band, weight) in members.iter().zip(weights) {
         let thickness = room * weight / total;
-        let kind = ORIENTATIONS
-            .iter()
-            .position(|o| *o == p.orientation)
-            .unwrap();
-        for i in 0..p.count {
-            let frame = groups[kind][used[kind]];
-            used[kind] += 1;
-            let w = if rows {
-                (region.w - (p.count - 1) as f64 * gap) / p.count as f64
-            } else {
-                thickness
-            };
-            let h = if rows {
-                thickness
-            } else {
-                (region.h - (p.count - 1) as f64 * gap) / p.count as f64
-            };
+        // Each frame takes the share of the band's length its proportion asks for.
+        let length = along - (band.len() - 1) as f64 * gap;
+        let spread = reach(band, axis);
+        let mut across = if rows { region.x } else { region.y };
+        for frame in band {
+            let extent = length * if rows { frame.ratio } else { 1.0 / frame.ratio } / spread;
             slots.push(Slot {
                 bounds: Bounds {
-                    w,
-                    h,
-                    x: if rows {
-                        region.x + i as f64 * (w + gap)
-                    } else {
-                        position
-                    },
-                    y: if rows {
-                        position
-                    } else {
-                        region.y + i as f64 * (h + gap)
-                    },
+                    x: if rows { across } else { position },
+                    y: if rows { position } else { across },
+                    w: if rows { extent } else { thickness },
+                    h: if rows { thickness } else { extent },
                 },
-                ..frame
+                ..*frame
             });
+            across += extent + gap;
         }
         position += thickness + gap;
     }
@@ -188,8 +182,10 @@ fn grids(frames: &[Slot], bounds: Bounds, gap: f64, fit: bool) -> Vec<Vec<Slot>>
         let mut w = (bounds.w - (columns - 1) as f64 * gap) / columns as f64;
         let mut h = (bounds.h - (rows - 1) as f64 * gap) / rows as f64;
         if fit {
-            h = h.min(w / base_ratio(frames[0].orientation));
-            w = h * base_ratio(frames[0].orientation);
+            // Equal cells take the average of the frames' proportions.
+            let ratio = frames.iter().map(|s| s.ratio).sum::<f64>() / frames.len() as f64;
+            h = h.min(w / ratio);
+            w = h * ratio;
         }
         let region = bounds.centered(
             columns as f64 * w + (columns - 1) as f64 * gap,
@@ -226,8 +222,11 @@ pub(super) fn local(frames: &[Slot], bounds: Bounds, search: &Search<'_>) -> Vec
             candidates.push(Candidate::new(slots, family, kind));
         }
     };
-    let patterns = band_patterns(frames);
     let groups = grouped(frames);
+    let patterns: Vec<_> = band_patterns(frames)
+        .iter()
+        .map(|pattern| band_members(&groups, pattern))
+        .collect();
     for fit in [false, true] {
         for slots in grids(frames, bounds, search.gap, fit) {
             let label = match frames.len() {
@@ -238,18 +237,14 @@ pub(super) fn local(frames: &[Slot], bounds: Bounds, search: &Search<'_>) -> Vec
             };
             add(slots, label, "grid");
         }
-        for pattern in &patterns {
+        for members in &patterns {
             for axis in [Axis::Rows, Axis::Columns] {
                 let (label, kind) = if matches!(axis, Axis::Rows) {
                     ("Faixas horizontais alinhadas", "rows")
                 } else {
                     ("Colunas alinhadas", "columns")
                 };
-                add(
-                    bands(&groups, bounds, pattern, axis, search.gap, fit),
-                    label,
-                    kind,
-                );
+                add(bands(members, bounds, axis, search.gap, fit), label, kind);
             }
         }
     }
@@ -279,8 +274,11 @@ pub(super) fn local(frames: &[Slot], bounds: Bounds, search: &Search<'_>) -> Vec
                 .filter(|s| s.index != hero.index)
                 .copied()
                 .collect();
-            let support_patterns = band_patterns(&support);
             let support_groups = grouped(&support);
+            let support_patterns: Vec<_> = band_patterns(&support)
+                .iter()
+                .map(|pattern| band_members(&support_groups, pattern))
+                .collect();
             for side in ["left", "right", "top", "bottom"] {
                 for share in [1.0 / 3.0, 0.4, 0.5, 0.6, 2.0 / 3.0] {
                     let (large, small) = split(bounds, search.gap, side, share);
@@ -305,29 +303,22 @@ pub(super) fn local(frames: &[Slot], bounds: Bounds, search: &Search<'_>) -> Vec
                     for slots in grids(&support, small, search.gap, false) {
                         accept(slots);
                     }
-                    for pattern in &support_patterns {
+                    for members in &support_patterns {
                         for axis in [Axis::Rows, Axis::Columns] {
-                            accept(bands(
-                                &support_groups,
-                                small,
-                                pattern,
-                                axis,
-                                search.gap,
-                                false,
-                            ));
+                            accept(bands(members, small, axis, search.gap, false));
                         }
                     }
                 }
                 // Besides the fixed shares, solve the hero and its support
-                // together at their reference proportions and centre the block.
-                for pattern in &support_patterns {
+                // together at their target proportions and centre the block.
+                for members in &support_patterns {
                     for axis in [Axis::Rows, Axis::Columns] {
                         let Some((large, small)) =
-                            natural_hero(bounds, search.gap, side, *hero, pattern, axis)
+                            natural_hero(bounds, search.gap, side, *hero, members, axis)
                         else {
                             continue;
                         };
-                        let slots = bands(&support_groups, small, pattern, axis, search.gap, false);
+                        let slots = bands(members, small, axis, search.gap, false);
                         let largest = slots
                             .iter()
                             .map(|s| s.bounds.w * s.bounds.h)
@@ -343,6 +334,12 @@ pub(super) fn local(frames: &[Slot], bounds: Bounds, search: &Search<'_>) -> Vec
                     }
                 }
             }
+        }
+    }
+    if trees::FRAMES.contains(&frames.len()) {
+        for (slots, stacked) in trees::compositions(frames, bounds, search) {
+            let kind = if stacked { "tree-rows" } else { "tree-columns" };
+            add(slots, "Blocos encaixados", kind);
         }
     }
     let mut seen = BTreeSet::new();
@@ -459,13 +456,7 @@ fn varied_bands(
         .iter()
         .map(|band| {
             band.iter()
-                .map(|s| {
-                    if rows {
-                        base_ratio(s.orientation)
-                    } else {
-                        1.0 / base_ratio(s.orientation)
-                    }
-                })
+                .map(|s| if rows { s.ratio } else { 1.0 / s.ratio })
                 .sum()
         })
         .collect();
@@ -484,12 +475,7 @@ fn varied_bands(
         let thickness = natural * factor;
         let mut across = if rows { bounds.x } else { bounds.y };
         for s in band {
-            let extent = natural
-                * if rows {
-                    base_ratio(s.orientation)
-                } else {
-                    1.0 / base_ratio(s.orientation)
-                };
+            let extent = natural * if rows { s.ratio } else { 1.0 / s.ratio };
             slots.push(Slot {
                 bounds: Bounds {
                     x: if rows { across } else { position },
@@ -541,7 +527,7 @@ pub(super) fn complementary_groups(
         });
         for c in &mut candidates {
             c.scope = LayoutScope::Sheet;
-            c.quality = search.score(c);
+            c.quality = search.score(&c.slots, c.scope);
         }
         candidates.sort_by(|a, b| {
             b.quality
@@ -613,18 +599,18 @@ fn hero_label(side: &str) -> &'static str {
     }
 }
 
-/// A hero beside its support block, both at reference proportions and sharing
+/// A hero beside its support block, both at their target proportions and sharing
 /// the dimension across `side`, as large as `bounds` allows and centred in it.
 fn natural_hero(
     bounds: Bounds,
     gap: f64,
     side: &str,
     hero: Slot,
-    pattern: &[Band],
+    support: &[Vec<Slot>],
     axis: Axis,
 ) -> Option<(Bounds, Bounds)> {
-    let ratio = base_ratio(hero.orientation);
-    let (a, b) = band_line(pattern, axis, gap);
+    let ratio = hero.ratio;
+    let (a, b) = band_line(support, axis, gap);
     let across = side == "left" || side == "right";
     // Support extent along the split as `k * shared + c`.
     let (k, c) = if matches!(axis, Axis::Rows) == across {
@@ -756,7 +742,7 @@ pub(super) fn pages(frames: &[Slot], search: &Search<'_>) -> Vec<Candidate> {
     let select = |frames: &[Slot], region| {
         let mut candidates = local(frames, region, search);
         for c in &mut candidates {
-            c.quality = search.score(c);
+            c.quality = search.score(&c.slots, c.scope);
         }
         candidates.sort_by(|a, b| {
             b.quality
@@ -799,4 +785,84 @@ pub(super) fn pages(frames: &[Slot], search: &Search<'_>) -> Vec<Candidate> {
     .into_iter()
     .flatten()
     .collect()
+}
+
+/// How much a Frame's Photo is cropped by a `ratio` shape: 1 means no crop.
+fn crop(frame: &Slot, ratio: f64) -> f64 {
+    (frame.ratio / ratio).max(ratio / frame.ratio)
+}
+
+/// One Frame printed over a whole Page, edge to edge, beside a composition of
+/// the other Frames on the facing Page. In each orientation, the Frame whose
+/// Photo the Page crops least takes the Page.
+pub(super) fn full_pages(frames: &[Slot], search: &Search<'_>) -> Vec<Candidate> {
+    let page_ratio = 0.5 / search.height;
+    let inset = search.margin.max(search.gap / 2.0);
+    let mut pool = Vec::new();
+    for orientation in ORIENTATIONS {
+        let Some(chosen) = frames
+            .iter()
+            .filter(|s| s.orientation == orientation)
+            .min_by(|a, b| crop(a, page_ratio).total_cmp(&crop(b, page_ratio)))
+        else {
+            continue;
+        };
+        let others: Vec<_> = frames
+            .iter()
+            .filter(|s| s.index != chosen.index)
+            .copied()
+            .collect();
+        for side in [0.0, 0.5] {
+            let page = Slot {
+                full_page: true,
+                bounds: Bounds {
+                    x: side,
+                    y: 0.0,
+                    w: 0.5,
+                    h: search.height,
+                },
+                ..*chosen
+            };
+            let facing = Bounds {
+                x: 0.5 - side + inset,
+                y: search.margin,
+                w: 0.5 - 2.0 * inset,
+                h: search.height - 2.0 * search.margin,
+            };
+            let mut compositions = local(&others, facing, search);
+            for c in &mut compositions {
+                c.quality = search.score(&c.slots, c.scope);
+            }
+            compositions.sort_by(|a, b| {
+                b.quality
+                    .total_cmp(&a.quality)
+                    .then_with(|| a.key.cmp(&b.key))
+            });
+            compositions.truncate(6);
+            for composition in compositions {
+                let mut slots = vec![page];
+                slots.extend(composition.slots);
+                pool.push(Candidate::new(slots, "Página inteira", "full-page"));
+            }
+        }
+    }
+    pool
+}
+
+/// A single Frame over a single page's whole surface, edge to edge.
+pub(super) fn full_surface(frames: &[Slot], search: &Search<'_>) -> Vec<Candidate> {
+    let [only] = frames else {
+        return Vec::new();
+    };
+    let slot = Slot {
+        full_page: true,
+        bounds: Bounds {
+            x: 0.0,
+            y: 0.0,
+            w: 1.0,
+            h: search.height,
+        },
+        ..*only
+    };
+    vec![Candidate::new(vec![slot], "Página inteira", "full-page")]
 }
