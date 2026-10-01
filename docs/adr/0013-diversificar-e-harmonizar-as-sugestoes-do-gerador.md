@@ -1,6 +1,7 @@
 ---
-status: proposed
+status: accepted
 date: 2026-09-30
+updated: 2026-10-01
 ---
 
 # Diversificar e harmonizar as sugestões do Gerador
@@ -59,11 +60,13 @@ otimizações nas 1.150 consultas. Medido no aplicativo de desenvolvimento, o
 Painel de uma Lâmina com 20 Frames abre em cerca de 1,06 s (1,05 s na versão 1);
 no build de release, a busca leva 169 ms (232 ms na versão 1). As vinte prévias
 ficam prontas em cerca de 27 ms. Com o núcleo otimizado também no perfil de
-desenvolvimento, o mesmo Painel abre em cerca de 0,26 s; a medição está em
+desenvolvimento, as buscas repetidas reaproveitadas na sessão e o trabalho
+independente feito em paralelo, o mesmo Painel abre em cerca de 0,15 s; as
+medições estão em
 [Desempenho do Painel de Layouts](../research/2026-09-30-desempenho-do-painel-de-layouts.md).
 
-A decisão fica proposta até o autor comparar visualmente as duas versões do
-algoritmo nas mesmas consultas. Detalhes e parâmetros estão no
+O autor aprovou a versão 2 em 01/10/2026, na revisão visual do PR que a
+implementou. Detalhes e parâmetros estão no
 [design 0026](../design/0026-contrato-do-gerador-e-da-aplicacao-de-layouts.md).
 Penalizar mais de três tamanhos e Frames muito pequenos foi avaliado e adiado:
 reduzia o contraste, mas aumentava o corte das Fotos e diminuía a variedade.
