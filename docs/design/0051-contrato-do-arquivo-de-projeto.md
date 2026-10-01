@@ -339,7 +339,7 @@ Falhas preservam o arquivo byte a byte, não criam Sessão e retornam resultado 
 
 ### Projetos do myAlbuns antigo
 
-Um arquivo que começa com `SQLite format 3 ` é um Projeto do myAlbuns antigo e não passa pelas etapas acima. O `ProjectStore` o lê dos bytes já carregados, converte-o para um documento deste contrato, que é validado pelo mesmo leitor, e o entrega como Sessão não salva. O arquivo só é gravado pelo primeiro `Salvar` confirmado, que o substitui por este formato. Regras, identidade e perdas estão no [ADR 0012](../adr/0012-abrir-projetos-do-myalbuns-antigo.md).
+Um arquivo que começa com `SQLite format 3\0` é um Projeto do myAlbuns antigo e não passa pelas etapas acima. O `ProjectStore` o lê dos bytes já carregados, converte-o para um documento deste contrato, que é validado pelo mesmo leitor, e o entrega como Sessão não salva. O arquivo só é gravado pelo primeiro `Salvar` confirmado, que o substitui por este formato. Regras, identidade e perdas estão no [ADR 0012](../adr/0012-abrir-projetos-do-myalbuns-antigo.md).
 
 ## Salvamento
 

@@ -1060,14 +1060,14 @@ mod qa_tests {
     }
 
     fn real_pair() -> (PathBuf, PathBuf, Face, Face) {
-        let root =
-            Path::new(env!("CARGO_MANIFEST_DIR")).join("../.scratch/face-detection-debug-20260923");
+        let root = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../.scratch/fixtures/correcao-de-olhos/rostos");
         let results: serde_json::Value =
             serde_json::from_slice(&std::fs::read(root.join("render-pair-results.json")).unwrap())
                 .unwrap();
         (
-            root.join("inputs/failing.jpg"),
-            root.join("inputs/reference.jpg"),
+            root.join("failing.jpg"),
+            root.join("reference.jpg"),
             serde_json::from_value(results[0]["faces"][0].clone()).unwrap(),
             serde_json::from_value(results[1]["faces"][0].clone()).unwrap(),
         )
@@ -1177,37 +1177,6 @@ mod qa_tests {
                 elapsed < budget,
                 "24 MP desktop preparation exceeded local {budget} ms budget"
             );
-        }
-    }
-
-    #[test]
-    #[ignore = "requires the ignored real-photo QA fixtures"]
-    fn renders_real_pair_at_original_resolution_and_exif_orientation() {
-        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../.scratch/eye-correction/qa");
-        let faces: Vec<Vec<Face>> =
-            serde_json::from_slice(&std::fs::read(root.join("faces.json")).unwrap()).unwrap();
-        let reference = &faces[0][0];
-        let target = &faces[1][0];
-        for (input, expected) in [
-            ("nikki-closed.jpg", (864, 864)),
-            ("nikki-closed-exif6.jpg", (864, 864)),
-            ("nikki-closed-4x.jpg", (3456, 3456)),
-        ] {
-            let reference_path = if input.ends_with("4x.jpg") {
-                root.join("nikki-open-a-4x.png")
-            } else {
-                root.join("nikki-open-a.jpg")
-            };
-            match compose(
-                &root.join(input),
-                &reference_path,
-                target,
-                reference,
-                |_| Ok(()),
-            ) {
-                Ok(corrected) => assert_eq!(corrected.dimensions(), expected),
-                Err(error) => panic!("{input}: {error}"),
-            }
         }
     }
 }

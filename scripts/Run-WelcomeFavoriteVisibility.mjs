@@ -40,7 +40,7 @@ try {
   };
   const capture = async name => writeFileSync(path.join(output, `${name}.png`),
     Buffer.from(await request('GET', `${endpoint}/screenshot`), 'base64'));
-  await request('POST', `${endpoint}/url`, { url: `http://127.0.0.1:${port}/welcome-preview.html?recents=favorites` });
+  await request('POST', `${endpoint}/url`, { url: `http://127.0.0.1:${port}/previews/welcome-preview.html?recents=favorites` });
   await waitState('p2', 'false');
   await move(2, 2);
   const initial = await snapshot('p2');

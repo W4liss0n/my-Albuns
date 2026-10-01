@@ -4,13 +4,13 @@ import ReactDOM from "react-dom/client";
 import type {
   GlobalProjectPort,
   ProjectFailureDialogPort,
-} from "./global/application/globalProjectPort";
-import { GlobalShell } from "./global/GlobalShell";
-import { createNewProjectPortStub } from "./global/testing/newProjectPortStub";
-import { welcomePreviewRecentProjects, welcomePreviewFirstSheet, welcomeDatesNow } from "./test/welcomePreviewFixtures";
-import "./ui/theme.css";
-import "./ui/ui.css";
-import "./global/GlobalShell.css";
+} from "../global/application/globalProjectPort";
+import { GlobalShell } from "../global/GlobalShell";
+import { createNewProjectPortStub } from "../global/testing/newProjectPortStub";
+import { welcomePreviewRecentProjects, welcomePreviewFirstSheet, welcomeDatesNow } from "../test/welcomePreviewFixtures";
+import "../ui/theme.css";
+import "../ui/ui.css";
+import "../global/GlobalShell.css";
 
 const previewParameters = new URLSearchParams(window.location.search);
 let previewProjects = welcomePreviewRecentProjects(previewParameters);
@@ -77,8 +77,8 @@ ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
       initialSurface={previewParameters.get("surface") === "newProject" ? "newProject" : "welcome"}
       recentProjectsNow={["dates", "long-names", "favorites", "favorites-only", "favorites-long-names"].includes(previewParameters.get("recents") ?? "")
         ? welcomeDatesNow : undefined}
-      onOpenBatch={secondaryActionsDisabled ? undefined : async () => { window.location.href = "/batch-export-preview.html?scenario=configuration"; }}
-      onOpenSettings={secondaryActionsDisabled ? undefined : async () => { window.location.href = "/settings-preview.html?section=performance"; }}
+      onOpenBatch={secondaryActionsDisabled ? undefined : async () => { window.location.href = "/previews/batch-export-preview.html?scenario=configuration"; }}
+      onOpenSettings={secondaryActionsDisabled ? undefined : async () => { window.location.href = "/previews/settings-preview.html?section=performance"; }}
       failureDialogPort={failureDialogPort}
       graphicsDiagnostic={graphicsDiagnostic}
       newProjectPort={newProjectPort}

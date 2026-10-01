@@ -7,7 +7,7 @@ import type { AlbumCanvasProps } from "../components/albumCanvasContract";
 import { AlbumCanvasScene } from "../components/albumCanvasScene";
 import { createContinuousCanvasLayout } from "../components/canvasGeometry";
 import { createFrameSnapGuideRenderNode } from "../components/frameSnapGuideRenderNode";
-import { mediaPanelPreviewFixture } from "./mediaPanelPreviewFixtures";
+import { mediaPanelPreviewFixture } from "../test/mediaPanelPreviewFixtures";
 import "../components/AlbumCanvas.css";
 import "../components/pixiRuntime";
 

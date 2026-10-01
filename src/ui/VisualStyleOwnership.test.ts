@@ -160,11 +160,11 @@ test("keeps App.css restricted to application-level composition", () => {
 
 test("entrypoints import only their global foundation and owned composition", () => {
   for (const entrypoint of [
-    "src/canvas-preview.tsx",
-    "src/media-panel-preview.tsx",
-    "src/sheet-grid-preview.tsx",
-    "src/ui-acceptance-preview.tsx",
-    "src/welcome-preview.tsx",
+    "src/previews/canvas-preview.tsx",
+    "src/previews/media-panel-preview.tsx",
+    "src/previews/sheet-grid-preview.tsx",
+    "src/previews/ui-acceptance-preview.tsx",
+    "src/previews/welcome-preview.tsx",
     "src/global/main.tsx",
   ]) {
     const contents = source(entrypoint);

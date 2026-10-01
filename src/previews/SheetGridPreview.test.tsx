@@ -1,4 +1,4 @@
-import { chooseColor } from "./test/colorPicker";
+import { chooseColor } from "../test/colorPicker";
 import {
   fireEvent,
   render,

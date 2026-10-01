@@ -27,7 +27,7 @@ margem de 15 mm, intervalo de 5 mm e menor lado de 20 mm.
 Das 165 consultas, 73 retornaram menos de cinco opções, incluindo sete sem
 candidatos. Todos os vinte casos de dois Frames ficaram abaixo de cinco.
 Esses números descrevem a matriz testada, não a frequência em Projetos reais.
-As medidas por consulta estão no [CSV](2026-09-17-diversidade-do-gerador-de-layouts.csv).
+As medidas por consulta estão no [CSV](artifacts/2026-09-17-diversidade-do-gerador-de-layouts.csv).
 
 Exemplos com Lâmina de 600 × 300 mm e permissão por Página e por Lâmina:
 

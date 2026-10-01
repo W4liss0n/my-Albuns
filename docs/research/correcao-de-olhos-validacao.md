@@ -1,3 +1,9 @@
+---
+status: current
+document: research
+date: 2026-09-23
+---
+
 # Correção de olhos — implementação e validação
 
 ## Mudança de fluxo em 23 de setembro de 2026

@@ -23,6 +23,34 @@ A ticket therefore mixes both: English labels and states around a Portuguese tit
 
 Do not translate an identifier that another document or skill matches on. When adding a new field or state, keep it English and add it to the lists above.
 
+## Local folders
+
+- `.tools/` holds only the local toolchain and tool reports: `cargo/`, `rustup/`,
+  `rustup-init.exe`, `bootstrap/`, `edge-driver/`, `webview2-driver/`,
+  `tauri-driver/`, `validation/` and `native-gate-build.json`. Never store
+  investigation evidence there.
+- `.scratch/` holds local work that stays out of Git. `.gitignore` ignores only
+  the `.scratch/` folders that versioned code or scripts use; any other untracked
+  file there stays visible on purpose, because native gates treat it as dirty
+  source (`scripts/Gate-SourceProvenance.ps1`, checked by
+  `scripts/Test-ProjectCloseGate.mjs`). Do not ignore `.scratch/` as a whole.
+- The frozen legacy trackers `.scratch/programa-diagramacao/` and
+  `.scratch/esqueleto-ponta-a-ponta/` are versioned because GitHub issues link to
+  them: do not edit, move or delete them.
+- `.scratch/fixtures/` holds real photos read by development QA modes, UI
+  acceptance scenarios and ignored tests. Do not delete it during cleanup.
+- `.scratch/planos/` holds plans. The repository is public and plans may name
+  client folders, so plans stay local.
+- Create one `.scratch/<YYYY-MM-DD>-<topic>/` folder per new investigation and
+  exclude it in `.git/info/exclude`. It becomes disposable once a research
+  document records the result.
+- Scripts write gate evidence under `.scratch/` (`ui-acceptance/`, `*-evidence/`,
+  `*-gate/`); those outputs are disposable.
+- Tracked files and GitHub issues must not depend on `.scratch/` content. Record
+  durable decisions and measurements under `docs/`; citing local evidence as
+  outside Git is allowed.
+- Do not rename or move files under `docs/`: GitHub issues link to them by path.
+
 ## Agent skills
 
 ### Workflow routing
@@ -65,7 +93,7 @@ The repository uses the canonical Matt Pocock triage labels. See `docs/agents/tr
 
 ### Domain docs
 
-The repository uses a single domain context at `CONTEXT.md`, with architectural decisions under `docs/adr/`. See `docs/agents/domain.md`.
+The repository uses a single domain context at `CONTEXT.md`, with architectural decisions under `docs/adr/`. See `docs/agents/domain.md`. `docs/README.md` maps the documentation folders and the documents for each topic.
 
 ### Review findings
 

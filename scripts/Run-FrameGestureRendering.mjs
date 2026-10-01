@@ -32,7 +32,7 @@ try {
   for (const scenario of ['resize', 'move', 'group-resize', 'group-move']) {
     const action = scenario.endsWith('resize') ? 'resize' : 'move';
     const group = scenario.startsWith('group-');
-    await request('POST', `/session/${session}/url`, { url: `http://127.0.0.1:${port}/frame-gesture-preview.html?${scenario}` });
+    await request('POST', `/session/${session}/url`, { url: `http://127.0.0.1:${port}/previews/frame-gesture-preview.html?${scenario}` });
     let ready = false;
     for (let attempt = 0; attempt < 600; ++attempt) {
       ready = await execute("return document.body.dataset.ready === 'true'");

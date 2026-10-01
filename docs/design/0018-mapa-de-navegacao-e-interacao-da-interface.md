@@ -14,7 +14,7 @@ Este documento é o mapa canônico, navegável e versionado das superfícies do
 MyAlbuns. Ele une nomes visíveis, modos, transições e ownership sem substituir
 os contratos detalhados dos designs [0001](0001-estrutura-da-janela-do-projeto.md)
 a [0009](0009-configuracoes-do-aplicativo.md). O
-[protótipo navegável](../../ui-architecture-prototype.html) é a prova executável
+[protótipo navegável](../../previews/ui-architecture-prototype.html) é a prova executável
 dos gestos que ainda não pertencem ao produto integrado; o
 [manifesto de aceitação visual](../../src/test/uiAcceptanceScenarios.json)
 identifica os fluxos reproduzíveis.

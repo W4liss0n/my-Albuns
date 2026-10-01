@@ -580,7 +580,7 @@ try {
   );
   managedProcesses.push(vite);
   await captureManagedRoot(vite);
-  await waitForHttp(`${frontendOrigin}/ui-acceptance.html`, "Vite");
+  await waitForHttp(`${frontendOrigin}/previews/ui-acceptance.html`, "Vite");
   console.log(`UI acceptance frontend ready at ${frontendOrigin}`);
 
   const driverPort = await freePort();

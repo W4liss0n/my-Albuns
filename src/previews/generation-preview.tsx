@@ -1,9 +1,9 @@
 import ReactDOM from "react-dom/client";
-import type { GenerationView, ProjectGenerationPort } from "./application/projectGeneration";
-import { GenerationWindow } from "./generation/GenerationWindow";
-import { GenerationProgressWindow } from "./generation/GenerationProgressWindow";
-import "./ui/theme.css";
-import "./ui/ui.css";
+import type { GenerationView, ProjectGenerationPort } from "../application/projectGeneration";
+import { GenerationWindow } from "../generation/GenerationWindow";
+import { GenerationProgressWindow } from "../generation/GenerationProgressWindow";
+import "../ui/theme.css";
+import "../ui/ui.css";
 
 const scenario = new URLSearchParams(window.location.search).get("scenario");
 const base: GenerationView = { id: "preview", phase: "prepared", canContinue: false,

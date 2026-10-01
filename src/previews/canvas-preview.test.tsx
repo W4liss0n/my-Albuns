@@ -1,10 +1,10 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, expect, test, vi } from "vitest";
 
-import type { AlbumCanvasProps } from "./components/albumCanvasContract";
+import type { AlbumCanvasProps } from "../components/albumCanvasContract";
 import { CanvasPreview } from "./canvas-preview";
 
-vi.mock("./components/AlbumCanvas", () => ({
+vi.mock("../components/AlbumCanvas", () => ({
   AlbumCanvas: ({
     centeredSheetId,
     mode,
@@ -47,7 +47,7 @@ test("enters Sheet Edit Mode with Enter while the preview Canvas has focus", () 
   window.history.replaceState(
     {},
     "",
-    "/canvas-preview.html?acceptance=editor",
+    "/previews/canvas-preview.html?acceptance=editor",
   );
   const view = render(<CanvasPreview />);
   const canvas = screen.getByTestId("canvas-preview-surface");
@@ -69,7 +69,7 @@ test("returns to normal mode with Escape from the preview Sheet Edit Mode", () =
   window.history.replaceState(
     {},
     "",
-    "/canvas-preview.html?mode=sheet-editing&sheet=sheet-002",
+    "/previews/canvas-preview.html?mode=sheet-editing&sheet=sheet-002",
   );
   const view = render(<CanvasPreview />);
   const canvas = screen.getByTestId("canvas-preview-surface");
@@ -87,7 +87,7 @@ test("centers the edited Sheet when the preview returns to normal mode", () => {
   window.history.replaceState(
     {},
     "",
-    "/canvas-preview.html?mode=sheet-editing&sheet=sheet-003",
+    "/previews/canvas-preview.html?mode=sheet-editing&sheet=sheet-003",
   );
   render(<CanvasPreview />);
   const canvas = screen.getByTestId("canvas-preview-surface");
@@ -105,7 +105,7 @@ test("keeps Frame selection state in the development preview", () => {
   window.history.replaceState(
     {},
     "",
-    "/canvas-preview.html?mode=sheet-editing&sheet=sheet-002",
+    "/previews/canvas-preview.html?mode=sheet-editing&sheet=sheet-002",
   );
   render(<CanvasPreview />);
   const canvas = screen.getByTestId("canvas-preview-surface");

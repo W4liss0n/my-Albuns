@@ -2,8 +2,12 @@
 node_modules/
 dist/
 target/
-src-tauri/target/
 src-tauri/binaries/*.exe
+# Only these .scratch/ folders are ignored: native gates treat any other
+# untracked file as dirty source (scripts/Gate-SourceProvenance.ps1). Exclude a
+# local investigation folder in .git/info/exclude instead.
+.scratch/fixtures/
+.scratch/planos/
 .scratch/cargo-target-tests/
 .scratch/windows-path-gate/
 .scratch/topology-spike-target/
@@ -15,8 +19,8 @@ src-tauri/binaries/*.exe
 .scratch/project-close-evidence/
 .scratch/webview-restore-gate/
 .scratch/webview-creation-gate/
+/.claude/settings.local.json
 benchmark-data/albums/*
 !benchmark-data/albums/README.md
 *.log
 .DS_Store
-.scratch/eye-correction/

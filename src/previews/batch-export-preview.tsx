@@ -1,10 +1,10 @@
 import ReactDOM from "react-dom/client";
-import type { BatchExportPort, BatchExportView } from "./application/batchExport";
-import { BatchExportWindow } from "./batch-export/BatchExportWindow";
-import { BatchProgressWindow } from "./batch-export/BatchProgressWindow";
-import "./ui/theme.css";
-import "./ui/ui.css";
-import "./batch-export/batchExport.css";
+import type { BatchExportPort, BatchExportView } from "../application/batchExport";
+import { BatchExportWindow } from "../batch-export/BatchExportWindow";
+import { BatchProgressWindow } from "../batch-export/BatchProgressWindow";
+import "../ui/theme.css";
+import "../ui/ui.css";
+import "../batch-export/batchExport.css";
 
 const scenario = new URLSearchParams(window.location.search).get("scenario");
 const ready: BatchExportView = {

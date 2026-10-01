@@ -1,7 +1,7 @@
-import { rasterLimitsAt300Dpi } from "./test/projectConfigurationFixtures";
+import { rasterLimitsAt300Dpi } from "../test/projectConfigurationFixtures";
 import { useCallback, useMemo, useState } from "react";
 
-import { InspectorPanel } from "./components/InspectorPanel";
+import { InspectorPanel } from "../components/InspectorPanel";
 import type {
   AlbumInformation,
   ComposedBackground,
@@ -17,9 +17,9 @@ import type {
   RectUm,
   SheetRole,
   SheetSnapshot,
-} from "./domain/project";
-import { mediaPanelPreviewFixture } from "./test/mediaPanelPreviewFixtures";
-import { representativeProjection, refreshSheetStructureFixture } from "./test/projectFixtures";
+} from "../domain/project";
+import { mediaPanelPreviewFixture } from "../test/mediaPanelPreviewFixtures";
+import { representativeProjection, refreshSheetStructureFixture } from "../test/projectFixtures";
 
 const PREVIEW_SHEET_COUNT = 6;
 

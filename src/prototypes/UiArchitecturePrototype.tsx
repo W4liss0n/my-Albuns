@@ -23,7 +23,7 @@ const zoomStep = 0.25;
 const canonicalSurfaces = [
   {
     availability: "Integrado",
-    href: "/welcome-preview.html",
+    href: "/previews/welcome-preview.html",
     id: "global.welcome",
     owner: "#13",
     parent: "Aplicativo global",
@@ -31,7 +31,7 @@ const canonicalSurfaces = [
   },
   {
     availability: "Integrado",
-    href: "/welcome-preview.html",
+    href: "/previews/welcome-preview.html",
     id: "global.new-project.configuration",
     owner: "#9",
     parent: "Novo projeto",
@@ -39,7 +39,7 @@ const canonicalSurfaces = [
   },
   {
     availability: "Integrado",
-    href: "/welcome-preview.html",
+    href: "/previews/welcome-preview.html",
     id: "global.new-project.personalization",
     owner: "#21",
     parent: "Novo projeto",
@@ -55,7 +55,7 @@ const canonicalSurfaces = [
   },
   {
     availability: "Integrado",
-    href: "/workspace-preview.html",
+    href: "/previews/workspace-preview.html",
     id: "project.normal",
     owner: "#9",
     parent: "Janela do projeto",
@@ -63,7 +63,7 @@ const canonicalSurfaces = [
   },
   {
     availability: "Protótipo verificável",
-    href: "/ui-architecture-prototype.html?view=editor",
+    href: "/previews/ui-architecture-prototype.html?view=editor",
     id: "project.edit",
     owner: "#20 e #22",
     parent: "Janela do projeto",

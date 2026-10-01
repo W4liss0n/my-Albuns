@@ -1,29 +1,29 @@
-import { rasterLimitsAt300Dpi } from "./test/projectConfigurationFixtures";
+import { rasterLimitsAt300Dpi } from "../test/projectConfigurationFixtures";
 import React from "react";
-import retainedPhotoPreview from "./test/dev-media/serra-amanhecer.svg";
+import retainedPhotoPreview from "../test/dev-media/serra-amanhecer.svg";
 import ReactDOM from "react-dom/client";
 
-import App from "./App";
-import { photoshopProjectPreview } from "./test/photoshopPreview";
+import App from "../App";
+import { photoshopProjectPreview } from "../test/photoshopPreview";
 import type {
   GraphicsDiagnostic,
   GraphicsProbe,
-} from "./application/graphics";
-import { silentLogger } from "./application/logging";
+} from "../application/graphics";
+import { silentLogger } from "../application/logging";
 import type {
   ExportPipelinePort,
   MediaPreviewPort,
   ProjectCorePort,
   ProjectStartupPort,
   ProjectWindowPort,
-} from "./application/projectPorts";
-import type { ProjectDialogPort } from "./application/projectDialogPort";
+} from "../application/projectPorts";
+import type { ProjectDialogPort } from "../application/projectDialogPort";
 import {
   applyWorkspacePreferenceChange,
   createWorkspacePreferences,
   type WorkspacePreferencesPort,
-} from "./application/workspacePreferences";
-import type { CanvasGraphicsDiagnosticProbe } from "./components/canvasGraphicsDiagnosticProbeContext";
+} from "../application/workspacePreferences";
+import type { CanvasGraphicsDiagnosticProbe } from "../components/canvasGraphicsDiagnosticProbeContext";
 import type {
   EditorProjection,
   ComposedFrame,
@@ -33,25 +33,25 @@ import type {
   PhotoAngleEdit,
   ProjectIntent,
   ProjectMutationOutcome,
-} from "./domain/project";
-import { createTwoSheetProjection, refreshSheetStructureFixture } from "./test/projectFixtures";
-import { useEditorView } from "./state/editorView";
-import groupGeometryCorpus from "../tests/fixtures/frame-group-geometry-cases.json";
-import stackCorpus from "../tests/fixtures/frame-stack-cases.json";
-import manualFrameCorpus from "../tests/fixtures/manual-frame-cases.json";
-import { frameDeletionCorpus } from "./test/frameDeletionPreview";
-import { frameContentSwapCorpus } from "./test/frameContentSwapPreview";
-import { frameClipboardCorpus } from "./test/frameClipboardPreview";
-import { sheetSideSwapCorpus } from "./test/sheetSideSwapPreview";
-import { sheetDuplicationCorpus } from "./test/sheetDuplicationPreview";
-import { photoOrientationCorpus } from "./test/photoOrientationPreview";
-import { frameStyleCorpus } from "./test/frameStylePreview";
-import { decorativeCorpus, decorativePreview, decorativeStateName } from "./test/decorativePreview";
-import { layoutPanelCorpus } from "./test/layoutPanelPreview";
-import { continuousCanvasScale, createCanvasSheetPresentation } from "./components/canvasGeometry";
-import { createCanvasSheetViewGeometry, createNormalCanvasLayout } from "./components/canvasSheetViewGeometry";
-import "./ui/theme.css";
-import "./ui/ui.css";
+} from "../domain/project";
+import { createTwoSheetProjection, refreshSheetStructureFixture } from "../test/projectFixtures";
+import { useEditorView } from "../state/editorView";
+import groupGeometryCorpus from "../../tests/fixtures/frame-group-geometry-cases.json";
+import stackCorpus from "../../tests/fixtures/frame-stack-cases.json";
+import manualFrameCorpus from "../../tests/fixtures/manual-frame-cases.json";
+import { frameDeletionCorpus } from "../test/frameDeletionPreview";
+import { frameContentSwapCorpus } from "../test/frameContentSwapPreview";
+import { frameClipboardCorpus } from "../test/frameClipboardPreview";
+import { sheetSideSwapCorpus } from "../test/sheetSideSwapPreview";
+import { sheetDuplicationCorpus } from "../test/sheetDuplicationPreview";
+import { photoOrientationCorpus } from "../test/photoOrientationPreview";
+import { frameStyleCorpus } from "../test/frameStylePreview";
+import { decorativeCorpus, decorativePreview, decorativeStateName } from "../test/decorativePreview";
+import { layoutPanelCorpus } from "../test/layoutPanelPreview";
+import { continuousCanvasScale, createCanvasSheetPresentation } from "../components/canvasGeometry";
+import { createCanvasSheetViewGeometry, createNormalCanvasLayout } from "../components/canvasSheetViewGeometry";
+import "../ui/theme.css";
+import "../ui/ui.css";
 
 const previewParameters = new URLSearchParams(window.location.search);
 const frameContext = previewParameters.get("frame");

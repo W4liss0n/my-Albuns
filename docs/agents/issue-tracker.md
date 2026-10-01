@@ -7,7 +7,7 @@ Issues and specs for this repository live as GitHub issues. Use the `gh` CLI for
 - The repository is `W4liss0n/my-Albuns`.
 - When run inside this clone, `gh` infers the repository from `git remote -v`.
 - Use `-R W4liss0n/my-Albuns` only when running outside the clone or when the repository would otherwise be ambiguous.
-- Existing files under `.scratch/` are legacy local artifacts after this switch. Do not create new tracker entries there unless the tracker configuration is changed again.
+- `.scratch/programa-diagramacao/` and `.scratch/esqueleto-ponta-a-ponta/` are frozen legacy trackers kept because GitHub issues link to them. Do not create tracker entries under `.scratch/`.
 
 ## Conventions
 

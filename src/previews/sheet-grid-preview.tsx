@@ -1,8 +1,8 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 
-import "./ui/theme.css";
-import "./ui/ui.css";
+import "../ui/theme.css";
+import "../ui/ui.css";
 import { SheetGridPreview } from "./SheetGridPreview";
 import "./sheet-grid-preview.css";
 

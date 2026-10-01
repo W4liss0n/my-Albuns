@@ -6,31 +6,31 @@ import React, {
 } from "react";
 import ReactDOM from "react-dom/client";
 
-import "./ui/theme.css";
-import "./ui/ui.css";
-import { AlbumCanvas } from "./components/AlbumCanvas";
+import "../ui/theme.css";
+import "../ui/ui.css";
+import { AlbumCanvas } from "../components/AlbumCanvas";
 import type {
   AlbumCanvasMode,
   CanvasMetrics,
   SheetBarMetadata,
-} from "./components/albumCanvasContract";
-import { createNormalCanvasLayout } from "./components/canvasSheetViewGeometry";
+} from "../components/albumCanvasContract";
+import { createNormalCanvasLayout } from "../components/canvasSheetViewGeometry";
 import {
   type CanvasGraphicsDiagnosticProbe,
   CanvasGraphicsDiagnosticProbeProvider,
-} from "./components/canvasGraphicsDiagnosticProbeContext";
+} from "../components/canvasGraphicsDiagnosticProbeContext";
 import {
   useCanvasModeKeyboardShortcuts,
-} from "./components/useCanvasModeKeyboardShortcuts";
+} from "../components/useCanvasModeKeyboardShortcuts";
 import type {
   ComposedFrame,
   ComposedSheet,
   CompositionPlan,
-} from "./domain/project";
+} from "../domain/project";
 import "./canvas-preview.css";
-import geometryCorpus from "../tests/fixtures/frame-geometry-cases.json";
-import groupGeometryCorpus from "../tests/fixtures/frame-group-geometry-cases.json";
-import geometryPhotoUrl from "./test/dev-media/serra-amanhecer.svg";
+import geometryCorpus from "../../tests/fixtures/frame-geometry-cases.json";
+import groupGeometryCorpus from "../../tests/fixtures/frame-group-geometry-cases.json";
+import geometryPhotoUrl from "../test/dev-media/serra-amanhecer.svg";
 
 const geometryCase = geometryCorpus.cases.find((item) =>
   item.name === new URLSearchParams(window.location.search).get("geometry"));
