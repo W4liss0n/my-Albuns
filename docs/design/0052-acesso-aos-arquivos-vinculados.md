@@ -1,7 +1,8 @@
 ---
-status: proposed
+status: accepted
 document: design
 date: 2026-09-29
+updated: 2026-10-02
 ---
 
 # Acesso aos Arquivos vinculados
@@ -109,8 +110,13 @@ Originais por conta própria. Cada exceção fica listada com o motivo.
 
 ## Pendências
 
-- **Falha rápida de raiz inacessível**: consultar a raiz uma vez e marcar todas as
-  mídias dela como indisponíveis, sem tentar arquivo por arquivo. Fica para depois de
-  medir o comportamento com o servidor fora do ar (P8 do plano de desempenho).
-- **Medição ponta a ponta** do limite de leituras remotas (P0 do plano de
-  desempenho): o número três vem das medições por componente.
+- **Limite de leituras remotas em rede cabeada**: no programa inteiro, em Wi‑Fi, o
+  limite de três leituras adiantou a primeira prévia em cerca de 1 s e custou cerca
+  de 5% do tempo total dos jobs de Cache (seção “Limite de leituras remotas (P5)” da
+  pesquisa). Falta repetir a medição em rede cabeada, onde a vazão por leitor muda.
+
+As duas pendências anteriores foram resolvidas em 2026-09-29. A raiz cujo servidor
+não responde fica marcada, como descrito em “Servidor que parou de responder”; a
+medição com o servidor desligado mostrou que o Windows espera uma vez por todas as
+mídias, e não uma vez por arquivo. O limite de leituras remotas foi medido no
+programa inteiro.
