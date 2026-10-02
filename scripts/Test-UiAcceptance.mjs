@@ -214,7 +214,7 @@ test("the manifest covers the integrated workspace and every critical Project di
   );
   assert.match(
     workspaceEntrypoint,
-    /import App from "\.\.\/App";/u,
+    /import App from "\.\.\/project\/App";/u,
     "the integrated workspace must use the production App composition",
   );
   assert.match(

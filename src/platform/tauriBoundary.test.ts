@@ -62,7 +62,7 @@ const compositionRoots = new Set([
   "../generation/main.tsx",
   "../dialog/main.tsx",
   "../global/main.tsx",
-  "../main.tsx",
+  "../project/main.tsx",
   "../project-dialog/main.tsx",
   "../image-viewer/main.tsx",
 ]);

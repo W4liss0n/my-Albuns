@@ -1,0 +1,126 @@
+import { VISUAL_MEDIA_FALLBACK_STYLE } from "../../ui/visualPreview/visualMediaFallbackStyle";
+
+export const SHEET_VISUAL_STYLE = {
+  surface: {
+    fill: "#f3f1ec",
+    outline: "#d8d3c9",
+    outlineOpacity: 0.85,
+    outlineWidthPx: 1,
+    cornerRadiusPx: 0,
+  },
+  centerLine: {
+    color: "#eeeae1",
+    opacity: 1,
+    widthPx: 1,
+  },
+  mediaFallback: VISUAL_MEDIA_FALLBACK_STYLE.background,
+  canvasShadow: {
+    close: {
+      color: "#3c362c",
+      offsetYPx: 1,
+      opacity: 0.16,
+      spreadPx: 1.5,
+      steps: 2,
+    },
+    depth: {
+      color: "#3c362c",
+      offsetYPx: 5,
+      opacity: 0.12,
+      spreadPx: 8,
+      steps: 6,
+    },
+  },
+  sheetBar: {
+    heightPx: 40,
+    surface: "#d8d3ca",
+    surfaceOpacity: 0.98,
+    separator: "#aaa296",
+    separatorOpacity: 1,
+    text: "#2c2924",
+    action: "#403b35",
+    actionHover: "#2c2924",
+    actionSizePx: 26,
+    swapActionCenterPx: 22,
+    actionHoverOpacity: 1,
+    sheetHoverOpacity: 0.55,
+    directHoverOpacity: 1,
+    hoverTransitionDurationMs: 140,
+    hoverTransitionFrameMs: 16,
+    placeholderActionOpacity: 0.8,
+    disabledActionOpacity: 0.35,
+    pageFontSizePx: 12.5,
+    numberFontSizePx: 12.5,
+  },
+  inactiveSide: {
+    outerEdge: "#faf9f6",
+    body: "#ebe3d8",
+    bodyStopOffset: 0.58,
+    fold: "#cec2b2",
+  },
+  framePlaceholder: {
+    fill: "#ece8e1",
+    outline: "#c9c2b7",
+    outlineOpacity: 0.88,
+    outlineWidthPx: 1,
+    labelText: "#655f56",
+    labelFontSizePx: 10.5,
+  },
+  frame: {
+    outline: "#ffffff",
+    outlineOpacity: 0.72,
+    outlineWidthPx: 1,
+  },
+  technicalOutlineStroke: {
+    alignment: 0.5,
+    color: 0x2f7fba,
+    width: 1,
+    alpha: 1,
+    pixelLine: true,
+  },
+  frameSelection: {
+    handleFill: "#ffffff",
+    handleOutline: "#2f7fba",
+    handleOutlineWidthPx: 1,
+    handleSizePx: 8,
+  },
+  frameContentDrag: {
+    targetColor: 0x2f7fba,
+    targetFillOpacity: 0.14,
+    targetOutlineWidthPx: 3,
+  },
+  overlay: {
+    cornerRadiusPx: VISUAL_MEDIA_FALLBACK_STYLE.overlay.cornerRadiusPx,
+    insetPx: 8,
+    outline: VISUAL_MEDIA_FALLBACK_STYLE.overlay.outline,
+    outlineOpacity: VISUAL_MEDIA_FALLBACK_STYLE.overlay.outlineOpacity,
+    outlineWidthPx: VISUAL_MEDIA_FALLBACK_STYLE.overlay.outlineWidthPx,
+  },
+} as const;
+
+export function frameOutlineStyle(hasPhoto: boolean) {
+  return hasPhoto
+    ? SHEET_VISUAL_STYLE.frame
+    : SHEET_VISUAL_STYLE.framePlaceholder;
+}
+
+const INACTIVE_SIDE_GRADIENT_ORIENTATION = {
+  left: { cssDirection: "to left", startX: 1, endX: 0 },
+  right: { cssDirection: "to right", startX: 0, endX: 1 },
+} as const;
+
+export function inactiveSideGradientOrientation(
+  activeSides: "left" | "right",
+) {
+  return INACTIVE_SIDE_GRADIENT_ORIENTATION[activeSides];
+}
+
+export function inactiveSideCssGradient(
+  activeSides: "left" | "right",
+) {
+  const style = SHEET_VISUAL_STYLE.inactiveSide;
+  const { cssDirection } = inactiveSideGradientOrientation(activeSides);
+  const bodyStopPercent = Number(
+    (style.bodyStopOffset * 100).toFixed(4),
+  );
+  return `linear-gradient(${cssDirection}, ${style.outerEdge} 0%, ${style.body} ${bodyStopPercent}%, ${style.fold} 100%)`;
+}

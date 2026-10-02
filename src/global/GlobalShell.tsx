@@ -33,7 +33,7 @@ import type {
 import { EditorUnavailableNotice } from "./EditorUnavailableNotice";
 import { NewProjectFlow } from "./NewProjectFlow";
 import { recentProjectOpeningTime } from "./recentProjectOpeningTime";
-import { SheetPreviewShell } from "../components/SheetPreview";
+import { SheetPreviewShell } from "../project/sheets/SheetPreview";
 import {
   ActionButton,
   AppIcon,

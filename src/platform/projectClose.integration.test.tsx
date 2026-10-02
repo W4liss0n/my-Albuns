@@ -11,14 +11,14 @@ import type { ProjectCorePort } from "../application/projectPorts";
 import type { LogEvent } from "../application/logging";
 import type { EditorProjection } from "../domain/project";
 import { representativeProjection as projection } from "../test/projectFixtures";
-import { ProjectWorkspace } from "../components/ProjectWorkspace";
-import { useProjectMutationRunner } from "../components/useProjectMutationRunner";
-import { LoggingProvider } from "../components/loggingContext";
+import { ProjectWorkspace } from "../project/workspace/ProjectWorkspace";
+import { useProjectMutationRunner } from "../project/editor/useProjectMutationRunner";
+import { LoggingProvider } from "../project/loggingContext";
 import { tauriProjectWindowPort } from "./tauriProjectWindowPort";
 
 vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn() }));
 vi.mock("@tauri-apps/api/event", () => ({ listen: vi.fn() }));
-vi.mock("../components/AlbumCanvas", () => ({ AlbumCanvas: () => <div /> }));
+vi.mock("../project/canvas/AlbumCanvas", () => ({ AlbumCanvas: () => <div /> }));
 
 function deferredProjection() {
   let resolve!: (projection: EditorProjection) => void;

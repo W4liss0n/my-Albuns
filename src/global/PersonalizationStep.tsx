@@ -1,6 +1,6 @@
 import { ColorPropertyControl } from "../ui/ColorPropertyControl";
 import { summarizeVisualSelection } from "../ui/visualSelection";
-import { FrameDefaultRangeControl } from "../components/FrameDefaultRangeControl";
+import { FrameDefaultRangeControl } from "../project/inspector/FrameDefaultRangeControl";
 import { useState } from "react";
 import { X } from "lucide-react";
 
@@ -26,7 +26,7 @@ import {
 } from "./application/newProjectPersonalization";
 import { personalizationPreviewFromDraft } from "./newProjectPersonalizationPreview";
 import { ActionButton, AppIcon } from "../ui";
-import { VisualScopePreview } from "../components/VisualScopePreview";
+import { VisualScopePreview } from "../project/inspector/VisualScopePreview";
 import { NewProjectPreviewPanel } from "./NewProjectPreviewPanel";
 
 interface PersonalizationStepProps {

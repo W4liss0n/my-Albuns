@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import ReactDOM from "react-dom/client";
-import { ImageViewer } from "../components/ImageViewer";
+import { ImageViewer } from "./ImageViewer";
 import type { ViewerPresentation } from "../application/imageViewerWindow";
 import type { ViewerCorrectionPhase } from "../contracts/generated/ViewerCorrectionPhase";
 import { observeViewerPresentation } from "./viewerObservation";

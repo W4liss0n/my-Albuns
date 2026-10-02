@@ -15,7 +15,7 @@ Aplicativo de diagramação de álbuns para Windows 10/11 x64, feito com Tauri 2
 
 | Pasta | Conteúdo |
 |---|---|
-| `src/` | interface em React/TypeScript: uma pasta por janela (`global/`, `project-dialog/`, `settings/`, `batch-export/`, `generation/`, `image-viewer/`, `dialog/`), a janela do Projeto em `App.tsx` e `components/`, e as camadas compartilhadas (`domain/`, `contracts/`, `application/`, `platform/`, `ui/`, `state/`) |
+| `src/` | interface em React/TypeScript: uma pasta por janela (`global/`, `project-dialog/`, `settings/`, `batch-export/`, `generation/`, `image-viewer/`, `dialog/`), a janela do Projeto em `project/` (uma subpasta por área: `canvas/`, `sheets/`, `media-panel/`, `inspector/`, `layouts/`, `workspace/`, `editor/`), e as camadas compartilhadas (`domain/`, `contracts/`, `application/`, `platform/`, `ui/`, `state/`) |
 | `previews/` e `src/previews/` | prévias e regressões visuais, usadas só no desenvolvimento |
 | `src-tauri/` | Host desktop em Rust (Tauri) |
 | `crates/` | núcleo em Rust: `myalbuns-core`, `myalbuns-imaging`, `myalbuns-imaging-protocol`, `myalbuns-paths` e `myalbuns-logging` |

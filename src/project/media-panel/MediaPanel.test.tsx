@@ -1,0 +1,1097 @@
+import { createRef, useState, type ComponentProps } from "react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { expect, test, vi } from "vitest";
+
+import type { MediaCatalogItem, MediaUsage } from "../../domain/project";
+import { MediaPanel, type MediaPanelHandle } from "./MediaPanel";
+
+const mediaItems: readonly MediaCatalogItem[] = [
+  media("photo-album-10", "photo", "Álbum 10"),
+  media("photo-album-2", "photo", "album 2"),
+  media("photo-retrato", "photo", "Retrato", 800, 1200),
+  media("decorative-overlay", "decorative", "Overlay dourado"),
+];
+
+const mediaUsage: readonly MediaUsage[] = [
+  { count: 2, mediaId: "photo-album-10" },
+  { count: 0, mediaId: "photo-album-2" },
+  { count: 1, mediaId: "photo-retrato" },
+  { count: 0, mediaId: "decorative-overlay" },
+];
+
+const mediaPanelInteractions = {
+  onApplyDecorative: () => undefined,
+  onImportMedia: () => undefined,
+  onRemoveMedia: () => undefined,
+  onMediaDragChange: () => undefined,
+  onRelinkMedia: () => undefined,
+  onReplaceMedia: () => undefined,
+  onRetryUnavailableMedia: async () => undefined,
+};
+
+test("viewer context menu opens the clicked photo in the current sorted list without changing a multiselection", () => {
+  const onViewPhoto = vi.fn();
+  const ref = createRef<MediaPanelHandle>();
+  render(<MediaPanel {...mediaPanelInteractions} ref={ref} mediaItems={mediaItems} mediaUsage={mediaUsage}
+    onFillPhoto={vi.fn()} previewSource={{ kind: "static" }} preferences={{ kind: "local" }} onViewPhoto={onViewPhoto} />);
+  const first = screen.getByRole("button", { name: /^album 2/ });
+  const second = screen.getByRole("button", { name: /^Álbum 10/ });
+  fireEvent.click(first);
+  fireEvent.click(second, { ctrlKey: true });
+  fireEvent.contextMenu(second);
+  fireEvent.click(screen.getByRole("menuitem", { name: "Visualizar imagem" }));
+  expect(onViewPhoto).toHaveBeenCalledWith("photo-album-10", ["photo-album-2", "photo-album-10", "photo-retrato"], second);
+  expect(first).toHaveAttribute("aria-pressed", "true");
+  expect(second).toHaveAttribute("aria-pressed", "true");
+  expect(ref.current?.viewerSelection()).toEqual({ mediaId: "photo-album-2", mediaIds: ["photo-album-2", "photo-album-10", "photo-retrato"] });
+});
+
+test("applies only the double-clicked Decorative and distinguishes each usage role", () => {
+  const onApplyDecorative = vi.fn();
+  render(<MediaPanel {...mediaPanelInteractions} onApplyDecorative={onApplyDecorative}
+    mediaItems={[...mediaItems, media("decorative-other", "decorative", "Textura")]} mediaUsage={[
+      { mediaId: "decorative-overlay", count: 5, breakdown: { frames: 0, backgrounds: 2, overlays: 1, albumBackgrounds: 1, albumOverlays: 1 } },
+    ]} onFillPhoto={vi.fn()} preferences={{ kind: "local" }} previewSource={{ kind: "static" }} />);
+  fireEvent.click(screen.getByRole("button", { name: "Decorativos" }));
+  const overlay = screen.getByRole("button", { name: /Overlay dourado/ });
+  fireEvent.click(overlay);
+  fireEvent.click(screen.getByRole("button", { name: /Textura/ }), { ctrlKey: true });
+  fireEvent.doubleClick(overlay);
+  expect(onApplyDecorative).toHaveBeenLastCalledWith("decorative-overlay", "background");
+  fireEvent.doubleClick(overlay, { shiftKey: true });
+  expect(onApplyDecorative).toHaveBeenLastCalledWith("decorative-overlay", "overlay");
+  expect(onApplyDecorative).toHaveBeenCalledTimes(2);
+  expect(overlay).toHaveAccessibleName(/2 fundos.*1 sobreposição.*1 padrão de fundo.*1 padrão de sobreposição/);
+});
+
+test("requests the initial measured viewport without waiting for a scroll or observer paint", () => {
+  vi.stubGlobal("IntersectionObserver", class {
+    observe() {}
+    disconnect() {}
+  });
+  const width = vi.spyOn(Element.prototype, "clientWidth", "get").mockReturnValue(202);
+  const height = vi.spyOn(Element.prototype, "clientHeight", "get").mockReturnValue(114);
+  const onDemandChange = vi.fn();
+  const view = render(<MediaPanel {...mediaPanelInteractions}
+    mediaItems={mediaItems} mediaUsage={mediaUsage} onFillPhoto={() => undefined}
+    preferences={{kind: "local"}}
+    previewSource={{kind: "connected", previews: {}, onDemandChange}}
+  />);
+  try {
+    expect(onDemandChange).toHaveBeenLastCalledWith(expect.objectContaining({
+      visibleMediaIds: expect.arrayContaining(["photo-album-2"]),
+    }));
+    const grid = screen.getByRole("group", { name: "Grade de fotos" });
+    grid.scrollTop = 190;
+    fireEvent.scroll(grid);
+    expect(onDemandChange).toHaveBeenLastCalledWith(expect.objectContaining({
+      visibleMediaIds: expect.arrayContaining(["photo-retrato"]),
+    }));
+  } finally {
+    view.unmount();
+    width.mockRestore();
+    height.mockRestore();
+    vi.unstubAllGlobals();
+  }
+});
+
+test("preloads upcoming viewports before the user scrolls, within a bounded window", () => {
+  const width = vi.spyOn(Element.prototype, "clientWidth", "get").mockReturnValue(84);
+  const height = vi.spyOn(Element.prototype, "clientHeight", "get").mockReturnValue(168);
+  const onDemandChange = vi.fn();
+  const view = render(<MediaPanel {...mediaPanelInteractions}
+    mediaItems={Array.from({length: 100}, (_, i) => media(`photo-${i}`, "photo", `Foto ${i}`))}
+    mediaUsage={[]} onFillPhoto={() => undefined} preferences={{kind: "local"}}
+    previewSource={{kind: "connected", previews: {}, onDemandChange}}
+  />);
+  try {
+    expect(onDemandChange).toHaveBeenLastCalledWith({
+      visibleMediaIds: ["photo-0", "photo-1"],
+      preloadMediaIds: ["photo-2", "photo-3", "photo-4", "photo-5", "photo-6", "photo-7"],
+    });
+  } finally {
+    view.unmount();
+    width.mockRestore();
+    height.mockRestore();
+  }
+});
+
+test("prepares only the future viewport with the panel's active ordering and filters", () => {
+  const ref = createRef<MediaPanelHandle>();
+  const demand = vi.fn();
+  const photos = Array.from({ length: 100 }, (_, i) => media(`photo-${i}`, "photo", `Álbum ${i}`));
+  const props = {
+    ...mediaPanelInteractions, mediaUsage: [], onFillPhoto: vi.fn(),
+    previewSource: { kind: "connected" as const, onDemandChange: demand, previews: {} },
+    preferences: { kind: "local" as const, initial: { photo: {
+      sortKey: "name" as const, sortDirection: "descending" as const, usageFilter: "all" as const,
+    } } },
+  };
+  const view = render(<MediaPanel {...props} ref={ref} mediaItems={mediaItems} />);
+  const grid = screen.getByRole("group", { name: "Grade de fotos" });
+  Object.defineProperties(grid, { clientWidth: { value: 202 }, clientHeight: { value: 114 } });
+  Object.assign(grid.style, { padding: "10px 12px", rowGap: "10px", columnGap: "10px" });
+  grid.scrollTop = 188;
+  const plan = ref.current!.planCatalog(photos, []);
+  expect(plan.demand.visibleMediaIds).toEqual(["photo-95", "photo-94", "photo-93", "photo-92"]);
+  expect(plan.demand.preloadMediaIds).not.toContain("photo-80");
+  plan.commit();
+  view.rerender(<MediaPanel {...props} ref={ref} mediaItems={photos} />);
+  expect(demand).toHaveBeenLastCalledWith(plan.demand);
+  fireEvent.change(screen.getByRole("searchbox", { name: "Buscar fotos" }), { target: { value: "album 99" } });
+  // A shorter filtered catalog clamps scroll just as the browser does.
+  expect(ref.current!.planCatalog(photos, []).demand).toEqual({
+    visibleMediaIds: ["photo-99"], preloadMediaIds: [],
+  });
+  fireEvent.change(screen.getByRole("searchbox", { name: "Buscar fotos" }), { target: { value: "nenhuma" } });
+  expect(ref.current!.planCatalog(photos, []).demand).toEqual({ visibleMediaIds: [], preloadMediaIds: [] });
+});
+
+test("matches the reference toolbar and disables folders when no mutation port is provided", async () => {
+  const user = userEvent.setup();
+  renderPanel();
+
+  expect(screen.getByRole("button", { name: "Fotos" })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  expect(screen.getByRole("button", { name: "Decorativos" })).toHaveAttribute(
+    "aria-pressed",
+    "false",
+  );
+  const photoSearch = screen.getByRole("searchbox", { name: "Buscar fotos" });
+  expect(photoSearch).toBeVisible();
+  expect(photoSearch).toHaveClass("ui-embedded-input");
+  expect(photoSearch.closest(".media-search")).toHaveClass(
+    "ui-embedded-field",
+  );
+  expect(screen.getByRole("button", { name: "Todas 3" })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  expect(
+    screen.getByRole("button", { name: "Nova pasta de organização" }),
+  ).toBeDisabled();
+  expect(
+    screen.getByRole("button", { name: "Filtro, ordem e tamanho" }),
+  ).toBeVisible();
+  expect(
+    screen.queryByRole("combobox", { name: "Filtro de uso" }),
+  ).not.toBeInTheDocument();
+
+  await user.click(screen.getByRole("button", { name: "Importar" }));
+  const importMenu = screen.getByRole("menu", { name: "Importar" });
+  expect(
+    within(importMenu).getByRole("menuitem", { name: "Arquivos…" }),
+  ).toBeEnabled();
+  const folderItem = within(importMenu).getByRole("menuitem", {
+    name: "Pasta…",
+  });
+  expect(folderItem).toBeEnabled();
+});
+
+test("imports files or a folder into the active media tab", async () => {
+  const user = userEvent.setup();
+  const onImportMedia = vi.fn();
+  render(<MediaPanel {...mediaPanelInteractions} onImportMedia={onImportMedia} mediaItems={mediaItems} mediaUsage={mediaUsage} onFillPhoto={vi.fn()} previewSource={{ kind: "static" }} preferences={{ kind: "local" }} />);
+  await user.click(screen.getByRole("button", { name: "Importar" }));
+  await user.click(screen.getByRole("menuitem", { name: "Arquivos…" }));
+  expect(onImportMedia).toHaveBeenLastCalledWith({ mediaKind: "photo", source: { kind: "files" } });
+  await user.click(screen.getByRole("button", { name: "Decorativos" }));
+  await user.click(screen.getByRole("button", { name: "Importar" }));
+  await user.click(screen.getByRole("menuitem", { name: "Pasta…" }));
+  expect(onImportMedia).toHaveBeenLastCalledWith({ mediaKind: "decorative", source: { kind: "folder" } });
+});
+
+test("imports a Windows drop anywhere inside the visible panel into the current tab", async () => {
+  const user = userEvent.setup();
+  let publish!: (event: import("../../application/projectPorts").MediaFileDrag) => void;
+  const stop = vi.fn();
+  const dropPort = { subscribe: async (listener: typeof publish) => { publish = listener; return stop; } };
+  const onImportMedia = vi.fn();
+  const view = render(<MediaPanel {...mediaPanelInteractions} dropPort={dropPort} onImportMedia={onImportMedia} mediaItems={mediaItems} mediaUsage={mediaUsage} onFillPhoto={vi.fn()} previewSource={{ kind: "static" }} preferences={{ kind: "local" }} />);
+  vi.spyOn(screen.getByRole("region", { name: "Painel de imagens" }), "getBoundingClientRect").mockReturnValue({ left: 10, right: 510, top: 400, bottom: 600 } as DOMRect);
+  await user.click(screen.getByRole("button", { name: "Decorativos" }));
+  act(() => publish({ kind: "over", x: 15, y: 405 }));
+  expect(screen.getByText("Solte para importar em decorativos")).toBeVisible();
+  act(() => publish({ kind: "drop", x: 15, y: 405, dropId: "native-drop-1" }));
+  expect(onImportMedia).toHaveBeenCalledWith({ mediaKind: "decorative", source: { kind: "drop", dropId: "native-drop-1" } });
+  act(() => publish({ kind: "drop", x: 15, y: 100, dropId: "native-drop-2" }));
+  expect(onImportMedia).toHaveBeenCalledOnce();
+  view.unmount();
+  expect(stop).toHaveBeenCalledOnce();
+});
+
+test("renders only centered copy when the media catalog is empty", () => {
+  render(
+    <MediaPanel
+      {...mediaPanelInteractions}
+      mediaItems={[]}
+      mediaUsage={[]}
+      onFillPhoto={vi.fn()}
+      previewSource={{ kind: "static" }}
+      preferences={{ kind: "local" }}
+    />,
+  );
+
+  const emptyState = screen.getByRole("status", {
+    name: "Nenhuma foto importada",
+  });
+  expect(emptyState).toHaveClass("ui-empty-state");
+  expect(emptyState).toHaveClass("media-empty-state--catalog");
+  expect(screen.getByRole("group", { name: "Grade de fotos" })).toHaveAttribute(
+    "data-empty",
+    "catalog",
+  );
+  expect(emptyState).toHaveTextContent(
+    "Use Importar para adicionar fotos ao projeto.",
+  );
+  expect(emptyState.querySelector(".ui-empty-state__eyebrow")).toBeNull();
+  expect(emptyState.querySelector(".ui-empty-state__icon")).toBeNull();
+});
+
+test("keeps only centered copy when filters have no results", async () => {
+  const user = userEvent.setup();
+  renderPanel();
+
+  await user.type(
+    screen.getByRole("searchbox", { name: "Buscar fotos" }),
+    "inexistente",
+  );
+
+  const emptyState = screen.getByRole("status", {
+    name: "Nenhum item encontrado",
+  });
+  expect(emptyState).toHaveClass("media-empty-state--filtered");
+  expect(screen.getByRole("group", { name: "Grade de fotos" })).toHaveAttribute(
+    "data-empty",
+    "filtered",
+  );
+  expect(emptyState).toHaveTextContent(
+    "Tente outro nome ou altere o filtro.",
+  );
+  expect(emptyState.querySelector(".ui-empty-state__eyebrow")).toBeNull();
+  expect(emptyState.querySelector(".ui-empty-state__icon")).toBeNull();
+});
+
+test("combines accent-insensitive search with the usage filter and natural name order", async () => {
+  const user = userEvent.setup();
+  renderPanel();
+
+  await user.type(screen.getByRole("searchbox", { name: "Buscar fotos" }), "album");
+  expect(visibleMediaIds()).toEqual(["photo-album-2", "photo-album-10"]);
+
+  await user.click(
+    screen.getByRole("button", { name: "Filtro, ordem e tamanho" }),
+  );
+  await user.selectOptions(
+    screen.getByRole("combobox", { name: "Ordenar por" }),
+    "name-descending",
+  );
+  expect(visibleMediaIds()).toEqual(["photo-album-10", "photo-album-2"]);
+  await user.selectOptions(
+    screen.getByRole("combobox", { name: "Ordenar por" }),
+    "name-ascending",
+  );
+  await user.selectOptions(
+    screen.getByRole("combobox", { name: "Filtro de uso" }),
+    "used",
+  );
+  expect(visibleMediaIds()).toEqual(["photo-album-10"]);
+  expect(screen.getByRole("combobox", { name: "Filtro de uso" })).toHaveValue(
+    "used",
+  );
+});
+
+test("orders absent and available Originals together by name and known dates", async () => {
+  const user = userEvent.setup();
+  render(<MediaPanel {...mediaPanelInteractions} mediaItems={mediaItems} mediaUsage={mediaUsage}
+    onFillPhoto={vi.fn()} previewSource={{ kind: "static" }} preferences={{ kind: "local" }}
+    mediaFiles={{
+      "photo-album-10": { mediaId: "photo-album-10", state: "available", createdAtMs: 100, modifiedAtMs: 300 },
+      "photo-album-2": { mediaId: "photo-album-2", state: "absent", createdAtMs: 200, modifiedAtMs: 100 },
+      "photo-retrato": { mediaId: "photo-retrato", state: "available", createdAtMs: 150, modifiedAtMs: 200 },
+    }} />);
+  expect(visibleMediaIds()).toEqual(["photo-album-2", "photo-album-10", "photo-retrato"]);
+  await user.click(screen.getByRole("button", { name: "Filtro, ordem e tamanho" }));
+  await user.selectOptions(screen.getByRole("combobox", { name: "Ordenar por" }), "createdAt-ascending");
+  expect(visibleMediaIds()).toEqual(["photo-album-10", "photo-retrato", "photo-album-2"]);
+  await user.selectOptions(screen.getByRole("combobox", { name: "Ordenar por" }), "createdAt-descending");
+  expect(visibleMediaIds()).toEqual(["photo-album-2", "photo-retrato", "photo-album-10"]);
+  await user.selectOptions(screen.getByRole("combobox", { name: "Ordenar por" }), "modifiedAt-ascending");
+  expect(visibleMediaIds()).toEqual(["photo-album-2", "photo-retrato", "photo-album-10"]);
+  await user.selectOptions(screen.getByRole("combobox", { name: "Ordenar por" }), "name-descending");
+  expect(visibleMediaIds()).toEqual(["photo-retrato", "photo-album-10", "photo-album-2"]);
+});
+
+test.each(["photo", "decorative"] as const)("an absent %s keeps its natural position and selection without file dates", (kind) => {
+  const items = [media("first", kind, "Foto 1"), media("middle", kind, "Foto 2"), media("last", kind, "Foto 10")];
+  const props = { ...mediaPanelInteractions, mediaItems: items, mediaUsage: [], onFillPhoto: vi.fn(),
+    preferences: { kind: "local" as const }, previewSource: { kind: "static" as const } };
+  const view = render(<MediaPanel {...props} />);
+  if (kind === "decorative") fireEvent.click(screen.getByRole("button", { name: "Decorativos" }));
+  fireEvent.click(screen.getByRole("button", { name: "Foto 2" }));
+  view.rerender(<MediaPanel {...props} previewSource={{ kind: "static", previews: {
+    middle: { mediaId: "middle", state: "absent", url: null },
+  } }} />);
+  const grid = screen.getByRole("group", { name: kind === "photo" ? "Grade de fotos" : "Grade de decorativos" });
+  const order = () => Array.from(grid.querySelectorAll("[data-media-id]")).map(item => item.getAttribute("data-media-id"));
+  expect(order()).toEqual(["first", "middle", "last"]);
+  expect(screen.getByRole("button", { name: "Foto 2. Arquivo ausente" })).toHaveAttribute("aria-pressed", "true");
+  view.rerender(<MediaPanel {...props} />);
+  expect(order()).toEqual(["first", "middle", "last"]);
+  expect(screen.getByRole("button", { name: "Foto 2" })).toHaveAttribute("aria-pressed", "true");
+});
+
+test("treats compact options as a disclosure and restores its trigger on Escape", async () => {
+  const user = userEvent.setup();
+  renderPanel();
+
+  const trigger = screen.getByRole("button", {
+    name: "Filtro, ordem e tamanho",
+  });
+  await user.click(trigger);
+  const usageFilter = screen.getByRole("combobox", { name: "Filtro de uso" });
+  await user.click(usageFilter);
+  expect(usageFilter).toHaveFocus();
+
+  await user.keyboard("{Escape}");
+
+  expect(trigger).toHaveFocus();
+  expect(
+    screen.queryByRole("combobox", { name: "Filtro de uso" }),
+  ).not.toBeInTheDocument();
+});
+
+test("keeps independent search text for Fotos and Decorativos", async () => {
+  const user = userEvent.setup();
+  renderPanel();
+
+  const photoSearch = screen.getByRole("searchbox", { name: "Buscar fotos" });
+  await user.type(photoSearch, "retrato");
+  await user.click(screen.getByRole("button", { name: "Decorativos" }));
+
+  const decorativeSearch = screen.getByRole("searchbox", {
+    name: "Buscar decorativos",
+  });
+  expect(decorativeSearch).toHaveValue("");
+  await user.type(decorativeSearch, "dourado");
+
+  await user.click(screen.getByRole("button", { name: "Fotos" }));
+  expect(screen.getByRole("searchbox", { name: "Buscar fotos" })).toHaveValue(
+    "retrato",
+  );
+});
+
+test("shares thumbnail size between tabs and resets both tabs together", async () => {
+  const user = userEvent.setup();
+  renderPanel();
+
+  await user.click(
+    screen.getByRole("button", { name: "Filtro, ordem e tamanho" }),
+  );
+  const size = screen.getByRole("slider", { name: "Tamanho das miniaturas" });
+  fireEvent.change(size, { target: { value: "124" } });
+
+  expect(screen.getByRole("group", { name: "Grade de fotos" })).toHaveStyle({
+    "--media-thumbnail-size": "124px",
+  });
+
+  const dateOption = screen.getByRole("option", { name: "Data de criação" });
+  expect(dateOption).toBeEnabled();
+
+  await user.click(screen.getByRole("button", { name: "Decorativos" }));
+  await user.click(
+    screen.getByRole("button", { name: "Filtro, ordem e tamanho" }),
+  );
+  const decorativeSize = screen.getByRole("slider", {
+    name: "Tamanho das miniaturas",
+  });
+  expect(decorativeSize).toHaveValue("124");
+  expect(screen.getByRole("group", { name: "Grade de decorativos" })).toHaveStyle({
+    "--media-thumbnail-size": "124px",
+  });
+  fireEvent.change(decorativeSize, { target: { value: "110" } });
+
+  await user.click(screen.getByRole("button", { name: "Fotos" }));
+  await user.click(
+    screen.getByRole("button", { name: "Filtro, ordem e tamanho" }),
+  );
+  const restoredPhotoSize = screen.getByRole("slider", {
+    name: "Tamanho das miniaturas",
+  });
+  expect(restoredPhotoSize).toHaveValue("110");
+  fireEvent.doubleClick(restoredPhotoSize);
+  expect(restoredPhotoSize).toHaveValue("84");
+  await user.click(screen.getByRole("button", { name: "Decorativos" }));
+  expect(screen.getByRole("group", { name: "Grade de decorativos" })).toHaveStyle({
+    "--media-thumbnail-size": "84px",
+  });
+});
+
+test("hydrates a shared thumbnail size and publishes changes without a tab", async () => {
+  const user = userEvent.setup();
+  const onThumbnailSizeChange = vi.fn();
+  render(
+    <PersistentMediaPanel
+      {...mediaPanelInteractions}
+      mediaItems={mediaItems}
+      mediaUsage={mediaUsage}
+      onFillPhoto={vi.fn()}
+      previewSource={{ kind: "static" }}
+      preferences={{
+        kind: "controlled",
+        persistent: {
+          decorative: { sortKey: "name", sortDirection: "ascending", usageFilter: "all" },
+          photo: { sortKey: "name", sortDirection: "ascending", usageFilter: "all" },
+        },
+        thumbnailSize: 124,
+        onSortDirectionChange: vi.fn(),
+        onSortKeyChange: vi.fn(),
+        onThumbnailSizeChange,
+        onUsageFilterChange: vi.fn(),
+      }}
+    />,
+  );
+
+  await user.click(
+    screen.getByRole("button", { name: "Filtro, ordem e tamanho" }),
+  );
+  const photoSize = screen.getByRole("slider", {
+    name: "Tamanho das miniaturas",
+  });
+  expect(photoSize).toHaveValue("124");
+  fireEvent.change(photoSize, { target: { value: "126" } });
+  expect(onThumbnailSizeChange).toHaveBeenCalledWith(126);
+
+  await user.click(screen.getByRole("button", { name: "Decorativos" }));
+  await user.click(
+    screen.getByRole("button", { name: "Filtro, ordem e tamanho" }),
+  );
+  expect(
+    screen.getByRole("slider", { name: "Tamanho das miniaturas" }),
+  ).toHaveValue("126");
+});
+
+test("hydrates authoritative per-tab settings and publishes only the changed field", async () => {
+  const user = userEvent.setup();
+  const onSortDirectionChange = vi.fn();
+  const onUsageFilterChange = vi.fn();
+  render(
+    <PersistentMediaPanel
+      {...mediaPanelInteractions}
+      mediaItems={mediaItems}
+      mediaUsage={mediaUsage}
+      onFillPhoto={vi.fn()}
+      previewSource={{ kind: "static" }}
+      preferences={{
+        kind: "controlled",
+        persistent: {
+          decorative: { sortKey: "name", sortDirection: "ascending", usageFilter: "all" },
+          photo: { sortKey: "name", sortDirection: "descending", usageFilter: "unused" },
+        },
+        thumbnailSize: 84,
+        onSortDirectionChange,
+        onSortKeyChange: vi.fn(),
+        onThumbnailSizeChange: vi.fn(),
+        onUsageFilterChange,
+      }}
+    />,
+  );
+
+  expect(visibleMediaIds()).toEqual(["photo-album-2"]);
+  await user.click(
+    screen.getByRole("button", { name: "Filtro, ordem e tamanho" }),
+  );
+  expect(screen.getByRole("combobox", { name: "Ordenar por" })).toHaveValue(
+    "name-descending",
+  );
+  expect(screen.getByRole("combobox", { name: "Filtro de uso" })).toHaveValue(
+    "unused",
+  );
+
+  await user.selectOptions(
+    screen.getByRole("combobox", { name: "Filtro de uso" }),
+    "used",
+  );
+  expect(onUsageFilterChange).toHaveBeenCalledWith("photo", "used");
+  await user.selectOptions(
+    screen.getByRole("combobox", { name: "Ordenar por" }),
+    "name-ascending",
+  );
+  expect(onSortDirectionChange).toHaveBeenCalledWith("photo", "ascending");
+
+  await user.click(screen.getByRole("button", { name: "Decorativos" }));
+  await user.click(
+    screen.getByRole("button", { name: "Filtro, ordem e tamanho" }),
+  );
+  expect(screen.getByRole("combobox", { name: "Ordenar por" })).toHaveValue(
+    "name-ascending",
+  );
+  expect(screen.getByRole("combobox", { name: "Filtro de uso" })).toHaveValue(
+    "all",
+  );
+});
+
+test("keeps the last observed viewport warm across Fotos and Decorativos", () => {
+  vi.stubGlobal("IntersectionObserver", class {
+    constructor(private callback: IntersectionObserverCallback) {}
+    observe(target: HTMLElement) {
+      this.callback([{ target, isIntersecting: target.dataset.mediaId !== "photo-retrato" } as unknown as IntersectionObserverEntry], this as unknown as IntersectionObserver);
+    }
+    disconnect() {}
+  });
+  const onDemandChange = vi.fn();
+  const view = render(
+    <MediaPanel
+      {...mediaPanelInteractions}
+      mediaItems={mediaItems}
+      mediaUsage={mediaUsage}
+      onFillPhoto={vi.fn()}
+      previewSource={{ kind: "connected", previews: {}, onDemandChange }}
+      preferences={{ kind: "local" }}
+    />,
+  );
+  try {
+    onDemandChange.mockClear();
+    fireEvent.click(screen.getByRole("button", { name: "Decorativos" }));
+    expect(onDemandChange).toHaveBeenLastCalledWith({
+      visibleMediaIds: ["decorative-overlay"],
+      preloadMediaIds: ["photo-album-2", "photo-album-10"],
+    });
+    expect(onDemandChange.mock.calls.every(([demand]) =>
+      [...demand.visibleMediaIds, ...demand.preloadMediaIds].includes("photo-album-2"),
+    )).toBe(true);
+    fireEvent.click(screen.getByRole("button", { name: "Fotos" }));
+    expect(onDemandChange).toHaveBeenLastCalledWith({
+      visibleMediaIds: ["photo-album-2", "photo-album-10"],
+      preloadMediaIds: ["decorative-overlay"],
+    });
+  } finally {
+    view.unmount();
+    vi.unstubAllGlobals();
+  }
+});
+
+test("retires scrolled and removed media and ignores disconnected observers", () => {
+  const observers: { callback: IntersectionObserverCallback; targets: HTMLElement[] }[] = [];
+  vi.stubGlobal("IntersectionObserver", class {
+    targets: HTMLElement[] = [];
+    constructor(public callback: IntersectionObserverCallback) { observers.push(this); }
+    observe(target: HTMLElement) { this.targets.push(target); }
+    disconnect() {}
+  });
+  const onDemandChange = vi.fn();
+  const props = {
+    ...mediaPanelInteractions,
+    mediaItems,
+    mediaUsage,
+    onFillPhoto: vi.fn(),
+    previewSource: { kind: "connected" as const, previews: {}, onDemandChange },
+    preferences: { kind: "local" as const },
+  };
+  const view = render(<MediaPanel {...props} />);
+  const observeOnly = (index: number, mediaId: string) => {
+    const observer = observers[index];
+    observer.callback(observer.targets.map((target) => ({
+      target, isIntersecting: target.dataset.mediaId === mediaId,
+    }) as unknown as IntersectionObserverEntry), observer as unknown as IntersectionObserver);
+  };
+  try {
+    observeOnly(0, "photo-album-2");
+    observeOnly(1, "photo-album-2");
+    observeOnly(0, "photo-retrato");
+    observeOnly(1, "photo-retrato");
+    expect(onDemandChange).toHaveBeenLastCalledWith({ visibleMediaIds: ["photo-retrato"], preloadMediaIds: [] });
+    fireEvent.click(screen.getByRole("button", { name: "Decorativos" }));
+    observeOnly(2, "decorative-overlay");
+    observeOnly(3, "decorative-overlay");
+    expect(onDemandChange).toHaveBeenLastCalledWith({ visibleMediaIds: ["decorative-overlay"], preloadMediaIds: ["photo-retrato"] });
+    onDemandChange.mockClear();
+    observeOnly(0, "photo-album-2");
+    expect(onDemandChange).not.toHaveBeenCalled();
+    view.rerender(<MediaPanel {...props} mediaItems={mediaItems.filter(({ id }) => id !== "photo-retrato")} />);
+    expect(onDemandChange).toHaveBeenLastCalledWith({ visibleMediaIds: ["decorative-overlay"], preloadMediaIds: [] });
+  } finally {
+    view.unmount();
+    vi.unstubAllGlobals();
+  }
+});
+
+test("clears preview demand when the panel unmounts", () => {
+  const onMediaDemandChange = vi.fn();
+  const view = render(
+    <MediaPanel
+      {...mediaPanelInteractions}
+      mediaItems={mediaItems}
+      mediaUsage={mediaUsage}
+      onFillPhoto={vi.fn()}
+      previewSource={{
+        kind: "connected",
+        previews: {},
+        onDemandChange: onMediaDemandChange,
+      }}
+      preferences={{ kind: "local" }}
+    />,
+  );
+  onMediaDemandChange.mockClear();
+
+  view.unmount();
+
+  expect(onMediaDemandChange).toHaveBeenCalledOnce();
+  expect(onMediaDemandChange).toHaveBeenCalledWith({
+    visibleMediaIds: [],
+    preloadMediaIds: [],
+  });
+});
+
+test("uses image orientation and opacity without visible names or usage counts", () => {
+  render(
+    <MediaPanel
+      {...mediaPanelInteractions}
+      mediaItems={mediaItems}
+      previewSource={{
+        kind: "static",
+        previews: {
+          "photo-album-10": {
+            mediaId: "photo-album-10",
+            state: "ready",
+            url: "/album-10.jpg",
+          },
+          "photo-retrato": {
+            mediaId: "photo-retrato",
+            state: "ready",
+            url: "/retrato.jpg",
+          },
+        },
+      }}
+      mediaUsage={mediaUsage}
+      onFillPhoto={vi.fn()}
+      preferences={{ kind: "local" }}
+    />,
+  );
+
+  const usedCard = document.querySelector<HTMLElement>(
+    '[data-media-id="photo-album-10"]',
+  );
+  const portraitCard = document.querySelector<HTMLElement>(
+    '[data-media-id="photo-retrato"]',
+  );
+
+  expect(usedCard).toHaveAttribute("data-used", "true");
+  expect(usedCard).toHaveAccessibleName("Álbum 10. Já usada. 2 usos");
+  expect(usedCard).not.toHaveTextContent("Álbum 10");
+  expect(usedCard).not.toHaveTextContent("2");
+  expect(usedCard?.querySelector(".media-meta")).toBeNull();
+  const landscapeThumb = usedCard?.querySelector<HTMLElement>(
+    ".media-preview-thumbnail",
+  );
+  const portraitThumb =
+    portraitCard?.querySelector<HTMLElement>(".media-preview-thumbnail");
+
+  expect(landscapeThumb).toHaveAttribute("data-portrait", "false");
+  expect(landscapeThumb).toHaveAttribute("data-has-preview", "true");
+  expect(landscapeThumb).toHaveStyle({
+    "--media-aspect-ratio": "1200 / 800",
+  });
+  expect(portraitThumb).toHaveAttribute("data-portrait", "true");
+  expect(portraitThumb).toHaveStyle({
+    "--media-aspect-ratio": "800 / 1200",
+  });
+});
+
+test("keeps selection on media ids and supports click, Ctrl, Shift, and Ctrl+A", () => {
+  renderPanel();
+
+  const album2 = screen.getByRole("button", { name: "album 2" });
+  const album10 = screen.getByRole("button", {
+    name: "Álbum 10. Já usada. 2 usos",
+  });
+  const portrait = screen.getByRole("button", {
+    name: "Retrato. Já usada. 1 uso",
+  });
+  const grid = screen.getByRole("group", { name: "Grade de fotos" });
+
+  expect(album2).toHaveAttribute("aria-pressed", "false");
+  fireEvent.click(album2);
+  expect(album2).toHaveAttribute("aria-pressed", "true");
+  expect(album10).toHaveAttribute("aria-pressed", "false");
+
+  fireEvent.click(portrait, { ctrlKey: true });
+  expect(album2).toHaveAttribute("aria-pressed", "true");
+  expect(portrait).toHaveAttribute("aria-pressed", "true");
+
+  fireEvent.click(album10, { shiftKey: true });
+  expect(album2).toHaveAttribute("aria-pressed", "true");
+  expect(album10).toHaveAttribute("aria-pressed", "true");
+  expect(portrait).toHaveAttribute("aria-pressed", "false");
+
+  fireEvent.keyDown(grid, { ctrlKey: true, key: "a" });
+  expect(album2).toHaveAttribute("aria-pressed", "true");
+  expect(album10).toHaveAttribute("aria-pressed", "true");
+  expect(portrait).toHaveAttribute("aria-pressed", "true");
+});
+
+test("preserves a selected group on right click and replaces it for an unselected item", () => {
+  renderPanel();
+
+  const album2 = screen.getByRole("button", { name: "album 2" });
+  const album10 = screen.getByRole("button", {
+    name: "Álbum 10. Já usada. 2 usos",
+  });
+  const portrait = screen.getByRole("button", {
+    name: "Retrato. Já usada. 1 uso",
+  });
+
+  fireEvent.click(album2);
+  fireEvent.click(portrait, { ctrlKey: true });
+  fireEvent.contextMenu(portrait);
+  expect(album2).toHaveAttribute("aria-pressed", "true");
+  expect(portrait).toHaveAttribute("aria-pressed", "true");
+
+  fireEvent.contextMenu(album10);
+  expect(album2).toHaveAttribute("aria-pressed", "false");
+  expect(album10).toHaveAttribute("aria-pressed", "true");
+  expect(portrait).toHaveAttribute("aria-pressed", "false");
+});
+
+test("clears selection and keeps Ctrl+A in the grid after a background click", () => {
+  renderPanel();
+
+  const grid = screen.getByRole("group", { name: "Grade de fotos" });
+  const album2 = screen.getByRole("button", { name: "album 2" });
+  fireEvent.click(album2);
+  expect(album2).toHaveAttribute("aria-pressed", "true");
+
+  fireEvent.click(grid);
+  expect(album2).toHaveAttribute("aria-pressed", "false");
+  expect(grid).toHaveFocus();
+
+  expect(fireEvent.keyDown(grid, { ctrlKey: true, key: "a" })).toBe(false);
+  const selectedMediaCards = within(grid).getAllByRole("button", {
+    pressed: true,
+  });
+  for (const mediaCard of selectedMediaCards) {
+    expect(mediaCard).toHaveAttribute("data-selected", "true");
+  }
+  expect(selectedMediaCards).toHaveLength(3);
+});
+
+test("leaves Ctrl+A to nested editable content inside the image panel", () => {
+  renderPanel();
+
+  const panel = screen.getByRole("region", { name: "Painel de imagens" });
+  const editor = document.createElement("div");
+  const text = document.createElement("span");
+  editor.setAttribute("contenteditable", "");
+  editor.append(text);
+  panel.append(editor);
+
+  expect(fireEvent.keyDown(text, { ctrlKey: true, key: "a" })).toBe(true);
+  const cards = panel.querySelectorAll("button[data-media-id]");
+  expect(cards).toHaveLength(3);
+  for (const card of cards) {
+    expect(card).toHaveAttribute("aria-pressed", "false");
+  }
+});
+
+test("removes hidden items from the transient media selection", async () => {
+  const user = userEvent.setup();
+  renderPanel();
+
+  await user.click(screen.getByRole("button", { name: "album 2" }));
+  const search = screen.getByRole("searchbox", { name: "Buscar fotos" });
+  await user.type(search, "retrato");
+  await user.clear(search);
+
+  expect(screen.getByRole("button", { name: "album 2" })).toHaveAttribute(
+    "aria-pressed",
+    "false",
+  );
+});
+
+test("uses the intrinsic preview ratio when source dimensions are unavailable", () => {
+  const mediaWithoutDimensions = media(
+    "photo-no-metadata",
+    "photo",
+    "Sem metadados",
+    null,
+    null,
+  );
+  render(
+    <MediaPanel
+      {...mediaPanelInteractions}
+      mediaItems={[mediaWithoutDimensions]}
+      previewSource={{
+        kind: "static",
+        previews: {
+          "photo-no-metadata": {
+            mediaId: "photo-no-metadata",
+            state: "ready",
+            url: "/portrait-without-metadata.jpg",
+          },
+        },
+      }}
+      mediaUsage={[]}
+      onFillPhoto={vi.fn()}
+      preferences={{ kind: "local" }}
+    />,
+  );
+
+  const image = document.querySelector<HTMLImageElement>(
+    '[data-media-id="photo-no-metadata"] img',
+  );
+  expect(image).not.toBeNull();
+  Object.defineProperties(image!, {
+    naturalHeight: { configurable: true, value: 1200 },
+    naturalWidth: { configurable: true, value: 800 },
+  });
+  fireEvent.load(image!);
+
+  const thumb = document.querySelector<HTMLElement>(
+    '[data-media-id="photo-no-metadata"] .media-preview-thumbnail',
+  );
+  expect(thumb).toHaveAttribute("data-portrait", "true");
+  expect(thumb).toHaveStyle({
+    "--media-aspect-ratio": "800 / 1200",
+  });
+});
+
+function renderPanel() {
+  return render(
+    <MediaPanel
+      {...mediaPanelInteractions}
+      mediaItems={mediaItems}
+      mediaUsage={mediaUsage}
+      onFillPhoto={vi.fn()}
+      previewSource={{ kind: "static" }}
+      preferences={{ kind: "local" }}
+    />,
+  );
+}
+
+test("an open media menu keeps selection shortcuts from executing behind it", async () => {
+  const remove = vi.fn();
+  const open = vi.fn();
+  render(<MediaPanel {...mediaPanelInteractions} mediaItems={mediaItems} mediaUsage={mediaUsage}
+    onFillPhoto={vi.fn()} previewSource={{ kind: "static" }} preferences={{ kind: "local" }}
+    onRemoveMedia={remove} photoshopAvailable onOpenInPhotoshop={open} />);
+  const photo = screen.getByRole("button", { name: /Retrato/ });
+  fireEvent.contextMenu(photo);
+  const menu = screen.getByRole("menu", { name: "Ações das imagens" });
+  const target = within(menu).getByRole("menuitem", { name: /Substituir imagem/ });
+  expect(fireEvent.keyDown(target, { key: "a", ctrlKey: true })).toBe(false);
+  expect(screen.getByRole("button", { name: /Álbum 10/ })).toHaveAttribute("aria-pressed", "false");
+  fireEvent.keyDown(target, { key: "Delete" });
+  expect(remove).not.toHaveBeenCalled();
+  fireEvent.keyDown(target, { key: "e", ctrlKey: true });
+  expect(open).not.toHaveBeenCalled();
+  expect(menu).toBeInTheDocument();
+  fireEvent.click(within(menu).getByRole("menuitem", { name: /Remover/ }));
+  expect(remove).toHaveBeenCalledExactlyOnceWith(["photo-retrato"]);
+});
+
+test.each(["Importar", "Filtro, ordem e tamanho"])("the open %s popup owns shortcuts from its trigger", async (label) => {
+  const user = userEvent.setup();
+  const remove = vi.fn();
+  const open = vi.fn();
+  render(<MediaPanel {...mediaPanelInteractions} mediaItems={mediaItems} mediaUsage={mediaUsage}
+    onFillPhoto={vi.fn()} previewSource={{ kind: "static" }} preferences={{ kind: "local" }}
+    onRemoveMedia={remove} photoshopAvailable onOpenInPhotoshop={open} />);
+  const photo = screen.getByRole("button", { name: /Retrato/ });
+  await user.click(photo);
+  const trigger = screen.getByRole("button", { name: label });
+  await user.click(trigger);
+  expect(fireEvent.keyDown(trigger, { key: "a", ctrlKey: true })).toBe(false);
+  await user.keyboard("{Control>}a{/Control}{Delete}{Control>}e{/Control}");
+  expect(screen.getByRole("button", { name: /Álbum 10/ })).toHaveAttribute("aria-pressed", "false");
+  expect(remove).not.toHaveBeenCalled();
+  expect(open).not.toHaveBeenCalled();
+  expect(trigger).toHaveAttribute("aria-expanded", "true");
+  await user.keyboard("{Escape}");
+  expect(trigger).toHaveAttribute("aria-expanded", "false");
+  await user.click(photo);
+  await user.keyboard("{Delete}");
+  expect(remove).toHaveBeenCalledExactlyOnceWith(["photo-retrato"]);
+});
+
+test("Photoshop opens every selected Photo and never a Decorative", () => {
+  const open = vi.fn();
+  render(<MediaPanel {...mediaPanelInteractions} mediaItems={mediaItems} mediaUsage={mediaUsage}
+    onFillPhoto={vi.fn()} previewSource={{ kind: "static" }} preferences={{ kind: "local" }}
+    photoshopAvailable onOpenInPhotoshop={open} />);
+  const photo = screen.getByRole("button", { name: /Retrato/ });
+  fireEvent.click(photo);
+  fireEvent.keyDown(photo, { key: "e", ctrlKey: true });
+  expect(open).toHaveBeenCalledExactlyOnceWith(["photo-retrato"]);
+  fireEvent.keyDown(photo, { key: "e", ctrlKey: true, repeat: true });
+  expect(open).toHaveBeenCalledTimes(1);
+  fireEvent.click(screen.getByRole("button", { name: /Álbum 10/ }), { ctrlKey: true });
+  fireEvent.keyDown(photo, { key: "e", ctrlKey: true });
+  expect(open).toHaveBeenLastCalledWith(["photo-album-10", "photo-retrato"]);
+  fireEvent.contextMenu(photo);
+  fireEvent.click(screen.getByRole("menuitem", { name: /Abrir no Photoshop/ }));
+  expect(open).toHaveBeenLastCalledWith(["photo-album-10", "photo-retrato"]);
+  expect(open).toHaveBeenCalledTimes(3);
+  fireEvent.click(screen.getByRole("button", { name: "Decorativos" }));
+  const decorative = screen.getByRole("button", { name: /Overlay dourado/ });
+  fireEvent.click(decorative);
+  fireEvent.keyDown(decorative, { key: "e", ctrlKey: true });
+  fireEvent.contextMenu(decorative);
+  expect(screen.queryByRole("menuitem", { name: /Abrir no Photoshop/ })).not.toBeInTheDocument();
+  expect(open).toHaveBeenCalledTimes(3);
+});
+
+test.each([
+  ["photo", null], ["photo", "asset://localhost/cache/retained.jpg"],
+  ["decorative", null], ["decorative", "asset://localhost/cache/retained.jpg"],
+] as const)("an absent %s with preview %s relinks only through its context menu", (kind, url) => {
+  const onRelinkMedia = vi.fn();
+  const onFillPhoto = vi.fn();
+  const onApplyDecorative = vi.fn();
+  render(<MediaPanel {...mediaPanelInteractions} onRelinkMedia={onRelinkMedia}
+    onFillPhoto={onFillPhoto} onApplyDecorative={onApplyDecorative}
+    mediaItems={[media("missing", kind, "Imagem 1")]} mediaUsage={[]}
+    preferences={{ kind: "local" }} previewSource={{ kind: "static", previews: {
+      missing: { mediaId: "missing", state: "absent", url },
+    } }} />);
+  if (kind === "decorative") fireEvent.click(screen.getByRole("button", { name: "Decorativos" }));
+  const card = screen.getByRole("button", { name: /^Imagem 1\. Arquivo ausente/ });
+  const status = within(card).getByRole("status", { name: /^Arquivo ausente/ });
+  expect(status.textContent).toBe("");
+  expect(status).toHaveAttribute("title", expect.stringContaining("Arquivo ausente"));
+  expect(card.querySelector("img")?.getAttribute("src") ?? null).toBe(url);
+  expect(card.querySelector(".media-preview-thumbnail"))
+    .toHaveAttribute("data-missing", String(!url));
+  expect(card.querySelector(".media-preview-thumbnail__missing-symbol") !== null).toBe(!url);
+  expect(screen.queryByRole("button", { name: /Religar/ })).not.toBeInTheDocument();
+  fireEvent.doubleClick(card);
+  if (kind === "photo") expect(onFillPhoto).toHaveBeenCalledWith("missing");
+  else expect(onApplyDecorative).toHaveBeenCalledWith("missing", "background");
+  fireEvent.contextMenu(card);
+  fireEvent.click(screen.getByRole("menuitem", { name: "Localizar imagem…" }));
+  expect(onRelinkMedia).toHaveBeenCalledExactlyOnceWith(["missing"]);
+  expect(screen.queryByRole("menu", { name: "Ações das imagens" })).not.toBeInTheDocument();
+});
+
+test.each(["photo", "decorative"] as const)("Substituir Imagem is available for every %s state and targets the clicked item", (kind) => {
+  const onReplaceMedia = vi.fn();
+  const states = ["ready", "absent", "unavailable", "cache_unavailable"] as const;
+  render(<MediaPanel {...mediaPanelInteractions} onReplaceMedia={onReplaceMedia}
+    mediaItems={states.map((state) => media(state, kind, state))} mediaUsage={[]}
+    onFillPhoto={vi.fn()} preferences={{ kind: "local" }} previewSource={{ kind: "static", previews:
+      Object.fromEntries(states.map((state) => [state, { mediaId: state, state, url: null }])) }} />);
+  if (kind === "decorative") fireEvent.click(screen.getByRole("button", { name: "Decorativos" }));
+  for (const state of states) {
+    const card = screen.getByRole("button", { name: new RegExp(`^${state}`) });
+    fireEvent.click(card);
+    fireEvent.contextMenu(card);
+    fireEvent.click(screen.getByRole("menuitem", { name: "Substituir imagem" }));
+    expect(onReplaceMedia).toHaveBeenLastCalledWith(state);
+    expect(screen.queryByRole("menu", { name: "Ações das imagens" })).not.toBeInTheDocument();
+  }
+  expect(onReplaceMedia).toHaveBeenCalledTimes(4);
+});
+
+test("Substituir Imagem is disabled while several images are selected", () => {
+  const onReplaceMedia = vi.fn();
+  render(<MediaPanel {...mediaPanelInteractions} onReplaceMedia={onReplaceMedia} mediaItems={mediaItems}
+    mediaUsage={mediaUsage} onFillPhoto={vi.fn()} previewSource={{ kind: "static" }} preferences={{ kind: "local" }} />);
+  const photo = screen.getByRole("button", { name: /Retrato/ });
+  fireEvent.click(photo);
+  fireEvent.click(screen.getByRole("button", { name: /Álbum 10/ }), { ctrlKey: true });
+  fireEvent.contextMenu(photo);
+  const replace = screen.getByRole("menuitem", { name: "Substituir imagem" });
+  expect(replace).toBeDisabled();
+  fireEvent.click(replace);
+  expect(onReplaceMedia).not.toHaveBeenCalled();
+});
+
+test("Localizar acts on every absent image of the selection and names it by their count", () => {
+  const onRelinkMedia = vi.fn();
+  const absent = (mediaId: string) => ({ mediaId, state: "absent" as const, createdAtMs: null, modifiedAtMs: null });
+  const props = { ...mediaPanelInteractions, onRelinkMedia, onFillPhoto: vi.fn(), mediaUsage: [],
+    mediaItems: [media("first", "photo", "Imagem 1"), media("second", "photo", "Imagem 2"), media("third", "photo", "Imagem 3")],
+    preferences: { kind: "local" as const }, previewSource: { kind: "static" as const },
+    mediaFiles: { first: absent("first"), second: absent("second") } };
+  const view = render(<MediaPanel {...props} />);
+  const first = screen.getByRole("button", { name: /^Imagem 1/ });
+  const second = screen.getByRole("button", { name: /^Imagem 2/ });
+  const third = screen.getByRole("button", { name: /^Imagem 3/ });
+  fireEvent.click(first);
+  fireEvent.click(second, { ctrlKey: true });
+  fireEvent.click(third, { ctrlKey: true });
+  fireEvent.contextMenu(third);
+  expect([first, second, third].map((card) => card.getAttribute("aria-pressed"))).toEqual(["true", "true", "true"]);
+  fireEvent.click(screen.getByRole("menuitem", { name: "Localizar imagens…" }));
+  expect(onRelinkMedia).toHaveBeenCalledExactlyOnceWith(["first", "second"]);
+
+  view.rerender(<MediaPanel {...props} mediaFiles={{ ...props.mediaFiles,
+    first: { ...props.mediaFiles.first, state: "available" },
+  }} />);
+  fireEvent.contextMenu(third);
+  fireEvent.click(screen.getByRole("menuitem", { name: "Localizar imagem…" }));
+  expect(onRelinkMedia).toHaveBeenLastCalledWith(["second"]);
+
+  fireEvent.click(third);
+  fireEvent.contextMenu(third);
+  expect(screen.queryByRole("menuitem", { name: /Localizar imagem/ })).not.toBeInTheDocument();
+});
+
+test.each(["relinkDisabled", "importPending"] as const)("Religar remains disabled during %s", (busyProp) => {
+  const onRelinkMedia = vi.fn();
+  render(<MediaPanel {...mediaPanelInteractions} {...{ [busyProp]: true }} onRelinkMedia={onRelinkMedia}
+    onFillPhoto={vi.fn()} mediaItems={[media("missing", "photo", "Imagem 1")]} mediaUsage={[]}
+    preferences={{ kind: "local" }} previewSource={{ kind: "static", previews: {
+      missing: { mediaId: "missing", state: "absent", url: null },
+    } }} />);
+  fireEvent.contextMenu(screen.getByRole("button", { name: /^Imagem 1/ }));
+  const relink = screen.getByRole("menuitem", { name: "Localizar imagem…" });
+  expect(relink).toBeDisabled();
+  expect(screen.getByRole("menuitem", { name: "Substituir imagem" })).toBeDisabled();
+  fireEvent.click(relink);
+  expect(onRelinkMedia).not.toHaveBeenCalled();
+});
+
+test("an unavailable Photoshop disables its Photo menu without blocking other actions", () => {
+  const open = vi.fn();
+  render(<MediaPanel {...mediaPanelInteractions} mediaItems={mediaItems} mediaUsage={mediaUsage}
+    onFillPhoto={vi.fn()} previewSource={{ kind: "static" }} preferences={{ kind: "local" }}
+    photoshopAvailable={false} onOpenInPhotoshop={open} />);
+  const photo = screen.getByRole("button", { name: /Retrato/ });
+  fireEvent.contextMenu(photo);
+  expect(screen.getByRole("menuitem", { name: /Abrir no Photoshop/ })).toBeDisabled();
+  fireEvent.keyDown(photo, { key: "e", ctrlKey: true });
+  expect(open).not.toHaveBeenCalled();
+});
+
+function PersistentMediaPanel(props: Omit<ComponentProps<typeof MediaPanel>, "preferences"> & {
+  preferences: Omit<Extract<ComponentProps<typeof MediaPanel>["preferences"], { kind: "controlled" }>, "activeKind" | "onActiveKindChange">;
+}) {
+  const [activeKind, setActiveKind] = useState<MediaCatalogItem["kind"]>("photo");
+  return <MediaPanel {...props} preferences={{ ...props.preferences, activeKind, onActiveKindChange: setActiveKind }} />;
+}
+
+function media(
+  id: string,
+  kind: MediaCatalogItem["kind"],
+  name: string,
+  sourceWidthPx: number | null = 1200,
+  sourceHeightPx: number | null = 800,
+) {
+  return {
+    id,
+    kind,
+    name,
+    palette: null,
+    sourceHeightPx,
+    sourceWidthPx,
+  } satisfies MediaCatalogItem;
+}
+
+function visibleMediaIds() {
+  return Array.from(document.querySelectorAll<HTMLElement>("[data-media-id]")).map(
+    (element) => element.dataset.mediaId,
+  );
+}

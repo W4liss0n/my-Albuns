@@ -3,7 +3,7 @@ import React from "react";
 import retainedPhotoPreview from "../test/dev-media/serra-amanhecer.svg";
 import ReactDOM from "react-dom/client";
 
-import App from "../App";
+import App from "../project/App";
 import { photoshopProjectPreview } from "../test/photoshopPreview";
 import type {
   GraphicsDiagnostic,
@@ -23,7 +23,7 @@ import {
   createWorkspacePreferences,
   type WorkspacePreferencesPort,
 } from "../application/workspacePreferences";
-import type { CanvasGraphicsDiagnosticProbe } from "../components/canvasGraphicsDiagnosticProbeContext";
+import type { CanvasGraphicsDiagnosticProbe } from "../project/canvas/canvasGraphicsDiagnosticProbeContext";
 import type {
   EditorProjection,
   ComposedFrame,
@@ -48,8 +48,8 @@ import { photoOrientationCorpus } from "../test/photoOrientationPreview";
 import { frameStyleCorpus } from "../test/frameStylePreview";
 import { decorativeCorpus, decorativePreview, decorativeStateName } from "../test/decorativePreview";
 import { layoutPanelCorpus } from "../test/layoutPanelPreview";
-import { continuousCanvasScale, createCanvasSheetPresentation } from "../components/canvasGeometry";
-import { createCanvasSheetViewGeometry, createNormalCanvasLayout } from "../components/canvasSheetViewGeometry";
+import { continuousCanvasScale, createCanvasSheetPresentation } from "../project/canvas/canvasGeometry";
+import { createCanvasSheetViewGeometry, createNormalCanvasLayout } from "../project/canvas/canvasSheetViewGeometry";
 import "../ui/theme.css";
 import "../ui/ui.css";
 

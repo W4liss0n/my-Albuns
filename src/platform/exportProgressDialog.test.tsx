@@ -3,7 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { beforeEach, expect, test, vi } from "vitest";
 
-import { ExportPreviewControl } from "../components/ExportPreviewControl";
+import { ExportPreviewControl } from "../project/workspace/ExportPreviewControl";
 import { createExportHarness } from "../test/exportPipelineHarness";
 import { createTauriProjectDialogPort } from "./tauriProjectDialogPort";
 import { parseProjectDialogState } from "./projectDialogContract";

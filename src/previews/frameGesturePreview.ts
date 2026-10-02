@@ -2,12 +2,12 @@
 // port. It verifies presentation timing and cursors, not Core geometry policy.
 import { Application, Container, Rectangle } from "pixi.js";
 import type { ComposedFrame, FrameGeometryEdit } from "../domain/project";
-import type { AlbumCanvasProps } from "../components/albumCanvasContract";
-import { AlbumCanvasScene } from "../components/albumCanvasScene";
-import { createContinuousCanvasLayout } from "../components/canvasGeometry";
-import { interactiveComposition } from "../components/albumCanvasTestFixtures";
-import "../components/AlbumCanvas.css";
-import "../components/pixiRuntime";
+import type { AlbumCanvasProps } from "../project/canvas/albumCanvasContract";
+import { AlbumCanvasScene } from "../project/canvas/albumCanvasScene";
+import { createContinuousCanvasLayout } from "../project/canvas/canvasGeometry";
+import { interactiveComposition } from "../project/canvas/albumCanvasTestFixtures";
+import "../project/canvas/AlbumCanvas.css";
+import "../project/canvas/pixiRuntime";
 import { useEditorView } from "../state/editorView";
 import { frameGeometryPreview } from "../test/frameGeometryPreview";
 

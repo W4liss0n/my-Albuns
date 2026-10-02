@@ -1,0 +1,530 @@
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+
+import type { PointerDragThreshold, ProjectCorePort } from "../../application/projectPorts";
+import type { PrepareImportedMedia } from "../../application/mediaPreviews";
+import type { SheetStructureIntent } from "../../application/sheetStructure";
+import type { DecorativeScope, EditorProjection, FrameStackAction, PhotoOrientationAction, SheetVisualChange } from "../../domain/project";
+import { useEditorView } from "../../state/editorView";
+import { CANVAS_MICROMETERS_PER_PIXEL } from "../canvas/canvasGeometry";
+import type {
+  AlbumCanvasMode,
+  AlbumCanvasProps,
+} from "../canvas/albumCanvasContract";
+import { useCanvasModeKeyboardShortcuts } from "./useCanvasModeKeyboardShortcuts";
+import { usePhotoGestures } from "./usePhotoGestures";
+import { usePropertyDrafts } from "./usePropertyDrafts";
+import { useSliderDoubleClickTime } from "./useSliderDoubleClickTime";
+import { useProjectMutations } from "./useProjectMutations";
+import type { ProjectMutationRunner } from "./useProjectMutationRunner";
+import { useProjectNavigation } from "./useProjectNavigation";
+import { useLayoutPanel } from "../layouts/useLayoutPanel";
+import { useLayoutCatalog } from "../layouts/useLayoutCatalog";
+import type { ProjectDialogPort } from "../../application/projectDialogPort";
+
+interface ProjectEditorControllerInput {
+  interactionBlocked?: boolean;
+  projection: EditorProjection;
+  runProjectMutation: ProjectMutationRunner;
+  projectCorePort: ProjectCorePort;
+  projectDialogPort: ProjectDialogPort;
+  onProjectionChange(projection: EditorProjection): void;
+  onSaveAsBarrierChange?(active: boolean): void;
+  prepareImportedMedia?: PrepareImportedMedia;
+}
+
+export function useProjectEditorController({
+  interactionBlocked = false,
+  projection,
+  runProjectMutation,
+  projectCorePort,
+  projectDialogPort,
+  onProjectionChange,
+  onSaveAsBarrierChange,
+  prepareImportedMedia,
+}: ProjectEditorControllerInput) {
+  const navigation = useProjectNavigation(projection);
+  const canvasMode = useMemo<AlbumCanvasMode>(
+    () =>
+      navigation.editingSheetId
+        ? {
+            kind: "sheet-editing",
+            sheetId: navigation.editingSheetId,
+          }
+        : { kind: "normal" },
+    [navigation.editingSheetId],
+  );
+  const structuralMutationAttemptRef = useRef(0);
+  const structuralMutationPendingRef = useRef(false);
+  const [structuralMutationPending, setStructuralMutationPending] =
+    useState(false);
+  const structuralCommandsDisabled =
+    interactionBlocked || canvasMode.kind === "sheet-editing";
+  const [pendingAffectedSheetId, setPendingAffectedSheetId] = useState<
+    string | null
+  >(null);
+
+  useEffect(() => {
+    structuralMutationAttemptRef.current += 1;
+    structuralMutationPendingRef.current = false;
+    setStructuralMutationPending(false);
+    setPendingAffectedSheetId(null);
+  }, [projection.state.projectId]);
+
+  useEffect(() => {
+    if (
+      !pendingAffectedSheetId ||
+      !projection.composition.sheets.some(
+        (sheet) => sheet.sheetId === pendingAffectedSheetId,
+      )
+    ) {
+      return;
+    }
+    navigation.navigateToSheet(pendingAffectedSheetId);
+    setPendingAffectedSheetId(null);
+  }, [
+    navigation.navigateToSheet,
+    pendingAffectedSheetId,
+    projection.composition.sheets,
+  ]);
+
+  const mutations = useProjectMutations({
+    projectDialogPort,
+    projection,
+    runProjectMutation,
+    onProjectionChange: (next) => {
+      navigation.synchronizeProjection(next);
+      onProjectionChange(next);
+    },
+    onAffectedFrame: navigation.selectFrame,
+    onAffectedSheet: setPendingAffectedSheetId,
+    onSaveAsBarrierChange,
+    prepareImportedMedia,
+  });
+  const [dragThreshold, setDragThreshold] = useState<PointerDragThreshold | null>(null);
+  const reportInteractionError = mutations.reportInteractionError;
+  useEffect(() => {
+    let request = 0;
+    let active = true;
+    setDragThreshold(null);
+    const readThreshold = () => {
+      const currentRequest = ++request;
+      setDragThreshold(null);
+      void projectCorePort.readFrameDragThreshold().then((threshold) => {
+        if (active && currentRequest === request) setDragThreshold(threshold);
+      }).catch((error: unknown) => {
+        if (active && currentRequest === request) {
+          reportInteractionError(error instanceof Error ? error.message : String(error));
+        }
+      });
+    };
+    readThreshold();
+    window.addEventListener("resize", readThreshold);
+    return () => {
+      active = false;
+      window.removeEventListener("resize", readThreshold);
+    };
+  }, [navigation.editingSheetId, projection.state.projectId, projectCorePort, reportInteractionError]);
+  const selectedFrames = useMemo(
+    () =>
+      projection.state.album.sheets
+        .flatMap((sheet) => sheet.frames)
+        .filter((frame) => navigation.selectedFrameIds.includes(frame.id)),
+    [projection.state.album.sheets, navigation.selectedFrameIds],
+  );
+  const selectedFrame = selectedFrames.length === 1 ? selectedFrames[0] : null;
+  const editingSheetLocked = canvasMode.kind === "sheet-editing" &&
+    projection.state.album.sheets.find((sheet) => sheet.id === canvasMode.sheetId)?.layoutLocked === true;
+  const canAddFrame = canvasMode.kind === "sheet-editing" && !editingSheetLocked && !interactionBlocked;
+  const canSelectAllFrames = canvasMode.kind === "sheet-editing" && !interactionBlocked &&
+    projection.state.album.sheets.some((sheet) => sheet.id === canvasMode.sheetId && sheet.frames.length > 0);
+  const selectFrames = (frameIds: readonly string[]) => {
+    if (canvasMode.kind !== "sheet-editing" || interactionBlocked) return;
+    const sheet = projection.state.album.sheets.find((item) => item.id === canvasMode.sheetId);
+    useEditorView.getState().selectFrames(sheet?.frames.filter((frame) => frameIds.includes(frame.id)).map((frame) => frame.id) ?? []);
+  };
+  const selectAllFrames = () => {
+    if (!canSelectAllFrames || canvasMode.kind !== "sheet-editing") return;
+    selectFrames(projection.state.album.sheets.find((sheet) => sheet.id === canvasMode.sheetId)!.frames.map((frame) => frame.id));
+  };
+  const addFrame = () => {
+    if (!canAddFrame || canvasMode.kind !== "sheet-editing") return Promise.resolve(false);
+    return mutations.applyWithOutcome({ kind: "addFrame", sheetId: canvasMode.sheetId });
+  };
+  const canArrangeFrames = canvasMode.kind === "sheet-editing" && selectedFrames.length > 0 && !interactionBlocked;
+  const canOrientPhotos = selectedFrames.some((frame) => frame.photo !== null) && !interactionBlocked;
+  const doubleClickTimeMs = useSliderDoubleClickTime(projection.state.projectId, projectCorePort, reportInteractionError);
+  const properties = usePropertyDrafts({
+    projection, frameIds: navigation.selectedFrameIds, disabled: interactionBlocked,
+    port: projectCorePort, runner: runProjectMutation,
+    commitFrameStyle: mutations.commitFrameStyle, commitPhotoAngle: mutations.commitPhotoAngle,
+    commitPhotoZoom: mutations.commitPhotoZoom, commitInteraction: intent => mutations.commitInteraction(intent, true),
+    onError: reportInteractionError,
+  });
+  const flushPropertyDrafts = properties.flush;
+  const layoutCatalog = useLayoutCatalog({ projection, runner: runProjectMutation,
+    port: projectCorePort, dialogPort: projectDialogPort, onError: reportInteractionError });
+  const canSaveLayout = canvasMode.kind === "sheet-editing" && !interactionBlocked && !layoutCatalog.busy &&
+    projection.state.album.sheets.some((sheet) => sheet.id === canvasMode.sheetId && sheet.frames.length > 0);
+  const saveLayout = () => {
+    if (!canSaveLayout || canvasMode.kind !== "sheet-editing") return;
+    flushPropertyDrafts();
+    void layoutCatalog.save(canvasMode.sheetId);
+  };
+  const layoutPanel = useLayoutPanel({
+    projection, editing: canvasMode.kind === "sheet-editing", disabled: interactionBlocked,
+    port: projectCorePort, runner: runProjectMutation, commit: mutations.applyIntent,
+    onError: reportInteractionError,
+    catalogRevision: layoutCatalog.revision,
+  });
+  const orientPhotos = (action: PhotoOrientationAction) => {
+    if (!canOrientPhotos) return Promise.resolve(false);
+    flushPropertyDrafts();
+    return mutations.orientPhotos([...navigation.selectedFrameIds], action);
+  };
+  const canApplyPhotoEffects = selectedFrames.some((frame) => frame.photo !== null) && !interactionBlocked;
+  const togglePhotoBlackAndWhite = () => {
+    if (!canApplyPhotoEffects) return Promise.resolve(false);
+    flushPropertyDrafts();
+    return mutations.togglePhotoBlackAndWhite([...navigation.selectedFrameIds]);
+  };
+  const canDeleteFrames = selectedFrames.length > 0 && !interactionBlocked;
+  const automaticPasteSelectionRef = useRef<readonly string[] | null>(null);
+  const canCopyFrames = selectedFrames.length > 0 && !interactionBlocked;
+  const pasteSheet = projection.state.album.sheets.find((sheet) => sheet.id === navigation.implicitSheetId);
+  const canPasteIntoSheet = pasteSheet !== undefined && !pasteSheet.layoutLocked && !interactionBlocked;
+  const canPasteFrames = canPasteIntoSheet && (projection.canPasteFrames || mutations.frameCopyPending);
+  const copyFrames = () => {
+    if (!canCopyFrames) return Promise.resolve(false);
+    return mutations.copyFrames([...navigation.selectedFrameIds]);
+  };
+  const pasteFrames = () => {
+    // Queue a rapid Ctrl+V after Ctrl+C even before its projection is rendered.
+    // Clipboard availability is checked again against the authoritative queued result.
+    if (!canPasteIntoSheet || !pasteSheet) return Promise.resolve(false);
+    const sheetId = pasteSheet.id;
+    const selection = navigation.selectedFrameIds;
+    const mode = canvasMode.kind === "sheet-editing" ? "edit" : "normal";
+    const desiredOffsetUm = mode === "edit" && navigation.canvasScale ? Math.round(16 * CANVAS_MICROMETERS_PER_PIXEL / navigation.canvasScale) : 0;
+    return mutations.pasteFrames(sheetId, desiredOffsetUm, mode, (ids, next) => {
+      const view = useEditorView.getState();
+      if (view.projectId !== next.state.projectId || view.editingSheetId !== navigation.editingSheetId ||
+          view.centeredSheetId !== navigation.centeredSheetId ||
+          (view.selectedFrameIds !== selection && view.selectedFrameIds !== automaticPasteSelectionRef.current)) return;
+      if (canvasMode.kind === "sheet-editing") view.selectFrames(ids);
+      else view.selectFrame(ids[ids.length - 1]);
+      // A preceding queued Paste may select its result; only subsequent user input wins.
+      automaticPasteSelectionRef.current = useEditorView.getState().selectedFrameIds;
+    });
+  };
+  const canSwapFrameContents = canvasMode.kind === "sheet-editing" &&
+    selectedFrames.length === 2 && selectedFrames.some((frame) => frame.photo !== null) &&
+    !interactionBlocked;
+  const swapFrameContents = () => {
+    if (!canSwapFrameContents) return Promise.resolve(false);
+    return mutations.applyIntent({ kind: "swapFrameContents", frameIds: [...navigation.selectedFrameIds] });
+  };
+  const deleteFrames = () => {
+    if (!canDeleteFrames) return Promise.resolve(false);
+    return mutations.applyIntent({ kind: "deleteFrames", frameIds: [...navigation.selectedFrameIds],
+      mode: canvasMode.kind === "sheet-editing" ? "edit" : "normal" });
+  };
+  const arrangeFrames = (action: FrameStackAction) => {
+    if (!canArrangeFrames) return Promise.resolve(false);
+    return mutations.applyIntent({ kind: "arrangeFrames", frameIds: [...navigation.selectedFrameIds], action });
+  };
+  const selectedComposedPhoto = useMemo(
+    () =>
+      projection.composition.sheets
+        .flatMap((sheet) => sheet.frames)
+        .find(
+          (frame) => frame.frameId === navigation.selectedFrameId,
+        )?.photo ?? null,
+    [projection.composition.sheets, navigation.selectedFrameId],
+  );
+  const photoGestures = usePhotoGestures({
+    projection,
+    selectedFrame,
+    selectedFrameId: navigation.selectedFrameId,
+    commitInteraction: mutations.commitInteraction,
+  });
+
+  const exitSheetEditing = useCallback(() => {
+    const editedSheetId = navigation.editingSheetId;
+    navigation.exitSheetEdit();
+    if (editedSheetId) {
+      navigation.focusSheet(editedSheetId);
+      navigation.centerSheet(editedSheetId);
+    }
+  }, [
+    navigation.centerSheet,
+    navigation.editingSheetId,
+    navigation.exitSheetEdit,
+    navigation.focusSheet,
+  ]);
+
+  const enterSheetEditing = useCallback(
+    (sheetId: string) => {
+      if (
+        interactionBlocked ||
+        navigation.editingSheetId !== null ||
+        !projection.state.album.sheets.some(
+          (sheet) => sheet.id === sheetId,
+        )
+      ) {
+        return;
+      }
+      navigation.enterSheetEdit(sheetId);
+    },
+    [
+      interactionBlocked,
+      navigation.editingSheetId,
+      navigation.enterSheetEdit,
+      projection.state.album.sheets,
+    ],
+  );
+
+  useCanvasModeKeyboardShortcuts({
+    implicitSheetId: layoutPanel.visible ? layoutPanel.sheetId : navigation.implicitSheetId,
+    interactionBlocked,
+    mode: canvasMode,
+    onEnterSheetEditing: enterSheetEditing,
+    onExitSheetEditing: exitSheetEditing,
+  });
+
+  const swapSheetSides = (sheetId: string) => {
+    if (structuralCommandsDisabled || structuralMutationPendingRef.current ||
+        projection.state.album.sheets.find((sheet) => sheet.id === sheetId)?.layoutLocked ||
+        projection.state.album.sheets.find((sheet) => sheet.id === sheetId)?.activeSides !== "both") {
+      return Promise.resolve(false);
+    }
+    return mutations.swapSheetSides(sheetId);
+  };
+
+  const canvasProps: AlbumCanvasProps = {
+    frameGapUm: projection.state.layoutSettings.gapUm,
+    displayUnit: projection.state.document.displayUnit,
+    revision: projection.state.revision,
+    projectId: projection.state.projectId,
+    mode: canvasMode.kind === "normal" && layoutPanel.visible && layoutPanel.sheetId
+      ? { kind: "normal", isolatedSheetId: layoutPanel.sheetId } : canvasMode,
+    composition: layoutPanel.composition !== projection.composition ? layoutPanel.composition
+      : properties.composition,
+    sheetBarMetadata: projection.state.album.sheets.map((sheet) => ({
+      sheetId: sheet.id,
+      pageNumbers: sheet.pageNumbers,
+      layoutLocked: sheet.layoutLocked,
+    })),
+    continuousCanvasLayout: navigation.canvasLayout,
+    selectedFrameIds: navigation.selectedFrameIds,
+    focusedSheetId: navigation.focusedSheetId,
+    centeredSheetId: navigation.centeredSheetId,
+    viewport: navigation.viewport,
+    photoZoomPreview: properties.singleZoom.preview,
+    sheetSideSwap: {
+      disabled: structuralCommandsDisabled || structuralMutationPending,
+      onSwap: (sheetId) => { void swapSheetSides(sheetId); },
+    },
+    sheetLayouts: {
+      disabled: structuralCommandsDisabled || structuralMutationPending,
+      activeSheetId: layoutPanel.visible ? layoutPanel.sheetId : null,
+      onToggle: (sheetId) => { flushPropertyDrafts(); layoutPanel.toggle(sheetId); },
+    },
+    frameGeometry: {
+      disabled: interactionBlocked,
+      dragThreshold,
+      preview: (edit) => projectCorePort.previewFrameGeometry(edit),
+      commit: mutations.commitFrameGeometry,
+      onError: reportInteractionError,
+    },
+    frameContentSwap: {
+      disabled: interactionBlocked || structuralMutationPending || canvasMode.kind !== "normal",
+      dragThreshold,
+      resolveTarget: (point) => projectCorePort.resolvePhotoDropTarget(point.sheetId, point.xUm, point.yUm),
+      commit: (sourceFrameId, point) => interactionBlocked || structuralMutationPending || canvasMode.kind !== "normal"
+        ? Promise.resolve(false) : mutations.swapFrameContentsAtPoint(sourceFrameId, point),
+      onError: reportInteractionError,
+    },
+    onSelectFrame: navigation.selectFrame,
+    onSelectFrames: selectFrames,
+    onEditSheet: enterSheetEditing,
+    onFocusSheet: navigation.focusSheet,
+    onCenteredSheetChange: navigation.centerSheet,
+    onViewportChange: navigation.setViewport,
+    onTransformPreview: photoGestures.onTransformPreview,
+    onTransformCommit: photoGestures.onTransformCommit,
+    onResolvePhotoDropTarget: async (_mediaId, point) =>
+      projectCorePort.resolvePhotoDropTarget(
+        point.sheetId,
+        point.xUm,
+        point.yUm,
+      ),
+    onDropPhoto: (mediaId, point) =>
+      mutations.dropPhoto({
+        kind: "dropPhoto",
+        sheetId: point.sheetId,
+        mediaId,
+        xUm: point.xUm,
+        yUm: point.yUm,
+        mode: canvasMode.kind === "sheet-editing" ? "edit" : "normal",
+      }),
+    onPreviewDecorativeDrop: (request) => projectCorePort.previewDecorativeDrop(request),
+    onDropDecorative: (request) => mutations.applyIntent({ kind: "dropDecorative", request }),
+    onCanvasMetricsChange: navigation.handleCanvasMetricsChange,
+  };
+
+  async function applyStructuralIntent(intent: SheetStructureIntent) {
+    if (structuralCommandsDisabled || structuralMutationPendingRef.current) {
+      return false;
+    }
+    const attempt = structuralMutationAttemptRef.current + 1;
+    structuralMutationAttemptRef.current = attempt;
+    structuralMutationPendingRef.current = true;
+    setStructuralMutationPending(true);
+    try {
+      return await mutations.applyWithOutcome(intent);
+    } finally {
+      if (structuralMutationAttemptRef.current === attempt) {
+        structuralMutationPendingRef.current = false;
+        setStructuralMutationPending(false);
+      }
+    }
+  }
+
+  const addSheetBefore = (sheetId = navigation.implicitSheetId) => {
+    if (!sheetId) return Promise.resolve(false);
+    return applyStructuralIntent({
+      kind: "addSheet",
+      anchorSheetId: sheetId,
+      position: "before",
+    });
+  };
+
+  const addSheetAfter = (sheetId = navigation.implicitSheetId) => {
+    if (!sheetId) return Promise.resolve(false);
+    return applyStructuralIntent({
+      kind: "addSheet",
+      anchorSheetId: sheetId,
+      position: "after",
+    });
+  };
+
+  const duplicateSheet = (sheetId = navigation.implicitSheetId) => {
+    if (!sheetId) return Promise.resolve(false);
+    return applyStructuralIntent({ kind: "duplicateSheet", sheetId });
+  };
+
+  const deleteSheet = (sheetId = navigation.implicitSheetId) => {
+    if (!sheetId) return Promise.resolve(false);
+    return applyStructuralIntent({ kind: "deleteSheet", sheetId });
+  };
+
+  const convertEdge = (sheetId = navigation.implicitSheetId) => {
+    if (!sheetId) return Promise.resolve(false);
+    return applyStructuralIntent({ kind: "convertEdgeSheet", sheetId });
+  };
+
+  const reorderSheet = (sheetId: string, targetIndex: number) => {
+    return applyStructuralIntent({
+      kind: "reorderSheet",
+      sheetId,
+      targetIndex,
+    });
+  };
+
+  return {
+    editMediaFolder: (edit: import("../../domain/project").MediaFolderEdit) => interactionBlocked
+      ? Promise.resolve(false) : mutations.editMediaFolder(edit),
+    layoutPanel,
+    frameStyle: { ...properties.frameStyle, doubleClickTimeMs, dragThreshold },
+    photoZoom: { ...properties.photoZoom, doubleClickTimeMs, dragThreshold },
+    photoAngle: { ...properties.photoAngle, doubleClickTimeMs, dragThreshold },
+    canOrientPhotos,
+    orientPhotos,
+    canApplyPhotoEffects,
+    togglePhotoBlackAndWhite,
+    addFrame,
+    canAddFrame,
+    canSelectAllFrames,
+    selectAllFrames,
+    canDeleteFrames,
+    canCopyFrames,
+    canPasteFrames,
+    copyFrames,
+    pasteFrames,
+    deleteFrames,
+    canSwapFrameContents,
+    swapFrameContents,
+    swapSheetSides,
+    arrangeFrames,
+    canArrangeFrames,
+    layoutCatalog,
+    canSaveLayout,
+    saveLayout,
+    message: mutations.message,
+    importPending: mutations.importPending,
+    imageProcessingProgress: mutations.imageProcessingProgress,
+    imageProcessingProblems: mutations.imageProcessingProblems,
+    imageProcessingOperationProblem: mutations.imageProcessingOperationProblem,
+    dismissImageProcessingProblems: mutations.dismissImageProcessingProblems,
+    retryUnavailableMedia: mutations.retryUnavailableMedia,
+    photoImportResult: mutations.photoImportResult,
+    dismissPhotoImportResult: mutations.dismissPhotoImportResult,
+    selectedFrame,
+    selectedComposedPhoto,
+    selectedFrames,
+    displayedPhotoZoom: properties.singleZoom.value ?? photoGestures.displayedPhotoZoom,
+    sheetCount: projection.state.album.sheets.length,
+    structuralCommandsDisabled,
+    structuralMutationPending,
+    canvasProps,
+    navigateToSheet: navigation.navigateToSheet,
+    navigateToAdjacentSheet: navigation.navigateToAdjacentSheet,
+    applyAlbumInformation: mutations.applyAlbumInformation,
+    applyAlbumDesign: mutations.applyAlbumDesign,
+    applyDpi: mutations.applyDpi,
+    relinkMedia: mutations.relinkMedia,
+    replaceMedia: mutations.replaceMedia,
+    importMedia: mutations.importMedia,
+    addSheetBefore,
+    addSheetAfter,
+    duplicateSheet,
+    convertEdge,
+    deleteSheet,
+    reorderSheet,
+    save: () => { flushPropertyDrafts(); return mutations.save(); },
+    saveAs: () => { flushPropertyDrafts(); return mutations.saveAs(); },
+    undo: () => { flushPropertyDrafts(); return mutations.undo(); },
+    redo: () => { flushPropertyDrafts(); return mutations.redo(); },
+    fillMedia: (mediaId: string) => {
+      if (navigation.implicitSheetId) {
+        void mutations.applyPhotoWithStatus({
+          kind: "addPhoto",
+          sheetId: navigation.implicitSheetId,
+          mediaId,
+          mode: canvasMode.kind === "sheet-editing" ? "edit" : "normal",
+        });
+      }
+    },
+    applyDecorative: (mediaId: string, role: import("../../domain/project").DecorativeRole) => {
+      if (!interactionBlocked && navigation.implicitSheetId) {
+        void mutations.applyIntent({ kind: "applyDecorative", sheetId: navigation.implicitSheetId, mediaId, role, scope: "bothSides" });
+      }
+    },
+    sheetDesign: {
+      disabled: interactionBlocked || canvasMode.kind !== "sheet-editing",
+      onApplyDecorative: (sheetId: string, scope: DecorativeScope, role: import("../../domain/project").DecorativeRole, mediaId: string) => {
+        if (interactionBlocked || canvasMode.kind !== "sheet-editing" || canvasMode.sheetId !== sheetId) {
+          return Promise.resolve(false);
+        }
+        return mutations.applyIntent({ kind: "applyDecorative", sheetId, scope, role, mediaId });
+      },
+      onChange: (sheetId: string, scope: DecorativeScope, change: SheetVisualChange) => {
+        if (interactionBlocked || canvasMode.kind !== "sheet-editing" || canvasMode.sheetId !== sheetId) {
+          return Promise.resolve(false);
+        }
+        return mutations.applyIntent({ kind: "editSheetVisual", sheetId, scope, change });
+      },
+    },
+    dismissFeedback: mutations.dismissFeedback,
+  };
+}

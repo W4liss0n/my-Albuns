@@ -22,33 +22,33 @@ const newProjectStyles = readStyles("src/global/NewProjectFlow.css");
 const newProjectPreviewStyles = readStyles(
   "src/global/NewProjectPreviewPanel.css",
 );
-const editorStyles = readStyles("src/App.css");
-const menuStyles = readStyles("src/components/ApplicationMenuBar.css");
-const canvasStyles = readStyles("src/components/AlbumCanvas.css");
+const editorStyles = readStyles("src/project/App.css");
+const menuStyles = readStyles("src/project/workspace/ApplicationMenuBar.css");
+const canvasStyles = readStyles("src/project/canvas/AlbumCanvas.css");
 const canvasScrollbarStyles = readStyles(
-  "src/components/CanvasHorizontalScrollbar.css",
+  "src/project/canvas/CanvasHorizontalScrollbar.css",
 );
 const canvasPreviewStyles = readStyles("src/previews/canvas-preview.css");
-const mediaPanelStyles = readStyles("src/components/MediaPanel.css");
-const mediaThumbnailStyles = readStyles("src/components/MediaThumbnail.css");
+const mediaPanelStyles = readStyles("src/project/media-panel/MediaPanel.css");
+const mediaThumbnailStyles = readStyles("src/project/media-panel/MediaThumbnail.css");
 const mediaPreviewCardStyles = readStyles(
-  "src/components/MediaPreviewCard.css",
+  "src/project/media-panel/MediaPreviewCard.css",
 );
-const inspectorPanelStyles = readStyles("src/components/InspectorPanel.css");
+const inspectorPanelStyles = readStyles("src/project/inspector/InspectorPanel.css");
 const albumInformationStyles = readStyles(
-  "src/components/AlbumInformationForm.css",
+  "src/project/inspector/AlbumInformationForm.css",
 );
 const visualDefaultPickerStyles = readStyles(
-  "src/components/VisualDesignControl.css",
+  "src/project/inspector/VisualDesignControl.css",
 );
 const decorativePickerStyles = readStyles(
-  "src/components/DecorativeMediaPicker.css",
+  "src/project/inspector/DecorativeMediaPicker.css",
 );
-const albumInformationSource = readStyles("src/components/AlbumInformationForm.tsx");
+const albumInformationSource = readStyles("src/project/inspector/AlbumInformationForm.tsx");
 const decorativePickerSource = readStyles(
-  "src/components/DecorativeMediaPicker.tsx",
+  "src/project/inspector/DecorativeMediaPicker.tsx",
 );
-const mediaToolbarSource = readStyles("src/components/MediaPanelToolbar.tsx");
+const mediaToolbarSource = readStyles("src/project/media-panel/MediaPanelToolbar.tsx");
 const newProjectSource = readStyles("src/global/NewProjectFlow.tsx");
 const newProjectPreviewSource = readStyles(
   "src/global/NewProjectPreviewPanel.tsx",
@@ -56,26 +56,26 @@ const newProjectPreviewSource = readStyles(
 const newProjectPersonalizationSource = readStyles(
   "src/global/PersonalizationStep.tsx",
 );
-const albumDesignSource = readStyles("src/components/AlbumDesignForm.tsx");
+const albumDesignSource = readStyles("src/project/inspector/AlbumDesignForm.tsx");
 const applicationMenuSource = readStyles(
-  "src/components/ApplicationMenuBar.tsx",
+  "src/project/workspace/ApplicationMenuBar.tsx",
 );
 const sharedVisualPreviewSources = [
   "src/ui/visualPreview/PersonalizationPreview.tsx",
-  "src/components/VisualScopePreview.tsx",
+  "src/project/inspector/VisualScopePreview.tsx",
   "src/ui/visualPreview/ProportionalPreviewViewport.tsx",
-  "src/components/VisualScopePreview.css",
+  "src/project/inspector/VisualScopePreview.css",
   "src/ui/visualPreview/VisualPreviewSheet.css",
   "src/ui/visualPreview/ProportionalPreviewViewport.css",
 ].map((path) => ({ path, source: readStyles(path) }));
-const exportStyles = readStyles("src/components/ExportPreviewControl.css");
-const projectWorkspaceSource = readStyles("src/components/ProjectWorkspace.tsx");
+const exportStyles = readStyles("src/project/workspace/ExportPreviewControl.css");
+const projectWorkspaceSource = readStyles("src/project/workspace/ProjectWorkspace.tsx");
 const inlineNoticeSource = readStyles("src/ui/InlineNotice.tsx");
-const sheetPreviewSource = readStyles("src/components/SheetPreview.tsx");
+const sheetPreviewSource = readStyles("src/project/sheets/SheetPreview.tsx");
 const canvasRenderNodesSource = readStyles(
-  "src/components/albumCanvasRenderNodes.ts",
+  "src/project/canvas/albumCanvasRenderNodes.ts",
 );
-const exportSource = readStyles("src/components/ExportPreviewControl.tsx");
+const exportSource = readStyles("src/project/workspace/ExportPreviewControl.tsx");
 const applicationStyles = discoverStylePaths("src")
   .filter((path) => path !== "src/ui/theme.css")
   .map((path) => ({ path, styles: readStyles(path) }));
@@ -94,8 +94,8 @@ test("centralizes the shared type scale used by every application surface", () =
 
   expect(applicationStyles.map(({ path }) => path)).toEqual(
     expect.arrayContaining([
-      "src/components/DecorativeMediaPicker.css",
-      "src/components/VisualScopePreview.css",
+      "src/project/inspector/DecorativeMediaPicker.css",
+      "src/project/inspector/VisualScopePreview.css",
       "src/ui/visualPreview/VisualPreviewSheet.css",
       "src/ui/visualPreview/ProportionalPreviewViewport.css",
     ]),
@@ -259,9 +259,9 @@ test("keeps the shared visual preview neutral from New Project chrome", () => {
     expect(source, path).not.toMatch(/from\s+["'][^"']*global\//);
   }
   expect(newProjectPersonalizationSource).toContain(
-    'from "../components/VisualScopePreview"',
+    'from "../project/inspector/VisualScopePreview"',
   );
-  expect(albumDesignSource).toContain('from "../ui/visualPreview"');
+  expect(albumDesignSource).toContain('from "../../ui/visualPreview"');
   expect(albumDesignSource).not.toMatch(/from\s+["'][^"']*global\//);
 });
 
@@ -293,7 +293,7 @@ test("centers the empty Decorative tile after the shared tile geometry", () => {
 });
 
 test("keeps physical Sheet previews straight in every surface", () => {
-  expect(readStyles("src/components/SheetPreview.css")).toMatch(
+  expect(readStyles("src/project/sheets/SheetPreview.css")).toMatch(
     /\.sheet-preview\s*\{[^}]*border-radius:\s*0;/s,
   );
   expect(
