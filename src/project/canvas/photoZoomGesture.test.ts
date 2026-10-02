@@ -5,7 +5,7 @@ import {
   finishPhotoZoomGesture,
 } from "./photoZoomGesture";
 
-const zoomRange = { minimum: 1, maximum: 4 };
+const zoomRange = { minimum: 1, maximum: 5 };
 
 test("groups consecutive wheel events into one Photo Zoom commit", () => {
   let transition = advancePhotoZoomGesture(null, {
@@ -60,7 +60,7 @@ test("finishes the previous Frame before starting another gesture", () => {
 test("keeps Photo Zoom within the domain range", () => {
   const maximum = advancePhotoZoomGesture(null, {
     frameId: "frame-a",
-    baseZoom: 3.95,
+    baseZoom: 4.95,
     zoomRange,
     wheelDeltaY: -1_000,
   });
@@ -71,6 +71,6 @@ test("keeps Photo Zoom within the domain range", () => {
     wheelDeltaY: 1_000,
   });
 
-  expect(maximum.previewZoom).toBe(4);
+  expect(maximum.previewZoom).toBe(5);
   expect(minimum.previewZoom).toBe(1);
 });

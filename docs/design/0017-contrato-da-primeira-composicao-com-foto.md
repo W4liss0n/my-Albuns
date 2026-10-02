@@ -2,7 +2,7 @@
 status: accepted
 document: design
 date: 2026-08-20
-updated: 2026-09-24
+updated: 2026-10-02
 ticket: 17-programa-09-primeira-composicao-com-foto
 ---
 
@@ -68,6 +68,9 @@ superfície ativa da Lâmina. `mediaId` precisa referenciar uma Foto do catálog
 Pan é normalizado e `userZoom` é relativo: `1.0` significa nenhum ajuste do
 usuário. O Zoom base mínimo que preenche o Frame é derivado das dimensões
 observadas e da geometria; não é persistido nem confundido com `userZoom`.
+`userZoom` vai de `1.0` a `5.0` (100% a 500%), o mesmo máximo do myAlbuns
+antigo; um valor fora desse intervalo é recusado na edição e na leitura do
+arquivo.
 
 O leitor executa a cadeia pura `v1 -> v2 -> v3`; as duas migrações apenas
 acrescentam os valores padrão definidos por suas versões. Abrir não regrava. Um

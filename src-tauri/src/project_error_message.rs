@@ -17,7 +17,7 @@ pub(crate) fn project_error_message(error: CoreError) -> String {
         | InvalidFrameStackSelection | InvalidFrameGeometrySelection => "Selecione quadros de uma única lâmina para esta ação.".into(),
         InvalidFrameOpacity => "Use uma opacidade entre 0% e 100%.".into(),
         InvalidPhotoAngle => "Use um ângulo entre −45° e 45°, com uma casa decimal.".into(),
-        InvalidPhotoZoom => "Use um zoom entre 100% e 400%.".into(),
+        InvalidPhotoZoom => "Use um zoom entre 100% e 500%.".into(),
         InvalidSheetSideSwap => "Só é possível trocar os lados de uma lâmina dupla.".into(),
         FrameClipboardEmpty => "Copie quadros deste projeto antes de colar.".into(),
         InvalidFramePaste => "Os quadros copiados não cabem na área disponível.".into(),

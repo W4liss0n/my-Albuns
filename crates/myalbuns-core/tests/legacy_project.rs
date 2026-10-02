@@ -619,7 +619,7 @@ fn features_the_current_program_lacks_are_dropped_and_noted() {
     sepia["image_id"] = json!("img_foto");
     sepia["filter"] = json!("sepia");
     sepia["adjustments"]["brightness"] = json!(0.2);
-    sepia["transform"]["scale"] = json!(5.0);
+    sepia["transform"]["scale"] = json!(6.0);
     let mut black_and_white = frame(
         "b0000000-0000-4000-8000-000000000002",
         600.0,
@@ -634,7 +634,7 @@ fn features_the_current_program_lacks_are_dropped_and_noted() {
     let (saved, notes) = convert(&fixture, &["Foto.jpg"]);
     let frames = &saved["project"]["sheets"][1]["frames"];
 
-    assert_eq!(frames[0]["photo"]["transform"]["userZoom"], 4.0);
+    assert_eq!(frames[0]["photo"]["transform"]["userZoom"], 5.0);
     assert!(
         frames[0]["photo"]["transform"]
             .get("blackAndWhite")
@@ -647,6 +647,29 @@ fn features_the_current_program_lacks_are_dropped_and_noted() {
     }));
     assert!(notes.contains(&LegacyConversionNote::PhotoAdjustmentsDropped { sheet_number: 2 }));
     assert!(notes.contains(&LegacyConversionNote::PhotoZoomLimited { sheet_number: 2 }));
+}
+
+#[test]
+fn the_old_maximum_zoom_is_kept() {
+    let mut fixture = LegacyFixture::new().image("img_foto", "Foto.jpg", false, "");
+    let mut zoomed = frame(
+        "b0000000-0000-4000-8000-000000000001",
+        10.0,
+        10.0,
+        500.0,
+        500.0,
+    );
+    zoomed["image_id"] = json!("img_foto");
+    zoomed["transform"]["scale"] = json!(5.0);
+    fixture.sheets[1]["frames"] = json!([zoomed]);
+
+    let (saved, notes) = convert(&fixture, &["Foto.jpg"]);
+
+    assert_eq!(
+        saved["project"]["sheets"][1]["frames"][0]["photo"]["transform"]["userZoom"],
+        5.0
+    );
+    assert!(!notes.contains(&LegacyConversionNote::PhotoZoomLimited { sheet_number: 2 }));
 }
 
 #[test]

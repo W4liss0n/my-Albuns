@@ -101,7 +101,7 @@
                     "width": 160000.0
                   },
                   "zoomRange": {
-                    "maximum": 4.0,
+                    "maximum": 5.0,
                     "minimum": 1.0
                   }
                 },
@@ -180,7 +180,7 @@
                     "width": 90000.0
                   },
                   "zoomRange": {
-                    "maximum": 4.0,
+                    "maximum": 5.0,
                     "minimum": 1.0
                   }
                 },
@@ -322,7 +322,7 @@
                     "width": 240000.0
                   },
                   "zoomRange": {
-                    "maximum": 4.0,
+                    "maximum": 5.0,
                     "minimum": 1.0
                   }
                 },
@@ -750,7 +750,7 @@
                         "width": 160000.0
                       },
                       "zoomRange": {
-                        "maximum": 4.0,
+                        "maximum": 5.0,
                         "minimum": 1.0
                       }
                     },
@@ -829,7 +829,7 @@
                         "width": 300000.0
                       },
                       "zoomRange": {
-                        "maximum": 4.0,
+                        "maximum": 5.0,
                         "minimum": 1.0
                       }
                     },
@@ -971,7 +971,7 @@
                         "width": 240000.0
                       },
                       "zoomRange": {
-                        "maximum": 4.0,
+                        "maximum": 5.0,
                         "minimum": 1.0
                       }
                     },
@@ -1420,7 +1420,7 @@
                         "width": 90000.0
                       },
                       "zoomRange": {
-                        "maximum": 4.0,
+                        "maximum": 5.0,
                         "minimum": 1.0
                       }
                     },
@@ -1499,7 +1499,7 @@
                         "width": 150000.0
                       },
                       "zoomRange": {
-                        "maximum": 4.0,
+                        "maximum": 5.0,
                         "minimum": 1.0
                       }
                     },
@@ -1625,7 +1625,7 @@
                         "width": 240000.0
                       },
                       "zoomRange": {
-                        "maximum": 4.0,
+                        "maximum": 5.0,
                         "minimum": 1.0
                       }
                     },
@@ -2058,7 +2058,7 @@
                         "width": 160000.0
                       },
                       "zoomRange": {
-                        "maximum": 4.0,
+                        "maximum": 5.0,
                         "minimum": 1.0
                       }
                     },
@@ -2137,7 +2137,7 @@
                         "width": 90000.0
                       },
                       "zoomRange": {
-                        "maximum": 4.0,
+                        "maximum": 5.0,
                         "minimum": 1.0
                       }
                     },
@@ -2279,7 +2279,7 @@
                         "width": 240000.0
                       },
                       "zoomRange": {
-                        "maximum": 4.0,
+                        "maximum": 5.0,
                         "minimum": 1.0
                       }
                     },
@@ -2728,7 +2728,7 @@
                         "width": 90000.0
                       },
                       "zoomRange": {
-                        "maximum": 4.0,
+                        "maximum": 5.0,
                         "minimum": 1.0
                       }
                     },
@@ -2870,7 +2870,7 @@
                         "width": 240000.0
                       },
                       "zoomRange": {
-                        "maximum": 4.0,
+                        "maximum": 5.0,
                         "minimum": 1.0
                       }
                     },
@@ -2949,7 +2949,7 @@
                         "width": 240000.0
                       },
                       "zoomRange": {
-                        "maximum": 4.0,
+                        "maximum": 5.0,
                         "minimum": 1.0
                       }
                     },
