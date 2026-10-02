@@ -3,13 +3,13 @@
 import { Application, Container } from "pixi.js";
 import corpus from "../../tests/fixtures/frame-snap-cases.json";
 import type { ComposedSheet, DisplayUnit, FrameGeometryEdit, FrameGeometryPreview } from "../domain/project";
-import type { AlbumCanvasProps } from "../components/albumCanvasContract";
-import { AlbumCanvasScene } from "../components/albumCanvasScene";
-import { createContinuousCanvasLayout } from "../components/canvasGeometry";
-import { createFrameSnapGuideRenderNode } from "../components/frameSnapGuideRenderNode";
+import type { AlbumCanvasProps } from "../project/canvas/albumCanvasContract";
+import { AlbumCanvasScene } from "../project/canvas/albumCanvasScene";
+import { createContinuousCanvasLayout } from "../project/canvas/canvasGeometry";
+import { createFrameSnapGuideRenderNode } from "../project/canvas/frameSnapGuideRenderNode";
 import { mediaPanelPreviewFixture } from "../test/mediaPanelPreviewFixtures";
-import "../components/AlbumCanvas.css";
-import "../components/pixiRuntime";
+import "../project/canvas/AlbumCanvas.css";
+import "../project/canvas/pixiRuntime";
 
 const params = new URLSearchParams(window.location.search);
 const item = corpus.cases.find((entry) => entry.name === (params.get("case") ?? "width")) as unknown as {

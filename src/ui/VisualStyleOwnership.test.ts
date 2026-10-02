@@ -7,15 +7,15 @@ const source = (path: string) => readFileSync(path, "utf8") as string;
 
 test("keeps feature CSS with its rendering owner", () => {
   const owners = [
-    ["src/components/ApplicationMenuBar.tsx", "./ApplicationMenuBar.css"],
-    ["src/components/AlbumCanvas.tsx", "./AlbumCanvas.css"],
+    ["src/project/workspace/ApplicationMenuBar.tsx", "./ApplicationMenuBar.css"],
+    ["src/project/canvas/AlbumCanvas.tsx", "./AlbumCanvas.css"],
     [
-      "src/components/CanvasHorizontalScrollbar.tsx",
+      "src/project/canvas/CanvasHorizontalScrollbar.tsx",
       "./CanvasHorizontalScrollbar.css",
     ],
-    ["src/components/SheetPreview.tsx", "./SheetPreview.css"],
+    ["src/project/sheets/SheetPreview.tsx", "./SheetPreview.css"],
     ["src/global/EditorUnavailableNotice.tsx", "./EditorUnavailableNotice.css"],
-    ["src/components/workspacePanelLayout.tsx", "./WorkspacePanelLayout.css"],
+    ["src/project/workspace/workspacePanelLayout.tsx", "./WorkspacePanelLayout.css"],
   ] as const;
 
   for (const [owner, stylesheet] of owners) {
@@ -24,7 +24,7 @@ test("keeps feature CSS with its rendering owner", () => {
 });
 
 test("keeps visual preview structure with its direct owner", () => {
-  expect(source("src/components/VisualScopePreview.tsx"))
+  expect(source("src/project/inspector/VisualScopePreview.tsx"))
     .toContain('import "./VisualScopePreview.css";');
   for (const owner of [
     "src/ui/visualPreview/PersonalizationPreview.tsx",
@@ -63,34 +63,34 @@ test("keeps the outside-surface interaction with its sole New Project owner", ()
 
 test("keeps shared visual-default option policy in a neutral module", () => {
   for (const owner of [
-    "src/components/VisualDesignControl.tsx",
-    "src/components/DecorativeMediaPicker.tsx",
+    "src/project/inspector/VisualDesignControl.tsx",
+    "src/project/inspector/DecorativeMediaPicker.tsx",
   ]) {
     expect(source(owner), owner).toContain('import "./VisualDesignControl.css";');
   }
-  expect(source("src/components/AlbumDesignForm.css")).not.toMatch(
+  expect(source("src/project/inspector/AlbumDesignForm.css")).not.toMatch(
     /^\.visual-design-picker__(?:option|tile)\s*\{/m,
   );
 });
 
 test("makes the shared media card own its wrapper protocol", () => {
-  expect(source("src/components/MediaPreviewCard.tsx")).toContain(
+  expect(source("src/project/media-panel/MediaPreviewCard.tsx")).toContain(
     'import "./MediaPreviewCard.css";',
   );
-  expect(source("src/components/MediaThumbnail.css")).not.toMatch(
+  expect(source("src/project/media-panel/MediaThumbnail.css")).not.toMatch(
     /\.media-preview-card\b/,
   );
-  expect(source("src/components/MediaPreviewCard.tsx")).not.toContain(
+  expect(source("src/project/media-panel/MediaPreviewCard.tsx")).not.toContain(
     "thumbnailClassName",
   );
   for (const caller of [
-    "src/components/MediaPanel.tsx",
-    "src/components/DecorativeMediaPicker.tsx",
+    "src/project/media-panel/MediaPanel.tsx",
+    "src/project/inspector/DecorativeMediaPicker.tsx",
   ]) {
     expect(source(caller), caller).toContain("<MediaPreviewCard");
     expect(source(caller), caller).not.toContain('className="media-preview-card');
   }
-  expect(source("src/components/DecorativeMediaPicker.css")).not.toContain(
+  expect(source("src/project/inspector/DecorativeMediaPicker.css")).not.toContain(
     "visual-design-card",
   );
 });
@@ -104,13 +104,13 @@ test("keeps destructive button styling private to confirmation dialogs", () => {
 });
 
 test("requires productive preview and diagnostic dependencies at editor seams", () => {
-  const mediaPanel = source("src/components/MediaPanel.tsx");
+  const mediaPanel = source("src/project/media-panel/MediaPanel.tsx");
   expect(mediaPanel).toContain('kind: "connected";');
   expect(mediaPanel).toContain('kind: "static";');
   expect(mediaPanel).toContain("previewSource: MediaPanelPreviewSource;");
   expect(mediaPanel).not.toContain("mediaPreviews = {}");
 
-  const workspace = source("src/components/ProjectWorkspace.tsx");
+  const workspace = source("src/project/workspace/ProjectWorkspace.tsx");
   expect(workspace).toContain(
     "mediaPreviews: Readonly<Record<string, MediaPreview>>;",
   );
@@ -138,7 +138,7 @@ test("keeps shared contracts canonical and removes dead visual protocols", () =>
       "visual-personalization-preview",
     ],
     ["src/global/DimensionsPreview.tsx", "new-project-dimensions-sheet"],
-    ["src/components/DecorativeMediaPicker.tsx", "visual-design-card"],
+    ["src/project/inspector/DecorativeMediaPicker.tsx", "visual-design-card"],
   ] as const) {
     expect(source(path), path).not.toContain(protocol);
   }
@@ -151,7 +151,7 @@ test("keeps shared contracts canonical and removes dead visual protocols", () =>
 });
 
 test("keeps App.css restricted to application-level composition", () => {
-  const styles = source("src/App.css");
+  const styles = source("src/project/App.css");
 
   expect(styles).not.toMatch(
     /\.(?:app-menu|canvas-shell|canvas-host|canvas-horizontal-scrollbar|sheet-preview|safe-application-shell|workspace-splitter)\b/,
@@ -172,11 +172,11 @@ test("entrypoints import only their global foundation and owned composition", ()
     expect(contents, entrypoint).toMatch(/ui\/theme\.css/);
     expect(contents, entrypoint).toMatch(/ui\/ui\.css/);
   }
-  expect(source("src/App.tsx")).toContain('import "./App.css";');
+  expect(source("src/project/App.tsx")).toContain('import "./App.css";');
 });
 
 test("keeps form-specific inspector CSS out of the panel owner", () => {
-  const styles = source("src/components/InspectorPanel.css");
+  const styles = source("src/project/inspector/InspectorPanel.css");
 
   expect(styles).not.toMatch(
     /\.(?:album-information|album-entry|album-measurement|album-design|visual-default|album-frame-border)\b/,
@@ -184,7 +184,7 @@ test("keeps form-specific inspector CSS out of the panel owner", () => {
 });
 
 test("composes the shared floating chrome into application menus", () => {
-  const menuSource = source("src/components/ApplicationMenuBar.tsx");
+  const menuSource = source("src/project/workspace/ApplicationMenuBar.tsx");
 
   expect(menuSource).toContain(
     'className="ui-floating-surface app-menu-popup"',
@@ -192,7 +192,7 @@ test("composes the shared floating chrome into application menus", () => {
   expect(menuSource).toContain(
     'className="ui-floating-surface app-menu-popup app-menu-submenu-popup"',
   );
-  expect(source("src/components/ApplicationMenuBar.css")).not.toMatch(
+  expect(source("src/project/workspace/ApplicationMenuBar.css")).not.toMatch(
     /\.app-menu-popup\s*\{[^}]*(?:border:|border-radius:|background:|box-shadow:)/s,
   );
 });

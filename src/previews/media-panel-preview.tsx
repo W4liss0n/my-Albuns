@@ -3,7 +3,7 @@ import ReactDOM from "react-dom/client";
 
 import "../ui/theme.css";
 import "../ui/ui.css";
-import { MediaPanel } from "../components/MediaPanel";
+import { MediaPanel } from "../project/media-panel/MediaPanel";
 import { mediaPanelPreviewFixture } from "../test/mediaPanelPreviewFixtures";
 import "./media-panel-preview.css";
 import type { MediaFolder } from "../domain/project";

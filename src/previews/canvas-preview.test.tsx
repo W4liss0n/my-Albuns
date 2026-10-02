@@ -1,10 +1,10 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, expect, test, vi } from "vitest";
 
-import type { AlbumCanvasProps } from "../components/albumCanvasContract";
+import type { AlbumCanvasProps } from "../project/canvas/albumCanvasContract";
 import { CanvasPreview } from "./canvas-preview";
 
-vi.mock("../components/AlbumCanvas", () => ({
+vi.mock("../project/canvas/AlbumCanvas", () => ({
   AlbumCanvas: ({
     centeredSheetId,
     mode,

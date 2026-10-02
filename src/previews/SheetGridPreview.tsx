@@ -1,7 +1,7 @@
 import { rasterLimitsAt300Dpi } from "../test/projectConfigurationFixtures";
 import { useCallback, useMemo, useState } from "react";
 
-import { InspectorPanel } from "../components/InspectorPanel";
+import { InspectorPanel } from "../project/inspector/InspectorPanel";
 import type {
   AlbumInformation,
   ComposedBackground,

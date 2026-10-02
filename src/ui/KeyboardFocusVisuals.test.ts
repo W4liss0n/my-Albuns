@@ -16,7 +16,7 @@ test("keeps keyboard focus visible inside destructive actions", () => {
 });
 
 test("keeps keyboard focus visible inside the active media folder chip", () => {
-  const css = stylesheet("../components/MediaPanel.css");
+  const css = stylesheet("../project/media-panel/MediaPanel.css");
 
   expect(css).toMatch(
     /\.media-folder-chip:focus-visible\s*\{[^}]*box-shadow:/s,
@@ -27,7 +27,7 @@ test("keeps keyboard focus visible inside the active media folder chip", () => {
 });
 
 test("keeps focus perceptible when a media toolbar control is already selected", () => {
-  const css = stylesheet("../components/MediaPanel.css");
+  const css = stylesheet("../project/media-panel/MediaPanel.css");
 
   expect(css).toMatch(
     /\.media-tabs button:focus-visible,[\s\S]*box-shadow:\s*inset 0 0 0 1px var\(--ui-focus-neutral\);/,

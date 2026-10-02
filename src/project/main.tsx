@@ -1,0 +1,53 @@
+import { tauriExportMediaPort } from "../platform/tauriExportMediaPort";
+import { tauriProjectGenerationLauncher } from "../platform/tauriProjectGenerationLauncher";
+import { tauriProjectLauncher } from "../platform/tauriProjectLauncher";
+import React from "react";
+import ReactDOM from "react-dom/client";
+import App from "./App";
+import {
+  probeCanvasGraphics,
+  probeGraphics,
+} from "../platform/graphics";
+import {
+  tauriExportPipelinePort,
+  tauriMediaPreviewPort,
+  tauriProjectStartupPort,
+  tauriProjectCorePort,
+  tauriWorkspacePreferencesPort,
+} from "../platform/tauriProjectPorts";
+import { installDesktopWebViewPolicy } from "../platform/desktopWebViewPolicy";
+import { tauriLogger } from "../platform/tauriLogger";
+import { tauriProjectWindowPort } from "../platform/tauriProjectWindowPort";
+import { tauriMediaDropPort } from "../platform/tauriMediaDropPort";
+import { tauriProjectDialogPort } from "../platform/tauriProjectDialogPort";
+import { tauriPhotoshopPort } from "../platform/tauriPhotoshopPort";
+import { tauriWindowControls } from "../platform/tauriWindowControls";
+import { tauriImageViewerWindow } from "../platform/tauriImageViewerWindow";
+import { WindowControlsProvider } from "../ui";
+
+installDesktopWebViewPolicy(document);
+
+ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
+  <React.StrictMode>
+    <WindowControlsProvider controls={tauriWindowControls}>
+      <App
+        projectLauncher={tauriProjectLauncher}
+        generationLauncher={tauriProjectGenerationLauncher}
+        exportMediaPort={tauriExportMediaPort}
+        exportPipelinePort={tauriExportPipelinePort}
+        photoshopPort={tauriPhotoshopPort}
+        mediaPreviewPort={tauriMediaPreviewPort}
+        mediaDropPort={tauriMediaDropPort}
+        projectStartupPort={tauriProjectStartupPort}
+        projectCorePort={tauriProjectCorePort}
+        projectDialogPort={tauriProjectDialogPort}
+        projectWindowPort={tauriProjectWindowPort}
+        imageViewerWindowPort={tauriImageViewerWindow}
+        graphicsProbe={probeGraphics}
+        canvasGraphicsDiagnosticProbe={probeCanvasGraphics}
+        logger={tauriLogger}
+        workspacePreferencesPort={tauriWorkspacePreferencesPort}
+      />
+    </WindowControlsProvider>
+  </React.StrictMode>,
+);

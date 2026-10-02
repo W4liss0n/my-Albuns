@@ -2,13 +2,13 @@
 import { Application, Container } from "pixi.js";
 import { createRoot } from "react-dom/client";
 import { flushSync } from "react-dom";
-import { MediaThumbnail } from "../components/MediaThumbnail";
-import { AlbumCanvasScene } from "../components/albumCanvasScene";
-import { interactiveComposition } from "../components/albumCanvasTestFixtures";
-import type { AlbumCanvasProps } from "../components/albumCanvasContract";
-import { createContinuousCanvasLayout } from "../components/canvasGeometry";
+import { MediaThumbnail } from "../project/media-panel/MediaThumbnail";
+import { AlbumCanvasScene } from "../project/canvas/albumCanvasScene";
+import { interactiveComposition } from "../project/canvas/albumCanvasTestFixtures";
+import type { AlbumCanvasProps } from "../project/canvas/albumCanvasContract";
+import { createContinuousCanvasLayout } from "../project/canvas/canvasGeometry";
 import { loadedMediaPreviewImage } from "../application/mediaPreviewImages";
-import "../components/pixiRuntime";
+import "../project/canvas/pixiRuntime";
 
 const count = 12;
 const previews = Array.from({ length: count }, (_, index) => {

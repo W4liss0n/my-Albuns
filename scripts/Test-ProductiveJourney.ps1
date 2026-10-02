@@ -189,12 +189,12 @@ try {
     $node = (Get-Command node.exe -ErrorAction Stop).Source
     $npm = (Get-Command npm.cmd -ErrorAction Stop).Source
     $frontendStructureTestFiles = @(
-        (Join-Path $workspaceRoot 'src\components\ProjectWorkspace.test.tsx'),
-        (Join-Path $workspaceRoot 'src\components\SheetContextMenu.test.tsx'),
-        (Join-Path $workspaceRoot 'src\components\useProjectCommandShortcuts.test.tsx'),
-        (Join-Path $workspaceRoot 'src\components\sheetReorderSession.test.ts'),
-        (Join-Path $workspaceRoot 'src\components\SheetBarOverlay.test.tsx'),
-        (Join-Path $workspaceRoot 'src\components\InspectorPanelStructure.test.tsx')
+        (Join-Path $workspaceRoot 'src\project\workspace\ProjectWorkspace.test.tsx'),
+        (Join-Path $workspaceRoot 'src\project\sheets\SheetContextMenu.test.tsx'),
+        (Join-Path $workspaceRoot 'src\project\workspace\useProjectCommandShortcuts.test.tsx'),
+        (Join-Path $workspaceRoot 'src\project\sheets\sheetReorderSession.test.ts'),
+        (Join-Path $workspaceRoot 'src\project\sheets\SheetBarOverlay.test.tsx'),
+        (Join-Path $workspaceRoot 'src\project\inspector\InspectorPanelStructure.test.tsx')
     )
     $priorErrorActionPreference = $ErrorActionPreference
     try {

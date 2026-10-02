@@ -5,7 +5,7 @@ import { describe, expect, test } from "vitest";
 
 const themeStyles = readFileSync("src/ui/theme.css", "utf8") as string;
 const mediaPanelStyles = readFileSync(
-  "src/components/MediaPanel.css",
+  "src/project/media-panel/MediaPanel.css",
   "utf8",
 ) as string;
 const globalStyles = readFileSync(

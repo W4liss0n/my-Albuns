@@ -8,20 +8,20 @@ import ReactDOM from "react-dom/client";
 
 import "../ui/theme.css";
 import "../ui/ui.css";
-import { AlbumCanvas } from "../components/AlbumCanvas";
+import { AlbumCanvas } from "../project/canvas/AlbumCanvas";
 import type {
   AlbumCanvasMode,
   CanvasMetrics,
   SheetBarMetadata,
-} from "../components/albumCanvasContract";
-import { createNormalCanvasLayout } from "../components/canvasSheetViewGeometry";
+} from "../project/canvas/albumCanvasContract";
+import { createNormalCanvasLayout } from "../project/canvas/canvasSheetViewGeometry";
 import {
   type CanvasGraphicsDiagnosticProbe,
   CanvasGraphicsDiagnosticProbeProvider,
-} from "../components/canvasGraphicsDiagnosticProbeContext";
+} from "../project/canvas/canvasGraphicsDiagnosticProbeContext";
 import {
   useCanvasModeKeyboardShortcuts,
-} from "../components/useCanvasModeKeyboardShortcuts";
+} from "../project/editor/useCanvasModeKeyboardShortcuts";
 import type {
   ComposedFrame,
   ComposedSheet,

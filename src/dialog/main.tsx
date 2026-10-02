@@ -3,8 +3,8 @@ import ReactDOM from "react-dom/client";
 
 import type { ProjectRecoveryDecision } from "../application/projectPorts";
 import type { OpeningExternalCopyDecision } from "../global/application/globalProjectPort";
-import { ExternalCopyDecisionDialog } from "../components/ExternalCopyDecisionDialog";
-import { ProjectRecoveryDialog } from "../components/ProjectRecoveryDialog";
+import { ExternalCopyDecisionDialog } from "./ExternalCopyDecisionDialog";
+import { ProjectRecoveryDialog } from "./ProjectRecoveryDialog";
 import { installDesktopWebViewPolicy } from "../platform/desktopWebViewPolicy";
 import {
   resolveOpeningExternalCopy,

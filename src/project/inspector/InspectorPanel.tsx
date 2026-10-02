@@ -1,0 +1,837 @@
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type MouseEvent as ReactMouseEvent,
+  type ReactNode,
+} from "react";
+import { Button } from "react-aria-components";
+import { ChevronDown, ChevronRight, PanelsTopLeft } from "lucide-react";
+
+import type {
+  AlbumInformation,
+  AlbumInformationImpact,
+  AlbumInformationValidation,
+  ComposedPhoto,
+  ComposedSheet,
+  DisplayUnit,
+  DocumentSnapshot,
+  FrameSnapshot,
+  MediaCatalogItem,
+  ProjectedVisualDefaults,
+  SheetSnapshot,
+} from "../../domain/project";
+import type {
+  AlbumDesignProjectDraft,
+  AlbumInformationProjectDraft,
+} from "../../application/projectSettingsDraft";
+import type { MediaPreview } from "../../application/projectPorts";
+import { renderableMediaPreviewUrls } from "../../application/mediaPreviews";
+import { ActionButton, AppIcon, EmptyState } from "../../ui";
+import { AlbumDesignForm } from "./AlbumDesignForm";
+import { AlbumInformationForm } from "./AlbumInformationForm";
+import { SheetPreviewShell } from "../sheets/SheetPreview";
+import { PhotoZoomControl, type PhotoZoomControlActions } from "./PhotoZoomControl";
+import { PhotoOrientationControls, type PhotoOrientationControlActions } from "./PhotoOrientationControls";
+import { PhotoEffectsControls, type PhotoEffectsControlActions } from "./PhotoEffectsControls";
+import { FrameStyleControls, type FrameStyleControlActions } from "./FrameStyleControls";
+import {
+  SheetDesignInspector,
+  type SheetDesignScope,
+} from "./SheetDesignInspector";
+import {
+  SHEET_REORDER_INVALID_MESSAGE,
+  sheetReorderAutoScrollVelocity,
+  type SheetReorderRepresentation,
+  type SheetReorderStatus,
+} from "../sheets/sheetReorderSession";
+import {
+  useSheetPointerReorder,
+  type SheetReorderPointerPosition,
+  type SheetReorderPointerState,
+} from "../sheets/useSheetPointerReorder";
+import "./InspectorPanel.css";
+
+const ALBUM_INFORMATION_FORM_ID = "album-information-settings";
+const ALBUM_DESIGN_FORM_ID = "album-design-settings";
+
+export type InspectorContext =
+  | { kind: "album" }
+  | { kind: "sheet"; sheet: ComposedSheet }
+  | { kind: "multiple-frames"; frames: readonly FrameSnapshot[]; editingSheet: ComposedSheet }
+  | {
+      kind: "frame";
+      frame: FrameSnapshot;
+      composedPhoto: ComposedPhoto | null;
+      editingSheet?: ComposedSheet;
+    };
+
+export type InspectorSectionState =
+  | {
+      kind: "controlled";
+      values: Readonly<Record<string, boolean>>;
+      onChange(preferenceKey: string, open: boolean): void;
+    }
+  | { kind: "local" };
+
+export interface InspectorPanelProps {
+  sheetDesign?: import("./SheetDesignInspector").SheetDesignActions;
+  saveLayout?: { enabled: boolean; onSave(): void; feedback?: ReactNode };
+  frameStyle?: FrameStyleControlActions;
+  photoEffects?: PhotoEffectsControlActions;
+  photoOrientation?: PhotoOrientationControlActions;
+  photoZoom?: PhotoZoomControlActions;
+  context: InspectorContext;
+  displayedPhotoZoom: number;
+  document: DocumentSnapshot;
+  presentationUnit: DisplayUnit;
+  mediaItems: readonly MediaCatalogItem[];
+  sheetStates: readonly SheetSnapshot[];
+  sheets: readonly ComposedSheet[];
+  visualDefaults: ProjectedVisualDefaults;
+  frameGapUm: number;
+  focusedSheetId: string | null;
+  mediaPreviews: Readonly<Record<string, MediaPreview>>;
+  revision: number;
+  onApplyAlbumInformation(
+    draft: AlbumInformationProjectDraft,
+    impact: AlbumInformationImpact,
+  ): Promise<boolean>;
+  onApplyAlbumDesign(
+    draft: AlbumDesignProjectDraft,
+  ): Promise<boolean>;
+  onValidateAlbumInformation(
+    information: AlbumInformation,
+  ): Promise<AlbumInformationValidation>;
+  onPresentationUnitChange(unit: DisplayUnit | null): void;
+  onNavigateToSheet(sheetId: string): void;
+  onOpenSheetContextMenu?(
+    sheetId: string,
+    position: { x: number; y: number },
+  ): void;
+  sheetReorder?: {
+    disabled: boolean;
+    representation: SheetReorderRepresentation;
+    status: SheetReorderStatus;
+    onPreview(draggedSheetId: string, targetIndex: number): void;
+    onDrop(): void;
+    onCancel(): void;
+  };
+  sectionState: InspectorSectionState;
+}
+
+export function InspectorPanel({
+  sheetDesign,
+  saveLayout,
+  frameStyle,
+  photoOrientation,
+  photoZoom,
+  photoEffects,
+  context,
+  displayedPhotoZoom,
+  document,
+  presentationUnit,
+  mediaItems,
+  sheetStates,
+  sheets,
+  visualDefaults,
+  frameGapUm,
+  focusedSheetId,
+  mediaPreviews,
+  revision,
+  onApplyAlbumInformation,
+  onApplyAlbumDesign,
+  onPresentationUnitChange,
+  onValidateAlbumInformation,
+  onNavigateToSheet,
+  onOpenSheetContextMenu,
+  sheetReorder,
+  sectionState,
+}: InspectorPanelProps) {
+  const mediaPreviewUrls = useMemo(
+    () => renderableMediaPreviewUrls(mediaPreviews),
+    [mediaPreviews],
+  );
+  const [informationDirty, setInformationDirty] = useState(false);
+  const [designDirty, setDesignDirty] = useState(false);
+  const [sheetScopeSelection, setSheetScopeSelection] = useState<{
+    sheetId: string;
+    scope: SheetDesignScope;
+  } | null>(null);
+  const gridRef = useRef<HTMLDivElement | null>(null);
+  const gridGhostAnchorRef = useRef<GridGhostAnchor | null>(null);
+  const gridAutoScrollRef = useRef<{
+    frameId: number | null;
+    lastTimestamp: number | null;
+    velocity: number;
+    viewport: HTMLElement | null;
+  }>({
+    frameId: null,
+    lastTimestamp: null,
+    velocity: 0,
+    viewport: null,
+  });
+  const sheetStateById = new Map(
+    sheetStates.map((sheet) => [sheet.id, sheet] as const),
+  );
+  const composedSheetById = new Map(
+    sheets.map((sheet) => [sheet.sheetId, sheet] as const),
+  );
+  const sheetReorderEnabled =
+    sheetReorder !== undefined &&
+    !sheetReorder.disabled &&
+    sheetReorder.status !== "committing";
+  const orderedSheets = sheetReorder
+    ? sheetReorder.representation.order.flatMap((sheetId) => {
+        const sheet = composedSheetById.get(sheetId);
+        return sheet ? [sheet] : [];
+      })
+    : sheets;
+
+  function stopGridAutoScroll() {
+    const state = gridAutoScrollRef.current;
+    if (state.frameId !== null) {
+      window.cancelAnimationFrame(state.frameId);
+    }
+    state.frameId = null;
+    state.lastTimestamp = null;
+    state.velocity = 0;
+    state.viewport = null;
+  }
+
+  function advanceGridAutoScroll(timestamp: number) {
+    const state = gridAutoScrollRef.current;
+    state.frameId = null;
+    if (!state.viewport || state.velocity === 0) {
+      state.lastTimestamp = null;
+      return;
+    }
+
+    const previousTimestamp = state.lastTimestamp;
+    state.lastTimestamp = timestamp;
+    if (previousTimestamp !== null) {
+      const elapsedMs = Math.min(
+        50,
+        Math.max(0, timestamp - previousTimestamp),
+      );
+      state.viewport.scrollTop += (state.velocity * elapsedMs) / 1_000;
+      pointerReorder.refreshTarget();
+    }
+    state.frameId = window.requestAnimationFrame(advanceGridAutoScroll);
+  }
+
+  function updateGridAutoScroll(
+    viewport: HTMLElement,
+    velocity: number,
+  ) {
+    if (velocity === 0) {
+      stopGridAutoScroll();
+      return;
+    }
+    const state = gridAutoScrollRef.current;
+    if (state.viewport !== viewport) state.lastTimestamp = null;
+    state.viewport = viewport;
+    state.velocity = velocity;
+    if (state.frameId === null) {
+      state.frameId = window.requestAnimationFrame(advanceGridAutoScroll);
+    }
+  }
+
+  useEffect(() => () => stopGridAutoScroll(), []);
+
+  function autoScrollGrid(position: SheetReorderPointerPosition) {
+    if (!sheetReorder || !sheetReorderEnabled) return;
+    const viewport = gridRef.current?.closest<HTMLElement>(
+      ".inspector-scroll",
+    );
+    if (!viewport) return;
+    const bounds = viewport.getBoundingClientRect();
+    const velocity = sheetReorderAutoScrollVelocity({
+      axis: "vertical",
+      pointerPosition: position.clientY,
+      viewportStart: bounds.top,
+      viewportEnd: bounds.bottom,
+    });
+    updateGridAutoScroll(viewport, velocity);
+  }
+
+  const pointerReorder = useSheetPointerReorder({
+    enabled: sheetReorderEnabled,
+    onActivate: onNavigateToSheet,
+    onCancel: () => sheetReorder?.onCancel(),
+    onDrop: () => sheetReorder?.onDrop(),
+    onFinish: stopGridAutoScroll,
+    onMove: autoScrollGrid,
+    onPreview: (sheetId, targetIndex) =>
+      sheetReorder?.onPreview(sheetId, targetIndex),
+    resolveTarget: (position) =>
+      resolveGridTarget(gridRef.current, position),
+    validRelease: (position) =>
+      pointInsideGridViewport(gridRef.current, position),
+  });
+  const reorderGhostSheetId =
+    pointerReorder.pointer?.sourceId ??
+    sheetReorder?.representation.ghost?.sheetId ??
+    null;
+  const reorderGhostSheet = reorderGhostSheetId
+    ? composedSheetById.get(reorderGhostSheetId)
+    : undefined;
+  const reorderGhostSheetState = reorderGhostSheetId
+    ? sheetStateById.get(reorderGhostSheetId)
+    : undefined;
+  const reorderGhostPageMetadata = formatSheetPageMetadata(
+    reorderGhostSheetState,
+  );
+
+  function openGridContextMenu(
+    event: ReactMouseEvent<HTMLDivElement>,
+    sheetId: string,
+  ) {
+    if (!onOpenSheetContextMenu) return;
+    event.preventDefault();
+    onOpenSheetContextMenu(sheetId, { x: event.clientX, y: event.clientY });
+  }
+  const editingSheet =
+    context.kind === "sheet"
+      ? context.sheet
+      : context.kind === "frame" || context.kind === "multiple-frames"
+        ? context.editingSheet ?? null
+        : null;
+  const selectedSheetScope = editingSheet
+    ? normalizeSheetScope(
+        sheetScopeSelection?.sheetId === editingSheet.sheetId
+          ? sheetScopeSelection.scope
+          : defaultSheetScope(editingSheet),
+        editingSheet,
+      )
+    : null;
+
+  useEffect(() => {
+    if (!editingSheet) setSheetScopeSelection(null);
+  }, [editingSheet]);
+  const selectedPhotoCount = context.kind === "multiple-frames"
+    ? context.frames.filter((frame) => frame.photo !== null).length : 0;
+  const selectedPlaceholderCount = context.kind === "multiple-frames"
+    ? context.frames.length - selectedPhotoCount : 0;
+
+  const selectedZooms = context.kind === "multiple-frames"
+    ? context.frames.flatMap((frame) => frame.photo ? [frame.photo.transform.userZoom] : []) : [];
+  const commonZoom = selectedZooms.length > 0 && selectedZooms.every((zoom) => zoom === selectedZooms[0])
+    ? Math.round(selectedZooms[0] * 100) : null;
+  const groupZoomRange = context.kind === "multiple-frames"
+    ? context.editingSheet.frames.find((frame) => frame.photo)?.photo?.placement.zoomRange : undefined;
+
+  return (
+    <aside
+      id="contextual-panel"
+      className="inspector"
+      aria-label="Painel contextual"
+    >
+      <div className="inspector-scroll">
+        {context.kind === "multiple-frames" ? (
+          <>
+            <div className="context-heading">
+              <span>Seleção múltipla</span>
+              <h2>{context.frames.length} quadros selecionados</h2>
+              <p>
+                {selectedPhotoCount} {selectedPhotoCount === 1 ? "foto" : "fotos"}
+                {" · "}
+                {selectedPlaceholderCount} {selectedPlaceholderCount === 1 ? "quadro vazio" : "quadros vazios"}
+              </p>
+            </div>
+            {(frameStyle || ((photoOrientation || photoZoom) && selectedPhotoCount > 0)) && (
+              <InspectorSection
+                key="frame-photo-design"
+                title="Design"
+                preferenceKey="frame-photo.design"
+                sectionState={sectionState}
+                defaultOpen
+              >
+                {photoZoom && selectedPhotoCount > 0 && groupZoomRange && (
+                  <PhotoZoomControl key={photoZoom.scopeKey} {...photoZoom} value={commonZoom}
+                    minimum={Math.round(groupZoomRange.minimum * 100)} maximum={Math.round(groupZoomRange.maximum * 100)} />
+                )}
+                {photoOrientation && <PhotoOrientationControls frames={context.frames} {...photoOrientation} />}
+                {frameStyle && <FrameStyleControls key={`${frameStyle.scopeKey}:${presentationUnit}`} frames={context.frames} unit={presentationUnit} {...frameStyle} />}
+              </InspectorSection>
+            )}
+            {photoEffects && selectedPhotoCount > 0 && (
+              <InspectorSection key="frame-photo-effects" title="Ajustes e Efeitos"
+                preferenceKey="frame-photo.effects" sectionState={sectionState} defaultOpen>
+                <PhotoEffectsControls frames={context.frames} {...photoEffects} />
+              </InspectorSection>
+            )}
+          </>
+        ) : context.kind === "frame" ? (
+          <>
+            <div className="context-heading">
+              <span>Quadro selecionado</span>
+              <h2>{context.composedPhoto?.name ?? "Quadro vazio"}</h2>
+            </div>
+            <InspectorSection
+              key="frame-photo-design"
+              title="Design"
+              preferenceKey="frame-photo.design"
+              sectionState={sectionState}
+              defaultOpen
+            >
+              {context.frame.photo && context.composedPhoto && photoZoom && (
+                <PhotoZoomControl key={photoZoom.scopeKey} {...photoZoom}
+                  value={Math.round(displayedPhotoZoom * 100)}
+                  minimum={Math.round(context.composedPhoto.placement.zoomRange.minimum * 100)}
+                  maximum={Math.round(context.composedPhoto.placement.zoomRange.maximum * 100)} />
+              )}
+              {photoOrientation && <PhotoOrientationControls frames={[context.frame]} {...photoOrientation} />}
+              {frameStyle && <FrameStyleControls key={`${frameStyle.scopeKey}:${presentationUnit}`} frames={[context.frame]} unit={presentationUnit} {...frameStyle} />}
+            </InspectorSection>
+            {photoEffects && context.frame.photo && (
+              <InspectorSection key="frame-photo-effects" title="Ajustes e Efeitos"
+                preferenceKey="frame-photo.effects" sectionState={sectionState} defaultOpen>
+                <PhotoEffectsControls frames={[context.frame]} {...photoEffects} />
+              </InspectorSection>
+            )}
+          </>
+        ) : context.kind === "sheet" && selectedSheetScope ? (
+          <InspectorSection
+            accessibleTitle="Design da lâmina"
+            key="sheet-design"
+            title="Design da lâmina"
+            preferenceKey="sheet.design"
+            sectionState={sectionState}
+            defaultOpen
+          >
+            <SheetDesignInspector
+              key={context.sheet.sheetId}
+              actions={sheetDesign}
+              visuals={sheetStateById.get(context.sheet.sheetId)?.visuals}
+              saveLayout={saveLayout}
+              mediaItems={mediaItems}
+              mediaPreviewUrls={mediaPreviewUrls}
+              scope={selectedSheetScope}
+              sheet={context.sheet}
+              onScopeChange={(scope) =>
+                setSheetScopeSelection({
+                  sheetId: context.sheet.sheetId,
+                  scope,
+                })
+              }
+            />
+          </InspectorSection>
+        ) : (
+          <>
+            <InspectorSection
+              action={
+                <ActionButton
+                  density="compact"
+                  disabled={!informationDirty}
+                  form={ALBUM_INFORMATION_FORM_ID}
+                  type="submit"
+                  variant={informationDirty ? "primary" : "quiet"}
+                >
+                  Aplicar
+                </ActionButton>
+              }
+              accessibleTitle="Informações do álbum"
+              key="album-information"
+              title="Informações do álbum"
+              preferenceKey="album.information"
+              sectionState={sectionState}
+              defaultOpen
+            >
+              <div className="inspector-subsections">
+                <AlbumInformationForm
+                  photoSources={mediaItems}
+                  document={document}
+                  formId={ALBUM_INFORMATION_FORM_ID}
+                  revision={revision}
+                  onApply={onApplyAlbumInformation}
+                  onPresentationUnitChange={onPresentationUnitChange}
+                  onReadyChange={setInformationDirty}
+                  onValidate={onValidateAlbumInformation}
+                  sheetStates={sheetStates}
+                />
+              </div>
+            </InspectorSection>
+            <InspectorSection
+              action={
+                <ActionButton
+                  density="compact"
+                  disabled={!designDirty}
+                  form={ALBUM_DESIGN_FORM_ID}
+                  type="submit"
+                  variant={designDirty ? "primary" : "quiet"}
+                >
+                  Aplicar
+                </ActionButton>
+              }
+              accessibleTitle="Design do álbum"
+              key="album-design"
+              title="Design do álbum"
+              preferenceKey="album.design"
+              sectionState={sectionState}
+              defaultOpen
+            >
+              <AlbumDesignForm
+                document={document}
+                presentationUnit={presentationUnit}
+                formId={ALBUM_DESIGN_FORM_ID}
+                mediaItems={mediaItems}
+                mediaPreviews={mediaPreviews}
+                revision={revision}
+                value={visualDefaults}
+                frameGapUm={frameGapUm}
+                onApply={onApplyAlbumDesign}
+                onReadyChange={setDesignDirty}
+              />
+            </InspectorSection>
+            <InspectorSection
+              accessibleTitle="Grade de lâminas"
+              key="album-sheet-grid"
+              title="Grade de lâminas"
+              preferenceKey="album.sheet-grid"
+              sectionState={sectionState}
+              meta={sheets.length}
+              defaultOpen
+            >
+              {sheets.length === 0 ? (
+                <EmptyState
+                  density="compact"
+                  description="As lâminas do projeto aparecerão aqui."
+                  icon={<AppIcon icon={PanelsTopLeft} size={16} />}
+                  title="Nenhuma lâmina na Grade"
+                />
+              ) : (
+                <div
+                  className="sheet-grid"
+                  data-reorder-state={sheetReorder?.status ?? "idle"}
+                  data-reorder-surface="grid"
+                  data-sheet-order={sheets.map((sheet) => sheet.sheetId).join(",")}
+                  data-testid="sheet-reorder-grid"
+                  onLostPointerCapture={pointerReorder.lostCapture}
+                  onPointerCancel={pointerReorder.cancel}
+                  onPointerMove={pointerReorder.move}
+                  onPointerUp={pointerReorder.end}
+                  ref={gridRef}
+                >
+                  {orderedSheets.map((sheet, index) => {
+                    const number = String(sheet.number).padStart(2, "0");
+                    const pageMetadata = formatSheetPageMetadata(
+                      sheetStateById.get(sheet.sheetId),
+                    );
+                    const visualPageLabel =
+                      pageMetadata?.visualLabel ?? `Lâmina ${number}`;
+                    const accessiblePageLabel =
+                      pageMetadata?.accessibleLabel ?? `Lâmina ${number}`;
+                    const active = sheet.sheetId === focusedSheetId;
+                    const tileStyle = {
+                      aspectRatio: `${document.sheetWidthUm} / ${document.sheetHeightUm}`,
+                    } as CSSProperties;
+                    const reorderGhost =
+                      reorderGhostSheetId === sheet.sheetId;
+                    return (
+                      <div
+                        className="sheet-grid-slot"
+                        data-reorder-enabled={
+                          sheetReorderEnabled || undefined
+                        }
+                        data-reorder-ghost={reorderGhost || undefined}
+                        data-sheet-id={sheet.sheetId}
+                        data-slot-index={index}
+                        key={sheet.sheetId}
+                        onContextMenu={(event) =>
+                          openGridContextMenu(event, sheet.sheetId)
+                        }
+                        onClickCapture={(event) => {
+                          if (
+                            !pointerReorder.consumeClickSuppression(
+                              sheet.sheetId,
+                            )
+                          ) {
+                            return;
+                          }
+                          event.preventDefault();
+                          event.stopPropagation();
+                        }}
+                        onPointerDownCapture={(event) => {
+                          const bounds =
+                            event.currentTarget.getBoundingClientRect();
+                          gridGhostAnchorRef.current = {
+                            height: bounds.height,
+                            offsetX: event.clientX - bounds.left,
+                            offsetY: event.clientY - bounds.top,
+                            width: bounds.width,
+                          };
+                          pointerReorder.begin(
+                            event,
+                            sheet.sheetId,
+                            gridRef.current,
+                          );
+                        }}
+                      >
+                        {sheetReorder?.representation.placeholderIndex ===
+                        index ? (
+                          <span
+                            aria-hidden="true"
+                            className="sheet-reorder-placeholder"
+                            data-testid="reorder-placeholder"
+                          />
+                        ) : null}
+                      <Button
+                        aria-current={active ? "true" : undefined}
+                        aria-label={`Ir para lâmina ${number}, ${accessiblePageLabel.toLocaleLowerCase("pt-BR")}`}
+                        className={active ? "sheet-tile active" : "sheet-tile"}
+                        data-active-sides={sheet.activeSides}
+                        style={tileStyle}
+                        onPress={() => onNavigateToSheet(sheet.sheetId)}
+                      >
+                        <SheetPreviewShell
+                          sheet={sheet}
+                          mediaPreviewUrls={mediaPreviewUrls}
+                        >
+                          <span aria-hidden="true" className="sheet-tile__number">
+                            {number}
+                          </span>
+                          <span aria-hidden="true" className="sheet-tile__pages">
+                            {visualPageLabel}
+                          </span>
+                        </SheetPreviewShell>
+                      </Button>
+                      </div>
+                    );
+                  })}
+                  {reorderGhostSheetId && reorderGhostSheet ? (
+                    <span
+                      aria-hidden="true"
+                      className="sheet-reorder-ghost"
+                      data-active-sides={reorderGhostSheet.activeSides}
+                      data-origin-selected={
+                        reorderGhostSheetId === focusedSheetId || undefined
+                      }
+                      data-pointer-x={pointerReorder.pointer?.clientX}
+                      data-pointer-y={pointerReorder.pointer?.clientY}
+                      data-sheet-id={reorderGhostSheetId}
+                      data-testid="reorder-ghost"
+                      style={gridGhostStyle(
+                        pointerReorder.pointer,
+                        gridGhostAnchorRef.current,
+                      )}
+                    >
+                      <SheetPreviewShell
+                        mediaPreviewUrls={mediaPreviewUrls}
+                        sheet={reorderGhostSheet}
+                      >
+                        <span className="sheet-tile__number">
+                          {String(
+                            reorderGhostSheetState?.number ??
+                              reorderGhostSheet.number,
+                          ).padStart(2, "0")}
+                        </span>
+                        <span className="sheet-tile__pages">
+                          {reorderGhostPageMetadata?.visualLabel ??
+                            `Lâmina ${String(
+                              reorderGhostSheet.number,
+                            ).padStart(2, "0")}`}
+                        </span>
+                      </SheetPreviewShell>
+                    </span>
+                  ) : null}
+                  {sheetReorder?.status === "invalid" &&
+                  sheetReorder.representation.ghost ? (
+                    <span
+                      className="sheet-grid__reorder-invalid"
+                      data-reorder-invalid-indicator
+                      role="status"
+                    >
+                      {SHEET_REORDER_INVALID_MESSAGE}
+                    </span>
+                  ) : null}
+                </div>
+              )}
+            </InspectorSection>
+          </>
+        )}
+      </div>
+    </aside>
+  );
+}
+
+interface GridGhostAnchor {
+  readonly height: number;
+  readonly offsetX: number;
+  readonly offsetY: number;
+  readonly width: number;
+}
+
+function gridGhostStyle(
+  pointer: SheetReorderPointerState | null,
+  anchor: GridGhostAnchor | null,
+): CSSProperties | undefined {
+  if (!pointer || !anchor) return undefined;
+  return {
+    height: `${anchor.height}px`,
+    left: `${pointer.clientX - anchor.offsetX}px`,
+    top: `${pointer.clientY - anchor.offsetY}px`,
+    width: `${anchor.width}px`,
+  };
+}
+
+function resolveGridTarget(
+  grid: HTMLElement | null,
+  position: SheetReorderPointerPosition,
+): number | null {
+  if (!grid) return null;
+  const slots = Array.from(
+    grid.querySelectorAll<HTMLElement>(".sheet-grid-slot"),
+  );
+  if (slots.length === 0) return null;
+  let nearestIndex = 0;
+  let nearestDistance = Number.POSITIVE_INFINITY;
+  slots.forEach((slot, fallbackIndex) => {
+    const bounds = slot.getBoundingClientRect();
+    const deltaX = distanceOutside(
+      position.clientX,
+      bounds.left,
+      bounds.right,
+    );
+    const deltaY = distanceOutside(
+      position.clientY,
+      bounds.top,
+      bounds.bottom,
+    );
+    const distance = Math.hypot(deltaX, deltaY);
+    if (distance < nearestDistance) {
+      nearestDistance = distance;
+      nearestIndex = Number(slot.dataset.slotIndex ?? fallbackIndex);
+    }
+  });
+  return nearestIndex;
+}
+
+function pointInsideGridViewport(
+  grid: HTMLElement | null,
+  position: SheetReorderPointerPosition,
+): boolean {
+  if (!grid || !pointInsideRenderedBounds(grid, position)) return false;
+  const viewport = grid.closest<HTMLElement>(".inspector-scroll");
+  return !viewport || pointInsideRenderedBounds(viewport, position);
+}
+
+function pointInsideRenderedBounds(
+  element: HTMLElement,
+  position: SheetReorderPointerPosition,
+): boolean {
+  const bounds = element.getBoundingClientRect();
+  if (bounds.width === 0 && bounds.height === 0) return true;
+  return (
+    position.clientX >= bounds.left &&
+    position.clientX <= bounds.right &&
+    position.clientY >= bounds.top &&
+    position.clientY <= bounds.bottom
+  );
+}
+
+function distanceOutside(value: number, start: number, end: number): number {
+  if (value < start) return start - value;
+  if (value > end) return value - end;
+  return 0;
+}
+
+function InspectorSection({
+  action,
+  accessibleTitle,
+  title,
+  preferenceKey,
+  meta,
+  defaultOpen = false,
+  children,
+  sectionState,
+}: {
+  action?: ReactNode;
+  accessibleTitle?: string;
+  title: string;
+  preferenceKey: string;
+  meta?: ReactNode;
+  defaultOpen?: boolean;
+  children: ReactNode;
+  sectionState: InspectorSectionState;
+}) {
+  const [fallbackOpen, setFallbackOpen] = useState(defaultOpen);
+  const open =
+    sectionState.kind === "controlled"
+      ? sectionState.values[preferenceKey] ?? defaultOpen
+      : fallbackOpen;
+
+  function toggle() {
+    const next = !open;
+    if (sectionState.kind === "controlled") {
+      sectionState.onChange(preferenceKey, next);
+      return;
+    }
+    setFallbackOpen(next);
+  }
+
+  return (
+    <section className="inspector-section">
+      <div className="inspector-section-header">
+        <button
+          aria-label={accessibleTitle}
+          type="button"
+          className="inspector-section-trigger"
+          aria-expanded={open}
+          onClick={toggle}
+        >
+          <AppIcon icon={open ? ChevronDown : ChevronRight} size={12} />
+          <span className="inspector-section-title">{title}</span>
+          {meta !== undefined && (
+            <span aria-hidden="true" className="inspector-section-meta">
+              {meta}
+            </span>
+          )}
+        </button>
+        {action && <div className="inspector-section-action">{action}</div>}
+      </div>
+      {open && <div className="inspector-section-content">{children}</div>}
+    </section>
+  );
+}
+function defaultSheetScope(sheet: ComposedSheet): SheetDesignScope {
+  return sheet.activeSides === "both" ? "both" : sheet.activeSides;
+}
+
+function normalizeSheetScope(
+  scope: SheetDesignScope,
+  sheet: ComposedSheet,
+): SheetDesignScope {
+  if (sheet.activeSides === "both") return scope;
+  return sheet.activeSides;
+}
+
+function formatSheetPageMetadata(sheet: SheetSnapshot | undefined) {
+  if (!sheet || sheet.pageNumbers.length === 0) return null;
+
+  const firstPage = sheet.pageNumbers[0];
+  const lastPage = sheet.pageNumbers[sheet.pageNumbers.length - 1];
+  if (sheet.role === "initial" && sheet.pageNumbers.length === 1) {
+    return {
+      accessibleLabel: `Lâmina inicial, página ${firstPage}`,
+      visualLabel: String(firstPage),
+    };
+  }
+  if (sheet.role === "final" && sheet.pageNumbers.length === 1) {
+    return {
+      accessibleLabel: `Lâmina final, página ${firstPage}`,
+      visualLabel: String(firstPage),
+    };
+  }
+  return firstPage === lastPage
+    ? {
+        accessibleLabel: `Página ${firstPage}`,
+        visualLabel: String(firstPage),
+      }
+    : {
+        accessibleLabel: `Páginas ${firstPage}–${lastPage}`,
+        visualLabel: `${firstPage}–${lastPage}`,
+      };
+}
