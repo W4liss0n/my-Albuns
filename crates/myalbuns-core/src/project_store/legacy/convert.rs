@@ -941,7 +941,7 @@ fn photo_transform(
             let fill = photo_pan_basis(rect, &transform, source).fill_scale;
             let requested_zoom = displayed_scale_um / fill;
             let zoom = requested_zoom.clamp(f64::from(PHOTO_ZOOM_MIN), f64::from(PHOTO_ZOOM_MAX));
-            if requested_zoom > f64::from(PHOTO_ZOOM_MAX) + 1e-6 {
+            if requested_zoom > f64::from(PHOTO_ZOOM_MAX) + ROUNDING {
                 notes.push(Note::PhotoZoomLimited { sheet_number });
             }
             transform.user_zoom = zoom as f32;
@@ -966,7 +966,7 @@ fn photo_transform(
             )
         }
         None => {
-            if old_scale > f64::from(PHOTO_ZOOM_MAX) + 1e-6 {
+            if old_scale > f64::from(PHOTO_ZOOM_MAX) + ROUNDING {
                 notes.push(Note::PhotoZoomLimited { sheet_number });
             }
             (
@@ -998,13 +998,15 @@ fn old_fill_scale(frame: &LegacyFrame, source: (u32, u32), angle_degrees: f64) -
     scale_width.max(scale_height)
 }
 
+/// Rounding error of Pan and Zoom converted through micrometre Frames.
+const ROUNDING: f64 = 1e-4;
+
 /// The file keeps six decimals of Pan and Zoom. Values within a rounding
-/// error of a limit or of neutral (micrometre Frames) snap to it.
+/// error of a limit or of neutral snap to it.
 fn micro(value: f64) -> f64 {
-    const SNAP: f64 = 1e-4;
     let snapped = [-1.0, 0.0, 1.0]
         .into_iter()
-        .find(|target: &f64| (value - target).abs() < SNAP)
+        .find(|target: &f64| (value - target).abs() < ROUNDING)
         .unwrap_or(value);
     (snapped * 1_000_000.0).round() / 1_000_000.0
 }

@@ -58,7 +58,7 @@ const horizontalPlacementPlan: PhotoPlacementPlan = {
   currentPan: { x: 0, y: 0 },
   currentZoom: 1,
   panRange: { minimum: -1, maximum: 1 },
-  zoomRange: { minimum: 1, maximum: 4 },
+  zoomRange: { minimum: 1, maximum: 5 },
   current: {
     center: { x: 150_000, y: 100_000 },
     size: { width: 400_000, height: 200_000 },

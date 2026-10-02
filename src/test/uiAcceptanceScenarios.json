@@ -13999,7 +13999,7 @@
         {
           "type": "input",
           "selector": "[aria-label=\"Zoom da foto em porcentagem\"]",
-          "value": "450"
+          "value": "550"
         }
       ]
     },

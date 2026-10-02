@@ -2,6 +2,7 @@
 status: accepted
 document: design
 date: 2026-09-22
+updated: 2026-10-02
 implementation-readiness: ready-for-agent
 ---
 
@@ -17,6 +18,7 @@ e borda deixam de mostrar frases de restauração abaixo dos sliders. Os gestos
 de dois cliques permanecem disponíveis, e os limites e erros de digitação
 continuam na validação por tooltip. A origem da borda e a ação para usar o
 padrão do álbum continuam disponíveis porque informam a herança do design.
+O Zoom da foto vai de 100% a 500%, no slider e no campo.
 
 Espelhar horizontalmente e Preto e branco usam `PropertyToggle`, componente
 neutro de UI com ícone em um botão compacto. Espelhar fica junto ao giro;

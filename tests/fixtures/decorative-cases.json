@@ -118,7 +118,7 @@
                     "width": 150000.0
                   },
                   "zoomRange": {
-                    "maximum": 4.0,
+                    "maximum": 5.0,
                     "minimum": 1.0
                   }
                 },
@@ -272,7 +272,7 @@
                     "width": 150000.0
                   },
                   "zoomRange": {
-                    "maximum": 4.0,
+                    "maximum": 5.0,
                     "minimum": 1.0
                   }
                 },
@@ -436,7 +436,7 @@
                     "width": 150000.0
                   },
                   "zoomRange": {
-                    "maximum": 4.0,
+                    "maximum": 5.0,
                     "minimum": 1.0
                   }
                 },
@@ -476,980 +476,6 @@
       },
       "request": {
         "mediaId": "00000000-0000-4000-8000-000000000020",
-        "role": "background",
-        "sheetId": "00000000-0000-4000-8000-000000000001",
-        "xUm": 500000,
-        "yUm": 150000
-      }
-    },
-    {
-      "from": "neutral",
-      "preview": {
-        "centerRect": {
-          "height": 300000,
-          "width": 120000,
-          "x": 240000,
-          "y": 0
-        },
-        "revision": 9,
-        "role": "overlay",
-        "scope": "left",
-        "sheet": {
-          "activeSides": "both",
-          "backgrounds": [
-            {
-              "drawRect": {
-                "height": 300000,
-                "width": 600000,
-                "x": 0,
-                "y": 0
-              },
-              "kind": "color",
-              "rgb": "#FFFFFF"
-            }
-          ],
-          "base": {
-            "drawRect": {
-              "height": 300000,
-              "width": 600000,
-              "x": 0,
-              "y": 0
-            },
-            "rgb": "#FFFFFF"
-          },
-          "frames": [
-            {
-              "border": {
-                "kind": "none"
-              },
-              "borderFillRects": [],
-              "clipRect": {
-                "height": 100000,
-                "width": 150000,
-                "x": 30000,
-                "y": 40000
-              },
-              "frameId": "00000000-0000-4000-8000-000000000101",
-              "opacityByte": 255,
-              "photo": {
-                "blackAndWhite": false,
-                "drawRect": {
-                  "height": 175000,
-                  "width": 262500,
-                  "x": -12188,
-                  "y": -16250
-                },
-                "mediaId": "00000000-0000-4000-8000-000000000010",
-                "mirrorX": false,
-                "name": "Foto.jpg",
-                "palette": [
-                  "#C22C24",
-                  "#248044",
-                  "#2454C2"
-                ],
-                "placement": {
-                  "baseFillZoom": 250.0,
-                  "current": {
-                    "center": {
-                      "x": 89062.5,
-                      "y": 31250.0
-                    },
-                    "size": {
-                      "height": 175000.0,
-                      "width": 262500.0
-                    }
-                  },
-                  "currentPan": {
-                    "x": 0.25,
-                    "y": -0.5
-                  },
-                  "currentZoom": 1.75,
-                  "panOrigin": {
-                    "x": 75000.0,
-                    "y": 50000.0
-                  },
-                  "panRange": {
-                    "maximum": 1.0,
-                    "minimum": -1.0
-                  },
-                  "panToCenter": {
-                    "xx": 56250.0,
-                    "xy": -0.0,
-                    "yx": 0.0,
-                    "yy": 37500.0
-                  },
-                  "panToCenterPerZoom": {
-                    "xx": 75000.0,
-                    "xy": -0.0,
-                    "yx": 0.0,
-                    "yy": 50000.0
-                  },
-                  "sizePerZoom": {
-                    "height": 100000.0,
-                    "width": 150000.0
-                  },
-                  "zoomRange": {
-                    "maximum": 4.0,
-                    "minimum": 1.0
-                  }
-                },
-                "rotationDegrees": 0.0
-              },
-              "zIndex": 0
-            },
-            {
-              "border": {
-                "kind": "none"
-              },
-              "borderFillRects": [],
-              "clipRect": {
-                "height": 150000,
-                "width": 100000,
-                "x": 320000,
-                "y": 60000
-              },
-              "frameId": "00000000-0000-4000-8000-000000000102",
-              "opacityByte": 255,
-              "photo": null,
-              "zIndex": 1
-            }
-          ],
-          "heightUm": 300000,
-          "number": 1,
-          "overlays": [
-            {
-              "drawRect": {
-                "height": 300000,
-                "width": 300000,
-                "x": 0,
-                "y": 0
-              },
-              "mediaId": "00000000-0000-4000-8000-000000000020",
-              "name": "Textura.png"
-            }
-          ],
-          "sheetId": "00000000-0000-4000-8000-000000000001",
-          "widthUm": 600000
-        },
-        "zoneRect": {
-          "height": 300000,
-          "width": 240000,
-          "x": 0,
-          "y": 0
-        }
-      },
-      "request": {
-        "mediaId": "00000000-0000-4000-8000-000000000020",
-        "role": "overlay",
-        "sheetId": "00000000-0000-4000-8000-000000000001",
-        "xUm": 100000,
-        "yUm": 150000
-      }
-    },
-    {
-      "from": "neutral",
-      "preview": {
-        "centerRect": {
-          "height": 300000,
-          "width": 120000,
-          "x": 240000,
-          "y": 0
-        },
-        "revision": 9,
-        "role": "overlay",
-        "scope": "bothSides",
-        "sheet": {
-          "activeSides": "both",
-          "backgrounds": [
-            {
-              "drawRect": {
-                "height": 300000,
-                "width": 600000,
-                "x": 0,
-                "y": 0
-              },
-              "kind": "color",
-              "rgb": "#FFFFFF"
-            }
-          ],
-          "base": {
-            "drawRect": {
-              "height": 300000,
-              "width": 600000,
-              "x": 0,
-              "y": 0
-            },
-            "rgb": "#FFFFFF"
-          },
-          "frames": [
-            {
-              "border": {
-                "kind": "none"
-              },
-              "borderFillRects": [],
-              "clipRect": {
-                "height": 100000,
-                "width": 150000,
-                "x": 30000,
-                "y": 40000
-              },
-              "frameId": "00000000-0000-4000-8000-000000000101",
-              "opacityByte": 255,
-              "photo": {
-                "blackAndWhite": false,
-                "drawRect": {
-                  "height": 175000,
-                  "width": 262500,
-                  "x": -12188,
-                  "y": -16250
-                },
-                "mediaId": "00000000-0000-4000-8000-000000000010",
-                "mirrorX": false,
-                "name": "Foto.jpg",
-                "palette": [
-                  "#C22C24",
-                  "#248044",
-                  "#2454C2"
-                ],
-                "placement": {
-                  "baseFillZoom": 250.0,
-                  "current": {
-                    "center": {
-                      "x": 89062.5,
-                      "y": 31250.0
-                    },
-                    "size": {
-                      "height": 175000.0,
-                      "width": 262500.0
-                    }
-                  },
-                  "currentPan": {
-                    "x": 0.25,
-                    "y": -0.5
-                  },
-                  "currentZoom": 1.75,
-                  "panOrigin": {
-                    "x": 75000.0,
-                    "y": 50000.0
-                  },
-                  "panRange": {
-                    "maximum": 1.0,
-                    "minimum": -1.0
-                  },
-                  "panToCenter": {
-                    "xx": 56250.0,
-                    "xy": -0.0,
-                    "yx": 0.0,
-                    "yy": 37500.0
-                  },
-                  "panToCenterPerZoom": {
-                    "xx": 75000.0,
-                    "xy": -0.0,
-                    "yx": 0.0,
-                    "yy": 50000.0
-                  },
-                  "sizePerZoom": {
-                    "height": 100000.0,
-                    "width": 150000.0
-                  },
-                  "zoomRange": {
-                    "maximum": 4.0,
-                    "minimum": 1.0
-                  }
-                },
-                "rotationDegrees": 0.0
-              },
-              "zIndex": 0
-            },
-            {
-              "border": {
-                "kind": "none"
-              },
-              "borderFillRects": [],
-              "clipRect": {
-                "height": 150000,
-                "width": 100000,
-                "x": 320000,
-                "y": 60000
-              },
-              "frameId": "00000000-0000-4000-8000-000000000102",
-              "opacityByte": 255,
-              "photo": null,
-              "zIndex": 1
-            }
-          ],
-          "heightUm": 300000,
-          "number": 1,
-          "overlays": [
-            {
-              "drawRect": {
-                "height": 300000,
-                "width": 600000,
-                "x": 0,
-                "y": 0
-              },
-              "mediaId": "00000000-0000-4000-8000-000000000020",
-              "name": "Textura.png"
-            }
-          ],
-          "sheetId": "00000000-0000-4000-8000-000000000001",
-          "widthUm": 600000
-        },
-        "zoneRect": {
-          "height": 300000,
-          "width": 120000,
-          "x": 240000,
-          "y": 0
-        }
-      },
-      "request": {
-        "mediaId": "00000000-0000-4000-8000-000000000020",
-        "role": "overlay",
-        "sheetId": "00000000-0000-4000-8000-000000000001",
-        "xUm": 300000,
-        "yUm": 150000
-      }
-    },
-    {
-      "from": "neutral",
-      "preview": {
-        "centerRect": {
-          "height": 300000,
-          "width": 120000,
-          "x": 240000,
-          "y": 0
-        },
-        "revision": 9,
-        "role": "overlay",
-        "scope": "right",
-        "sheet": {
-          "activeSides": "both",
-          "backgrounds": [
-            {
-              "drawRect": {
-                "height": 300000,
-                "width": 600000,
-                "x": 0,
-                "y": 0
-              },
-              "kind": "color",
-              "rgb": "#FFFFFF"
-            }
-          ],
-          "base": {
-            "drawRect": {
-              "height": 300000,
-              "width": 600000,
-              "x": 0,
-              "y": 0
-            },
-            "rgb": "#FFFFFF"
-          },
-          "frames": [
-            {
-              "border": {
-                "kind": "none"
-              },
-              "borderFillRects": [],
-              "clipRect": {
-                "height": 100000,
-                "width": 150000,
-                "x": 30000,
-                "y": 40000
-              },
-              "frameId": "00000000-0000-4000-8000-000000000101",
-              "opacityByte": 255,
-              "photo": {
-                "blackAndWhite": false,
-                "drawRect": {
-                  "height": 175000,
-                  "width": 262500,
-                  "x": -12188,
-                  "y": -16250
-                },
-                "mediaId": "00000000-0000-4000-8000-000000000010",
-                "mirrorX": false,
-                "name": "Foto.jpg",
-                "palette": [
-                  "#C22C24",
-                  "#248044",
-                  "#2454C2"
-                ],
-                "placement": {
-                  "baseFillZoom": 250.0,
-                  "current": {
-                    "center": {
-                      "x": 89062.5,
-                      "y": 31250.0
-                    },
-                    "size": {
-                      "height": 175000.0,
-                      "width": 262500.0
-                    }
-                  },
-                  "currentPan": {
-                    "x": 0.25,
-                    "y": -0.5
-                  },
-                  "currentZoom": 1.75,
-                  "panOrigin": {
-                    "x": 75000.0,
-                    "y": 50000.0
-                  },
-                  "panRange": {
-                    "maximum": 1.0,
-                    "minimum": -1.0
-                  },
-                  "panToCenter": {
-                    "xx": 56250.0,
-                    "xy": -0.0,
-                    "yx": 0.0,
-                    "yy": 37500.0
-                  },
-                  "panToCenterPerZoom": {
-                    "xx": 75000.0,
-                    "xy": -0.0,
-                    "yx": 0.0,
-                    "yy": 50000.0
-                  },
-                  "sizePerZoom": {
-                    "height": 100000.0,
-                    "width": 150000.0
-                  },
-                  "zoomRange": {
-                    "maximum": 4.0,
-                    "minimum": 1.0
-                  }
-                },
-                "rotationDegrees": 0.0
-              },
-              "zIndex": 0
-            },
-            {
-              "border": {
-                "kind": "none"
-              },
-              "borderFillRects": [],
-              "clipRect": {
-                "height": 150000,
-                "width": 100000,
-                "x": 320000,
-                "y": 60000
-              },
-              "frameId": "00000000-0000-4000-8000-000000000102",
-              "opacityByte": 255,
-              "photo": null,
-              "zIndex": 1
-            }
-          ],
-          "heightUm": 300000,
-          "number": 1,
-          "overlays": [
-            {
-              "drawRect": {
-                "height": 300000,
-                "width": 300000,
-                "x": 300000,
-                "y": 0
-              },
-              "mediaId": "00000000-0000-4000-8000-000000000020",
-              "name": "Textura.png"
-            }
-          ],
-          "sheetId": "00000000-0000-4000-8000-000000000001",
-          "widthUm": 600000
-        },
-        "zoneRect": {
-          "height": 300000,
-          "width": 240000,
-          "x": 360000,
-          "y": 0
-        }
-      },
-      "request": {
-        "mediaId": "00000000-0000-4000-8000-000000000020",
-        "role": "overlay",
-        "sheetId": "00000000-0000-4000-8000-000000000001",
-        "xUm": 500000,
-        "yUm": 150000
-      }
-    },
-    {
-      "from": "neutral",
-      "preview": {
-        "centerRect": {
-          "height": 300000,
-          "width": 120000,
-          "x": 240000,
-          "y": 0
-        },
-        "revision": 9,
-        "role": "background",
-        "scope": "left",
-        "sheet": {
-          "activeSides": "both",
-          "backgrounds": [
-            {
-              "drawRect": {
-                "height": 300000,
-                "width": 300000,
-                "x": 0,
-                "y": 0
-              },
-              "kind": "media",
-              "mediaId": "00000000-0000-4000-8000-000000000030",
-              "name": "Overlay.png"
-            },
-            {
-              "drawRect": {
-                "height": 300000,
-                "width": 300000,
-                "x": 300000,
-                "y": 0
-              },
-              "kind": "color",
-              "rgb": "#FFFFFF"
-            }
-          ],
-          "base": {
-            "drawRect": {
-              "height": 300000,
-              "width": 600000,
-              "x": 0,
-              "y": 0
-            },
-            "rgb": "#FFFFFF"
-          },
-          "frames": [
-            {
-              "border": {
-                "kind": "none"
-              },
-              "borderFillRects": [],
-              "clipRect": {
-                "height": 100000,
-                "width": 150000,
-                "x": 30000,
-                "y": 40000
-              },
-              "frameId": "00000000-0000-4000-8000-000000000101",
-              "opacityByte": 255,
-              "photo": {
-                "blackAndWhite": false,
-                "drawRect": {
-                  "height": 175000,
-                  "width": 262500,
-                  "x": -12188,
-                  "y": -16250
-                },
-                "mediaId": "00000000-0000-4000-8000-000000000010",
-                "mirrorX": false,
-                "name": "Foto.jpg",
-                "palette": [
-                  "#C22C24",
-                  "#248044",
-                  "#2454C2"
-                ],
-                "placement": {
-                  "baseFillZoom": 250.0,
-                  "current": {
-                    "center": {
-                      "x": 89062.5,
-                      "y": 31250.0
-                    },
-                    "size": {
-                      "height": 175000.0,
-                      "width": 262500.0
-                    }
-                  },
-                  "currentPan": {
-                    "x": 0.25,
-                    "y": -0.5
-                  },
-                  "currentZoom": 1.75,
-                  "panOrigin": {
-                    "x": 75000.0,
-                    "y": 50000.0
-                  },
-                  "panRange": {
-                    "maximum": 1.0,
-                    "minimum": -1.0
-                  },
-                  "panToCenter": {
-                    "xx": 56250.0,
-                    "xy": -0.0,
-                    "yx": 0.0,
-                    "yy": 37500.0
-                  },
-                  "panToCenterPerZoom": {
-                    "xx": 75000.0,
-                    "xy": -0.0,
-                    "yx": 0.0,
-                    "yy": 50000.0
-                  },
-                  "sizePerZoom": {
-                    "height": 100000.0,
-                    "width": 150000.0
-                  },
-                  "zoomRange": {
-                    "maximum": 4.0,
-                    "minimum": 1.0
-                  }
-                },
-                "rotationDegrees": 0.0
-              },
-              "zIndex": 0
-            },
-            {
-              "border": {
-                "kind": "none"
-              },
-              "borderFillRects": [],
-              "clipRect": {
-                "height": 150000,
-                "width": 100000,
-                "x": 320000,
-                "y": 60000
-              },
-              "frameId": "00000000-0000-4000-8000-000000000102",
-              "opacityByte": 255,
-              "photo": null,
-              "zIndex": 1
-            }
-          ],
-          "heightUm": 300000,
-          "number": 1,
-          "overlays": [],
-          "sheetId": "00000000-0000-4000-8000-000000000001",
-          "widthUm": 600000
-        },
-        "zoneRect": {
-          "height": 300000,
-          "width": 240000,
-          "x": 0,
-          "y": 0
-        }
-      },
-      "request": {
-        "mediaId": "00000000-0000-4000-8000-000000000030",
-        "role": "background",
-        "sheetId": "00000000-0000-4000-8000-000000000001",
-        "xUm": 100000,
-        "yUm": 150000
-      }
-    },
-    {
-      "from": "neutral",
-      "preview": {
-        "centerRect": {
-          "height": 300000,
-          "width": 120000,
-          "x": 240000,
-          "y": 0
-        },
-        "revision": 9,
-        "role": "background",
-        "scope": "bothSides",
-        "sheet": {
-          "activeSides": "both",
-          "backgrounds": [
-            {
-              "drawRect": {
-                "height": 300000,
-                "width": 600000,
-                "x": 0,
-                "y": 0
-              },
-              "kind": "media",
-              "mediaId": "00000000-0000-4000-8000-000000000030",
-              "name": "Overlay.png"
-            }
-          ],
-          "base": {
-            "drawRect": {
-              "height": 300000,
-              "width": 600000,
-              "x": 0,
-              "y": 0
-            },
-            "rgb": "#FFFFFF"
-          },
-          "frames": [
-            {
-              "border": {
-                "kind": "none"
-              },
-              "borderFillRects": [],
-              "clipRect": {
-                "height": 100000,
-                "width": 150000,
-                "x": 30000,
-                "y": 40000
-              },
-              "frameId": "00000000-0000-4000-8000-000000000101",
-              "opacityByte": 255,
-              "photo": {
-                "blackAndWhite": false,
-                "drawRect": {
-                  "height": 175000,
-                  "width": 262500,
-                  "x": -12188,
-                  "y": -16250
-                },
-                "mediaId": "00000000-0000-4000-8000-000000000010",
-                "mirrorX": false,
-                "name": "Foto.jpg",
-                "palette": [
-                  "#C22C24",
-                  "#248044",
-                  "#2454C2"
-                ],
-                "placement": {
-                  "baseFillZoom": 250.0,
-                  "current": {
-                    "center": {
-                      "x": 89062.5,
-                      "y": 31250.0
-                    },
-                    "size": {
-                      "height": 175000.0,
-                      "width": 262500.0
-                    }
-                  },
-                  "currentPan": {
-                    "x": 0.25,
-                    "y": -0.5
-                  },
-                  "currentZoom": 1.75,
-                  "panOrigin": {
-                    "x": 75000.0,
-                    "y": 50000.0
-                  },
-                  "panRange": {
-                    "maximum": 1.0,
-                    "minimum": -1.0
-                  },
-                  "panToCenter": {
-                    "xx": 56250.0,
-                    "xy": -0.0,
-                    "yx": 0.0,
-                    "yy": 37500.0
-                  },
-                  "panToCenterPerZoom": {
-                    "xx": 75000.0,
-                    "xy": -0.0,
-                    "yx": 0.0,
-                    "yy": 50000.0
-                  },
-                  "sizePerZoom": {
-                    "height": 100000.0,
-                    "width": 150000.0
-                  },
-                  "zoomRange": {
-                    "maximum": 4.0,
-                    "minimum": 1.0
-                  }
-                },
-                "rotationDegrees": 0.0
-              },
-              "zIndex": 0
-            },
-            {
-              "border": {
-                "kind": "none"
-              },
-              "borderFillRects": [],
-              "clipRect": {
-                "height": 150000,
-                "width": 100000,
-                "x": 320000,
-                "y": 60000
-              },
-              "frameId": "00000000-0000-4000-8000-000000000102",
-              "opacityByte": 255,
-              "photo": null,
-              "zIndex": 1
-            }
-          ],
-          "heightUm": 300000,
-          "number": 1,
-          "overlays": [],
-          "sheetId": "00000000-0000-4000-8000-000000000001",
-          "widthUm": 600000
-        },
-        "zoneRect": {
-          "height": 300000,
-          "width": 120000,
-          "x": 240000,
-          "y": 0
-        }
-      },
-      "request": {
-        "mediaId": "00000000-0000-4000-8000-000000000030",
-        "role": "background",
-        "sheetId": "00000000-0000-4000-8000-000000000001",
-        "xUm": 300000,
-        "yUm": 150000
-      }
-    },
-    {
-      "from": "neutral",
-      "preview": {
-        "centerRect": {
-          "height": 300000,
-          "width": 120000,
-          "x": 240000,
-          "y": 0
-        },
-        "revision": 9,
-        "role": "background",
-        "scope": "right",
-        "sheet": {
-          "activeSides": "both",
-          "backgrounds": [
-            {
-              "drawRect": {
-                "height": 300000,
-                "width": 300000,
-                "x": 0,
-                "y": 0
-              },
-              "kind": "color",
-              "rgb": "#FFFFFF"
-            },
-            {
-              "drawRect": {
-                "height": 300000,
-                "width": 300000,
-                "x": 300000,
-                "y": 0
-              },
-              "kind": "media",
-              "mediaId": "00000000-0000-4000-8000-000000000030",
-              "name": "Overlay.png"
-            }
-          ],
-          "base": {
-            "drawRect": {
-              "height": 300000,
-              "width": 600000,
-              "x": 0,
-              "y": 0
-            },
-            "rgb": "#FFFFFF"
-          },
-          "frames": [
-            {
-              "border": {
-                "kind": "none"
-              },
-              "borderFillRects": [],
-              "clipRect": {
-                "height": 100000,
-                "width": 150000,
-                "x": 30000,
-                "y": 40000
-              },
-              "frameId": "00000000-0000-4000-8000-000000000101",
-              "opacityByte": 255,
-              "photo": {
-                "blackAndWhite": false,
-                "drawRect": {
-                  "height": 175000,
-                  "width": 262500,
-                  "x": -12188,
-                  "y": -16250
-                },
-                "mediaId": "00000000-0000-4000-8000-000000000010",
-                "mirrorX": false,
-                "name": "Foto.jpg",
-                "palette": [
-                  "#C22C24",
-                  "#248044",
-                  "#2454C2"
-                ],
-                "placement": {
-                  "baseFillZoom": 250.0,
-                  "current": {
-                    "center": {
-                      "x": 89062.5,
-                      "y": 31250.0
-                    },
-                    "size": {
-                      "height": 175000.0,
-                      "width": 262500.0
-                    }
-                  },
-                  "currentPan": {
-                    "x": 0.25,
-                    "y": -0.5
-                  },
-                  "currentZoom": 1.75,
-                  "panOrigin": {
-                    "x": 75000.0,
-                    "y": 50000.0
-                  },
-                  "panRange": {
-                    "maximum": 1.0,
-                    "minimum": -1.0
-                  },
-                  "panToCenter": {
-                    "xx": 56250.0,
-                    "xy": -0.0,
-                    "yx": 0.0,
-                    "yy": 37500.0
-                  },
-                  "panToCenterPerZoom": {
-                    "xx": 75000.0,
-                    "xy": -0.0,
-                    "yx": 0.0,
-                    "yy": 50000.0
-                  },
-                  "sizePerZoom": {
-                    "height": 100000.0,
-                    "width": 150000.0
-                  },
-                  "zoomRange": {
-                    "maximum": 4.0,
-                    "minimum": 1.0
-                  }
-                },
-                "rotationDegrees": 0.0
-              },
-              "zIndex": 0
-            },
-            {
-              "border": {
-                "kind": "none"
-              },
-              "borderFillRects": [],
-              "clipRect": {
-                "height": 150000,
-                "width": 100000,
-                "x": 320000,
-                "y": 60000
-              },
-              "frameId": "00000000-0000-4000-8000-000000000102",
-              "opacityByte": 255,
-              "photo": null,
-              "zIndex": 1
-            }
-          ],
-          "heightUm": 300000,
-          "number": 1,
-          "overlays": [],
-          "sheetId": "00000000-0000-4000-8000-000000000001",
-          "widthUm": 600000
-        },
-        "zoneRect": {
-          "height": 300000,
-          "width": 240000,
-          "x": 360000,
-          "y": 0
-        }
-      },
-      "request": {
-        "mediaId": "00000000-0000-4000-8000-000000000030",
         "role": "background",
         "sheetId": "00000000-0000-4000-8000-000000000001",
         "xUm": 500000,
@@ -1563,7 +589,981 @@
                     "width": 150000.0
                   },
                   "zoomRange": {
-                    "maximum": 4.0,
+                    "maximum": 5.0,
+                    "minimum": 1.0
+                  }
+                },
+                "rotationDegrees": 0.0
+              },
+              "zIndex": 0
+            },
+            {
+              "border": {
+                "kind": "none"
+              },
+              "borderFillRects": [],
+              "clipRect": {
+                "height": 150000,
+                "width": 100000,
+                "x": 320000,
+                "y": 60000
+              },
+              "frameId": "00000000-0000-4000-8000-000000000102",
+              "opacityByte": 255,
+              "photo": null,
+              "zIndex": 1
+            }
+          ],
+          "heightUm": 300000,
+          "number": 1,
+          "overlays": [
+            {
+              "drawRect": {
+                "height": 300000,
+                "width": 300000,
+                "x": 0,
+                "y": 0
+              },
+              "mediaId": "00000000-0000-4000-8000-000000000020",
+              "name": "Textura.png"
+            }
+          ],
+          "sheetId": "00000000-0000-4000-8000-000000000001",
+          "widthUm": 600000
+        },
+        "zoneRect": {
+          "height": 300000,
+          "width": 240000,
+          "x": 0,
+          "y": 0
+        }
+      },
+      "request": {
+        "mediaId": "00000000-0000-4000-8000-000000000020",
+        "role": "overlay",
+        "sheetId": "00000000-0000-4000-8000-000000000001",
+        "xUm": 100000,
+        "yUm": 150000
+      }
+    },
+    {
+      "from": "neutral",
+      "preview": {
+        "centerRect": {
+          "height": 300000,
+          "width": 120000,
+          "x": 240000,
+          "y": 0
+        },
+        "revision": 9,
+        "role": "overlay",
+        "scope": "bothSides",
+        "sheet": {
+          "activeSides": "both",
+          "backgrounds": [
+            {
+              "drawRect": {
+                "height": 300000,
+                "width": 600000,
+                "x": 0,
+                "y": 0
+              },
+              "kind": "color",
+              "rgb": "#FFFFFF"
+            }
+          ],
+          "base": {
+            "drawRect": {
+              "height": 300000,
+              "width": 600000,
+              "x": 0,
+              "y": 0
+            },
+            "rgb": "#FFFFFF"
+          },
+          "frames": [
+            {
+              "border": {
+                "kind": "none"
+              },
+              "borderFillRects": [],
+              "clipRect": {
+                "height": 100000,
+                "width": 150000,
+                "x": 30000,
+                "y": 40000
+              },
+              "frameId": "00000000-0000-4000-8000-000000000101",
+              "opacityByte": 255,
+              "photo": {
+                "blackAndWhite": false,
+                "drawRect": {
+                  "height": 175000,
+                  "width": 262500,
+                  "x": -12188,
+                  "y": -16250
+                },
+                "mediaId": "00000000-0000-4000-8000-000000000010",
+                "mirrorX": false,
+                "name": "Foto.jpg",
+                "palette": [
+                  "#C22C24",
+                  "#248044",
+                  "#2454C2"
+                ],
+                "placement": {
+                  "baseFillZoom": 250.0,
+                  "current": {
+                    "center": {
+                      "x": 89062.5,
+                      "y": 31250.0
+                    },
+                    "size": {
+                      "height": 175000.0,
+                      "width": 262500.0
+                    }
+                  },
+                  "currentPan": {
+                    "x": 0.25,
+                    "y": -0.5
+                  },
+                  "currentZoom": 1.75,
+                  "panOrigin": {
+                    "x": 75000.0,
+                    "y": 50000.0
+                  },
+                  "panRange": {
+                    "maximum": 1.0,
+                    "minimum": -1.0
+                  },
+                  "panToCenter": {
+                    "xx": 56250.0,
+                    "xy": -0.0,
+                    "yx": 0.0,
+                    "yy": 37500.0
+                  },
+                  "panToCenterPerZoom": {
+                    "xx": 75000.0,
+                    "xy": -0.0,
+                    "yx": 0.0,
+                    "yy": 50000.0
+                  },
+                  "sizePerZoom": {
+                    "height": 100000.0,
+                    "width": 150000.0
+                  },
+                  "zoomRange": {
+                    "maximum": 5.0,
+                    "minimum": 1.0
+                  }
+                },
+                "rotationDegrees": 0.0
+              },
+              "zIndex": 0
+            },
+            {
+              "border": {
+                "kind": "none"
+              },
+              "borderFillRects": [],
+              "clipRect": {
+                "height": 150000,
+                "width": 100000,
+                "x": 320000,
+                "y": 60000
+              },
+              "frameId": "00000000-0000-4000-8000-000000000102",
+              "opacityByte": 255,
+              "photo": null,
+              "zIndex": 1
+            }
+          ],
+          "heightUm": 300000,
+          "number": 1,
+          "overlays": [
+            {
+              "drawRect": {
+                "height": 300000,
+                "width": 600000,
+                "x": 0,
+                "y": 0
+              },
+              "mediaId": "00000000-0000-4000-8000-000000000020",
+              "name": "Textura.png"
+            }
+          ],
+          "sheetId": "00000000-0000-4000-8000-000000000001",
+          "widthUm": 600000
+        },
+        "zoneRect": {
+          "height": 300000,
+          "width": 120000,
+          "x": 240000,
+          "y": 0
+        }
+      },
+      "request": {
+        "mediaId": "00000000-0000-4000-8000-000000000020",
+        "role": "overlay",
+        "sheetId": "00000000-0000-4000-8000-000000000001",
+        "xUm": 300000,
+        "yUm": 150000
+      }
+    },
+    {
+      "from": "neutral",
+      "preview": {
+        "centerRect": {
+          "height": 300000,
+          "width": 120000,
+          "x": 240000,
+          "y": 0
+        },
+        "revision": 9,
+        "role": "overlay",
+        "scope": "right",
+        "sheet": {
+          "activeSides": "both",
+          "backgrounds": [
+            {
+              "drawRect": {
+                "height": 300000,
+                "width": 600000,
+                "x": 0,
+                "y": 0
+              },
+              "kind": "color",
+              "rgb": "#FFFFFF"
+            }
+          ],
+          "base": {
+            "drawRect": {
+              "height": 300000,
+              "width": 600000,
+              "x": 0,
+              "y": 0
+            },
+            "rgb": "#FFFFFF"
+          },
+          "frames": [
+            {
+              "border": {
+                "kind": "none"
+              },
+              "borderFillRects": [],
+              "clipRect": {
+                "height": 100000,
+                "width": 150000,
+                "x": 30000,
+                "y": 40000
+              },
+              "frameId": "00000000-0000-4000-8000-000000000101",
+              "opacityByte": 255,
+              "photo": {
+                "blackAndWhite": false,
+                "drawRect": {
+                  "height": 175000,
+                  "width": 262500,
+                  "x": -12188,
+                  "y": -16250
+                },
+                "mediaId": "00000000-0000-4000-8000-000000000010",
+                "mirrorX": false,
+                "name": "Foto.jpg",
+                "palette": [
+                  "#C22C24",
+                  "#248044",
+                  "#2454C2"
+                ],
+                "placement": {
+                  "baseFillZoom": 250.0,
+                  "current": {
+                    "center": {
+                      "x": 89062.5,
+                      "y": 31250.0
+                    },
+                    "size": {
+                      "height": 175000.0,
+                      "width": 262500.0
+                    }
+                  },
+                  "currentPan": {
+                    "x": 0.25,
+                    "y": -0.5
+                  },
+                  "currentZoom": 1.75,
+                  "panOrigin": {
+                    "x": 75000.0,
+                    "y": 50000.0
+                  },
+                  "panRange": {
+                    "maximum": 1.0,
+                    "minimum": -1.0
+                  },
+                  "panToCenter": {
+                    "xx": 56250.0,
+                    "xy": -0.0,
+                    "yx": 0.0,
+                    "yy": 37500.0
+                  },
+                  "panToCenterPerZoom": {
+                    "xx": 75000.0,
+                    "xy": -0.0,
+                    "yx": 0.0,
+                    "yy": 50000.0
+                  },
+                  "sizePerZoom": {
+                    "height": 100000.0,
+                    "width": 150000.0
+                  },
+                  "zoomRange": {
+                    "maximum": 5.0,
+                    "minimum": 1.0
+                  }
+                },
+                "rotationDegrees": 0.0
+              },
+              "zIndex": 0
+            },
+            {
+              "border": {
+                "kind": "none"
+              },
+              "borderFillRects": [],
+              "clipRect": {
+                "height": 150000,
+                "width": 100000,
+                "x": 320000,
+                "y": 60000
+              },
+              "frameId": "00000000-0000-4000-8000-000000000102",
+              "opacityByte": 255,
+              "photo": null,
+              "zIndex": 1
+            }
+          ],
+          "heightUm": 300000,
+          "number": 1,
+          "overlays": [
+            {
+              "drawRect": {
+                "height": 300000,
+                "width": 300000,
+                "x": 300000,
+                "y": 0
+              },
+              "mediaId": "00000000-0000-4000-8000-000000000020",
+              "name": "Textura.png"
+            }
+          ],
+          "sheetId": "00000000-0000-4000-8000-000000000001",
+          "widthUm": 600000
+        },
+        "zoneRect": {
+          "height": 300000,
+          "width": 240000,
+          "x": 360000,
+          "y": 0
+        }
+      },
+      "request": {
+        "mediaId": "00000000-0000-4000-8000-000000000020",
+        "role": "overlay",
+        "sheetId": "00000000-0000-4000-8000-000000000001",
+        "xUm": 500000,
+        "yUm": 150000
+      }
+    },
+    {
+      "from": "neutral",
+      "preview": {
+        "centerRect": {
+          "height": 300000,
+          "width": 120000,
+          "x": 240000,
+          "y": 0
+        },
+        "revision": 9,
+        "role": "background",
+        "scope": "left",
+        "sheet": {
+          "activeSides": "both",
+          "backgrounds": [
+            {
+              "drawRect": {
+                "height": 300000,
+                "width": 300000,
+                "x": 0,
+                "y": 0
+              },
+              "kind": "media",
+              "mediaId": "00000000-0000-4000-8000-000000000030",
+              "name": "Overlay.png"
+            },
+            {
+              "drawRect": {
+                "height": 300000,
+                "width": 300000,
+                "x": 300000,
+                "y": 0
+              },
+              "kind": "color",
+              "rgb": "#FFFFFF"
+            }
+          ],
+          "base": {
+            "drawRect": {
+              "height": 300000,
+              "width": 600000,
+              "x": 0,
+              "y": 0
+            },
+            "rgb": "#FFFFFF"
+          },
+          "frames": [
+            {
+              "border": {
+                "kind": "none"
+              },
+              "borderFillRects": [],
+              "clipRect": {
+                "height": 100000,
+                "width": 150000,
+                "x": 30000,
+                "y": 40000
+              },
+              "frameId": "00000000-0000-4000-8000-000000000101",
+              "opacityByte": 255,
+              "photo": {
+                "blackAndWhite": false,
+                "drawRect": {
+                  "height": 175000,
+                  "width": 262500,
+                  "x": -12188,
+                  "y": -16250
+                },
+                "mediaId": "00000000-0000-4000-8000-000000000010",
+                "mirrorX": false,
+                "name": "Foto.jpg",
+                "palette": [
+                  "#C22C24",
+                  "#248044",
+                  "#2454C2"
+                ],
+                "placement": {
+                  "baseFillZoom": 250.0,
+                  "current": {
+                    "center": {
+                      "x": 89062.5,
+                      "y": 31250.0
+                    },
+                    "size": {
+                      "height": 175000.0,
+                      "width": 262500.0
+                    }
+                  },
+                  "currentPan": {
+                    "x": 0.25,
+                    "y": -0.5
+                  },
+                  "currentZoom": 1.75,
+                  "panOrigin": {
+                    "x": 75000.0,
+                    "y": 50000.0
+                  },
+                  "panRange": {
+                    "maximum": 1.0,
+                    "minimum": -1.0
+                  },
+                  "panToCenter": {
+                    "xx": 56250.0,
+                    "xy": -0.0,
+                    "yx": 0.0,
+                    "yy": 37500.0
+                  },
+                  "panToCenterPerZoom": {
+                    "xx": 75000.0,
+                    "xy": -0.0,
+                    "yx": 0.0,
+                    "yy": 50000.0
+                  },
+                  "sizePerZoom": {
+                    "height": 100000.0,
+                    "width": 150000.0
+                  },
+                  "zoomRange": {
+                    "maximum": 5.0,
+                    "minimum": 1.0
+                  }
+                },
+                "rotationDegrees": 0.0
+              },
+              "zIndex": 0
+            },
+            {
+              "border": {
+                "kind": "none"
+              },
+              "borderFillRects": [],
+              "clipRect": {
+                "height": 150000,
+                "width": 100000,
+                "x": 320000,
+                "y": 60000
+              },
+              "frameId": "00000000-0000-4000-8000-000000000102",
+              "opacityByte": 255,
+              "photo": null,
+              "zIndex": 1
+            }
+          ],
+          "heightUm": 300000,
+          "number": 1,
+          "overlays": [],
+          "sheetId": "00000000-0000-4000-8000-000000000001",
+          "widthUm": 600000
+        },
+        "zoneRect": {
+          "height": 300000,
+          "width": 240000,
+          "x": 0,
+          "y": 0
+        }
+      },
+      "request": {
+        "mediaId": "00000000-0000-4000-8000-000000000030",
+        "role": "background",
+        "sheetId": "00000000-0000-4000-8000-000000000001",
+        "xUm": 100000,
+        "yUm": 150000
+      }
+    },
+    {
+      "from": "neutral",
+      "preview": {
+        "centerRect": {
+          "height": 300000,
+          "width": 120000,
+          "x": 240000,
+          "y": 0
+        },
+        "revision": 9,
+        "role": "background",
+        "scope": "bothSides",
+        "sheet": {
+          "activeSides": "both",
+          "backgrounds": [
+            {
+              "drawRect": {
+                "height": 300000,
+                "width": 600000,
+                "x": 0,
+                "y": 0
+              },
+              "kind": "media",
+              "mediaId": "00000000-0000-4000-8000-000000000030",
+              "name": "Overlay.png"
+            }
+          ],
+          "base": {
+            "drawRect": {
+              "height": 300000,
+              "width": 600000,
+              "x": 0,
+              "y": 0
+            },
+            "rgb": "#FFFFFF"
+          },
+          "frames": [
+            {
+              "border": {
+                "kind": "none"
+              },
+              "borderFillRects": [],
+              "clipRect": {
+                "height": 100000,
+                "width": 150000,
+                "x": 30000,
+                "y": 40000
+              },
+              "frameId": "00000000-0000-4000-8000-000000000101",
+              "opacityByte": 255,
+              "photo": {
+                "blackAndWhite": false,
+                "drawRect": {
+                  "height": 175000,
+                  "width": 262500,
+                  "x": -12188,
+                  "y": -16250
+                },
+                "mediaId": "00000000-0000-4000-8000-000000000010",
+                "mirrorX": false,
+                "name": "Foto.jpg",
+                "palette": [
+                  "#C22C24",
+                  "#248044",
+                  "#2454C2"
+                ],
+                "placement": {
+                  "baseFillZoom": 250.0,
+                  "current": {
+                    "center": {
+                      "x": 89062.5,
+                      "y": 31250.0
+                    },
+                    "size": {
+                      "height": 175000.0,
+                      "width": 262500.0
+                    }
+                  },
+                  "currentPan": {
+                    "x": 0.25,
+                    "y": -0.5
+                  },
+                  "currentZoom": 1.75,
+                  "panOrigin": {
+                    "x": 75000.0,
+                    "y": 50000.0
+                  },
+                  "panRange": {
+                    "maximum": 1.0,
+                    "minimum": -1.0
+                  },
+                  "panToCenter": {
+                    "xx": 56250.0,
+                    "xy": -0.0,
+                    "yx": 0.0,
+                    "yy": 37500.0
+                  },
+                  "panToCenterPerZoom": {
+                    "xx": 75000.0,
+                    "xy": -0.0,
+                    "yx": 0.0,
+                    "yy": 50000.0
+                  },
+                  "sizePerZoom": {
+                    "height": 100000.0,
+                    "width": 150000.0
+                  },
+                  "zoomRange": {
+                    "maximum": 5.0,
+                    "minimum": 1.0
+                  }
+                },
+                "rotationDegrees": 0.0
+              },
+              "zIndex": 0
+            },
+            {
+              "border": {
+                "kind": "none"
+              },
+              "borderFillRects": [],
+              "clipRect": {
+                "height": 150000,
+                "width": 100000,
+                "x": 320000,
+                "y": 60000
+              },
+              "frameId": "00000000-0000-4000-8000-000000000102",
+              "opacityByte": 255,
+              "photo": null,
+              "zIndex": 1
+            }
+          ],
+          "heightUm": 300000,
+          "number": 1,
+          "overlays": [],
+          "sheetId": "00000000-0000-4000-8000-000000000001",
+          "widthUm": 600000
+        },
+        "zoneRect": {
+          "height": 300000,
+          "width": 120000,
+          "x": 240000,
+          "y": 0
+        }
+      },
+      "request": {
+        "mediaId": "00000000-0000-4000-8000-000000000030",
+        "role": "background",
+        "sheetId": "00000000-0000-4000-8000-000000000001",
+        "xUm": 300000,
+        "yUm": 150000
+      }
+    },
+    {
+      "from": "neutral",
+      "preview": {
+        "centerRect": {
+          "height": 300000,
+          "width": 120000,
+          "x": 240000,
+          "y": 0
+        },
+        "revision": 9,
+        "role": "background",
+        "scope": "right",
+        "sheet": {
+          "activeSides": "both",
+          "backgrounds": [
+            {
+              "drawRect": {
+                "height": 300000,
+                "width": 300000,
+                "x": 0,
+                "y": 0
+              },
+              "kind": "color",
+              "rgb": "#FFFFFF"
+            },
+            {
+              "drawRect": {
+                "height": 300000,
+                "width": 300000,
+                "x": 300000,
+                "y": 0
+              },
+              "kind": "media",
+              "mediaId": "00000000-0000-4000-8000-000000000030",
+              "name": "Overlay.png"
+            }
+          ],
+          "base": {
+            "drawRect": {
+              "height": 300000,
+              "width": 600000,
+              "x": 0,
+              "y": 0
+            },
+            "rgb": "#FFFFFF"
+          },
+          "frames": [
+            {
+              "border": {
+                "kind": "none"
+              },
+              "borderFillRects": [],
+              "clipRect": {
+                "height": 100000,
+                "width": 150000,
+                "x": 30000,
+                "y": 40000
+              },
+              "frameId": "00000000-0000-4000-8000-000000000101",
+              "opacityByte": 255,
+              "photo": {
+                "blackAndWhite": false,
+                "drawRect": {
+                  "height": 175000,
+                  "width": 262500,
+                  "x": -12188,
+                  "y": -16250
+                },
+                "mediaId": "00000000-0000-4000-8000-000000000010",
+                "mirrorX": false,
+                "name": "Foto.jpg",
+                "palette": [
+                  "#C22C24",
+                  "#248044",
+                  "#2454C2"
+                ],
+                "placement": {
+                  "baseFillZoom": 250.0,
+                  "current": {
+                    "center": {
+                      "x": 89062.5,
+                      "y": 31250.0
+                    },
+                    "size": {
+                      "height": 175000.0,
+                      "width": 262500.0
+                    }
+                  },
+                  "currentPan": {
+                    "x": 0.25,
+                    "y": -0.5
+                  },
+                  "currentZoom": 1.75,
+                  "panOrigin": {
+                    "x": 75000.0,
+                    "y": 50000.0
+                  },
+                  "panRange": {
+                    "maximum": 1.0,
+                    "minimum": -1.0
+                  },
+                  "panToCenter": {
+                    "xx": 56250.0,
+                    "xy": -0.0,
+                    "yx": 0.0,
+                    "yy": 37500.0
+                  },
+                  "panToCenterPerZoom": {
+                    "xx": 75000.0,
+                    "xy": -0.0,
+                    "yx": 0.0,
+                    "yy": 50000.0
+                  },
+                  "sizePerZoom": {
+                    "height": 100000.0,
+                    "width": 150000.0
+                  },
+                  "zoomRange": {
+                    "maximum": 5.0,
+                    "minimum": 1.0
+                  }
+                },
+                "rotationDegrees": 0.0
+              },
+              "zIndex": 0
+            },
+            {
+              "border": {
+                "kind": "none"
+              },
+              "borderFillRects": [],
+              "clipRect": {
+                "height": 150000,
+                "width": 100000,
+                "x": 320000,
+                "y": 60000
+              },
+              "frameId": "00000000-0000-4000-8000-000000000102",
+              "opacityByte": 255,
+              "photo": null,
+              "zIndex": 1
+            }
+          ],
+          "heightUm": 300000,
+          "number": 1,
+          "overlays": [],
+          "sheetId": "00000000-0000-4000-8000-000000000001",
+          "widthUm": 600000
+        },
+        "zoneRect": {
+          "height": 300000,
+          "width": 240000,
+          "x": 360000,
+          "y": 0
+        }
+      },
+      "request": {
+        "mediaId": "00000000-0000-4000-8000-000000000030",
+        "role": "background",
+        "sheetId": "00000000-0000-4000-8000-000000000001",
+        "xUm": 500000,
+        "yUm": 150000
+      }
+    },
+    {
+      "from": "neutral",
+      "preview": {
+        "centerRect": {
+          "height": 300000,
+          "width": 120000,
+          "x": 240000,
+          "y": 0
+        },
+        "revision": 9,
+        "role": "overlay",
+        "scope": "left",
+        "sheet": {
+          "activeSides": "both",
+          "backgrounds": [
+            {
+              "drawRect": {
+                "height": 300000,
+                "width": 600000,
+                "x": 0,
+                "y": 0
+              },
+              "kind": "color",
+              "rgb": "#FFFFFF"
+            }
+          ],
+          "base": {
+            "drawRect": {
+              "height": 300000,
+              "width": 600000,
+              "x": 0,
+              "y": 0
+            },
+            "rgb": "#FFFFFF"
+          },
+          "frames": [
+            {
+              "border": {
+                "kind": "none"
+              },
+              "borderFillRects": [],
+              "clipRect": {
+                "height": 100000,
+                "width": 150000,
+                "x": 30000,
+                "y": 40000
+              },
+              "frameId": "00000000-0000-4000-8000-000000000101",
+              "opacityByte": 255,
+              "photo": {
+                "blackAndWhite": false,
+                "drawRect": {
+                  "height": 175000,
+                  "width": 262500,
+                  "x": -12188,
+                  "y": -16250
+                },
+                "mediaId": "00000000-0000-4000-8000-000000000010",
+                "mirrorX": false,
+                "name": "Foto.jpg",
+                "palette": [
+                  "#C22C24",
+                  "#248044",
+                  "#2454C2"
+                ],
+                "placement": {
+                  "baseFillZoom": 250.0,
+                  "current": {
+                    "center": {
+                      "x": 89062.5,
+                      "y": 31250.0
+                    },
+                    "size": {
+                      "height": 175000.0,
+                      "width": 262500.0
+                    }
+                  },
+                  "currentPan": {
+                    "x": 0.25,
+                    "y": -0.5
+                  },
+                  "currentZoom": 1.75,
+                  "panOrigin": {
+                    "x": 75000.0,
+                    "y": 50000.0
+                  },
+                  "panRange": {
+                    "maximum": 1.0,
+                    "minimum": -1.0
+                  },
+                  "panToCenter": {
+                    "xx": 56250.0,
+                    "xy": -0.0,
+                    "yx": 0.0,
+                    "yy": 37500.0
+                  },
+                  "panToCenterPerZoom": {
+                    "xx": 75000.0,
+                    "xy": -0.0,
+                    "yx": 0.0,
+                    "yy": 50000.0
+                  },
+                  "sizePerZoom": {
+                    "height": 100000.0,
+                    "width": 150000.0
+                  },
+                  "zoomRange": {
+                    "maximum": 5.0,
                     "minimum": 1.0
                   }
                 },
@@ -1727,7 +1727,7 @@
                     "width": 150000.0
                   },
                   "zoomRange": {
-                    "maximum": 4.0,
+                    "maximum": 5.0,
                     "minimum": 1.0
                   }
                 },
@@ -1891,7 +1891,7 @@
                     "width": 150000.0
                   },
                   "zoomRange": {
-                    "maximum": 4.0,
+                    "maximum": 5.0,
                     "minimum": 1.0
                   }
                 },
@@ -2073,7 +2073,7 @@
                     "width": 150000.0
                   },
                   "zoomRange": {
-                    "maximum": 4.0,
+                    "maximum": 5.0,
                     "minimum": 1.0
                   }
                 },
@@ -2227,7 +2227,7 @@
                     "width": 150000.0
                   },
                   "zoomRange": {
-                    "maximum": 4.0,
+                    "maximum": 5.0,
                     "minimum": 1.0
                   }
                 },
@@ -2398,7 +2398,7 @@
                     "width": 150000.0
                   },
                   "zoomRange": {
-                    "maximum": 4.0,
+                    "maximum": 5.0,
                     "minimum": 1.0
                   }
                 },
@@ -2552,7 +2552,7 @@
                     "width": 150000.0
                   },
                   "zoomRange": {
-                    "maximum": 4.0,
+                    "maximum": 5.0,
                     "minimum": 1.0
                   }
                 },
@@ -2717,7 +2717,7 @@
                     "width": 150000.0
                   },
                   "zoomRange": {
-                    "maximum": 4.0,
+                    "maximum": 5.0,
                     "minimum": 1.0
                   }
                 },
@@ -2882,7 +2882,7 @@
                     "width": 150000.0
                   },
                   "zoomRange": {
-                    "maximum": 4.0,
+                    "maximum": 5.0,
                     "minimum": 1.0
                   }
                 },
@@ -3064,7 +3064,7 @@
                     "width": 150000.0
                   },
                   "zoomRange": {
-                    "maximum": 4.0,
+                    "maximum": 5.0,
                     "minimum": 1.0
                   }
                 },
@@ -3218,7 +3218,7 @@
                     "width": 150000.0
                   },
                   "zoomRange": {
-                    "maximum": 4.0,
+                    "maximum": 5.0,
                     "minimum": 1.0
                   }
                 },
@@ -3389,7 +3389,7 @@
                     "width": 150000.0
                   },
                   "zoomRange": {
-                    "maximum": 4.0,
+                    "maximum": 5.0,
                     "minimum": 1.0
                   }
                 },
@@ -3543,7 +3543,7 @@
                     "width": 150000.0
                   },
                   "zoomRange": {
-                    "maximum": 4.0,
+                    "maximum": 5.0,
                     "minimum": 1.0
                   }
                 },
@@ -3708,7 +3708,7 @@
                     "width": 150000.0
                   },
                   "zoomRange": {
-                    "maximum": 4.0,
+                    "maximum": 5.0,
                     "minimum": 1.0
                   }
                 },
@@ -3873,7 +3873,7 @@
                     "width": 150000.0
                   },
                   "zoomRange": {
-                    "maximum": 4.0,
+                    "maximum": 5.0,
                     "minimum": 1.0
                   }
                 },
@@ -4055,7 +4055,7 @@
                     "width": 150000.0
                   },
                   "zoomRange": {
-                    "maximum": 4.0,
+                    "maximum": 5.0,
                     "minimum": 1.0
                   }
                 },
@@ -4209,7 +4209,7 @@
                     "width": 150000.0
                   },
                   "zoomRange": {
-                    "maximum": 4.0,
+                    "maximum": 5.0,
                     "minimum": 1.0
                   }
                 },
@@ -4374,7 +4374,7 @@
                     "width": 150000.0
                   },
                   "zoomRange": {
-                    "maximum": 4.0,
+                    "maximum": 5.0,
                     "minimum": 1.0
                   }
                 },
@@ -4545,7 +4545,7 @@
                     "width": 150000.0
                   },
                   "zoomRange": {
-                    "maximum": 4.0,
+                    "maximum": 5.0,
                     "minimum": 1.0
                   }
                 },
@@ -4727,7 +4727,7 @@
                     "width": 150000.0
                   },
                   "zoomRange": {
-                    "maximum": 4.0,
+                    "maximum": 5.0,
                     "minimum": 1.0
                   }
                 },
@@ -4909,7 +4909,7 @@
                     "width": 150000.0
                   },
                   "zoomRange": {
-                    "maximum": 4.0,
+                    "maximum": 5.0,
                     "minimum": 1.0
                   }
                 },
@@ -5091,7 +5091,7 @@
                     "width": 150000.0
                   },
                   "zoomRange": {
-                    "maximum": 4.0,
+                    "maximum": 5.0,
                     "minimum": 1.0
                   }
                 },
@@ -5245,7 +5245,7 @@
                     "width": 150000.0
                   },
                   "zoomRange": {
-                    "maximum": 4.0,
+                    "maximum": 5.0,
                     "minimum": 1.0
                   }
                 },
@@ -5410,7 +5410,7 @@
                     "width": 150000.0
                   },
                   "zoomRange": {
-                    "maximum": 4.0,
+                    "maximum": 5.0,
                     "minimum": 1.0
                   }
                 },
@@ -5581,7 +5581,7 @@
                     "width": 150000.0
                   },
                   "zoomRange": {
-                    "maximum": 4.0,
+                    "maximum": 5.0,
                     "minimum": 1.0
                   }
                 },
@@ -5763,7 +5763,7 @@
                     "width": 150000.0
                   },
                   "zoomRange": {
-                    "maximum": 4.0,
+                    "maximum": 5.0,
                     "minimum": 1.0
                   }
                 },
@@ -5945,7 +5945,7 @@
                     "width": 150000.0
                   },
                   "zoomRange": {
-                    "maximum": 4.0,
+                    "maximum": 5.0,
                     "minimum": 1.0
                   }
                 },
@@ -6127,7 +6127,7 @@
                     "width": 150000.0
                   },
                   "zoomRange": {
-                    "maximum": 4.0,
+                    "maximum": 5.0,
                     "minimum": 1.0
                   }
                 },
@@ -6292,7 +6292,7 @@
                     "width": 150000.0
                   },
                   "zoomRange": {
-                    "maximum": 4.0,
+                    "maximum": 5.0,
                     "minimum": 1.0
                   }
                 },
@@ -6468,7 +6468,7 @@
                     "width": 150000.0
                   },
                   "zoomRange": {
-                    "maximum": 4.0,
+                    "maximum": 5.0,
                     "minimum": 1.0
                   }
                 },
@@ -6650,7 +6650,7 @@
                     "width": 150000.0
                   },
                   "zoomRange": {
-                    "maximum": 4.0,
+                    "maximum": 5.0,
                     "minimum": 1.0
                   }
                 },
@@ -6848,7 +6848,7 @@
                     "width": 150000.0
                   },
                   "zoomRange": {
-                    "maximum": 4.0,
+                    "maximum": 5.0,
                     "minimum": 1.0
                   }
                 },
@@ -7030,7 +7030,7 @@
                     "width": 150000.0
                   },
                   "zoomRange": {
-                    "maximum": 4.0,
+                    "maximum": 5.0,
                     "minimum": 1.0
                   }
                 },
@@ -7228,7 +7228,7 @@
                     "width": 150000.0
                   },
                   "zoomRange": {
-                    "maximum": 4.0,
+                    "maximum": 5.0,
                     "minimum": 1.0
                   }
                 },
@@ -7393,7 +7393,7 @@
                     "width": 150000.0
                   },
                   "zoomRange": {
-                    "maximum": 4.0,
+                    "maximum": 5.0,
                     "minimum": 1.0
                   }
                 },
@@ -7569,7 +7569,7 @@
                     "width": 150000.0
                   },
                   "zoomRange": {
-                    "maximum": 4.0,
+                    "maximum": 5.0,
                     "minimum": 1.0
                   }
                 },
@@ -7751,7 +7751,7 @@
                     "width": 150000.0
                   },
                   "zoomRange": {
-                    "maximum": 4.0,
+                    "maximum": 5.0,
                     "minimum": 1.0
                   }
                 },
@@ -7949,7 +7949,7 @@
                     "width": 150000.0
                   },
                   "zoomRange": {
-                    "maximum": 4.0,
+                    "maximum": 5.0,
                     "minimum": 1.0
                   }
                 },
@@ -8131,7 +8131,7 @@
                     "width": 150000.0
                   },
                   "zoomRange": {
-                    "maximum": 4.0,
+                    "maximum": 5.0,
                     "minimum": 1.0
                   }
                 },
@@ -8307,7 +8307,7 @@
                     "width": 122308.0
                   },
                   "zoomRange": {
-                    "maximum": 4.0,
+                    "maximum": 5.0,
                     "minimum": 1.0
                   }
                 },
@@ -8473,7 +8473,7 @@
                     "width": 122308.0
                   },
                   "zoomRange": {
-                    "maximum": 4.0,
+                    "maximum": 5.0,
                     "minimum": 1.0
                   }
                 },
@@ -8633,7 +8633,7 @@
                     "width": 122308.0
                   },
                   "zoomRange": {
-                    "maximum": 4.0,
+                    "maximum": 5.0,
                     "minimum": 1.0
                   }
                 },
@@ -8799,7 +8799,7 @@
                     "width": 122308.0
                   },
                   "zoomRange": {
-                    "maximum": 4.0,
+                    "maximum": 5.0,
                     "minimum": 1.0
                   }
                 },
@@ -8960,7 +8960,7 @@
                       "width": 391155.0
                     },
                     "zoomRange": {
-                      "maximum": 4.0,
+                      "maximum": 5.0,
                       "minimum": 1.0
                     }
                   },
@@ -9373,7 +9373,7 @@
                       "width": 391155.0
                     },
                     "zoomRange": {
-                      "maximum": 4.0,
+                      "maximum": 5.0,
                       "minimum": 1.0
                     }
                   },
@@ -9797,7 +9797,7 @@
                       "width": 391155.0
                     },
                     "zoomRange": {
-                      "maximum": 4.0,
+                      "maximum": 5.0,
                       "minimum": 1.0
                     }
                   },
@@ -10202,7 +10202,7 @@
                       "width": 391155.0
                     },
                     "zoomRange": {
-                      "maximum": 4.0,
+                      "maximum": 5.0,
                       "minimum": 1.0
                     }
                   },
@@ -10629,7 +10629,7 @@
                       "width": 391155.0
                     },
                     "zoomRange": {
-                      "maximum": 4.0,
+                      "maximum": 5.0,
                       "minimum": 1.0
                     }
                   },
@@ -11066,7 +11066,7 @@
                       "width": 150000.0
                     },
                     "zoomRange": {
-                      "maximum": 4.0,
+                      "maximum": 5.0,
                       "minimum": 1.0
                     }
                   },
@@ -11464,7 +11464,7 @@
                       "width": 150000.0
                     },
                     "zoomRange": {
-                      "maximum": 4.0,
+                      "maximum": 5.0,
                       "minimum": 1.0
                     }
                   },
@@ -11906,7 +11906,7 @@
                       "width": 391155.0
                     },
                     "zoomRange": {
-                      "maximum": 4.0,
+                      "maximum": 5.0,
                       "minimum": 1.0
                     }
                   },
@@ -12320,7 +12320,7 @@
                       "width": 391155.0
                     },
                     "zoomRange": {
-                      "maximum": 4.0,
+                      "maximum": 5.0,
                       "minimum": 1.0
                     }
                   },
@@ -12732,7 +12732,7 @@
                       "width": 122308.0
                     },
                     "zoomRange": {
-                      "maximum": 4.0,
+                      "maximum": 5.0,
                       "minimum": 1.0
                     }
                   },
@@ -13163,7 +13163,7 @@
                       "width": 150000.0
                     },
                     "zoomRange": {
-                      "maximum": 4.0,
+                      "maximum": 5.0,
                       "minimum": 1.0
                     }
                   },
@@ -13581,7 +13581,7 @@
                       "width": 150000.0
                     },
                     "zoomRange": {
-                      "maximum": 4.0,
+                      "maximum": 5.0,
                       "minimum": 1.0
                     }
                   },
@@ -13985,7 +13985,7 @@
                         "width": 150000.0
                       },
                       "zoomRange": {
-                        "maximum": 4.0,
+                        "maximum": 5.0,
                         "minimum": 1.0
                       }
                     },
@@ -14398,7 +14398,7 @@
                         "width": 150000.0
                       },
                       "zoomRange": {
-                        "maximum": 4.0,
+                        "maximum": 5.0,
                         "minimum": 1.0
                       }
                     },
@@ -14831,7 +14831,7 @@
                         "width": 150000.0
                       },
                       "zoomRange": {
-                        "maximum": 4.0,
+                        "maximum": 5.0,
                         "minimum": 1.0
                       }
                     },
@@ -15240,7 +15240,7 @@
                         "width": 150000.0
                       },
                       "zoomRange": {
-                        "maximum": 4.0,
+                        "maximum": 5.0,
                         "minimum": 1.0
                       }
                     },
@@ -15653,7 +15653,7 @@
                         "width": 150000.0
                       },
                       "zoomRange": {
-                        "maximum": 4.0,
+                        "maximum": 5.0,
                         "minimum": 1.0
                       }
                     },
@@ -16086,7 +16086,7 @@
                         "width": 150000.0
                       },
                       "zoomRange": {
-                        "maximum": 4.0,
+                        "maximum": 5.0,
                         "minimum": 1.0
                       }
                     },
@@ -16507,7 +16507,7 @@
                         "width": 150000.0
                       },
                       "zoomRange": {
-                        "maximum": 4.0,
+                        "maximum": 5.0,
                         "minimum": 1.0
                       }
                     },
@@ -16920,7 +16920,7 @@
                         "width": 150000.0
                       },
                       "zoomRange": {
-                        "maximum": 4.0,
+                        "maximum": 5.0,
                         "minimum": 1.0
                       }
                     },
@@ -17353,7 +17353,7 @@
                         "width": 150000.0
                       },
                       "zoomRange": {
-                        "maximum": 4.0,
+                        "maximum": 5.0,
                         "minimum": 1.0
                       }
                     },
@@ -17762,7 +17762,7 @@
                         "width": 150000.0
                       },
                       "zoomRange": {
-                        "maximum": 4.0,
+                        "maximum": 5.0,
                         "minimum": 1.0
                       }
                     },
@@ -18175,7 +18175,7 @@
                         "width": 150000.0
                       },
                       "zoomRange": {
-                        "maximum": 4.0,
+                        "maximum": 5.0,
                         "minimum": 1.0
                       }
                     },
@@ -18608,7 +18608,7 @@
                         "width": 150000.0
                       },
                       "zoomRange": {
-                        "maximum": 4.0,
+                        "maximum": 5.0,
                         "minimum": 1.0
                       }
                     },
@@ -19029,7 +19029,7 @@
                         "width": 150000.0
                       },
                       "zoomRange": {
-                        "maximum": 4.0,
+                        "maximum": 5.0,
                         "minimum": 1.0
                       }
                     },
@@ -19449,7 +19449,7 @@
                         "width": 150000.0
                       },
                       "zoomRange": {
-                        "maximum": 4.0,
+                        "maximum": 5.0,
                         "minimum": 1.0
                       }
                     },
@@ -19894,7 +19894,7 @@
                         "width": 150000.0
                       },
                       "zoomRange": {
-                        "maximum": 4.0,
+                        "maximum": 5.0,
                         "minimum": 1.0
                       }
                     },
@@ -20322,7 +20322,7 @@
                         "width": 150000.0
                       },
                       "zoomRange": {
-                        "maximum": 4.0,
+                        "maximum": 5.0,
                         "minimum": 1.0
                       }
                     },
@@ -20740,7 +20740,7 @@
                         "width": 150000.0
                       },
                       "zoomRange": {
-                        "maximum": 4.0,
+                        "maximum": 5.0,
                         "minimum": 1.0
                       }
                     },
@@ -21178,7 +21178,7 @@
                         "width": 150000.0
                       },
                       "zoomRange": {
-                        "maximum": 4.0,
+                        "maximum": 5.0,
                         "minimum": 1.0
                       }
                     },
@@ -21603,7 +21603,7 @@
                         "width": 150000.0
                       },
                       "zoomRange": {
-                        "maximum": 4.0,
+                        "maximum": 5.0,
                         "minimum": 1.0
                       }
                     },
@@ -22023,7 +22023,7 @@
                         "width": 150000.0
                       },
                       "zoomRange": {
-                        "maximum": 4.0,
+                        "maximum": 5.0,
                         "minimum": 1.0
                       }
                     },
@@ -22468,7 +22468,7 @@
                         "width": 150000.0
                       },
                       "zoomRange": {
-                        "maximum": 4.0,
+                        "maximum": 5.0,
                         "minimum": 1.0
                       }
                     },
@@ -22896,7 +22896,7 @@
                         "width": 150000.0
                       },
                       "zoomRange": {
-                        "maximum": 4.0,
+                        "maximum": 5.0,
                         "minimum": 1.0
                       }
                     },
@@ -23314,7 +23314,7 @@
                         "width": 150000.0
                       },
                       "zoomRange": {
-                        "maximum": 4.0,
+                        "maximum": 5.0,
                         "minimum": 1.0
                       }
                     },
@@ -23752,7 +23752,7 @@
                         "width": 150000.0
                       },
                       "zoomRange": {
-                        "maximum": 4.0,
+                        "maximum": 5.0,
                         "minimum": 1.0
                       }
                     },
@@ -24177,7 +24177,7 @@
                         "width": 150000.0
                       },
                       "zoomRange": {
-                        "maximum": 4.0,
+                        "maximum": 5.0,
                         "minimum": 1.0
                       }
                     },
@@ -24597,7 +24597,7 @@
                         "width": 150000.0
                       },
                       "zoomRange": {
-                        "maximum": 4.0,
+                        "maximum": 5.0,
                         "minimum": 1.0
                       }
                     },
@@ -25036,7 +25036,7 @@
                         "width": 150000.0
                       },
                       "zoomRange": {
-                        "maximum": 4.0,
+                        "maximum": 5.0,
                         "minimum": 1.0
                       }
                     },
@@ -25481,7 +25481,7 @@
                         "width": 150000.0
                       },
                       "zoomRange": {
-                        "maximum": 4.0,
+                        "maximum": 5.0,
                         "minimum": 1.0
                       }
                     },
@@ -25941,7 +25941,7 @@
                         "width": 150000.0
                       },
                       "zoomRange": {
-                        "maximum": 4.0,
+                        "maximum": 5.0,
                         "minimum": 1.0
                       }
                     },
@@ -26415,7 +26415,7 @@
                         "width": 150000.0
                       },
                       "zoomRange": {
-                        "maximum": 4.0,
+                        "maximum": 5.0,
                         "minimum": 1.0
                       }
                     },
@@ -26865,7 +26865,7 @@
                         "width": 150000.0
                       },
                       "zoomRange": {
-                        "maximum": 4.0,
+                        "maximum": 5.0,
                         "minimum": 1.0
                       }
                     },
@@ -27285,7 +27285,7 @@
                         "width": 150000.0
                       },
                       "zoomRange": {
-                        "maximum": 4.0,
+                        "maximum": 5.0,
                         "minimum": 1.0
                       }
                     },
@@ -27724,7 +27724,7 @@
                         "width": 150000.0
                       },
                       "zoomRange": {
-                        "maximum": 4.0,
+                        "maximum": 5.0,
                         "minimum": 1.0
                       }
                     },
@@ -28169,7 +28169,7 @@
                         "width": 150000.0
                       },
                       "zoomRange": {
-                        "maximum": 4.0,
+                        "maximum": 5.0,
                         "minimum": 1.0
                       }
                     },
@@ -28629,7 +28629,7 @@
                         "width": 150000.0
                       },
                       "zoomRange": {
-                        "maximum": 4.0,
+                        "maximum": 5.0,
                         "minimum": 1.0
                       }
                     },
@@ -29103,7 +29103,7 @@
                         "width": 150000.0
                       },
                       "zoomRange": {
-                        "maximum": 4.0,
+                        "maximum": 5.0,
                         "minimum": 1.0
                       }
                     },
@@ -29553,7 +29553,7 @@
                         "width": 150000.0
                       },
                       "zoomRange": {
-                        "maximum": 4.0,
+                        "maximum": 5.0,
                         "minimum": 1.0
                       }
                     },
@@ -29988,7 +29988,7 @@
                         "width": 150000.0
                       },
                       "zoomRange": {
-                        "maximum": 4.0,
+                        "maximum": 5.0,
                         "minimum": 1.0
                       }
                     },
@@ -30442,7 +30442,7 @@
                         "width": 150000.0
                       },
                       "zoomRange": {
-                        "maximum": 4.0,
+                        "maximum": 5.0,
                         "minimum": 1.0
                       }
                     },
@@ -30902,7 +30902,7 @@
                         "width": 150000.0
                       },
                       "zoomRange": {
-                        "maximum": 4.0,
+                        "maximum": 5.0,
                         "minimum": 1.0
                       }
                     },
@@ -31362,7 +31362,7 @@
                         "width": 150000.0
                       },
                       "zoomRange": {
-                        "maximum": 4.0,
+                        "maximum": 5.0,
                         "minimum": 1.0
                       }
                     },
@@ -31857,7 +31857,7 @@
                         "width": 150000.0
                       },
                       "zoomRange": {
-                        "maximum": 4.0,
+                        "maximum": 5.0,
                         "minimum": 1.0
                       }
                     },
@@ -32335,7 +32335,7 @@
                         "width": 150000.0
                       },
                       "zoomRange": {
-                        "maximum": 4.0,
+                        "maximum": 5.0,
                         "minimum": 1.0
                       }
                     },
@@ -32770,7 +32770,7 @@
                         "width": 150000.0
                       },
                       "zoomRange": {
-                        "maximum": 4.0,
+                        "maximum": 5.0,
                         "minimum": 1.0
                       }
                     },
@@ -33224,7 +33224,7 @@
                         "width": 150000.0
                       },
                       "zoomRange": {
-                        "maximum": 4.0,
+                        "maximum": 5.0,
                         "minimum": 1.0
                       }
                     },
@@ -33684,7 +33684,7 @@
                         "width": 150000.0
                       },
                       "zoomRange": {
-                        "maximum": 4.0,
+                        "maximum": 5.0,
                         "minimum": 1.0
                       }
                     },
@@ -34144,7 +34144,7 @@
                         "width": 150000.0
                       },
                       "zoomRange": {
-                        "maximum": 4.0,
+                        "maximum": 5.0,
                         "minimum": 1.0
                       }
                     },
@@ -34639,7 +34639,7 @@
                         "width": 150000.0
                       },
                       "zoomRange": {
-                        "maximum": 4.0,
+                        "maximum": 5.0,
                         "minimum": 1.0
                       }
                     },
@@ -35117,7 +35117,7 @@
                         "width": 122308.0
                       },
                       "zoomRange": {
-                        "maximum": 4.0,
+                        "maximum": 5.0,
                         "minimum": 1.0
                       }
                     },
@@ -35534,7 +35534,7 @@
                         "width": 122308.0
                       },
                       "zoomRange": {
-                        "maximum": 4.0,
+                        "maximum": 5.0,
                         "minimum": 1.0
                       }
                     },
@@ -35964,7 +35964,7 @@
                         "width": 122308.0
                       },
                       "zoomRange": {
-                        "maximum": 4.0,
+                        "maximum": 5.0,
                         "minimum": 1.0
                       }
                     },
@@ -36394,7 +36394,7 @@
                         "width": 122308.0
                       },
                       "zoomRange": {
-                        "maximum": 4.0,
+                        "maximum": 5.0,
                         "minimum": 1.0
                       }
                     },
@@ -36825,7 +36825,7 @@
                         "width": 122308.0
                       },
                       "zoomRange": {
-                        "maximum": 4.0,
+                        "maximum": 5.0,
                         "minimum": 1.0
                       }
                     },
@@ -37242,7 +37242,7 @@
                         "width": 122308.0
                       },
                       "zoomRange": {
-                        "maximum": 4.0,
+                        "maximum": 5.0,
                         "minimum": 1.0
                       }
                     },
@@ -37672,7 +37672,7 @@
                         "width": 122308.0
                       },
                       "zoomRange": {
-                        "maximum": 4.0,
+                        "maximum": 5.0,
                         "minimum": 1.0
                       }
                     },
@@ -38102,7 +38102,7 @@
                         "width": 122308.0
                       },
                       "zoomRange": {
-                        "maximum": 4.0,
+                        "maximum": 5.0,
                         "minimum": 1.0
                       }
                     },
@@ -38544,7 +38544,7 @@
                         "width": 391155.0
                       },
                       "zoomRange": {
-                        "maximum": 4.0,
+                        "maximum": 5.0,
                         "minimum": 1.0
                       }
                     },
@@ -38993,7 +38993,7 @@
                         "width": 391155.0
                       },
                       "zoomRange": {
-                        "maximum": 4.0,
+                        "maximum": 5.0,
                         "minimum": 1.0
                       }
                     },
@@ -39432,7 +39432,7 @@
                         "width": 391155.0
                       },
                       "zoomRange": {
-                        "maximum": 4.0,
+                        "maximum": 5.0,
                         "minimum": 1.0
                       }
                     },
@@ -39878,7 +39878,7 @@
                         "width": 391155.0
                       },
                       "zoomRange": {
-                        "maximum": 4.0,
+                        "maximum": 5.0,
                         "minimum": 1.0
                       }
                     },
@@ -40304,7 +40304,7 @@
                         "width": 391155.0
                       },
                       "zoomRange": {
-                        "maximum": 4.0,
+                        "maximum": 5.0,
                         "minimum": 1.0
                       }
                     },
@@ -40719,7 +40719,7 @@
                         "width": 391155.0
                       },
                       "zoomRange": {
-                        "maximum": 4.0,
+                        "maximum": 5.0,
                         "minimum": 1.0
                       }
                     },

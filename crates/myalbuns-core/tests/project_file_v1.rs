@@ -149,6 +149,28 @@ fn an_invalid_folder_membership_is_rejected_without_writing() {
 }
 
 #[test]
+fn the_photo_zoom_is_accepted_up_to_five_times_and_rejected_above() {
+    let root = tempfile::tempdir().unwrap();
+    let path = root.path().join("Zoom.myalbuns");
+    let mut document: serde_json::Value = serde_json::from_slice(FIXTURES[1].1).unwrap();
+    let load = |document: &serde_json::Value| {
+        fs::write(&path, serde_json::to_vec(document).unwrap()).unwrap();
+        core(root.path()).load_persisted_revision(LoadProjectRequest::new(location(&path)))
+    };
+
+    document["project"]["sheets"][0]["frames"][0]["photo"]["transform"]["userZoom"] =
+        serde_json::json!(5.0);
+    assert!(load(&document).is_ok());
+
+    document["project"]["sheets"][0]["frames"][0]["photo"]["transform"]["userZoom"] =
+        serde_json::json!(5.01);
+    assert_eq!(
+        load(&document).unwrap_err(),
+        LoadProjectError::Document(DocumentFailure::InvalidProjectDocument)
+    );
+}
+
+#[test]
 fn development_files_before_the_first_public_version_are_rejected_without_writing() {
     let root = tempfile::tempdir().unwrap();
     let path = root.path().join("Desenvolvimento.myalbuns");

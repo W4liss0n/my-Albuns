@@ -174,13 +174,13 @@ fn batch_zoom_preserves_other_properties_and_shares_preview_history_and_persiste
 }
 
 #[test]
-fn batch_zoom_rejects_invalid_values_and_selections_atomically() {
+fn batch_zoom_accepts_500_percent_and_rejects_invalid_values_and_selections_atomically() {
     use myalbuns_core::PhotoZoomEdit;
     let root = tempfile::tempdir().unwrap();
     let mut project = mixed_project(root.path());
     let before = project.projection();
     let id = before.state.album.sheets[0].frames[0].id.clone();
-    let mut edits: Vec<_> = [f32::NAN, f32::INFINITY, 0.99, 4.01]
+    let mut edits: Vec<_> = [f32::NAN, f32::INFINITY, 0.99, 5.01]
         .into_iter()
         .map(|user_zoom| PhotoZoomEdit {
             frame_ids: vec![id.clone()],
@@ -202,6 +202,16 @@ fn batch_zoom_rejects_invalid_values_and_selections_atomically() {
         assert!(project.apply(ProjectIntent::SetPhotoZoom { edit }).is_err());
         assert_eq!(project.projection(), before);
     }
+    let maximum = PhotoZoomEdit {
+        frame_ids: vec![before.state.album.sheets[0].frames[0].id.clone()],
+        user_zoom: 5.0,
+    };
+    assert!(project.preview_photo_zoom(&maximum).is_ok());
+    project
+        .apply(ProjectIntent::SetPhotoZoom { edit: maximum })
+        .unwrap();
+    let photo = &project.projection().state.album.sheets[0].frames[0].photo;
+    assert_eq!(photo.as_ref().unwrap().transform.user_zoom, 5.0);
 }
 
 #[test]
@@ -487,7 +497,7 @@ fn fine_angles_fill_every_frame_corner_at_pan_limits_with_any_rotation_and_mirro
                         },
                     })
                     .unwrap();
-                for zoom in [1.0, 2.0] {
+                for zoom in [1.0, 2.0, 5.0] {
                     for (x, y) in [
                         (-1.0, -1.0),
                         (-1.0, 1.0),

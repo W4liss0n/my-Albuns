@@ -101,7 +101,7 @@
                     "width": 180000.0
                   },
                   "zoomRange": {
-                    "maximum": 4.0,
+                    "maximum": 5.0,
                     "minimum": 1.0
                   }
                 },
@@ -180,7 +180,7 @@
                     "width": 225000.0
                   },
                   "zoomRange": {
-                    "maximum": 4.0,
+                    "maximum": 5.0,
                     "minimum": 1.0
                   }
                 },
@@ -676,7 +676,7 @@
                         "width": 180000.0
                       },
                       "zoomRange": {
-                        "maximum": 4.0,
+                        "maximum": 5.0,
                         "minimum": 1.0
                       }
                     },
@@ -755,7 +755,7 @@
                         "width": 225000.0
                       },
                       "zoomRange": {
-                        "maximum": 4.0,
+                        "maximum": 5.0,
                         "minimum": 1.0
                       }
                     },
@@ -1254,7 +1254,7 @@
                         "width": 180000.0
                       },
                       "zoomRange": {
-                        "maximum": 4.0,
+                        "maximum": 5.0,
                         "minimum": 1.0
                       }
                     },
@@ -1333,7 +1333,7 @@
                         "width": 225000.0
                       },
                       "zoomRange": {
-                        "maximum": 4.0,
+                        "maximum": 5.0,
                         "minimum": 1.0
                       }
                     },

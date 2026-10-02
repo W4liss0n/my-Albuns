@@ -28,7 +28,7 @@
         "currentPan": { "x": -0.9, "y": 0 },
         "currentZoom": 1,
         "panRange": { "minimum": -1, "maximum": 1 },
-        "zoomRange": { "minimum": 1, "maximum": 4 },
+        "zoomRange": { "minimum": 1, "maximum": 5 },
         "current": {
           "center": { "x": 105000, "y": 100000 },
           "size": { "width": 400000, "height": 200000 }
@@ -96,7 +96,7 @@
         "currentPan": { "x": 1, "y": -1 },
         "currentZoom": 1.5,
         "panRange": { "minimum": -1, "maximum": 1 },
-        "zoomRange": { "minimum": 1, "maximum": 4 },
+        "zoomRange": { "minimum": 1, "maximum": 5 },
         "current": {
           "center": { "x": 225000, "y": 337500 },
           "size": { "width": 675000, "height": 450000 }

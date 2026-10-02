@@ -13,7 +13,7 @@ pub(crate) const RENDER_SNAPSHOT_SCHEMA_VERSION: u32 = 6;
 pub(crate) const PHOTO_PAN_MIN: f32 = -1.0;
 pub(crate) const PHOTO_PAN_MAX: f32 = 1.0;
 pub(crate) const PHOTO_ZOOM_MIN: f32 = 1.0;
-pub(crate) const PHOTO_ZOOM_MAX: f32 = 4.0;
+pub(crate) const PHOTO_ZOOM_MAX: f32 = 5.0;
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub struct MediaId(Uuid);
@@ -1117,7 +1117,7 @@ pub enum CoreError {
     InvalidPhotoEffectSelection,
     #[error("O Ângulo da Foto deve estar entre -45° e +45°, em décimos de grau")]
     InvalidPhotoAngle,
-    #[error("O Zoom da Foto deve estar entre 100% e 400%")]
+    #[error("O Zoom da Foto deve estar entre 100% e 500%")]
     InvalidPhotoZoom,
     #[error("Selecione Frames distintos de uma única Lâmina para ajustar o Zoom das Fotos")]
     InvalidPhotoZoomSelection,
