@@ -29,7 +29,7 @@ jobs:
       run:
         shell: powershell
     env:
-      CARGO_BUILD_JOBS: '2'
+      CARGO_BUILD_JOBS: '4'
       CARGO_INCREMENTAL: '0'
       CARGO_PROFILE_DEV_DEBUG: '0'
       CARGO_PROFILE_TEST_DEBUG: '0'
@@ -64,7 +64,22 @@ jobs:
         run: npm ci
       - name: Prepare pinned local Rust toolchain
         run: ./scripts/Setup-LocalToolchain.ps1 -SkipNodeInstall
+      - name: Decide whether the change can affect a validated check
+        id: scope
+        run: |
+          $base = '${{ github.base_ref }}'
+          $docsOnly = 'false'
+          if ($base) {
+            git fetch --quiet --depth=1 origin $base
+            $changed = @(git diff --name-only FETCH_HEAD HEAD)
+            # Documentation never reaches a test, a build or a contract.
+            $unrelated = @($changed | Where-Object { $_ -notmatch '^(docs/|[^/]+\.md$|\.scratch/|\.out-of-scope/)' })
+            if ($changed.Count -gt 0 -and $unrelated.Count -eq 0) { $docsOnly = 'true' }
+          }
+          "docs_only=$docsOnly" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          Write-Output "docs_only=$docsOnly ($($changed.Count) changed files)"
       - name: Validate without visible windows
+        if: steps.scope.outputs.docs_only != 'true'
         run: npm run validate
       - name: Retain validation evidence
         if: always()
@@ -86,7 +101,7 @@ jobs:
       run:
         shell: powershell
     env:
-      CARGO_BUILD_JOBS: '2'
+      CARGO_BUILD_JOBS: '4'
       CARGO_INCREMENTAL: '0'
       CARGO_PROFILE_DEV_DEBUG: '0'
       CARGO_PROFILE_TEST_DEBUG: '0'

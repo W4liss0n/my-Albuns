@@ -16,7 +16,12 @@ function Invoke-RealProcessorTests {
     if ($Exact) {
         $testArguments += '--exact'
     }
-    & $script:CargoExecutable test -p myalbuns-desktop $Filter -- @testArguments |
+    & $script:CargoExecutable test `
+        --workspace `
+        --exclude myalbuns-imaging `
+        --features myalbuns-desktop/dev-supervisor `
+        $Filter `
+        -- @testArguments |
         Tee-Object -Variable testOutput
     if ($LASTEXITCODE -ne 0) {
         exit $LASTEXITCODE
@@ -37,28 +42,25 @@ function Invoke-RealProcessorTests {
 Push-Location $script:WorkspaceRoot
 $previousTestProcessor = $env:MYALBUNS_TEST_IMAGING_PROCESSOR
 try {
+    # One package selection for the whole pass: Cargo rebuilds the workspace
+    # crates whenever the selected packages or features change, so every
+    # invocation below keeps `--workspace --exclude myalbuns-imaging`. The
+    # `dev-supervisor` feature only gates the `myalbuns-dev` binary, so enabling
+    # it here tests that binary without a second build of the desktop crate.
+    #
     # Cargo 1.97 can rematerialize a stale top-level binary while testing the
     # complete workspace, even after an explicit build. Keep the processor out
-    # of that pass, then build and test it in one package-scoped sequence so
-    # CARGO_BIN_EXE_myalbuns-imaging names the executable just produced.
+    # of that pass and test it package-scoped, so CARGO_BIN_EXE_myalbuns-imaging
+    # names the executable just produced; that build is then reused below.
     & $script:CargoExecutable test `
         --workspace `
-        --exclude myalbuns-imaging
+        --exclude myalbuns-imaging `
+        --features myalbuns-desktop/dev-supervisor
     if ($LASTEXITCODE -ne 0) {
         exit $LASTEXITCODE
     }
 
-    & $script:CargoExecutable test `
-        -p myalbuns-desktop `
-        --bin myalbuns-dev `
-        --features dev-supervisor
-    if ($LASTEXITCODE -ne 0) {
-        exit $LASTEXITCODE
-    }
-
-    & $script:CargoExecutable build `
-        -p myalbuns-imaging `
-        --bin myalbuns-imaging
+    & $script:CargoExecutable test -p myalbuns-imaging
     if ($LASTEXITCODE -ne 0) {
         exit $LASTEXITCODE
     }
@@ -90,9 +92,7 @@ try {
     Invoke-RealProcessorTests `
         -Filter 'photo_import::native_flow_tests::' `
         -ExpectedCount 3
-
-    & $script:CargoExecutable test -p myalbuns-imaging
-    exit $LASTEXITCODE
+    exit 0
 }
 finally {
     $env:MYALBUNS_TEST_IMAGING_PROCESSOR = $previousTestProcessor
