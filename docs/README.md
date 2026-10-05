@@ -59,6 +59,7 @@ documento quebra esses links: corrija o conteúdo no próprio arquivo.
 | Salvamento, identidade e cópias | ADR 0002; design 0015 |
 | Arquivos vinculados, caminhos e Cache | ADRs 0001 e 0007; designs 0010, 0011, 0020, 0032, 0039 e 0052 |
 | Exportação e renderização | ADRs 0003, 0004 e 0006; designs 0004, 0014, 0017 e 0019 |
+| Automação por outro programa | design 0053 |
 | Fotos e Frames | designs 0017, 0021 a 0024, 0033 e 0048 |
 | Layouts e Pastas | ADRs 0008 e 0010; designs 0026 a 0030, 0035 e 0042 |
 | Dimensões | ADR 0011; design 0036 |

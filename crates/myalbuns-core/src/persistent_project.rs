@@ -166,6 +166,14 @@ impl LoadedProjectRevision {
     pub fn project(&self) -> &ProjectDocument {
         &self.revision.project
     }
+
+    /// Freezes the persisted creative state as a model for independent
+    /// Projects, without an editable identity lease.
+    pub fn freeze_template(&self) -> ProjectTemplate {
+        ProjectTemplate {
+            project: self.revision.project.clone(),
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

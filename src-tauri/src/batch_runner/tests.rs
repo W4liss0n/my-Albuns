@@ -2,7 +2,7 @@ use super::*;
 use myalbuns_core::{CreateAuthorization, CreateProjectRequest, InitialProject, ProjectLocation};
 use std::sync::Mutex;
 
-pub(super) fn fixture(
+pub(crate) fn fixture(
     root: &std::path::Path,
     relative: &str,
 ) -> (ProjectCore, myalbuns_core::EditableProject) {
@@ -902,7 +902,7 @@ fn process_exit_before_during_and_after_publication_replays_the_whole_interrupte
     }
 }
 
-pub(super) fn background_fixture(
+pub(crate) fn background_fixture(
     root: &Path,
     name: &str,
 ) -> (ProjectCore, myalbuns_core::EditableProject, PathBuf) {
