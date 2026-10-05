@@ -127,3 +127,22 @@ test("reports a saved file whose Recovery cleanup still needs a retry", async ()
       "O projeto foi salvo, mas a limpeza dos dados de recuperação não terminou. Tente salvar novamente.",
   });
 });
+
+test.each<[string, unknown]>([
+  ["an Error the save contract does not describe", new Error("ipc channel closed")],
+  ["a failure code outside the save contract", { code: "window_destroyed" }],
+  ["a bare text", "window destroyed"],
+  ["no reason", undefined],
+])("reports %s as an unavailable close for both close commands", async (_name, reason) => {
+  vi.mocked(invoke).mockRejectedValue(reason);
+
+  for (const attempt of [
+    () => tauriProjectWindowPort.requestClose(),
+    () => tauriProjectWindowPort.resolveClose("saveAndClose"),
+  ]) {
+    await expect(attempt()).rejects.toMatchObject({
+      name: "ProjectCloseError",
+      code: "close_unavailable",
+    });
+  }
+});

@@ -64,10 +64,8 @@ fn sources(folder: &Path, found: &mut Vec<PathBuf>) {
 
 /// Violations in one source file, given its path relative to `src`.
 fn violations(relative: &str, source: &str) -> Vec<String> {
-    // The module itself, tests and the network measurement, which may build
-    // fixtures however they need.
+    // The module itself and tests, which may build fixtures however they need.
     if relative == "linked_files.rs"
-        || relative == "network_bench.rs"
         || relative.ends_with("tests.rs")
         || relative.contains("/tests/")
     {

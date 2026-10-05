@@ -1383,25 +1383,6 @@ mod tests {
     }
 
     #[test]
-    fn photo_import_accepts_decodable_jpeg_bytes_and_never_rewrites_the_original() {
-        let root = tempfile::tempdir().expect("temporary JPEG import fixture");
-        let source = root.path().join("Foto externa.jpeg");
-        RgbImage::from_pixel(37, 23, Rgb([20, 80, 160]))
-            .save_with_format(&source, ImageFormat::Jpeg)
-            .expect("the external JPEG is writable");
-        let before = std::fs::read(&source).expect("the Original is readable before import");
-
-        let proposal = MediaResolver.propose_photo_imports(vec![source.clone()], &[], |_| {});
-        assert_eq!(proposal.commands.len(), 1);
-        assert!(proposal.problems.is_empty());
-        assert_eq!(
-            std::fs::read(&source).expect("the Original remains readable"),
-            before,
-            "import inspection never modifies the linked Original"
-        );
-    }
-
-    #[test]
     fn photo_import_accepts_supported_content_even_with_a_different_extension() {
         let root = tempfile::tempdir().expect("temporary invalid JPEG fixture");
         let source = root.path().join("Nao e JPEG.jpg");

@@ -2,7 +2,7 @@ use super::*;
 use myalbuns_core::{CreateAuthorization, CreateProjectRequest, InitialProject, ProjectLocation};
 use std::sync::Mutex;
 
-pub(super) fn fixture(
+pub(crate) fn fixture(
     root: &std::path::Path,
     relative: &str,
 ) -> (ProjectCore, myalbuns_core::EditableProject) {
@@ -69,6 +69,7 @@ struct RecordingTransport {
     sources: Vec<Vec<PathBuf>>,
     dpis: Vec<u32>,
     storage_full_for: Option<String>,
+    termination_unconfirmed_for: Option<String>,
 }
 
 #[test]
@@ -146,6 +147,10 @@ fn batch_conflicts_skip_and_orphan_cleanup_use_the_frozen_destination() {
             assert_eq!(
                 std::fs::read(bound.join("Delivery/A_001.png")).unwrap(),
                 b"bound-first"
+            );
+            assert_eq!(
+                std::fs::read(bound.join("Delivery/A_003.png")).unwrap(),
+                b"bound-orphan"
             );
         }
         assert_eq!(
@@ -240,6 +245,17 @@ impl crate::imaging_processor::ImagingTransport for RecordingTransport {
         }
         if self.crash_during_preparation {
             std::process::exit(91);
+        }
+        if self.termination_unconfirmed_for.as_deref() == Some(&request.snapshot.project_name) {
+            self.prior_outputs.clear();
+            return Box::pin(async {
+                Err(
+                    crate::imaging_processor::InvocationFailure::termination_unconfirmed(
+                        4242,
+                        UNCONFIRMED_TERMINATION,
+                    ),
+                )
+            });
         }
         let response = if self.storage_full_for.as_deref() == Some(&request.snapshot.project_name) {
             self.prior_outputs.clear();
@@ -902,7 +918,7 @@ fn process_exit_before_during_and_after_publication_replays_the_whole_interrupte
     }
 }
 
-pub(super) fn background_fixture(
+pub(crate) fn background_fixture(
     root: &Path,
     name: &str,
 ) -> (ProjectCore, myalbuns_core::EditableProject, PathBuf) {
@@ -1044,46 +1060,6 @@ fn changed_persisted_revision_fails_only_that_item_and_an_explicit_recheck_uses_
             Some(&(if same_revision_rewrite { 300 } else { 240 }))
         );
     }
-}
-
-#[test]
-fn skipping_global_conflicts_preserves_existing_outputs_and_orphans() {
-    let root = tempfile::tempdir().unwrap();
-    let (core, _editor) = fixture(root.path(), "source/A.myalbuns");
-    let destination = root.path().join("source/A");
-    std::fs::create_dir_all(&destination).unwrap();
-    std::fs::write(destination.join("A_001.png"), b"previous").unwrap();
-    std::fs::write(destination.join("A_003.png"), b"orphan").unwrap();
-    let batch = BatchRunner::discover(
-        BatchConfiguration {
-            source: root.path().join("source"),
-            destination: None,
-            format: ExportFormat::Png,
-            mode: ExportMode::Sheet,
-        },
-        core,
-        root.path().join("checkpoints"),
-    )
-    .unwrap();
-    assert!(batch.view().has_conflicts);
-    let mut transport = RecordingTransport::default();
-    let result = tauri::async_runtime::block_on(batch.run(
-        &mut transport,
-        &BatchCancellation::default(),
-        ExportConflictPolicy::Skip,
-        &|_| {},
-    ))
-    .unwrap();
-    assert_eq!(result.view().items[0].status, BatchItemStatus::Completed);
-    assert_eq!(
-        std::fs::read(destination.join("A_001.png")).unwrap(),
-        b"previous"
-    );
-    assert!(destination.join("A_002.png").exists());
-    assert_eq!(
-        std::fs::read(destination.join("A_003.png")).unwrap(),
-        b"orphan"
-    );
 }
 
 #[test]
@@ -1324,150 +1300,447 @@ fn real_processor_exports_persisted_batches_in_every_format() {
     });
 }
 
-/// End-to-end proof for Projects of the old myAlbuns (ADR 0012). Each file in
-/// `MYALBUNS_LEGACY_EXPORT_PROJECTS` (`;`-separated, usually the real files on
-/// the network share) is only read: it is converted in memory and every Sheet
-/// without empty Frames is exported by the real Processor into
-/// `MYALBUNS_LEGACY_EXPORT_OUTPUT`, for comparison with the old program.
+const UNCONFIRMED_TERMINATION: &str = "injected unconfirmed termination";
+
+fn discovered(root: &Path, core: ProjectCore) -> BatchRunner {
+    BatchRunner::discover(
+        BatchConfiguration {
+            source: root.join("source"),
+            destination: None,
+            format: ExportFormat::Png,
+            mode: ExportMode::Sheet,
+        },
+        core,
+        root.join("checkpoints"),
+    )
+    .unwrap()
+}
+
+fn preparation_directories(destination: &Path) -> Vec<PathBuf> {
+    std::fs::read_dir(destination)
+        .unwrap()
+        .map(|entry| entry.unwrap().path())
+        .filter(|path| {
+            path.file_name()
+                .unwrap()
+                .to_string_lossy()
+                .starts_with(".myalbuns-export-")
+        })
+        .collect()
+}
+
 #[test]
-#[ignore = "run manually with real old myAlbuns Projects and a matching Processor"]
-fn real_processor_exports_old_myalbuns_projects_without_writing_them() {
-    use crate::{
-        imaging_processor::InvocationContext, imaging_recovery_integration::RealProcessTransport,
-        path_io,
+fn cancellation_during_an_item_publishes_nothing_and_replays_that_item_on_resume() {
+    let root = tempfile::tempdir().unwrap();
+    let (core, _first) = fixture(root.path(), "source/A.myalbuns");
+    let (_, _second) = fixture(root.path(), "source/B.myalbuns");
+    let checkpoints = root.path().join("checkpoints");
+    let batch = discovered(root.path(), core.clone());
+    let id = batch.view().id;
+    let cancel = BatchCancellation::default();
+    let mut transport = RecordingTransport::default();
+    let interrupted = tauri::async_runtime::block_on(batch.run(
+        &mut transport,
+        &cancel,
+        ExportConflictPolicy::Ask,
+        &|progress| {
+            // Only the Processor rendering the current item moves the percentage
+            // while no item has been recorded yet.
+            if progress.completed == 0 && progress.percent > 0.0 {
+                cancel.request();
+            }
+        },
+    ))
+    .unwrap();
+    assert_eq!(transport.names, ["A"], "B must not start after the cancel");
+    let view = interrupted.view();
+    assert_eq!(view.phase, BatchPhase::Interrupted);
+    assert_eq!(view.items[0].status, BatchItemStatus::Pending);
+    assert!(
+        !view.items[0].problems.is_empty(),
+        "the interrupted project says it will be redone"
+    );
+    assert_eq!(view.items[1].status, BatchItemStatus::Pending);
+    assert!(view.items[1].problems.is_empty());
+    assert_eq!(
+        std::fs::read_dir(root.path().join("source/A"))
+            .unwrap()
+            .count(),
+        0,
+        "the cancelled item publishes nothing and discards its preparation"
+    );
+    assert_eq!(
+        BatchRunner::recoveries(&checkpoints).unwrap()[0].remaining,
+        2
+    );
+    drop(interrupted);
+
+    let resumed = BatchRunner::resume(&checkpoints, &id, core).unwrap();
+    let mut second_transport = RecordingTransport::default();
+    let finished = tauri::async_runtime::block_on(resumed.run(
+        &mut second_transport,
+        &BatchCancellation::default(),
+        ExportConflictPolicy::Ask,
+        &|_| {},
+    ))
+    .unwrap();
+    assert_eq!(second_transport.names, ["A", "B"]);
+    assert_eq!(finished.view().phase, BatchPhase::Finished);
+    assert_eq!(
+        std::fs::read(root.path().join("source/A/A_001.png")).unwrap(),
+        b"A-0"
+    );
+}
+
+/// A is published, B stops with an unconfirmed Processor termination and C never starts.
+fn interrupted_by_unconfirmed_termination(root: &Path) -> BatchRunner {
+    let (core, _first) = fixture(root, "source/A.myalbuns");
+    let (_, _second) = fixture(root, "source/B.myalbuns");
+    let (_, _third) = fixture(root, "source/C.myalbuns");
+    let batch = discovered(root, core);
+    let mut transport = RecordingTransport {
+        termination_unconfirmed_for: Some("B".into()),
+        ..Default::default()
     };
-    tauri::async_runtime::block_on(async {
-        let executable = PathBuf::from(
-            std::env::var_os("MYALBUNS_TEST_IMAGING_PROCESSOR")
-                .expect("a matching Processor is configured"),
-        );
-        let projects = std::env::var("MYALBUNS_LEGACY_EXPORT_PROJECTS")
-            .expect("the old Projects to export are configured");
-        let output = PathBuf::from(
-            std::env::var_os("MYALBUNS_LEGACY_EXPORT_OUTPUT").expect("an output folder"),
-        );
+    let interrupted = tauri::async_runtime::block_on(batch.run(
+        &mut transport,
+        &BatchCancellation::default(),
+        ExportConflictPolicy::Ask,
+        &|_| {},
+    ))
+    .unwrap();
+    assert_eq!(
+        transport.names,
+        ["A", "B"],
+        "a Processor that may still be running must stop the batch before C"
+    );
+    interrupted
+}
+
+#[test]
+fn unconfirmed_processor_termination_interrupts_the_batch_and_keeps_the_item_pending() {
+    let root = tempfile::tempdir().unwrap();
+    let interrupted = interrupted_by_unconfirmed_termination(root.path());
+    let view = interrupted.view();
+    assert_eq!(view.phase, BatchPhase::Interrupted);
+    assert_eq!(view.items[0].status, BatchItemStatus::Completed);
+    assert_eq!(view.items[1].status, BatchItemStatus::Pending);
+    assert_eq!(view.items[1].problems.len(), 1);
+    assert_eq!(view.items[1].problems[0].message, UNCONFIRMED_TERMINATION);
+    assert_eq!(view.items[2].status, BatchItemStatus::Pending);
+    assert!(view.items[2].problems.is_empty());
+    assert!(!root.path().join("source/B/B_001.png").exists());
+    assert_eq!(
+        preparation_directories(&root.path().join("source/B")).len(),
+        1,
+        "files a live Processor may still write are preserved for recovery"
+    );
+    let recoveries = BatchRunner::recoveries(&root.path().join("checkpoints")).unwrap();
+    assert_eq!(recoveries.len(), 1);
+    assert_eq!(recoveries[0].remaining, 2);
+}
+
+#[test]
+fn abandoning_a_batch_ends_its_recovery_and_cleans_only_its_preparation() {
+    for cleanup_preparation in [true, false] {
         let root = tempfile::tempdir().unwrap();
-        let core = ProjectCore::new().with_identity_storage_roots(
-            root.path().join("leases"),
-            root.path().join("identities"),
+        let interrupted = interrupted_by_unconfirmed_termination(root.path());
+        let project = std::fs::read(root.path().join("source/B.myalbuns")).unwrap();
+
+        interrupted.abandon(cleanup_preparation).unwrap();
+
+        assert!(
+            BatchRunner::recoveries(&root.path().join("checkpoints"))
+                .unwrap()
+                .is_empty(),
+            "an abandoned batch is never offered for recovery again"
         );
-        for project_path in projects.split(';').filter(|path| !path.is_empty()) {
-            let project_path = PathBuf::from(project_path);
-            let before = std::fs::read(&project_path).unwrap();
-            let mut paths = myalbuns_paths::OperationPathContext::new();
-            paths.capture(&project_path).unwrap();
-            let loaded = core
-                .load_persisted_revision(myalbuns_core::LoadProjectRequest::new(
-                    ProjectLocation::new(project_path.clone(), paths.freeze()),
-                ))
-                .unwrap_or_else(|error| panic!("{}: {error:?}", project_path.display()));
-            let frozen = loaded.freeze_rendering();
-            let sheet_ids: Vec<String> = frozen
-                .render_snapshot()
-                .composition
-                .sheets
-                .iter()
-                .map(|sheet| sheet.sheet_id.clone())
-                .filter(|id| {
-                    frozen
-                        .validate_export_sheets(std::slice::from_ref(id))
-                        .is_ok_and(|problems| problems.is_empty())
-                })
-                .collect();
-            let destination = output.join(project_path.file_stem().unwrap());
-            std::fs::create_dir_all(&destination).unwrap();
-            let logs = root.path().join("logs");
-            std::fs::create_dir_all(&logs).unwrap();
-            // Photos are observed from their headers, as the batch export does.
-            let mut media_paths = myalbuns_paths::OperationPathContext::new();
-            for media in loaded.project().media() {
-                let _ = media_paths.capture(media.path());
-            }
-            let media_paths = media_paths.freeze();
-            let photo_sources: HashMap<_, _> = loaded
-                .project()
-                .media()
-                .iter()
-                .filter(|media| media.kind() == MediaKind::Photo)
-                .filter_map(|media| {
-                    let binding = MediaBinding {
-                        media_id: media.id().to_string(),
-                        kind: media.kind(),
-                        logical_path: media.path().to_path_buf(),
-                    };
-                    crate::linked_files::LinkedFiles::new()
-                        .header(&media_paths, &binding.logical_path)
-                        .and_then(|header| header.photo_metadata())
-                        .ok()
-                        .map(|metadata| (MediaId::try_from(media.id()).unwrap(), metadata))
-                })
-                .collect();
-            // An export interval must be continuous; Sheets with empty Frames
-            // are skipped, so each Sheet is exported on its own.
-            for sheet_id in &sheet_ids {
-                let frozen = loaded.freeze_rendering_with_photo_sources(&photo_sources);
-                let referenced: HashSet<_> = frozen
-                    .render_snapshot()
-                    .composition
-                    .sheets
-                    .iter()
-                    .filter(|sheet| &sheet.sheet_id == sheet_id)
-                    .flat_map(|sheet| sheet.referenced_media_ids())
-                    .collect();
-                let sources: Vec<_> = loaded
-                    .project()
-                    .media()
-                    .iter()
-                    .filter_map(|media| {
-                        let id = MediaId::try_from(media.id()).unwrap();
-                        referenced
-                            .contains(&id)
-                            .then(|| RenderSource::new(id, media.path().to_path_buf()).unwrap())
-                    })
-                    .collect();
-                let (snapshot, _) = frozen
-                    .into_export(std::slice::from_ref(sheet_id))
-                    .unwrap_or_else(|error| panic!("{}: {error:?}", project_path.display()));
-                let request_id = "legacy-export-proof";
-                let plan = export_pipeline::plan_album(
-                    snapshot,
-                    AlbumExportOptions {
-                        protected_originals: vec![project_path.clone()],
-                        sheet_ids: vec![sheet_id.clone()],
-                        whole_album: false,
-                        mode: ExportMode::Sheet,
-                        format: ExportFormat::Jpeg { quality: 100 },
-                        destination: destination.clone(),
-                        authorization: myalbuns_paths::ExportWriteAuthorization::ReplaceConfirmed,
-                        sources,
-                        request_id: request_id.into(),
-                    },
-                )
-                .unwrap();
-                let roots = path_io::capture_root_bindings(plan.required_paths())
-                    .await
-                    .unwrap();
-                export_pipeline::execute_album(
-                    &mut RealProcessTransport::stable(executable.clone(), logs.clone()),
-                    plan,
-                    &roots,
-                    &export_pipeline::ExportExecutionControl::default(),
-                    &|_| {},
-                    &InvocationContext::new(request_id, None::<String>),
-                )
-                .await
-                .unwrap_or_else(|error| panic!("{}: {error:?}", project_path.display()));
-            }
-            println!(
-                "{}: {} lâminas exportadas",
-                project_path.display(),
-                sheet_ids.len()
-            );
-            assert_eq!(
-                std::fs::read(&project_path).unwrap(),
-                before,
-                "the old file is never written"
-            );
+        assert_eq!(
+            preparation_directories(&root.path().join("source/B")).len(),
+            usize::from(!cleanup_preparation)
+        );
+        assert_eq!(
+            std::fs::read(root.path().join("source/A/A_001.png")).unwrap(),
+            b"A-0",
+            "published outputs are never touched"
+        );
+        assert_eq!(
+            std::fs::read(root.path().join("source/B.myalbuns")).unwrap(),
+            project
+        );
+    }
+}
+
+#[test]
+fn run_refuses_to_start_while_a_pending_project_has_problems() {
+    let root = tempfile::tempdir().unwrap();
+    let (core, _editor) = fixture(root.path(), "source/A.myalbuns");
+    std::fs::write(root.path().join("source/Invalid.myalbuns"), b"invalid").unwrap();
+    let batch = discovered(root.path(), core);
+    assert!(!batch.view().can_continue);
+    let mut transport = RecordingTransport::default();
+    let refused = tauri::async_runtime::block_on(batch.run(
+        &mut transport,
+        &BatchCancellation::default(),
+        ExportConflictPolicy::Replace,
+        &|_| {},
+    ));
+    assert!(refused.is_err());
+    assert!(transport.names.is_empty());
+    assert!(!root.path().join("source/A").exists());
+    assert!(
+        BatchRunner::recoveries(&root.path().join("checkpoints"))
+            .unwrap()
+            .is_empty(),
+        "a refused run records no recovery"
+    );
+}
+
+#[test]
+fn run_refuses_the_ask_policy_while_a_pending_project_has_conflicts() {
+    let root = tempfile::tempdir().unwrap();
+    let (core, _editor) = fixture(root.path(), "source/A.myalbuns");
+    let existing = root.path().join("source/A/A_001.png");
+    std::fs::create_dir_all(existing.parent().unwrap()).unwrap();
+    std::fs::write(&existing, b"previous export").unwrap();
+    let batch = discovered(root.path(), core);
+    let view = batch.view();
+    assert!(view.can_continue && view.has_conflicts);
+    let mut transport = RecordingTransport::default();
+    let refused = tauri::async_runtime::block_on(batch.run(
+        &mut transport,
+        &BatchCancellation::default(),
+        ExportConflictPolicy::Ask,
+        &|_| {},
+    ));
+    assert!(
+        refused.is_err(),
+        "existing files need the user's choice before any project is exported"
+    );
+    assert!(transport.names.is_empty());
+    assert_eq!(std::fs::read(&existing).unwrap(), b"previous export");
+    assert_eq!(
+        std::fs::read_dir(existing.parent().unwrap())
+            .unwrap()
+            .count(),
+        1
+    );
+    assert!(
+        BatchRunner::recoveries(&root.path().join("checkpoints"))
+            .unwrap()
+            .is_empty()
+    );
+}
+
+#[test]
+fn resume_rejects_a_corrupt_tampered_or_incompatible_checkpoint() {
+    use serde_json::{Value, json};
+    let root = tempfile::tempdir().unwrap();
+    let (core, _editor) = fixture(root.path(), "source/A.myalbuns");
+    let checkpoints = root.path().join("checkpoints");
+    let batch = discovered(root.path(), core.clone());
+    let id = batch.id.clone();
+    batch.save_checkpoint().unwrap();
+    let file = checkpoints.join(format!("{id}.json"));
+    let valid = std::fs::read(&file).unwrap();
+    let resumes = |bytes: &[u8]| {
+        std::fs::write(&file, bytes).unwrap();
+        BatchRunner::resume(&checkpoints, &id, core.clone()).is_ok()
+    };
+    let tampered = |change: &dyn Fn(&mut Value)| {
+        let mut value: Value = serde_json::from_slice(&valid).unwrap();
+        change(&mut value);
+        resumes(&serde_json::to_vec(&value).unwrap())
+    };
+    let native =
+        |path: PathBuf| serde_json::to_value(myalbuns_paths::NativePathDto::from(path)).unwrap();
+    let source = root.path().join("source");
+    let preparation = |folder: &str| {
+        json!({
+            "requestId": "batch-interrupted",
+            "path": native(source.join("A").join(folder)),
+        })
+    };
+    assert!(resumes(&valid), "the untouched checkpoint is the baseline");
+    {
+        let mut value: Value = serde_json::from_slice(&valid).unwrap();
+        value["items"][0]["preparation"] = preparation(".myalbuns-export-batch-interrupted.tmp");
+        std::fs::write(&file, serde_json::to_vec(&value).unwrap()).unwrap();
+        BatchRunner::resume(&checkpoints, &id, core.clone())
+            .map(drop)
+            .expect("a preparation folder derived from its request is accepted");
+    }
+
+    let other_id = uuid::Uuid::new_v4().to_string();
+    type Tamper<'a> = &'a dyn Fn(&mut Value);
+    let changes: [(&str, Tamper); 13] = [
+        ("another version", &|value| value["version"] = json!(2)),
+        ("an id that is not the file name", &|value| {
+            value["id"] = json!(other_id)
+        }),
+        ("no items", &|value| value["items"] = json!([])),
+        ("an unknown field", &|value| value["extra"] = json!(true)),
+        ("an unknown item status", &|value| {
+            value["items"][0]["status"] = json!("exploded")
+        }),
+        ("an item id that is not a UUID", &|value| {
+            value["items"][0]["id"] = json!("first")
+        }),
+        ("a repeated item", &|value| {
+            let item = value["items"][0].clone();
+            value["items"].as_array_mut().unwrap().push(item);
+        }),
+        ("a project outside the source folder", &|value| {
+            value["items"][0]["path"] = native(root.path().join("elsewhere").join("A.myalbuns"));
+        }),
+        ("a file that is not a project", &|value| {
+            value["items"][0]["path"] = native(source.join("A.txt"));
+        }),
+        ("a relative source folder", &|value| {
+            value["source"] = native(PathBuf::from("source"));
+            value["items"][0]["path"] = native(PathBuf::from("source").join("A.myalbuns"));
+        }),
+        ("a relative destination folder", &|value| {
+            value["destination"] = native(PathBuf::from("delivery"))
+        }),
+        ("an interrupted item that is not in the batch", &|value| {
+            value["current"] = json!(other_id)
+        }),
+        ("a preparation folder chosen by the file", &|value| {
+            value["items"][0]["preparation"] = preparation("A_001.png");
+        }),
+    ];
+    let mut accepted = changes
+        .iter()
+        .filter(|(_, change)| tampered(change))
+        .map(|(name, _)| *name)
+        .collect::<Vec<_>>();
+    for (name, bytes) in [
+        ("truncated JSON", &valid[..valid.len() / 2]),
+        ("bytes that are not JSON", b"\0\0not json".as_slice()),
+        ("an empty file", b"".as_slice()),
+    ] {
+        if resumes(bytes) {
+            accepted.push(name);
         }
-    });
+    }
+    std::fs::remove_file(&file).unwrap();
+    std::fs::create_dir(&file).unwrap();
+    if BatchRunner::resume(&checkpoints, &id, core.clone()).is_ok() {
+        accepted.push("a folder in place of the file");
+    }
+    std::fs::remove_dir(&file).unwrap();
+    std::fs::write(&file, &valid).unwrap();
+    if BatchRunner::resume(&checkpoints, &id.to_uppercase(), core.clone()).is_ok() {
+        accepted.push("an id that is not in canonical form");
+    }
+    assert!(accepted.is_empty(), "accepted: {accepted:?}");
+    assert!(
+        BatchRunner::resume(&checkpoints, &id, core).is_ok(),
+        "the restored checkpoint still resumes"
+    );
+}
+
+#[test]
+fn one_corrupt_checkpoint_file_hides_every_batch_recovery() {
+    let root = tempfile::tempdir().unwrap();
+    let (core, _editor) = fixture(root.path(), "source/A.myalbuns");
+    let checkpoints = root.path().join("checkpoints");
+    for _ in 0..2 {
+        discovered(root.path(), core.clone())
+            .save_checkpoint()
+            .unwrap();
+    }
+    assert_eq!(BatchRunner::recoveries(&checkpoints).unwrap().len(), 2);
+
+    // Files that are not `.json` are not checkpoints and are skipped.
+    std::fs::write(checkpoints.join("notes.txt"), b"not a checkpoint").unwrap();
+    assert_eq!(BatchRunner::recoveries(&checkpoints).unwrap().len(), 2);
+
+    let corrupt = checkpoints.join(format!("{}.json", uuid::Uuid::new_v4()));
+    std::fs::write(&corrupt, b"{ truncated").unwrap();
+    assert!(
+        BatchRunner::recoveries(&checkpoints).is_err(),
+        "today the two valid recoveries are not listed either"
+    );
+    std::fs::remove_file(&corrupt).unwrap();
+
+    // The same happens for any `.json` whose name is not a batch id.
+    let stray = checkpoints.join("notes.json");
+    std::fs::write(&stray, b"{}").unwrap();
+    assert!(BatchRunner::recoveries(&checkpoints).is_err());
+    std::fs::remove_file(&stray).unwrap();
+    assert_eq!(BatchRunner::recoveries(&checkpoints).unwrap().len(), 2);
+}
+
+#[test]
+fn a_project_reached_through_two_hard_links_is_discovered_once() {
+    let root = tempfile::tempdir().unwrap();
+    let (core, editor) = fixture(root.path(), "source/A.myalbuns");
+    std::fs::create_dir(root.path().join("source/copies")).unwrap();
+    std::fs::hard_link(
+        editor.project_path(),
+        root.path().join("source/copies/Alias.myalbuns"),
+    )
+    .unwrap();
+    // A separate file with identical bytes is another project file, not an alias.
+    std::fs::create_dir(root.path().join("source/other")).unwrap();
+    std::fs::copy(
+        editor.project_path(),
+        root.path().join("source/other/Copy.myalbuns"),
+    )
+    .unwrap();
+
+    let batch = discovered(root.path(), core);
+
+    let mut names = batch
+        .view()
+        .items
+        .into_iter()
+        .map(|item| item.name)
+        .collect::<Vec<_>>();
+    names.sort();
+    assert_eq!(names.len(), 2, "{names:?}");
+    assert!(names.contains(&"Copy".to_owned()), "{names:?}");
+    assert_eq!(
+        names.iter().filter(|name| *name != "Copy").count(),
+        1,
+        "the two links to one file are a single item: {names:?}"
+    );
+}
+
+#[cfg(windows)]
+#[test]
+fn a_folder_that_contains_a_junction_to_its_ancestor_is_walked_once() {
+    use std::os::windows::process::CommandExt;
+    let root = tempfile::tempdir().unwrap();
+    let (core, _editor) = fixture(root.path(), "source/real/A.myalbuns");
+    // The junction leads back to the folder being walked.
+    let junction = root.path().join("source").join("real").join("again");
+    let created = std::process::Command::new("cmd")
+        .args(["/d", "/c", "mklink", "/J"])
+        .arg(&junction)
+        .arg(root.path().join("source"))
+        .creation_flags(windows_sys::Win32::System::Threading::CREATE_NO_WINDOW)
+        .output()
+        .expect("the junction command starts");
+    assert!(
+        created.status.success(),
+        "the junction is created: stdout={}, stderr={}",
+        String::from_utf8_lossy(&created.stdout),
+        String::from_utf8_lossy(&created.stderr)
+    );
+
+    let found = discover_projects(
+        &root.path().join("source"),
+        &mut OperationPathContext::new(),
+    );
+    std::fs::remove_dir(&junction).expect("the junction is removed");
+
+    assert_eq!(
+        found.unwrap().len(),
+        1,
+        "the cycle ends at the folder already visited"
+    );
+    drop(core);
 }

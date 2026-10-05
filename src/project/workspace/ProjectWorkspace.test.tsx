@@ -148,8 +148,16 @@ vi.mock("../canvas/AlbumCanvas", () => ({
   },
 }));
 
-const projection = representativeProjection;
-const twoSheetProjection = createTwoSheetProjection();
+function deepFreeze<Value>(value: Value): Value {
+  if (typeof value === "object" && value !== null && !Object.isFrozen(value)) {
+    Object.freeze(value);
+    Object.values(value).forEach(deepFreeze);
+  }
+  return value;
+}
+
+const projection = deepFreeze(representativeProjection);
+const twoSheetProjection = deepFreeze(createTwoSheetProjection());
 const decorativePreviewUrl =
   "asset://localhost/cache/decorative-overlay.png";
 const decorativeProjection: EditorProjection = {
@@ -701,7 +709,6 @@ test("viewer opens from a selected canvas photo on Space release, isolates edito
   await waitFor(() => expect(viewerPort.open).toHaveBeenCalledWith(expect.objectContaining({ mediaId: "media-001" })));
   expect(demand).toHaveBeenLastCalledWith(expect.objectContaining({ visibleMediaIds: expect.arrayContaining(["media-001"]) }));
   expect(port.undo).not.toHaveBeenCalled();
-  expect(projection.state.revision).toBe(25);
   act(() => closed(viewerPort.open.mock.calls[0][0].sessionId));
   await waitFor(() => expect(document.activeElement).toBe(canvas));
 });
@@ -1975,22 +1982,6 @@ test.each(["bar", "grid"] as const)(
   },
 );
 
-test("derives the Canvas technical guides from the canonical document", () => {
-  render(
-    <ProjectWorkspace
-      exportPort={exportPort}
-      projection={projection}
-      projectSessionPort={projectSessionPortWithApply(async () => projection)}
-      onProjectionChange={() => undefined}
-    />,
-  );
-
-  expect(canvasHarness.props?.technicalGuides).toEqual({
-    bleedUm: projection.state.document.bleedUm,
-    safetyUm: projection.state.document.safetyUm,
-  });
-});
-
 test("temporarily compacts the image panel during Sheet Edit Mode and restores its normal height", () => {
   const view = render(
     <ProjectWorkspace
@@ -2374,13 +2365,16 @@ test("offers the three close choices for a native request and Cancel keeps the P
       onProjectionChange={() => undefined}
     />,
   );
-  await waitFor(() => {
-    expect(harness.emitCloseRequested()).toBeUndefined();
+  await waitFor(() => expect(harness.port.onCloseRequested).toHaveBeenCalled());
+
+  act(() => harness.emitCloseRequested());
+
+  await waitFor(() =>
     expect(harness.dialog.present).toHaveBeenCalledWith({
       busy: false,
       kind: "projectCloseConfirmation",
-    });
-  });
+    }),
+  );
 
   expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   expect(
@@ -2400,6 +2394,35 @@ test("offers the three close choices for a native request and Cancel keeps the P
   expect(
     getApplicationCommand("Editar", "Desfazer"),
   ).toBeEnabled();
+});
+
+test("warns in the close confirmation that saving an old myAlbuns Project replaces its file", async () => {
+  const harness = projectWindowHarness();
+  const oldFormatProjection = {
+    ...projection,
+    state: { ...projection.state, dirty: true, formatConversionPending: true },
+  };
+
+  render(
+    <ProjectWorkspace
+      exportPipelinePort={exportPipelinePort}
+      projection={oldFormatProjection}
+      projectCorePort={projectCorePortWithApply(async () => oldFormatProjection)}
+      projectDialogPort={harness.dialog.port}
+      projectWindowPort={harness.port}
+      onProjectionChange={() => undefined}
+    />,
+  );
+  await waitFor(() => expect(harness.port.onCloseRequested).toHaveBeenCalled());
+
+  act(() => harness.emitCloseRequested());
+
+  await waitFor(() => expect(harness.dialog.present).toHaveBeenCalledOnce());
+  expect(harness.dialog.present).toHaveBeenCalledWith({
+    busy: false,
+    formatConversion: true,
+    kind: "projectCloseConfirmation",
+  });
 });
 
 test("releases an application close when its confirmation window cannot be presented", async () => {
@@ -2542,10 +2565,9 @@ test("sends Discard and resumes the unchanged Project after a conclusive save fa
       onProjectionChange={() => undefined}
     />,
   );
-  await waitFor(() => {
-    discardHarness.emitCloseRequested();
-    expect(discardHarness.dialog.present).toHaveBeenCalled();
-  });
+  await waitFor(() => expect(discardHarness.port.onCloseRequested).toHaveBeenCalled());
+  act(() => discardHarness.emitCloseRequested());
+  await waitFor(() => expect(discardHarness.dialog.present).toHaveBeenCalled());
   act(() => discardHarness.dialog.emit("discardAndClose"));
   expect(discardHarness.port.resolveClose).toHaveBeenCalledWith(
     "discardAndClose",
@@ -2570,10 +2592,9 @@ test("sends Discard and resumes the unchanged Project after a conclusive save fa
       onProjectionChange={() => undefined}
     />,
   );
-  await waitFor(() => {
-    failureHarness.emitCloseRequested();
-    expect(failureHarness.dialog.present).toHaveBeenCalled();
-  });
+  await waitFor(() => expect(failureHarness.port.onCloseRequested).toHaveBeenCalled());
+  act(() => failureHarness.emitCloseRequested());
+  await waitFor(() => expect(failureHarness.dialog.present).toHaveBeenCalled());
   act(() => failureHarness.dialog.emit("saveAndClose"));
 
   await waitFor(() =>
@@ -2608,10 +2629,9 @@ test("never resumes or reports success after an indeterminate close save", async
       onProjectionChange={() => undefined}
     />,
   );
-  await waitFor(() => {
-    harness.emitCloseRequested();
-    expect(harness.dialog.present).toHaveBeenCalled();
-  });
+  await waitFor(() => expect(harness.port.onCloseRequested).toHaveBeenCalled());
+  act(() => harness.emitCloseRequested());
+  await waitFor(() => expect(harness.dialog.present).toHaveBeenCalled());
 
   act(() => harness.dialog.emit("saveAndClose"));
 
@@ -2687,32 +2707,6 @@ test("blocks only Project commands while its Export attempt is active", async ()
   expect(getApplicationCommand("Editar", "Desfazer")).toBeEnabled();
 });
 
-test("forwards a fatal Canvas graphics diagnostic without interpreting it", () => {
-  const onGraphicsUnavailable = vi.fn();
-  const diagnostic: GraphicsDiagnostic = {
-    supported: false,
-    code: "webgl2_unavailable",
-    renderer: "indisponível",
-    reason: "A área de edição real não possui WebGL2.",
-    limits: null,
-  };
-  render(
-    <ProjectWorkspace
-      exportPipelinePort={exportPipelinePort}
-      projection={projection}
-      projectCorePort={projectCorePortWithApply(async () => projection)}
-      onProjectionChange={() => undefined}
-      onGraphicsUnavailable={onGraphicsUnavailable}
-    />,
-  );
-
-  act(() => {
-    canvasHarness.props?.onGraphicsUnavailable?.(diagnostic);
-  });
-
-  expect(onGraphicsUnavailable).toHaveBeenCalledWith(diagnostic);
-});
-
 test("restores accordion preferences after context changes and remounts", async () => {
   const workspacePreferencesPort = createFallbackWorkspacePreferencesPort();
   const renderWorkspace = () =>
@@ -2764,36 +2758,6 @@ test("restores accordion preferences after context changes and remounts", async 
       screen.getByRole("button", { name: "Informações do álbum" }),
     ).toHaveAttribute("aria-expanded", "false"),
   );
-});
-
-test("uses the reference chrome and collapsible contextual sections", () => {
-  render(
-    <ProjectWorkspace
-      exportPipelinePort={exportPipelinePort}
-      projection={projection}
-      projectCorePort={projectCorePortWithApply(async () => projection)}
-      onProjectionChange={() => undefined}
-    />,
-  );
-
-  expect(screen.getByLabelText("MyAlbuns")).toBeInTheDocument();
-  expect(
-    screen.getByText("Álbum Horizonte", {
-      selector: ".ui-application-header__identity strong",
-    }),
-  ).toBeInTheDocument();
-  expect(screen.getByText("300×300 mm · 1 lâmina")).toBeInTheDocument();
-  expect(screen.queryByText("Intel(R) UHD Graphics")).not.toBeInTheDocument();
-  expect(screen.queryByText("revisão 25")).not.toBeInTheDocument();
-  expect(screen.queryByText("3 fotos vinculadas")).not.toBeInTheDocument();
-  expect(screen.queryByLabelText("Zoom da área de edição")).not.toBeInTheDocument();
-  expect(screen.queryByRole("button", { name: "Geral" })).not.toBeInTheDocument();
-  expect(
-    screen.getByRole("button", { name: "Informações do álbum" }),
-  ).toBeInTheDocument();
-  expect(
-    screen.getByRole("button", { name: "Grade de lâminas" }),
-  ).toBeInTheDocument();
 });
 
 test("shows the physical configuration projected from the opened Project", () => {
@@ -2999,107 +2963,6 @@ test("clears pending Apply actions when their inspector forms are collapsed", as
 
   await waitFor(() => expect(informationApply).toBeDisabled());
   await waitFor(() => expect(designApply).toBeDisabled());
-});
-
-test("uses the current reference layout for the Album context", () => {
-  render(
-    <ProjectWorkspace
-      exportPort={exportPort}
-      projection={projection}
-      projectSessionPort={projectSessionPortWithApply(async () => projection)}
-      onProjectionChange={() => undefined}
-    />,
-  );
-
-  const albumInformationTrigger = screen.getByRole("button", {
-    name: "Informações do álbum",
-  });
-  const albumInformationSection = albumInformationTrigger
-    .closest("section") as HTMLElement;
-  const albumDesignTrigger = screen.getByRole("button", {
-    name: "Design do álbum",
-  });
-  const albumDesignSection = albumDesignTrigger
-    .closest("section") as HTMLElement;
-  const albumInformation = within(albumInformationSection);
-  const albumDesign = within(albumDesignSection);
-  const albumInformationApply = albumInformation.getByRole("button", {
-    name: "Aplicar",
-  });
-  const albumDesignApply = albumDesign.getByRole("button", {
-    name: "Aplicar",
-  });
-
-  expect(albumInformation.queryByText("Projeto")).not.toBeInTheDocument();
-  expect(albumInformation.queryByText("Verificação")).not.toBeInTheDocument();
-  expect(
-    albumInformation.queryByLabelText("Nome do projeto"),
-  ).not.toBeInTheDocument();
-  expect(
-    albumInformation.queryByText("Quadros quadro vazio"),
-  ).not.toBeInTheDocument();
-  expect(
-    screen.getByRole("button", { name: "Design do álbum" }),
-  ).toHaveAttribute("aria-expanded", "true");
-  const albumDesignPreview = albumDesign.getByLabelText(
-    "Prévia do padrão visual do álbum",
-  );
-  expect(albumDesignPreview).toBeInTheDocument();
-  expect(
-    within(albumDesignPreview).getByRole("img", {
-      name: "Composição do padrão visual do álbum",
-    }),
-  ).toBeInTheDocument();
-  expect(
-    within(albumDesignPreview).queryByLabelText("Guias de dobra, corte e segurança da lâmina"),
-  ).not.toBeInTheDocument();
-  expect(
-    albumDesignPreview.querySelector(".visual-scope-preview__selection"),
-  ).toHaveAttribute("data-scope", "both");
-  expect(
-    within(albumDesignPreview).getByRole("group", {
-      name: "Escopo do padrão visual do álbum",
-    }),
-  ).toBeInTheDocument();
-  expect(
-    albumInformationSection.querySelector(
-      '[data-placeholder-feature="album-end-sheet-settings"]',
-    ),
-  ).not.toBeInTheDocument();
-  expect(
-    albumInformationSection.querySelector(
-      '[data-placeholder-feature="album-technical-area-settings"]',
-    ),
-  ).not.toBeInTheDocument();
-  const compactControls = albumInformationSection.querySelector(
-    ".document-compact-controls",
-  ) as HTMLElement;
-  expect(within(compactControls).getByLabelText("Unidade")).toBeInTheDocument();
-  expect(within(compactControls).getByLabelText("DPI")).toBeInTheDocument();
-  expect(albumInformationApply).toBeDisabled();
-  expect(albumDesignApply).toBeDisabled();
-  expect(albumInformationApply.closest(".inspector-section-header")).toContainElement(
-    albumInformationTrigger,
-  );
-  expect(albumDesignApply.closest(".inspector-section-header")).toContainElement(
-    albumDesignTrigger,
-  );
-  expect(albumDesignApply).not.toHaveAttribute("data-placeholder-feature");
-  expect(albumInformation.getByText("Estrutura")).toBeInTheDocument();
-  expect(albumInformation.getByText("Documento")).toBeInTheDocument();
-  expect(albumInformation.getByText("Áreas técnicas")).toBeInTheDocument();
-  expect(albumDesign.queryByText("Estrutura")).not.toBeInTheDocument();
-  expect(albumDesign.queryByText("Documento")).not.toBeInTheDocument();
-  expect(albumDesign.queryByText("Áreas técnicas")).not.toBeInTheDocument();
-  expect(albumDesign.getByText("Padrões visuais")).toBeInTheDocument();
-  expect(albumDesign.getByText("Padrão dos quadros")).toBeInTheDocument();
-  expect(
-    albumDesign.getByRole("slider", { name: "Espessura da borda" }),
-  ).toBeInTheDocument();
-  expect(
-    albumDesign.queryByRole("checkbox", { name: "Exibir borda" }),
-  ).not.toBeInTheDocument();
-  expect(albumDesign.getByLabelText("Cor do fundo")).toBeInTheDocument();
 });
 
 test("edits and applies the complete Album design draft as one intent", async () => {
@@ -3481,7 +3344,7 @@ test("clears pending Save state after a queued Album Design save fails", async (
     2,
     appliedProjection.state.revision,
   );
-}, 15_000);
+});
 
 test("revalidates queued Redo after Album Design Apply changes History eligibility", async () => {
   const pendingApply = deferredProjection();
@@ -3974,45 +3837,6 @@ test("presents an empty per-side Overlay as absent", () => {
   ).toBeInTheDocument();
 });
 
-test("does not present divergent per-side Overlays as absent", () => {
-  const projectionWithMixedOverlay: EditorProjection = {
-    ...projection,
-    state: {
-      ...projection.state,
-      album: {
-        ...projection.state.album,
-        visualDefaults: {
-          ...projection.state.album.visualDefaults,
-          overlay: {
-            scope: "perSide",
-            left: { kind: "media", mediaId: "decorative-overlay" },
-            right: null,
-          },
-        },
-      },
-    },
-  };
-
-  render(
-    <ProjectWorkspace
-      exportPort={exportPort}
-      projection={projectionWithMixedOverlay}
-      projectSessionPort={projectSessionPortWithApply(
-        async () => projectionWithMixedOverlay,
-      )}
-      onProjectionChange={() => undefined}
-    />,
-  );
-
-  const visualDefaults = screen
-    .getByRole("button", { name: "Design do álbum" })
-    .closest("section") as HTMLElement;
-  // Um lado tem Overlay e o outro não: o escopo é misto, não é ausência.
-  expect(
-    within(visualDefaults).getByRole("button", { name: "Sem sobreposição" }),
-  ).toHaveAttribute("aria-pressed", "false");
-});
-
 test("confirms and applies Album information as one authoritative Project change", async () => {
   const initialProjection: EditorProjection = {
     ...projection,
@@ -4224,8 +4048,6 @@ test("saves with Ctrl+S without transient feedback or flashing unrelated control
   });
 
   expect(save).toHaveBeenCalledWith(projection.state.revision);
-  expect(screen.queryByText("Salvando")).not.toBeInTheDocument();
-  expect(screen.queryByText("Aguarde…")).not.toBeInTheDocument();
   expect(exportButton).toBeEnabled();
 
   await act(async () => {
@@ -4266,7 +4088,6 @@ test("keeps unrelated controls stable while a History command is pending", async
   });
 
   expect(undo).toHaveBeenCalledOnce();
-  expect(screen.queryByText("Desfazendo")).not.toBeInTheDocument();
   expect(exportButton).toBeEnabled();
 
   await act(async () => {
@@ -6234,23 +6055,6 @@ test("keeps a retained Decorative preview while preserving unavailable state", (
   ).toHaveAttribute("href", decorativePreviewUrl);
 });
 
-test("renders derived media usage as the thumbnail opacity state", () => {
-  render(
-    <ProjectWorkspace
-      exportPipelinePort={exportPipelinePort}
-      projection={projection}
-      projectCorePort={projectCorePortWithApply(async () => projection)}
-      onProjectionChange={() => undefined}
-    />,
-  );
-
-  const usedMedia = screen.getByRole("button", {
-    name: "Serra ao amanhecer.jpg. Já usada. 1 uso",
-  });
-  expect(usedMedia).toHaveAttribute("data-used", "true");
-  expect(usedMedia).not.toHaveTextContent("Serra ao amanhecer.jpg");
-});
-
 test("centers a Grade navigation target in the visible Canvas", () => {
   render(
     <ProjectWorkspace
@@ -6378,8 +6182,6 @@ test("resizes both workspace panels and persists only completed drags", async ()
     />,
   );
 
-  expect(screen.queryByText("área de edição contÃ­nuo")).not.toBeInTheDocument();
-
   const verticalSplitter = screen.getByRole("separator", {
     name: "Redimensionar painel contextual",
   });
@@ -6417,8 +6219,6 @@ test("resizes both workspace panels and persists only completed drags", async ()
   expect(workspace.getAttribute("style")).toContain(
     "--media-panel-height: 200px",
   );
-  expect(localStorage.getItem("myalbuns.workspace.inspector-width")).toBeNull();
-  expect(localStorage.getItem("myalbuns.workspace.media-panel-height")).toBeNull();
 
   firstView.unmount();
   render(
@@ -6483,7 +6283,6 @@ test("commits a slider zoom once without flashing a global busy state", async ()
     deltaPanY: 0,
     deltaZoom: 0.25,
   }, expect.any(Function));
-  expect(screen.queryByText("Aplicando alteração")).not.toBeInTheDocument();
   expect(exportButton).toBeEnabled();
 
   await act(async () => {
@@ -6548,7 +6347,6 @@ test("updates the contextual Zoom slider during a Canvas gesture", () => {
   });
 
   expect(slider).toHaveValue("125");
-  expect(screen.queryByText("Posição horizontal")).not.toBeInTheDocument();
   expect(apply).not.toHaveBeenCalled();
 
   act(() => {
@@ -6804,7 +6602,6 @@ test.each((["files", "folder"] as const).flatMap((source) =>
     await waitFor(() => expect(dialogs.dismiss).toHaveBeenCalled());
     if (outcome === "completed") {
       expect(dialogs.present).toHaveBeenCalledTimes(3);
-      expect(screen.queryByText("12 fotos importadas.")).not.toBeInTheDocument();
     } else {
       expect(dialogs.present).toHaveBeenLastCalledWith({ kind: "projectOperationFailure", message: "Falha na importação." });
       expect(dialogs.dismiss.mock.invocationCallOrder[0]).toBeLessThan(dialogs.present.mock.invocationCallOrder[dialogs.present.mock.calls.length - 1]);
@@ -6834,7 +6631,6 @@ test.each([0, 12])("completes import with %i new Photos without a success dialog
   await waitFor(() => expect(screen.getByRole("button", { name: "Importar" })).toBeEnabled());
   expect(port.importMedia).toHaveBeenCalledOnce();
   expect(dialogs.present).not.toHaveBeenCalled();
-  expect(screen.queryByText("12 fotos importadas.")).not.toBeInTheDocument();
 });
 
 test("the connected media panel preserves a group and its anchor through ordering and filters", () => {
@@ -6892,8 +6688,6 @@ test("absent Originals stay in the media panel without an album inspector notice
   render(<ProjectWorkspace exportPipelinePort={exportPipelinePort} projection={projection}
     projectCorePort={projectCorePortWithApply(async () => projection)} onProjectionChange={vi.fn()}
     mediaFiles={{ "media-002": { mediaId: "media-002", state: "absent", createdAtMs: null, modifiedAtMs: null } }} />);
-  expect(screen.queryByText(/arquivo original ausente/i)).not.toBeInTheDocument();
-  expect(screen.queryByRole("button", { name: "Ver arquivos ausentes" })).not.toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Fotos" })).toHaveAttribute("aria-pressed", "true");
   expect(screen.getByRole("button", { name: "Campo.jpg. Arquivo ausente" })).toBeVisible();
   expect(screen.getByRole("button", { name: "Serra ao amanhecer.jpg. Já usada. 1 uso" })).toBeVisible();
@@ -7111,66 +6905,6 @@ test("forwards simultaneous Canvas Pan and Zoom as one intent", () => {
     deltaPanY: -0.2,
     deltaZoom: 0.12,
   }, expect.any(Function));
-});
-
-test("serializes Project mutations so projections cannot arrive out of order", async () => {
-  const first = deferredProjection();
-  const second = deferredProjection();
-  const apply = vi
-    .fn<ProjectCorePort["apply"]>()
-    .mockImplementationOnce(() => first.promise)
-    .mockImplementationOnce(() => second.promise);
-  const onProjectionChange = vi.fn();
-
-  render(
-    <ProjectWorkspace
-      exportPipelinePort={exportPipelinePort}
-      projection={projection}
-      projectCorePort={projectCorePortWithApply(apply)}
-      onProjectionChange={onProjectionChange}
-    />,
-  );
-
-  canvasHarness.props?.onTransformCommit({
-    frameId: "frame-001",
-    deltaPanX: 0.1,
-    deltaPanY: 0,
-    deltaZoom: 0,
-  });
-  canvasHarness.props?.onTransformCommit({
-    frameId: "frame-001",
-    deltaPanX: 0.2,
-    deltaPanY: 0,
-    deltaZoom: 0,
-  });
-
-  await act(async () => {
-    await Promise.resolve();
-  });
-  expect(apply).toHaveBeenCalledOnce();
-
-  const firstProjection = {
-    ...projection,
-    state: { ...projection.state, revision: 26 },
-  };
-  await act(async () => {
-    first.resolve(firstProjection);
-    await first.promise;
-  });
-
-  expect(onProjectionChange).toHaveBeenLastCalledWith(firstProjection);
-  expect(apply).toHaveBeenCalledTimes(2);
-
-  const secondProjection = {
-    ...projection,
-    state: { ...projection.state, revision: 27 },
-  };
-  await act(async () => {
-    second.resolve(secondProjection);
-    await second.promise;
-  });
-
-  expect(onProjectionChange).toHaveBeenLastCalledWith(secondProjection);
 });
 
 

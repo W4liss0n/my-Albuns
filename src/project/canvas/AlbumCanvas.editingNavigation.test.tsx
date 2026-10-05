@@ -1,7 +1,7 @@
 import { act, fireEvent } from "@testing-library/react";
 import { expect, test, vi } from "vitest";
-import { interactiveComposition } from "./albumCanvasTestFixtures";
 import { displayWithLabel, finishPixiInitialization, getPixiLifecycle, renderCanvas, setupAlbumCanvasTestHarness } from "./albumCanvasTestHarness";
+import { interactiveComposition } from "./albumCanvasTestFixtures";
 
 setupAlbumCanvasTestHarness();
 

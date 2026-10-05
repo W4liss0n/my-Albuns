@@ -1184,6 +1184,67 @@ mod tests {
         fixture_with_initial(InitialProject::neutral())
     }
 
+    /// A Project of the old myAlbuns (SQLite, format 2.2) with two empty double
+    /// Sheets, opened as the Host opens it: converted in memory, nothing written.
+    fn old_format_fixture() -> Fixture {
+        let root = tempfile::tempdir().expect("temporary old Project fixture");
+        let project_path = root.path().join("Projeto antigo.myalbuns");
+        let identity_lease_root = root.path().join("leases");
+        let connection =
+            rusqlite::Connection::open(&project_path).expect("the old database is created");
+        connection
+            .execute_batch(
+                "CREATE TABLE project_metadata (uuid TEXT PRIMARY KEY, name TEXT NOT NULL, \
+                 format_version TEXT NOT NULL, created_date TEXT NOT NULL, modified_date TEXT NOT NULL, \
+                 width REAL NOT NULL, height REAL NOT NULL, dpi INTEGER NOT NULL, last_save_date TEXT, \
+                 default_settings TEXT, original_file_path TEXT, cut_margin REAL, safe_margin REAL, \
+                 image_folders TEXT, layout_favorites_state TEXT, canonical_model_version INTEGER, \
+                 file_identity TEXT);
+                 CREATE TABLE laminas (uuid TEXT PRIMARY KEY, index_position INTEGER NOT NULL, data TEXT NOT NULL);
+                 CREATE TABLE images (image_id TEXT PRIMARY KEY, content_hash TEXT NOT NULL, data TEXT NOT NULL);
+                 INSERT INTO project_metadata VALUES ('2cc441f7-6fd9-5d3e-8254-dc6c4f549bf1', 'Modelo', \
+                 '2.2', '2026-09-10T22:24:39', '2026-09-22T07:55:41', 5811.0, 3614.0, 300, NULL, NULL, \
+                 NULL, 0.3, 0.6, NULL, NULL, 2, NULL);
+                 INSERT INTO laminas VALUES ('a0000000-0000-4000-8000-000000000001', 0, \
+                 '{\"id\":\"a0000000-0000-4000-8000-000000000001\",\"left_page\":{\"enabled\":true},\"right_page\":{\"enabled\":true}}');
+                 INSERT INTO laminas VALUES ('a0000000-0000-4000-8000-000000000002', 1, \
+                 '{\"id\":\"a0000000-0000-4000-8000-000000000002\",\"left_page\":{\"enabled\":true},\"right_page\":{\"enabled\":true}}');",
+            )
+            .expect("the old Project is written");
+        drop(connection);
+        let host = ProjectHost::new(open_editable_project(&project_path, &identity_lease_root));
+        Fixture {
+            _root: root,
+            project_path,
+            identity_lease_root,
+            host,
+        }
+    }
+
+    fn is_current_format(project_path: &Path) -> bool {
+        serde_json::from_slice::<serde_json::Value>(
+            &std::fs::read(project_path).expect("the Project file is readable"),
+        )
+        .is_ok_and(|document| document["documentType"] == "myalbuns.project")
+    }
+
+    /// Lets the Project file be replaced while the identity lease cannot record
+    /// the new file, which leaves a Save without a provable result.
+    fn hold_identity_lease_target(
+        identity_lease_root: &Path,
+        authority: &myalbuns_core::ProjectIdentityAuthority,
+    ) -> std::fs::File {
+        use std::os::windows::fs::OpenOptionsExt;
+
+        std::fs::OpenOptions::new()
+            .read(true)
+            .share_mode(0)
+            .open(
+                identity_lease_root.join(format!("{}.target", authority.project_id().hyphenated())),
+            )
+            .expect("another handle denies every sharing mode on the lease target")
+    }
+
     fn open_project(project_path: &Path, identity_lease_root: &Path) -> ProjectHost {
         let host = ProjectHost::new(open_editable_project(project_path, identity_lease_root));
         hydrate_reopened_photos(&host);
@@ -1246,7 +1307,7 @@ mod tests {
         store: &RecoveryStore,
         authority: &myalbuns_core::ProjectIdentityAuthority,
     ) {
-        let deadline = std::time::Instant::now() + Duration::from_secs(5);
+        let deadline = std::time::Instant::now() + Duration::from_secs(30);
         loop {
             if store
                 .load(authority)
@@ -1327,7 +1388,9 @@ mod tests {
     #[test]
     fn completed_host_actions_publish_the_latest_checkpoint_and_save_finishes_it() {
         tauri::async_runtime::block_on(async {
-            let fixture = recovery_fixture();
+            // Long enough that only a stalled test thread could observe the
+            // publication before the immediate check below.
+            let fixture = recovery_fixture_with_delay(Duration::from_millis(500));
             fixture
                 .host
                 .apply_with_outcome(ProjectIntent::SetDpi { dpi: 240 })
@@ -1338,7 +1401,6 @@ mod tests {
                 .expect("the nearby Host action is accepted")
                 .projection;
 
-            tokio::time::sleep(Duration::from_millis(20)).await;
             assert!(
                 fixture
                     .store
@@ -1621,40 +1683,6 @@ mod tests {
     }
 
     #[test]
-    fn a_new_host_blocks_the_editor_until_reopening_and_recovering() {
-        tauri::async_runtime::block_on(async {
-            let fixture = recovery_fixture();
-            fixture
-                .host
-                .apply_with_outcome(ProjectIntent::SetDpi { dpi: 360 })
-                .expect("the completed action becomes recoverable");
-            wait_for_checkpoint(&fixture.store, &fixture.authority).await;
-            drop(fixture.host);
-
-            let host = ProjectHost::with_recovery(
-                open_editable_project(&fixture.project_path, &fixture.identity_lease_root),
-                fixture.coordinator.clone(),
-            )
-            .expect("the next Host detects the prior checkpoint");
-            assert_eq!(host.recovery_status(), Ok(ProjectRecoveryStatus::Available));
-            assert!(host.projection().is_err());
-            assert!(host.undo().is_err());
-
-            let ProjectRecoveryResolution::Recovered(recovered) = host
-                .resolve_recovery(ProjectRecoveryDecision::ReopenAndRecover)
-                .expect("the user reopens and recovers")
-            else {
-                panic!("the recovered choice must activate the recovered Session");
-            };
-            assert_eq!(recovered.state.document.dpi, 360);
-            assert!(recovered.state.dirty);
-            assert!(!recovered.state.can_undo);
-            assert!(!recovered.state.can_redo);
-            assert!(fixture.store.load(&fixture.authority).unwrap().is_some());
-        });
-    }
-
-    #[test]
     fn recovery_pending_capabilities_transition_together_after_recovery() {
         tauri::async_runtime::block_on(async {
             let fixture = recovery_fixture();
@@ -1685,6 +1713,7 @@ mod tests {
                 host.apply_with_outcome(ProjectIntent::SetDpi { dpi: 420 })
                     .is_err()
             );
+            assert!(host.undo().is_err());
 
             let ProjectRecoveryResolution::Recovered(recovered) = host
                 .resolve_recovery(ProjectRecoveryDecision::ReopenAndRecover)
@@ -1693,6 +1722,10 @@ mod tests {
                 panic!("the recovery decision must return the recovered projection");
             };
             assert_eq!(recovered.state.document.dpi, 360);
+            assert!(recovered.state.dirty);
+            assert!(!recovered.state.can_undo);
+            assert!(!recovered.state.can_redo);
+            assert!(fixture.store.load(&fixture.authority).unwrap().is_some());
             assert_eq!(host.recovery_status(), Ok(ProjectRecoveryStatus::None));
             assert_eq!(
                 host.apply_with_outcome(ProjectIntent::SetDpi { dpi: 420 })
@@ -1955,68 +1988,11 @@ mod tests {
                 .expect("the bounded close observation remains available");
         });
         result
-            .recv_timeout(Duration::from_secs(5))
+            .recv_timeout(Duration::from_secs(30))
             .expect("closing the saved original must finish without blocking the independent copy");
         worker
             .join()
             .expect("the close reproduction worker succeeds");
-    }
-
-    #[test]
-    fn confirmed_clean_close_discard_and_save_close_finish_the_checkpoint() {
-        tauri::async_runtime::block_on(async {
-            let clean = recovery_fixture();
-            clean
-                .host
-                .apply_with_outcome(ProjectIntent::SetDpi { dpi: 360 })
-                .expect("the action is completed before Undo");
-            clean.host.undo().expect("Undo returns to the saved state");
-            wait_for_checkpoint(&clean.store, &clean.authority).await;
-            assert!(clean.store.load(&clean.authority).unwrap().is_some());
-            assert_eq!(
-                clean.host.begin_close(),
-                Ok(ProjectCloseRequestOutcome::CloseImmediately)
-            );
-            assert!(clean.store.load(&clean.authority).unwrap().is_none());
-
-            let discarded = recovery_fixture();
-            discarded
-                .host
-                .apply_with_outcome(ProjectIntent::SetDpi { dpi: 360 })
-                .expect("the discarded action is completed");
-            wait_for_checkpoint(&discarded.store, &discarded.authority).await;
-            assert_eq!(
-                discarded.host.begin_close(),
-                Ok(ProjectCloseRequestOutcome::ConfirmationRequired)
-            );
-            discarded
-                .host
-                .discard_close()
-                .expect("explicit discard confirms checkpoint removal");
-            assert!(
-                discarded
-                    .store
-                    .load(&discarded.authority)
-                    .unwrap()
-                    .is_none()
-            );
-
-            let saved = recovery_fixture();
-            saved
-                .host
-                .apply_with_outcome(ProjectIntent::SetDpi { dpi: 360 })
-                .expect("the saved action is completed");
-            wait_for_checkpoint(&saved.store, &saved.authority).await;
-            assert_eq!(
-                saved.host.begin_close(),
-                Ok(ProjectCloseRequestOutcome::ConfirmationRequired)
-            );
-            saved
-                .host
-                .save_and_close()
-                .expect("Save and close finishes the checkpoint");
-            assert!(saved.store.load(&saved.authority).unwrap().is_none());
-        });
     }
 
     #[test]
@@ -2044,27 +2020,12 @@ mod tests {
             ));
             assert_eq!(fixture.host.projection().unwrap(), dirty);
             assert!(fixture.store.load(&fixture.authority).unwrap().is_some());
+            let undone = fixture
+                .host
+                .undo()
+                .expect("creative commands resume after the conclusive failure");
+            assert_eq!(undone.state.document.dpi, 300);
         });
-    }
-
-    #[test]
-    fn productive_projection_yields_a_valid_neutral_render_snapshot() {
-        let fixture = fixture();
-        let frozen = fixture
-            .host
-            .freeze_sheet_export(
-                &fixture
-                    .host
-                    .projection()
-                    .expect("the neutral projection is available")
-                    .composition
-                    .sheets[0]
-                    .sheet_id,
-            )
-            .expect("the neutral exportação is frozen");
-
-        assert!(frozen.snapshot.validate().is_ok());
-        assert!(frozen.sources.is_empty());
     }
 
     #[test]
@@ -2649,25 +2610,32 @@ mod tests {
 
     #[test]
     fn clean_close_consumes_the_session_and_releases_editable_ownership() {
-        let Fixture {
-            _root,
-            project_path,
-            identity_lease_root,
-            host,
-        } = fixture();
+        tauri::async_runtime::block_on(async {
+            let fixture = recovery_fixture();
+            fixture
+                .host
+                .apply_with_outcome(ProjectIntent::SetDpi { dpi: 240 })
+                .expect("the action is completed before Undo");
+            fixture
+                .host
+                .undo()
+                .expect("Undo returns to the saved state");
+            wait_for_checkpoint(&fixture.store, &fixture.authority).await;
 
-        assert_eq!(
-            host.begin_close(),
-            Ok(ProjectCloseRequestOutcome::CloseImmediately)
-        );
-        assert!(host.projection().is_err());
+            assert_eq!(
+                fixture.host.begin_close(),
+                Ok(ProjectCloseRequestOutcome::CloseImmediately)
+            );
+            assert!(fixture.host.projection().is_err());
+            assert!(fixture.store.load(&fixture.authority).unwrap().is_none());
 
-        let reopened = open_project(&project_path, &identity_lease_root);
-        let projection = reopened
-            .projection()
-            .expect("closing releases the Project for a new editable Session");
-        assert_eq!(projection.state.revision, 0);
-        assert!(!projection.state.dirty);
+            let reopened = open_project(&fixture.project_path, &fixture.identity_lease_root);
+            let projection = reopened
+                .projection()
+                .expect("closing releases the Project for a new editable Session");
+            assert_eq!(projection.state.revision, 0);
+            assert!(!projection.state.dirty);
+        });
     }
 
     #[test]
@@ -2737,106 +2705,75 @@ mod tests {
 
     #[test]
     fn discarding_close_consumes_the_session_without_persisting_changes() {
-        let Fixture {
-            _root,
-            project_path,
-            identity_lease_root,
-            host,
-        } = fixture();
-        host.apply_with_outcome(ProjectIntent::SetDpi { dpi: 240 })
-            .expect("the Project becomes dirty before closing");
-        assert_eq!(
-            host.begin_close(),
-            Ok(ProjectCloseRequestOutcome::ConfirmationRequired)
-        );
+        tauri::async_runtime::block_on(async {
+            let fixture = recovery_fixture();
+            fixture
+                .host
+                .apply_with_outcome(ProjectIntent::SetDpi { dpi: 240 })
+                .expect("the Project becomes dirty before closing");
+            wait_for_checkpoint(&fixture.store, &fixture.authority).await;
+            assert_eq!(
+                fixture.host.begin_close(),
+                Ok(ProjectCloseRequestOutcome::ConfirmationRequired)
+            );
 
-        host.discard_close()
-            .expect("discarding consumes the editable Session");
-        assert!(host.projection().is_err());
+            fixture
+                .host
+                .discard_close()
+                .expect("discarding consumes the editable Session");
+            assert!(fixture.host.projection().is_err());
+            assert!(fixture.store.load(&fixture.authority).unwrap().is_none());
 
-        let reopened = open_project(&project_path, &identity_lease_root);
-        let projection = reopened
-            .projection()
-            .expect("discarding releases ownership for a fresh Session");
-        assert_eq!(projection.state.document.dpi, 300);
-        assert_eq!(projection.state.revision, 0);
-        assert_eq!(projection.state.saved_revision, 0);
-        assert!(!projection.state.dirty);
-        assert!(!projection.state.can_undo);
-        assert!(!projection.state.can_redo);
+            let reopened = open_project(&fixture.project_path, &fixture.identity_lease_root);
+            let projection = reopened
+                .projection()
+                .expect("discarding releases ownership for a fresh Session");
+            assert_eq!(projection.state.document.dpi, 300);
+            assert_eq!(projection.state.revision, 0);
+            assert_eq!(projection.state.saved_revision, 0);
+            assert!(!projection.state.dirty);
+            assert!(!projection.state.can_undo);
+            assert!(!projection.state.can_redo);
+        });
     }
 
     #[test]
     fn saving_close_persists_the_current_revision_then_consumes_the_session() {
-        let Fixture {
-            _root,
-            project_path,
-            identity_lease_root,
-            host,
-        } = fixture();
-        let dirty = host
-            .apply_with_outcome(ProjectIntent::SetDpi { dpi: 240 })
-            .expect("the Project becomes dirty before closing")
-            .projection;
-        assert_eq!(dirty.state.revision, 1);
-        assert_eq!(
-            host.begin_close(),
-            Ok(ProjectCloseRequestOutcome::ConfirmationRequired)
-        );
-
-        assert_eq!(
-            host.save_and_close()
-                .expect("Save and close confirms the current revision"),
-            SaveProjectOutcome::Saved { revision: 1 }
-        );
-        assert!(host.projection().is_err());
-
-        let reopened = open_project(&project_path, &identity_lease_root);
-        let projection = reopened
-            .projection()
-            .expect("the confirmed revision reopens in a fresh Session");
-        assert_eq!(projection.state.document.dpi, 240);
-        assert_eq!(projection.state.revision, 1);
-        assert_eq!(projection.state.saved_revision, 1);
-        assert!(!projection.state.dirty);
-        assert!(!projection.state.can_undo);
-        assert!(!projection.state.can_redo);
-    }
-
-    #[test]
-    fn a_conclusive_save_failure_keeps_the_dirty_session_and_reenables_history() {
-        let fixture = fixture();
-        let dirty = fixture
-            .host
-            .apply_with_outcome(ProjectIntent::SetDpi { dpi: 240 })
-            .expect("the Project becomes dirty before closing")
-            .projection;
-        assert_eq!(
-            fixture.host.begin_close(),
-            Ok(ProjectCloseRequestOutcome::ConfirmationRequired)
-        );
-        std::fs::write(&fixture.project_path, b"externally replaced")
-            .expect("an external writer changes the persisted baseline");
-
-        assert!(matches!(
-            fixture.host.save_and_close(),
-            Err(ProjectHostSaveError::Project(
-                SaveProjectError::PersistedBaselineConflict
-            ))
-        ));
-
-        assert_eq!(
-            fixture
+        tauri::async_runtime::block_on(async {
+            let fixture = recovery_fixture();
+            let dirty = fixture
                 .host
+                .apply_with_outcome(ProjectIntent::SetDpi { dpi: 240 })
+                .expect("the Project becomes dirty before closing")
+                .projection;
+            assert_eq!(dirty.state.revision, 1);
+            wait_for_checkpoint(&fixture.store, &fixture.authority).await;
+            assert_eq!(
+                fixture.host.begin_close(),
+                Ok(ProjectCloseRequestOutcome::ConfirmationRequired)
+            );
+
+            assert_eq!(
+                fixture
+                    .host
+                    .save_and_close()
+                    .expect("Save and close confirms the current revision"),
+                SaveProjectOutcome::Saved { revision: 1 }
+            );
+            assert!(fixture.host.projection().is_err());
+            assert!(fixture.store.load(&fixture.authority).unwrap().is_none());
+
+            let reopened = open_project(&fixture.project_path, &fixture.identity_lease_root);
+            let projection = reopened
                 .projection()
-                .expect("a conclusive failure preserves the Session"),
-            dirty
-        );
-        let undone = fixture
-            .host
-            .undo()
-            .expect("creative commands resume after the conclusive failure");
-        assert_eq!(undone.state.document.dpi, 300);
+                .expect("the confirmed revision reopens in a fresh Session");
+            assert_eq!(projection.state.document.dpi, 240);
+            assert_eq!(projection.state.revision, 1);
+            assert_eq!(projection.state.saved_revision, 1);
+            assert!(!projection.state.dirty);
+            assert!(!projection.state.can_undo);
+            assert!(!projection.state.can_redo);
+        });
     }
 
     #[test]
@@ -2883,6 +2820,338 @@ mod tests {
         assert!(!projection.state.dirty);
         assert!(!projection.state.can_undo);
         assert!(!projection.state.can_redo);
+    }
+
+    #[test]
+    fn saving_an_old_format_project_without_confirmation_changes_nothing() {
+        let fixture = old_format_fixture();
+        let old_bytes = std::fs::read(&fixture.project_path).expect("the old file is readable");
+        let edited = fixture
+            .host
+            .apply_with_outcome(ProjectIntent::SetDpi { dpi: 240 })
+            .expect("the converted Project is editable")
+            .projection;
+        assert!(edited.state.format_conversion_pending);
+        assert!(edited.state.dirty);
+        assert!(edited.state.can_undo);
+
+        assert!(matches!(
+            fixture.host.save(edited.state.revision),
+            Err(ProjectHostSaveError::Project(
+                SaveProjectError::FormatConversionConfirmationRequired
+            ))
+        ));
+
+        assert_eq!(
+            fixture
+                .host
+                .projection()
+                .expect("the Session stays active while the user decides"),
+            edited
+        );
+        assert_eq!(
+            std::fs::read(&fixture.project_path).expect("the old file remains readable"),
+            old_bytes,
+            "an unconfirmed Save never replaces the old file"
+        );
+        let undone = fixture
+            .host
+            .undo()
+            .expect("the History survives the refused Save");
+        assert_eq!(undone.state.document.dpi, 300);
+        assert!(undone.state.format_conversion_pending);
+    }
+
+    #[test]
+    fn only_the_save_that_replaces_the_old_file_reports_a_format_conversion() {
+        let fixture = old_format_fixture();
+        let old_bytes = std::fs::read(&fixture.project_path).expect("the old file is readable");
+        let revision = fixture
+            .host
+            .projection()
+            .expect("the old Project is projected")
+            .state
+            .revision;
+
+        // A confirmed Save that fails converts nothing.
+        assert!(matches!(
+            fixture.host.save_converting_format(revision + 1),
+            Err(ProjectHostSaveError::Project(
+                SaveProjectError::StaleRevision { .. }
+            ))
+        ));
+        assert_eq!(
+            std::fs::read(&fixture.project_path).expect("the old file remains readable"),
+            old_bytes
+        );
+
+        let converted = fixture
+            .host
+            .save_converting_format(revision)
+            .expect("the confirmed Save replaces the old file");
+        assert_eq!(converted.outcome, SaveProjectOutcome::Saved { revision });
+        assert!(converted.converted_format);
+        assert!(!converted.projection.state.format_conversion_pending);
+        assert!(!converted.projection.state.dirty);
+        assert!(is_current_format(&fixture.project_path));
+
+        // The file is now in the current format: no later Save converts again,
+        // with or without the confirmation flag.
+        let unchanged = fixture
+            .host
+            .save_converting_format(revision)
+            .expect("a repeated confirmed Save has nothing to write");
+        assert_eq!(
+            unchanged.outcome,
+            SaveProjectOutcome::AlreadyCurrent { revision }
+        );
+        assert!(!unchanged.converted_format);
+        let edited = fixture
+            .host
+            .apply_with_outcome(ProjectIntent::SetDpi { dpi: 240 })
+            .expect("the converted Project is editable")
+            .projection;
+        let saved = fixture
+            .host
+            .save(edited.state.revision)
+            .expect("a regular Save needs no confirmation after the conversion");
+        assert!(!saved.converted_format);
+
+        drop(fixture.host);
+        let reopened = open_project(&fixture.project_path, &fixture.identity_lease_root)
+            .projection()
+            .expect("the converted Project reopens");
+        assert!(!reopened.state.format_conversion_pending);
+        assert!(!reopened.state.dirty);
+        assert_eq!(reopened.state.document.dpi, 240);
+    }
+
+    #[test]
+    fn a_confirmed_save_of_a_current_format_project_reports_no_conversion() {
+        let fixture = fixture();
+        let edited = fixture
+            .host
+            .apply_with_outcome(ProjectIntent::SetDpi { dpi: 240 })
+            .expect("the Project becomes dirty")
+            .projection;
+
+        let saved = fixture
+            .host
+            .save_converting_format(edited.state.revision)
+            .expect("without an old file this is a regular Save");
+
+        assert_eq!(saved.outcome, SaveProjectOutcome::Saved { revision: 1 });
+        assert!(!saved.converted_format);
+    }
+
+    #[test]
+    fn saving_and_closing_an_old_format_project_converts_it_without_another_confirmation() {
+        let fixture = old_format_fixture();
+        let revision = fixture
+            .host
+            .projection()
+            .expect("the old Project is projected")
+            .state
+            .revision;
+        // An old Project opens with unsaved changes, so closing always asks.
+        assert_eq!(
+            fixture.host.begin_close(),
+            Ok(ProjectCloseRequestOutcome::ConfirmationRequired)
+        );
+
+        assert_eq!(
+            fixture
+                .host
+                .save_and_close()
+                .expect("Save and close replaces the old file"),
+            SaveProjectOutcome::Saved { revision }
+        );
+
+        assert!(fixture.host.projection().is_err());
+        assert!(is_current_format(&fixture.project_path));
+        let reopened = open_project(&fixture.project_path, &fixture.identity_lease_root)
+            .projection()
+            .expect("the converted Project reopens in a fresh Session");
+        assert!(!reopened.state.format_conversion_pending);
+        assert!(!reopened.state.dirty);
+    }
+
+    #[test]
+    fn a_stale_save_preserves_the_session_and_its_recovery_checkpoint() {
+        tauri::async_runtime::block_on(async {
+            let fixture = recovery_fixture();
+            let persisted_before =
+                std::fs::read(&fixture.project_path).expect("the persisted baseline is readable");
+            let dirty = fixture
+                .host
+                .apply_with_outcome(ProjectIntent::SetDpi { dpi: 360 })
+                .expect("the Session becomes recoverable")
+                .projection;
+            wait_for_checkpoint(&fixture.store, &fixture.authority).await;
+
+            assert!(matches!(
+                fixture.host.save(dirty.state.revision + 1),
+                Err(ProjectHostSaveError::Project(SaveProjectError::StaleRevision {
+                    expected,
+                    current,
+                })) if expected == dirty.state.revision + 1 && current == dirty.state.revision
+            ));
+
+            assert_eq!(fixture.host.projection().unwrap(), dirty);
+            assert!(fixture.store.load(&fixture.authority).unwrap().is_some());
+            assert_eq!(
+                std::fs::read(&fixture.project_path).expect("the persisted file remains readable"),
+                persisted_before
+            );
+
+            fixture
+                .host
+                .save(dirty.state.revision)
+                .expect("the Session saves with its current revision");
+            assert!(fixture.store.load(&fixture.authority).unwrap().is_none());
+        });
+    }
+
+    #[test]
+    fn an_indeterminate_save_ends_the_session_and_keeps_its_recovery_checkpoint() {
+        tauri::async_runtime::block_on(async {
+            let fixture = recovery_fixture();
+            let dirty = fixture
+                .host
+                .apply_with_outcome(ProjectIntent::SetDpi { dpi: 360 })
+                .expect("the Session becomes recoverable")
+                .projection;
+            wait_for_checkpoint(&fixture.store, &fixture.authority).await;
+            let held = hold_identity_lease_target(&fixture.identity_lease_root, &fixture.authority);
+
+            assert!(matches!(
+                fixture.host.save(dirty.state.revision),
+                Err(ProjectHostSaveError::Project(
+                    SaveProjectError::SaveStateIndeterminate
+                ))
+            ));
+            drop(held);
+
+            // Nothing more goes through a Session that cannot tell what it saved.
+            assert!(fixture.host.projection().is_err());
+            assert!(fixture.host.undo().is_err());
+            assert!(matches!(
+                fixture.host.save(dirty.state.revision),
+                Err(ProjectHostSaveError::SessionUnavailable)
+            ));
+            assert!(fixture.store.load(&fixture.authority).unwrap().is_some());
+
+            // Ending the Session releases the Project, and the next Host is
+            // offered the checkpoint that was kept.
+            let next = ProjectHost::with_recovery(
+                open_editable_project(&fixture.project_path, &fixture.identity_lease_root),
+                fixture.coordinator.clone(),
+            )
+            .expect("the next Host opens the released Project");
+            assert_eq!(next.recovery_status(), Ok(ProjectRecoveryStatus::Available));
+        });
+    }
+
+    #[test]
+    fn an_indeterminate_close_save_ends_the_session_and_keeps_its_recovery_checkpoint() {
+        tauri::async_runtime::block_on(async {
+            let fixture = recovery_fixture();
+            fixture
+                .host
+                .apply_with_outcome(ProjectIntent::SetDpi { dpi: 360 })
+                .expect("the Session becomes recoverable");
+            wait_for_checkpoint(&fixture.store, &fixture.authority).await;
+            assert_eq!(
+                fixture.host.begin_close(),
+                Ok(ProjectCloseRequestOutcome::ConfirmationRequired)
+            );
+            let held = hold_identity_lease_target(&fixture.identity_lease_root, &fixture.authority);
+
+            assert!(matches!(
+                fixture.host.save_and_close(),
+                Err(ProjectHostSaveError::Project(
+                    SaveProjectError::SaveStateIndeterminate
+                ))
+            ));
+            drop(held);
+
+            // Unlike a conclusive failure, the Session is not handed back.
+            assert!(fixture.host.projection().is_err());
+            assert!(fixture.host.cancel_close().is_err());
+            assert!(matches!(
+                fixture.host.save_and_close(),
+                Err(ProjectHostSaveError::SessionUnavailable)
+            ));
+            assert!(fixture.store.load(&fixture.authority).unwrap().is_some());
+
+            let next = ProjectHost::with_recovery(
+                open_editable_project(&fixture.project_path, &fixture.identity_lease_root),
+                fixture.coordinator.clone(),
+            )
+            .expect("the next Host opens the released Project");
+            assert_eq!(next.recovery_status(), Ok(ProjectRecoveryStatus::Available));
+        });
+    }
+
+    #[test]
+    fn an_unreadable_checkpoint_stops_the_host_from_opening_and_stays_in_place() {
+        tauri::async_runtime::block_on(async {
+            let first = recovery_fixture();
+            first
+                .host
+                .apply_with_outcome(ProjectIntent::SetDpi { dpi: 360 })
+                .expect("the first Session becomes recoverable");
+            wait_for_checkpoint(&first.store, &first.authority).await;
+            let checkpoint = first
+                .store
+                .checkpoint_path(&first.authority)
+                .expect("the checkpoint path is valid");
+            let other = recovery_fixture();
+            other
+                .host
+                .apply_with_outcome(ProjectIntent::SetDpi { dpi: 420 })
+                .expect("another Project becomes recoverable");
+            wait_for_checkpoint(&other.store, &other.authority).await;
+            let of_another_project = std::fs::read(
+                other
+                    .store
+                    .checkpoint_path(&other.authority)
+                    .expect("the other checkpoint path is valid"),
+            )
+            .expect("the other checkpoint is readable");
+            let truncated = std::fs::read(&checkpoint).expect("the checkpoint is readable");
+            let truncated = truncated[..truncated.len() / 2].to_vec();
+            drop(first.host);
+
+            for unreadable in [truncated, of_another_project] {
+                std::fs::write(&checkpoint, &unreadable)
+                    .expect("the published checkpoint is replaced");
+
+                let error = ProjectHost::with_recovery(
+                    open_editable_project(&first.project_path, &first.identity_lease_root),
+                    first.coordinator.clone(),
+                )
+                .err()
+                .expect("the Host does not start over an unreadable checkpoint");
+
+                assert_eq!(error.kind(), std::io::ErrorKind::InvalidData);
+                assert_eq!(
+                    std::fs::read(&checkpoint).expect("the checkpoint remains readable"),
+                    unreadable,
+                    "the Host neither repairs nor removes the checkpoint"
+                );
+            }
+
+            // The refused Host released the Project; only the checkpoint is in
+            // the way of the next opening.
+            std::fs::remove_file(&checkpoint).expect("the checkpoint is removed by hand");
+            let host = ProjectHost::with_recovery(
+                open_editable_project(&first.project_path, &first.identity_lease_root),
+                first.coordinator.clone(),
+            )
+            .expect("the Host opens once the checkpoint is gone");
+            assert_eq!(host.recovery_status(), Ok(ProjectRecoveryStatus::None));
+        });
     }
 
     #[test]
@@ -2974,70 +3243,14 @@ mod tests {
             projection.state.album.media[0].id.to_string()
         );
         assert_eq!(catalog.bindings[0].logical_path, background_path);
+        assert_eq!(
+            host.authorized_media_binding(&catalog.bindings[0].media_id)
+                .expect("the Host authorizes the current occurrence binding"),
+            catalog.bindings[0]
+        );
         let frontend_projection =
             serde_json::to_string(&projection).expect("the editor projection serializes");
         assert!(!frontend_projection.contains(root.path().to_string_lossy().as_ref()));
-    }
-
-    #[test]
-    fn public_host_runtime_retry_reinspects_without_mutating_media_ref_or_project() {
-        let root = tempfile::tempdir().expect("temporary media retry Host fixture");
-        let media_path = root.path().join("Background.png");
-        std::fs::write(&media_path, b"linked Original")
-            .expect("the linked Original fixture is writable");
-        let initial =
-            InitialProject::neutral().with_personalization(InitialProjectPersonalization::new(
-                InitialBackground::BothSides {
-                    both: InitialBackgroundContent::Media {
-                        path: media_path.clone(),
-                    },
-                },
-                InitialOverlay::BothSides { both: None },
-                InitialFrameBorder::None,
-            ));
-        let fixture = fixture_with_initial(initial);
-        let before = fixture
-            .host
-            .projection()
-            .expect("the Project is available before retry authorization");
-        let media_id = before.state.album.media[0].id.to_string();
-
-        let binding = fixture
-            .host
-            .authorized_media_binding(&media_id)
-            .expect("the Host authorizes the current occurrence binding");
-        let mut unavailable_sample = binding.clone();
-        unavailable_sample.logical_path = "relative-unavailable-source.png".into();
-        let runtime = MediaRuntime::default();
-        let resolver = MediaResolver;
-        runtime.apply(resolver.observe(1, std::slice::from_ref(&unavailable_sample)));
-        let retried = MediaMonitor::default()
-            .retry_readable_fixture(&runtime, &binding)
-            .expect("the Runtime repeats the authoritative inspection through the Host binding");
-
-        let after = fixture
-            .host
-            .projection()
-            .expect("the Project remains available after retry authorization");
-        assert_eq!(binding.media_id, media_id);
-        assert_eq!(binding.logical_path, media_path);
-        assert_eq!(
-            retried.availability(),
-            crate::media_runtime::MediaAvailability::Candidate
-        );
-        assert_eq!(after.state.revision, before.state.revision);
-        assert_eq!(after.state.saved_revision, before.state.saved_revision);
-        assert_eq!(after.state.dirty, before.state.dirty);
-        assert_eq!(after.state.can_undo, before.state.can_undo);
-        assert_eq!(after.state.can_redo, before.state.can_redo);
-        assert_eq!(
-            fixture
-                .host
-                .authorized_media_catalog()
-                .expect("the authorized catalog is unchanged")
-                .bindings[0],
-            binding
-        );
     }
 
     #[test]

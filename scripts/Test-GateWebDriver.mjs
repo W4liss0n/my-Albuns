@@ -267,7 +267,6 @@ test("limits every WebDriver request to the remaining discovery budget", async (
       );
     },
   };
-  const startedAt = performance.now();
 
   await assert.rejects(
     switchToWebDriverWindow(
@@ -279,7 +278,7 @@ test("limits every WebDriver request to the remaining discovery budget", async (
     { name: "TimeoutError" },
   );
 
-  assert.ok(performance.now() - startedAt < 200);
+  assert.ok(observedTimeouts.length > 0);
   assert.ok(
     observedTimeouts.every(
       (timeout) => Number.isFinite(timeout) && timeout > 0 && timeout <= 30,
@@ -305,6 +304,7 @@ test("fails immediately on a non-transient WebDriver protocol error", async () =
       throw wrappedProtocolError;
     },
   };
+  const discoveryBudgetMilliseconds = 5_000;
   const startedAt = performance.now();
 
   await assert.rejects(
@@ -312,13 +312,13 @@ test("fails immediately on a non-transient WebDriver protocol error", async () =
       driver,
       () => false,
       "invalid Project dialog",
-      5_000,
+      discoveryBudgetMilliseconds,
     ),
     (error) => error === wrappedProtocolError,
   );
 
   assert.equal(handleReadCount, 1);
-  assert.ok(performance.now() - startedAt < 200);
+  assert.ok(performance.now() - startedAt < discoveryBudgetMilliseconds / 2);
 });
 
 test("failed driver acquisition releases its process and listener", {

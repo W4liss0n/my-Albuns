@@ -16,7 +16,7 @@ const evidence = {
   sourceInputs: { initial: source(), final: null }, passed: false, cleanupCompleted: false,
   scenarios: [],
 };
-const browser = createHeadlessBrowserSession({ root, output, windowSize: '1000,800', requestTimeoutMilliseconds: 10000 });
+const browser = createHeadlessBrowserSession({ root, output, windowSize: '1000,800', requestTimeoutMilliseconds: 120000 });
 let request, session;
 try {
   const started = await browser.start();

@@ -45,6 +45,49 @@ test("renders one accessible external dialog and traps focus on its three decisi
   expect(props.onRecover).not.toHaveBeenCalled();
 });
 
+const callbacks = ["onBack", "onDefer", "onDiscard", "onRecover", "onRequestDiscard"] as const;
+
+test.each([
+  ["Recuperar e abrir", "onRecover"],
+  ["Abrir última versão salva", "onRequestDiscard"],
+  ["Agora não", "onDefer"],
+] as const)("%s reports only %s", (label, callback) => {
+  const { props } = recoveryDialog();
+
+  fireEvent.click(screen.getByRole("button", { name: label }));
+
+  for (const name of callbacks) {
+    expect(props[name]).toHaveBeenCalledTimes(name === callback ? 1 : 0);
+  }
+});
+
+test.each([
+  ["Descartar alterações e abrir", "onDiscard"],
+  ["Voltar", "onBack"],
+] as const)("%s in the discard confirmation reports only %s", (label, callback) => {
+  const { props } = recoveryDialog({ state: "confirmDiscard" });
+
+  fireEvent.click(screen.getByRole("button", { name: label }));
+
+  for (const name of callbacks) {
+    expect(props[name]).toHaveBeenCalledTimes(name === callback ? 1 : 0);
+  }
+});
+
+test.each(["available", "confirmDiscard", "resolving"] as const)(
+  "shows the error inside the %s dialog and nothing when there is none",
+  (state) => {
+    const { props, view } = recoveryDialog({ state, error: "Projeto indisponível." });
+    const notice = screen.getByText("Projeto indisponível.").closest(".ui-inline-notice");
+
+    expect(notice).toHaveClass("ui-inline-notice--error");
+    expect(screen.getByRole("dialog")).toContainElement(notice as HTMLElement);
+
+    view.rerender(<ProjectRecoveryDialog {...props} error={null} />);
+    expect(document.querySelector(".ui-inline-notice")).not.toBeInTheDocument();
+  },
+);
+
 test("keeps discard confirmation in the same external owner and cancels it with Escape", () => {
   const { props } = recoveryDialog({ state: "confirmDiscard" });
   const dialog = screen.getByRole("dialog", {

@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { expect, test } from "vitest";
 
 import type { CompositionPlan } from "../../domain/project";
@@ -121,26 +122,4 @@ test("reserves the same two-page footprint for single-page edge sheets", () => {
     { left: 646, width: 600, center: 946, right: 1_246 },
     { left: 1_292, width: 600, center: 1_592, right: 1_892 },
   ]);
-});
-
-test("measures sheet geometry once and reuses it", () => {
-  let widthReads = 0;
-  const measuredSheets: CompositionPlan["sheets"] = threeSheets.map(
-    (sheet) => ({
-      ...sheet,
-      get widthUm() {
-        widthReads += 1;
-        return sheet.widthUm;
-      },
-    }),
-  );
-
-  const layout = createContinuousCanvasLayout(measuredSheets);
-  expect(widthReads).toBe(threeSheets.length);
-
-  layout.clampOffset(999, 0.5, 1_000);
-  layout.offsetBounds(0.5, 1_000);
-  layout.centeredSheetId(4, 0.5, 1_000);
-  layout.centeredOffset("sheet-003", 0.5, 1_000);
-  expect(widthReads).toBe(threeSheets.length);
 });

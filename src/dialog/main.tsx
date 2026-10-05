@@ -1,10 +1,8 @@
 import React, { useEffect, useLayoutEffect, useState } from "react";
 import ReactDOM from "react-dom/client";
 
-import type { ProjectRecoveryDecision } from "../application/projectPorts";
-import type { OpeningExternalCopyDecision } from "../global/application/globalProjectPort";
-import { ExternalCopyDecisionDialog } from "./ExternalCopyDecisionDialog";
-import { ProjectRecoveryDialog } from "./ProjectRecoveryDialog";
+import { OpeningExternalCopyDialog } from "./OpeningExternalCopyDialog";
+import { OpeningRecoveryDialog } from "./OpeningRecoveryDialog";
 import { installDesktopWebViewPolicy } from "../platform/desktopWebViewPolicy";
 import {
   resolveOpeningExternalCopy,
@@ -31,6 +29,10 @@ const OPENING_OWNER_MARKER = "myalbuns:opening-project-owner";
 function parameter(name: string, fallback: string) {
   const value = parameters.get(name)?.trim();
   return value ? value.slice(0, 800) : fallback;
+}
+
+function openedFromLoadingOwner() {
+  return window.sessionStorage.getItem(OPENING_OWNER_MARKER) === "loading";
 }
 
 function DialogContent() {
@@ -95,106 +97,26 @@ function DialogContent() {
   }
 
   if (kind === "project-recovery") {
-    return <OpeningRecoveryDialog />;
+    return (
+      <OpeningRecoveryDialog
+        attemptId={parameter("attemptId", "")}
+        openedFromLoadingOwner={openedFromLoadingOwner()}
+        resolveOpeningRecovery={resolveOpeningRecovery}
+      />
+    );
   }
 
   if (kind === "external-copy") {
-    return <OpeningExternalCopyDialog />;
+    return (
+      <OpeningExternalCopyDialog
+        attemptId={parameter("attemptId", "")}
+        openedFromLoadingOwner={openedFromLoadingOwner()}
+        resolveOpeningExternalCopy={resolveOpeningExternalCopy}
+      />
+    );
   }
 
   return <OpeningProgressDialog />;
-}
-
-function OpeningExternalCopyDialog() {
-  const attemptId = parameter("attemptId", "");
-  const openedFromLoadingOwner =
-    window.sessionStorage.getItem(OPENING_OWNER_MARKER) === "loading";
-  const [resolving, setResolving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const resolve = async (decision: OpeningExternalCopyDecision) => {
-    if (!attemptId || resolving) return;
-    setError(null);
-    setResolving(true);
-    try {
-      await resolveOpeningExternalCopy(attemptId, decision);
-    } catch (reason: unknown) {
-      setError(
-        reason instanceof Error
-          ? reason.message
-          : "Não foi possível concluir a decisão sobre a Cópia externa.",
-      );
-      setResolving(false);
-    }
-  };
-
-  return (
-    <div data-opening-owner-transition={String(openedFromLoadingOwner)}>
-      <ExternalCopyDecisionDialog
-        error={
-          attemptId
-            ? error
-            : "A tentativa de abertura não está mais disponível."
-        }
-        onCancel={() => void resolve("cancel")}
-        onSaveCopyAs={() => void resolve("saveCopyAs")}
-        resolving={resolving}
-      />
-    </div>
-  );
-}
-
-function OpeningRecoveryDialog() {
-  const attemptId = parameter("attemptId", "");
-  const openedFromLoadingOwner =
-    window.sessionStorage.getItem(OPENING_OWNER_MARKER) === "loading";
-  const [state, setState] = useState<
-    "available" | "confirmDiscard" | "resolving"
-  >("available");
-  const [error, setError] = useState<string | null>(null);
-
-  const resolve = async (decision: ProjectRecoveryDecision) => {
-    if (!attemptId || state === "resolving") return;
-    setError(null);
-    setState("resolving");
-    try {
-      await resolveOpeningRecovery(attemptId, decision);
-    } catch (reason: unknown) {
-      setError(
-        reason instanceof Error
-          ? reason.message
-          : "Não foi possível concluir a escolha de Recuperação.",
-      );
-      setState(
-        decision === "discardCheckpointAndOpenLastSaved"
-          ? "confirmDiscard"
-          : "available",
-      );
-    }
-  };
-
-  return (
-    <div data-opening-owner-transition={String(openedFromLoadingOwner)}>
-      <ProjectRecoveryDialog
-        error={
-          attemptId
-            ? error
-            : "A tentativa de abertura não está mais disponível."
-        }
-        onBack={() => {
-          setError(null);
-          setState("available");
-        }}
-        onDefer={() => void resolve("nowNot")}
-        onDiscard={() =>
-          void resolve("discardCheckpointAndOpenLastSaved")
-        }
-        onRecover={() => void resolve("reopenAndRecover")}
-        onRequestDiscard={() => setState("confirmDiscard")}
-        state={state}
-      />
-    </div>
-  );
 }
 
 function DialogWindow() {

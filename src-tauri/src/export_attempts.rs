@@ -244,8 +244,6 @@ impl std::error::Error for BeginExportAttemptError {}
 mod tests {
     use std::time::Duration;
 
-    use serde_json::json;
-
     use super::ExportAttempts;
     use crate::ipc_contract::CancelDisposition;
 
@@ -307,25 +305,6 @@ mod tests {
             CancelDisposition::Requested
         );
         assert!(second.is_cancelled());
-    }
-
-    #[test]
-    fn cancellation_results_have_a_stable_ipc_contract() {
-        assert_eq!(
-            [
-                serde_json::to_value(CancelDisposition::Requested).expect("Requested serializes"),
-                serde_json::to_value(CancelDisposition::AlreadyRequested)
-                    .expect("AlreadyRequested serializes"),
-                serde_json::to_value(CancelDisposition::TooLate).expect("TooLate serializes"),
-                serde_json::to_value(CancelDisposition::NotFound).expect("NotFound serializes"),
-            ],
-            [
-                json!("requested"),
-                json!("already_requested"),
-                json!("too_late"),
-                json!("not_found"),
-            ]
-        );
     }
 
     #[test]

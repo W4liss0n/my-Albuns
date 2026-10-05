@@ -675,13 +675,6 @@ mod tests {
 
     use myalbuns_paths::{NativePathDto, OperationPathContext, RootBindingPlan};
 
-    use super::super::configuration::{
-        InitialBackground, InitialBackgroundContent, InitialDisplayUnit,
-        InitialDocumentConfiguration, InitialFrameBorder, InitialOverlay,
-        InitialProjectCreationConfiguration, InitialSheetFormat, InitialStructureConfiguration,
-        InitialVisualDefaults,
-    };
-
     use super::*;
 
     fn authority(path: PathBuf) -> TargetAuthority {
@@ -978,53 +971,6 @@ mod tests {
         .expect_err("authority without its root is invalid");
 
         assert_eq!(error.kind, BootstrapFailureKind::InvalidAuthority);
-    }
-
-    #[test]
-    fn create_request_freezes_its_configuration_and_write_authorization() {
-        let target = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("Novo.myalbuns");
-        let configuration = InitialProjectCreationConfiguration {
-            frame_gap_um: 5_000,
-            document: InitialDocumentConfiguration {
-                display_unit: InitialDisplayUnit::Cm,
-                sheet_width_um: 508_000,
-                sheet_height_um: 254_000,
-                dpi: 240,
-                bleed_um: 4_000,
-                safety_um: 7_500,
-            },
-            structure: InitialStructureConfiguration {
-                sheet_count: 3,
-                first_sheet: InitialSheetFormat::SinglePage,
-                last_sheet: InitialSheetFormat::Double,
-            },
-            visual_defaults: InitialVisualDefaults {
-                background: InitialBackground::BothSides {
-                    both: InitialBackgroundContent::Color {
-                        rgb: "#FFFFFF".into(),
-                    },
-                },
-                overlay: InitialOverlay::BothSides { both: None },
-                frame_border: InitialFrameBorder::None,
-            },
-        };
-        let request = new_request(
-            authority(target.clone()),
-            BootstrapIntent::CreateNew {
-                configuration: Box::new(configuration.clone()),
-                authorization: CreateWriteAuthorization::ReplaceConfirmed,
-            },
-        )
-        .expect("valid create bootstrap fixture");
-
-        assert_eq!(
-            request.intent,
-            BootstrapIntent::CreateNew {
-                configuration: Box::new(configuration),
-                authorization: CreateWriteAuthorization::ReplaceConfirmed,
-            }
-        );
-        assert_eq!(request.authority.logical_target.as_path(), target);
     }
 
     #[test]

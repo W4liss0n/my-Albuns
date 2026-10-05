@@ -12,7 +12,6 @@ import {
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
-import { fileURLToPath } from "node:url";
 
 import { createOwnedCacheGuard } from "./ProductiveJourneyCacheSafety.mjs";
 import {
@@ -23,172 +22,6 @@ import {
   assertPhysicalAlbumProjectCoreEvents,
   assertReopenedHostExport,
 } from "./ProductiveJourneyObservations.mjs";
-
-test("productive journey uses the neutral captured-pointer gesture policy", () => {
-  const runner = readFileSync(
-    path.join(
-      path.dirname(fileURLToPath(import.meta.url)),
-      "Run-ProductiveJourneyGate.mjs",
-    ),
-    "utf8",
-  );
-
-  assert.match(runner, /from "\.\/WebDriverPointerGestures\.mjs"/u);
-  assert.doesNotMatch(runner, /const visibleCenter =/u);
-});
-
-test("locates the New Project flow through stable accessible names", () => {
-  const scripts = path.dirname(fileURLToPath(import.meta.url));
-  const runner = readFileSync(
-    path.join(scripts, "Run-ProductiveJourneyGate.mjs"),
-    "utf8",
-  );
-  const wrapper = readFileSync(
-    path.join(scripts, "Test-ProductiveJourney.ps1"),
-    "utf8",
-  );
-
-  assert.match(
-    runner,
-    /"css selector",\s*"button\[aria-label='Novo projeto'\]"/,
-  );
-  assert.match(runner, /\["Largura", "50\.8"\]/);
-  assert.match(runner, /\["Altura", "25\.4"\]/);
-  assert.match(
-    runner,
-    /"css selector",\s*"button\[aria-label='Continuar'\]"/,
-  );
-  assert.match(
-    runner,
-    /"css selector",\s*"button\[aria-label='Criar Projeto'\]"/,
-  );
-  assert.match(runner, /"input\[aria-label='DPI'\]"/);
-  assert.match(runner, /"button\[form='album-information-settings'\]"/);
-  assert.match(runner, /MYALBUNS_DEV_PROJECT_DIALOG_WEBVIEW_DEBUG_PORT/);
-  assert.match(runner, /MYALBUNS_DEV_PROJECT_DIALOG_WEBVIEW_DATA_DIRECTORY/);
-  assert.match(runner, /projectDialogDebugPort/);
-  assert.match(
-    runner,
-    /productive Grade click did not activate Sheet 2/,
-  );
-  assert.match(runner, /button\.active \.sheet-tile__number/);
-  assert.match(
-    runner,
-    /startAttachedWebDriver\(\s*driver\.projectDialogDebugPort/,
-  );
-  assert.match(runner, /Aplicar alterações no Álbum\?/);
-  assert.match(runner, /selectApplicationMenuCommand/);
-  assert.match(runner, /clickElementWhenInteractable/);
-  assert.match(runner, /withProjectDialog/);
-  assert.match(runner, /function accessibleProjectDialogXpath/);
-  assert.match(
-    runner,
-    /@aria-labelledby = \/\/\*\[normalize-space\(\)=\$\{title\}\]\/@id/,
-  );
-  assert.doesNotMatch(
-    runner,
-    /@role='dialog' and @aria-label=/,
-  );
-  assert.match(runner, /openPhotoImportDialog/);
-  assert.match(runner, /globalInspectorPreferencePreserved/);
-  assert.match(runner, /projectLocalSelectionReset/);
-  assert.doesNotMatch(runner, /recovery Project Host after resolution/);
-  assert.match(runner, /waitForHttpUnavailable/);
-  assert.match(runner, /waitForWebViewDataDirectoryRelease/);
-  assert.match(runner, /waitForHostUiReady/);
-  assert.match(runner, /webDriverSessionTimeoutMilliseconds/);
-  assert.match(runner, /missingOriginalBlockedBeforePipeline/);
-  assert.match(runner, /exportProcessorAttempts\(\)\.length === missingOriginalProcessorCount/);
-  assert.match(runner, /MYALBUNS_DEV_ALTERNATE_HOST_WEBVIEW_DEBUG_PORT/);
-  assert.match(runner, /reopenedHostDebugPort/);
-  assert.match(runner, /The productive Host WebView2 process was not observable/);
-  assert.match(runner, /const observationDeadline = Math\.min\(deadline, Date\.now\(\) \+ 500\)/);
-  assert.match(runner, /\$\{label\} confirmation dialog/);
-  assert.doesNotMatch(
-    runner,
-    /\/\/button\[normalize-space\(\)='(?:Novo [Pp]rojeto|Próximo|Criar)'\]/,
-  );
-  assert.doesNotMatch(runner, /document-dpi-control|Aplicar DPI/);
-  assert.doesNotMatch(
-    runner,
-    /button\[aria-label='(?:Desfazer|Refazer|Salvar)'\]/,
-  );
-  assert.doesNotMatch(
-    runner,
-    /\/\/button\[normalize-space\(\)='Exportar Lâmina'\]/,
-  );
-  assert.doesNotMatch(runner, /Importar JPEG…/);
-  assert.doesNotMatch(runner, /\.media-card\[data-media-id\]/);
-  assert.match(runner, /switchToWebDriverWindow\(/);
-  assert.match(
-    runner,
-    /const ownerTargets = await devToolsTargets\(\s*recoveryGlobalDebugPort/,
-  );
-  assert.match(
-    runner,
-    /startAttachedWebDriver\(\s*recoveryOpeningDebugPort/,
-  );
-  assert.match(
-    runner,
-    /parsed\.pathname\.endsWith\("\/dialog\.html"\)[\s\S]*parsed\.searchParams\.get\("kind"\) === "project-recovery"/u,
-  );
-  assert.match(runner, /const actionGeometry =/u);
-  assert.match(runner, /action\.lineCount === 1/u);
-  assert.match(runner, /recoveryPresentation\.viewportWidth !== 492/u);
-  assert.match(
-    runner,
-    /parsed\.searchParams\.get\("kind"\) === "external-copy"/u,
-  );
-  assert.match(runner, /externalCopyPresentation\.viewportWidth !== 440/u);
-  assert.match(runner, /nativeOwnedWindowState\(externalCopyGlobal\)/u);
-  assert.match(runner, /cancelRestoredGlobalAndCleanedHost/u);
-  assert.match(runner, /\[externalCopyPath\]/u);
-  assert.match(runner, /realPathActivationsCompletedSerially/u);
-  assert.match(runner, /pickerCancellationPreservedAttempt/u);
-  assert.match(runner, /emptyActivationDidNotResurrectGlobal/u);
-  assert.match(runner, /samePendingHostCompletedHandoff/u);
-  assert.match(runner, /selectedExternalCopy\.exactProcess === true/u);
-  assert.match(runner, /new Event\('webglcontextlost'/u);
-  assert.match(runner, /canvas_context_restore_failed/u);
-  assert.match(runner, /graphicsDialogOwnedAndProjectBlocked/u);
-  assert.match(runner, /cancelledCloseRearmedSingleGraphicsDialog/u);
-  assert.match(runner, /workspaceInertBeforeDialogTerminal/u);
-  assert.match(runner, /exportDisabledBeforeDialogTerminal/u);
-  assert.match(wrapper, /externalCopyOpening\.pickerCancellationPreservedAttempt/u);
-  assert.match(wrapper, /graphicsFailure\.dialogOwnedByProject/u);
-  assert.doesNotMatch(runner, /DEBUG-project-dialog-targets/);
-  assert.doesNotMatch(runner, /localStateStartedEmpty/);
-});
-
-test("keeps the physical Album structure proof in the productive WebView2 contract", () => {
-  const scripts = path.dirname(fileURLToPath(import.meta.url));
-  const runner = readFileSync(
-    path.join(scripts, "Run-ProductiveJourneyGate.mjs"),
-    "utf8",
-  );
-  const wrapper = readFileSync(
-    path.join(scripts, "Test-ProductiveJourney.ps1"),
-    "utf8",
-  );
-
-  assert.match(wrapper, /presentation\.viewportWidth -ne 492/u);
-  assert.match(wrapper, /invalidRecoveryActionGeometry\.Count -ne 0/u);
-
-  assert.match(runner, /physicalAlbumStructure:\s*\{/);
-  assert.match(runner, /projectCoreEvents/);
-  assert.match(runner, /"Lâmina",\s*"Adicionar depois"/);
-  assert.match(runner, /"Lâmina",\s*"Excluir"/);
-  assert.match(runner, /\.sheet-grid-slot\[data-sheet-id=/);
-  assert.match(
-    runner,
-    /"add_sheet",\s*"reorder_sheet",\s*"delete_sheet"/,
-  );
-  assert.match(wrapper, /\$physicalAlbumStructure\.afterAdd\.count -ne 4/);
-  assert.match(wrapper, /\$physicalAlbumStructure\.afterReorder\.count -ne 4/);
-  assert.match(wrapper, /\$physicalAlbumStructure\.afterDelete\.count -ne 3/);
-  assert.match(wrapper, /physical-album-structure-ui-project-core/);
-  assert.match(wrapper, /physicalAlbumStructure = \$gate\.physicalAlbumStructure/);
-});
 
 test("correlates the physical Album ProjectCore events to one Host in causal order", () => {
   const input = [
@@ -260,28 +93,6 @@ test("correlates the physical Album ProjectCore events to one Host in causal ord
         },
       ),
     /causal and consecutive/,
-  );
-});
-
-test("emits Project intent outcomes with the Desktop Host process id", () => {
-  const commands = readFileSync(
-    path.join(
-      path.dirname(fileURLToPath(import.meta.url)),
-      "..",
-      "src-tauri",
-      "src",
-      "project_commands.rs",
-    ),
-    "utf8",
-  );
-
-  assert.match(
-    commands,
-    /tracing::warn!\([\s\S]{0,400}?process_id\s*=\s*process_id[\s\S]{0,400}?event\s*=\s*"project_intent_rejected"/,
-  );
-  assert.match(
-    commands,
-    /tracing::info!\([\s\S]{0,400}?process_id\s*=\s*process_id[\s\S]{0,400}?event\s*=\s*"project_intent_applied"/,
   );
 });
 

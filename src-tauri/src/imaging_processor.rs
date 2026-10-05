@@ -517,7 +517,7 @@ async fn invoke_once(
                 format!("Não foi possível correlacionar o plano de caminhos: {error}"),
             )
         })?;
-    let mut decoder =
+    let decoder =
         ImagingEventStreamDecoder::for_request(&context.operation_id).map_err(|error| {
             InvocationFailure::at_stage(
                 InvocationFailureStage::EncodeRequest,
@@ -547,31 +547,33 @@ async fn invoke_once(
         )
     })?;
     let imaging_process_id = child.pid();
-    let process_instance =
-        match receive_processor_handshake(&mut events, &handshake_challenge, imaging_process_id)
-            .await
-        {
-            Ok(process_instance) => process_instance,
-            Err(failure) if failure.termination_observed => return Err(failure),
-            Err(failure) => {
-                let handshake_message = failure.message;
-                match terminate_process(child, &mut events, imaging_process_id).await {
-                    Ok(kill_error) => {
-                        let message = kill_error.map_or(handshake_message.clone(), |kill_error| {
-                            format!(
-                                "{handshake_message}; o encerramento também falhou: {kill_error}"
-                            )
-                        });
-                        return Err(InvocationFailure::at_stage(
-                            InvocationFailureStage::SpawnSidecar,
-                            Some(imaging_process_id),
-                            message,
-                        ));
-                    }
-                    Err(failure) => return Err(failure),
+    let process_instance = match receive_processor_handshake(
+        &mut events,
+        &handshake_challenge,
+        imaging_process_id,
+        PROCESS_HANDSHAKE_TIMEOUT,
+    )
+    .await
+    {
+        Ok(process_instance) => process_instance,
+        Err(failure) if failure.termination_observed => return Err(failure),
+        Err(failure) => {
+            let handshake_message = failure.message;
+            match terminate_process(child, &mut events, imaging_process_id).await {
+                Ok(kill_error) => {
+                    let message = kill_error.map_or(handshake_message.clone(), |kill_error| {
+                        format!("{handshake_message}; o encerramento também falhou: {kill_error}")
+                    });
+                    return Err(InvocationFailure::at_stage(
+                        InvocationFailureStage::SpawnSidecar,
+                        Some(imaging_process_id),
+                        message,
+                    ));
                 }
+                Err(failure) => return Err(failure),
             }
-        };
+        }
+    };
     let mut processor_lifetime = match ProcessorChildLifetime::attach(process_instance) {
         Ok(lifetime) => lifetime,
         Err(error) => {
@@ -639,18 +641,54 @@ async fn invoke_once(
         ));
     }
 
-    let mut exit_code = None;
-    let mut termination_observed = false;
-    let mut stream_error = None;
-    loop {
-        if control.is_cancelled() {
+    match receive_invocation_events(&mut events, decoder, context, control, imaging_process_id)
+        .await
+    {
+        InvocationEventsEnd::Cancelled => {
             let kill_error = terminate_process(child, &mut events, imaging_process_id).await?;
             let mut failure = InvocationFailure::cancelled(imaging_process_id);
             if let Some(error) = kill_error {
                 failure.message =
                     format!("A operação foi cancelada, mas o encerramento falhou: {error}");
             }
-            return Err(failure);
+            Err(failure)
+        }
+        InvocationEventsEnd::InvalidEvent(error) => {
+            terminate_process(child, &mut events, imaging_process_id).await?;
+            Err(InvocationFailure::at_stage(
+                InvocationFailureStage::DecodeResponse,
+                Some(imaging_process_id),
+                format!("Evento inválido do Processador de Imagens: {error}"),
+            ))
+        }
+        InvocationEventsEnd::Closed(result) => result,
+    }
+}
+
+/// How the event stream of one invocation ended.
+#[derive(Debug)]
+enum InvocationEventsEnd {
+    /// The process may still be running: the caller terminates it.
+    Cancelled,
+    /// The process may still be running: the caller terminates it.
+    InvalidEvent(String),
+    /// The stream ended by itself, with or without a confirmed termination.
+    Closed(Result<ImagingResponse, InvocationFailure>),
+}
+
+async fn receive_invocation_events(
+    events: &mut tauri::async_runtime::Receiver<CommandEvent>,
+    mut decoder: ImagingEventStreamDecoder,
+    context: &InvocationContext,
+    control: InvocationControl<'_>,
+    imaging_process_id: u32,
+) -> InvocationEventsEnd {
+    let mut exit_code = None;
+    let mut termination_observed = false;
+    let mut stream_error = None;
+    loop {
+        if control.is_cancelled() {
+            return InvocationEventsEnd::Cancelled;
         }
         let event = match tokio::time::timeout(Duration::from_millis(20), events.recv()).await {
             Ok(event) => event,
@@ -662,12 +700,7 @@ async fn invoke_once(
         match event {
             CommandEvent::Stdout(bytes) => {
                 if let Err(error) = decode_and_report_event_chunk(&mut decoder, &bytes, control) {
-                    terminate_process(child, &mut events, imaging_process_id).await?;
-                    return Err(InvocationFailure::at_stage(
-                        InvocationFailureStage::DecodeResponse,
-                        Some(imaging_process_id),
-                        format!("Evento inválido do Processador de Imagens: {error}"),
-                    ));
+                    return InvocationEventsEnd::InvalidEvent(error);
                 }
             }
             CommandEvent::Stderr(bytes) => {
@@ -691,6 +724,22 @@ async fn invoke_once(
         }
     }
 
+    InvocationEventsEnd::Closed(conclude_invocation(
+        decoder,
+        imaging_process_id,
+        termination_observed,
+        exit_code,
+        stream_error,
+    ))
+}
+
+fn conclude_invocation(
+    decoder: ImagingEventStreamDecoder,
+    imaging_process_id: u32,
+    termination_observed: bool,
+    exit_code: Option<i32>,
+    stream_error: Option<String>,
+) -> Result<ImagingResponse, InvocationFailure> {
     if !termination_observed {
         let message = stream_error.map_or_else(
             || {
@@ -733,8 +782,9 @@ async fn receive_processor_handshake(
     events: &mut tauri::async_runtime::Receiver<CommandEvent>,
     expected_challenge: &str,
     process_id: u32,
+    timeout: Duration,
 ) -> Result<myalbuns_paths::ProcessInstanceId, InvocationFailure> {
-    tokio::time::timeout(PROCESS_HANDSHAKE_TIMEOUT, async {
+    tokio::time::timeout(timeout, async {
         let mut source = Vec::new();
         loop {
             let Some(event) = events.recv().await else {
@@ -896,10 +946,14 @@ mod tests {
     use tauri_plugin_shell::process::{CommandEvent, TerminatedPayload};
 
     use super::{
-        ImagingProcessor, InvocationControl, InvocationFailure, InvocationFailureStage,
-        complete_invocation, decode_and_report_event_chunk, invoke_reserved,
+        ImagingProcessor, InvocationContext, InvocationControl, InvocationEventsEnd,
+        InvocationFailure, InvocationFailureStage, complete_invocation,
+        decode_and_report_event_chunk, invoke_reserved, receive_invocation_events,
         receive_processor_handshake, wait_for_termination_for,
     };
+
+    /// Long enough that only a missing event can exhaust it.
+    const HANDSHAKE_WAIT: Duration = Duration::from_secs(30);
 
     #[test]
     fn processor_reservation_serializes_callers_and_is_released_with_its_guard() {
@@ -1039,25 +1093,6 @@ mod tests {
     }
 
     #[test]
-    fn unconfirmed_termination_quarantines_the_processor_before_releasing_the_guard() {
-        tauri::async_runtime::block_on(async {
-            let processor = ImagingProcessor::with_capacity(2);
-            let reservation = processor
-                .reserve()
-                .await
-                .expect("a healthy Processor can be reserved");
-
-            reservation.quarantine();
-            drop(reservation);
-
-            assert!(
-                processor.reserve().await.is_err(),
-                "a new sidecar cannot start after termination became unconfirmed"
-            );
-        });
-    }
-
-    #[test]
     fn transport_failure_marks_the_shared_processor_quarantine() {
         tauri::async_runtime::block_on(async {
             let processor = ImagingProcessor::with_capacity(2);
@@ -1117,19 +1152,6 @@ mod tests {
     }
 
     #[test]
-    fn processor_exit_codes_remain_typed_at_the_host_boundary() {
-        let failure = InvocationFailure::deterministic(ImagingFailureStage::SourceDecode, 4242);
-
-        assert_eq!(
-            failure.stage,
-            InvocationFailureStage::Processor(ImagingFailureStage::SourceDecode)
-        );
-        assert_eq!(failure.stage.as_str(), "source_decode");
-        assert_eq!(failure.process_id, Some(4242));
-        assert!(!failure.is_unexpected_termination());
-    }
-
-    #[test]
     fn collected_process_status_uses_the_same_recovery_classification_for_every_adapter() {
         let unexpected =
             complete_invocation(4242, Some(1), b"").expect_err("an abrupt exit is a failure");
@@ -1146,6 +1168,8 @@ mod tests {
             deterministic.stage,
             InvocationFailureStage::Processor(ImagingFailureStage::SourceDecode)
         );
+        assert_eq!(deterministic.stage.as_str(), "source_decode");
+        assert_eq!(deterministic.process_id, Some(4343));
     }
 
     #[test]
@@ -1241,7 +1265,7 @@ mod tests {
                 .expect("the second raw chunk is delivered");
 
             assert_eq!(
-                receive_processor_handshake(&mut events, "launch_47", 47)
+                receive_processor_handshake(&mut events, "launch_47", 47, HANDSHAKE_WAIT)
                     .await
                     .expect("the fragmented handshake is decoded"),
                 process
@@ -1261,10 +1285,317 @@ mod tests {
                 .await
                 .expect("the raw handshake is delivered");
 
-            let failure = receive_processor_handshake(&mut events, "launch_47", 47)
+            let failure = receive_processor_handshake(&mut events, "launch_47", 47, HANDSHAKE_WAIT)
                 .await
                 .expect_err("a handshake from another launch is rejected");
             assert_eq!(failure.stage, InvocationFailureStage::SpawnSidecar);
+            assert!(!failure.termination_observed);
+        });
+    }
+
+    const PROCESS_ID: u32 = 4242;
+
+    fn terminated(code: Option<i32>) -> CommandEvent {
+        CommandEvent::Terminated(TerminatedPayload { code, signal: None })
+    }
+
+    fn stream_response() -> ImagingResponse {
+        ImagingResponse::single_output_completed(
+            "render-stream",
+            RenderCompletion {
+                width_px: 10,
+                height_px: 5,
+                dpi: 25,
+                source_count: 1,
+                source_bytes: 100,
+                output_bytes: 200,
+                output_sha256: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+                    .into(),
+            },
+        )
+    }
+
+    fn stream_progress() -> ImagingProgress {
+        ImagingProgress::new("render-stream", ImagingProgressStage::LoadingSources, 1, 1)
+            .expect("the progress fixture is valid")
+    }
+
+    fn stdout(event: &ImagingEvent) -> CommandEvent {
+        CommandEvent::Stdout(encode_event(event).expect("the event fixture serializes"))
+    }
+
+    /// Runs the production event loop over scripted events. An open channel is
+    /// a process that has neither exited nor closed its streams.
+    fn invocation_events_end(
+        events: Vec<CommandEvent>,
+        channel_stays_open: bool,
+        control: InvocationControl<'_>,
+    ) -> InvocationEventsEnd {
+        tauri::async_runtime::block_on(async {
+            let (sender, mut receiver) = tauri::async_runtime::channel(events.len().max(1));
+            for event in events {
+                sender.send(event).await.expect("the event is queued");
+            }
+            let _open = channel_stays_open.then_some(sender);
+            let decoder = ImagingEventStreamDecoder::for_request("render-stream")
+                .expect("the request is valid");
+            let context = InvocationContext::new("render-stream", None::<String>);
+            tokio::time::timeout(
+                Duration::from_secs(30),
+                receive_invocation_events(&mut receiver, decoder, &context, control, PROCESS_ID),
+            )
+            .await
+            .expect("the scripted stream reaches a terminal")
+        })
+    }
+
+    fn closed_stream(events: Vec<CommandEvent>) -> Result<ImagingResponse, InvocationFailure> {
+        let cancellation = AtomicBool::new(false);
+        let control = InvocationControl::controlled(&cancellation, &|_| {});
+        match invocation_events_end(events, false, control) {
+            InvocationEventsEnd::Closed(result) => result,
+            end => panic!("the stream ended by itself: {end:?}"),
+        }
+    }
+
+    #[test]
+    fn a_cancelled_invocation_hands_the_running_process_back_for_termination() {
+        let cancellation = AtomicBool::new(true);
+        let control = InvocationControl::controlled(&cancellation, &|_| {});
+        assert!(matches!(
+            invocation_events_end(vec![], true, control),
+            InvocationEventsEnd::Cancelled
+        ));
+
+        // A cancellation raised while events are flowing stops before the response.
+        let cancellation = AtomicBool::new(false);
+        let cancel_on_progress = |_| cancellation.store(true, super::Ordering::Release);
+        let control = InvocationControl::controlled(&cancellation, &cancel_on_progress);
+        assert!(matches!(
+            invocation_events_end(
+                vec![stdout(&ImagingEvent::Progress(stream_progress()))],
+                true,
+                control
+            ),
+            InvocationEventsEnd::Cancelled
+        ));
+    }
+
+    #[test]
+    fn an_invalid_event_hands_the_running_process_back_for_termination() {
+        let cancellation = AtomicBool::new(false);
+        let control = InvocationControl::controlled(&cancellation, &|_| {});
+        assert!(matches!(
+            invocation_events_end(
+                vec![CommandEvent::Stdout(b"not an imaging event\n".to_vec())],
+                true,
+                control
+            ),
+            InvocationEventsEnd::InvalidEvent(_)
+        ));
+    }
+
+    #[test]
+    fn a_stream_that_closes_without_a_terminated_event_never_confirms_the_termination() {
+        for events in [
+            vec![],
+            vec![CommandEvent::Error("the pipe broke".into())],
+            // Even a complete response does not prove that the process is gone.
+            vec![stdout(&ImagingEvent::Response(stream_response()))],
+        ] {
+            let failure = closed_stream(events).expect_err("the process may still be running");
+            assert_eq!(
+                failure.stage,
+                InvocationFailureStage::TerminationUnconfirmed
+            );
+            assert!(failure.is_termination_unconfirmed());
+            assert!(!failure.termination_observed);
+            assert!(!failure.is_unexpected_termination());
+            assert_eq!(failure.process_id, Some(PROCESS_ID));
+            assert_eq!(failure.exit_code, None);
+        }
+    }
+
+    #[test]
+    fn a_stream_error_followed_by_a_confirmed_termination_is_a_read_failure() {
+        for events in [
+            vec![
+                CommandEvent::Error("the pipe broke".into()),
+                terminated(Some(0)),
+            ],
+            vec![
+                stdout(&ImagingEvent::Response(stream_response())),
+                CommandEvent::Error("the pipe broke".into()),
+                terminated(Some(0)),
+            ],
+        ] {
+            let failure = closed_stream(events).expect_err("the response cannot be trusted");
+            assert_eq!(failure.stage, InvocationFailureStage::ReadResponse);
+            assert!(failure.termination_observed);
+            assert!(!failure.is_termination_unconfirmed());
+            assert_eq!(failure.exit_code, Some(0));
+            assert_eq!(failure.process_id, Some(PROCESS_ID));
+        }
+    }
+
+    #[test]
+    fn a_confirmed_non_zero_exit_is_classified_by_its_exit_code() {
+        let typed = i32::from(ImagingFailureStage::SourceDecode.exit_code());
+        for (code, stage, unexpected) in [
+            (Some(1), InvocationFailureStage::ImagingProcess, true),
+            (None, InvocationFailureStage::ImagingProcess, true),
+            (
+                Some(typed),
+                InvocationFailureStage::Processor(ImagingFailureStage::SourceDecode),
+                false,
+            ),
+        ] {
+            // A response written before a failing exit is not a success.
+            let failure = closed_stream(vec![
+                stdout(&ImagingEvent::Response(stream_response())),
+                terminated(code),
+            ])
+            .expect_err("a failing exit is a failure");
+            assert_eq!(failure.stage, stage, "{code:?}");
+            assert_eq!(failure.exit_code, code);
+            assert!(failure.termination_observed, "{code:?}");
+            assert!(!failure.is_termination_unconfirmed(), "{code:?}");
+            assert_eq!(failure.is_unexpected_termination(), unexpected, "{code:?}");
+        }
+    }
+
+    #[test]
+    fn a_clean_exit_returns_the_response_after_reporting_its_progress() {
+        let progress = [
+            stream_progress(),
+            ImagingProgress::new("render-stream", ImagingProgressStage::Composing, 2, 2).unwrap(),
+            ImagingProgress::new("render-stream", ImagingProgressStage::EncodingOutput, 1, 1)
+                .unwrap(),
+        ];
+        let mut stream = Vec::new();
+        for event in &progress {
+            stream.extend(encode_event(&ImagingEvent::Progress(event.clone())).unwrap());
+        }
+        stream.extend(encode_event(&ImagingEvent::Response(stream_response())).unwrap());
+        let split = stream.len() / 2;
+        let reported = Mutex::new(Vec::new());
+        let collect = |event| reported.lock().unwrap().push(event);
+        let cancellation = AtomicBool::new(false);
+        let control = InvocationControl::controlled(&cancellation, &collect);
+
+        let end = invocation_events_end(
+            vec![
+                CommandEvent::Stdout(stream[..split].to_vec()),
+                CommandEvent::Stderr(b"diagnostic".to_vec()),
+                CommandEvent::Stdout(stream[split..].to_vec()),
+                terminated(Some(0)),
+            ],
+            true,
+            control,
+        );
+
+        let InvocationEventsEnd::Closed(Ok(response)) = end else {
+            panic!("a clean exit with a response succeeds: {end:?}");
+        };
+        assert_eq!(response, stream_response());
+        assert_eq!(reported.into_inner().unwrap(), progress);
+    }
+
+    #[test]
+    fn a_clean_exit_without_a_response_is_a_decode_failure() {
+        let failure = closed_stream(vec![terminated(Some(0))])
+            .expect_err("an exit without a response is not a success");
+        assert_eq!(failure.stage, InvocationFailureStage::DecodeResponse);
+        assert!(!failure.is_termination_unconfirmed());
+    }
+
+    /// The channel stays open, so a decision other than the timeout must come
+    /// from the scripted events well before `HANDSHAKE_WAIT`.
+    fn handshake_failure(events: Vec<CommandEvent>, close_channel: bool) -> InvocationFailure {
+        tauri::async_runtime::block_on(async {
+            let (sender, mut receiver) = tauri::async_runtime::channel(events.len().max(1));
+            for event in events {
+                sender.send(event).await.expect("the event is queued");
+            }
+            let _open = (!close_channel).then_some(sender);
+            tokio::time::timeout(
+                Duration::from_secs(10),
+                receive_processor_handshake(&mut receiver, "launch_47", 47, HANDSHAKE_WAIT),
+            )
+            .await
+            .expect("the handshake is decided by its events, not by the timeout")
+            .expect_err("the handshake is refused")
+        })
+    }
+
+    #[test]
+    fn a_handshake_larger_than_the_limit_is_refused_while_the_process_still_runs() {
+        let limit = myalbuns_imaging_protocol::PROCESSOR_HANDSHAKE_MAX_BYTES;
+        for chunks in [vec![limit + 1], vec![limit, 1]] {
+            let failure = handshake_failure(
+                chunks
+                    .into_iter()
+                    .map(|bytes| CommandEvent::Stdout(vec![b'x'; bytes]))
+                    .collect(),
+                false,
+            );
+            assert_eq!(failure.stage, InvocationFailureStage::SpawnSidecar);
+            assert!(
+                !failure.termination_observed,
+                "the caller still has to terminate the process"
+            );
+        }
+    }
+
+    #[test]
+    fn a_process_that_exits_during_the_handshake_needs_no_termination() {
+        let typed = i32::from(ImagingFailureStage::SourceDecode.exit_code());
+        for (code, stage) in [
+            (Some(1), InvocationFailureStage::ImagingProcess),
+            (None, InvocationFailureStage::ImagingProcess),
+            (
+                Some(typed),
+                InvocationFailureStage::Processor(ImagingFailureStage::SourceDecode),
+            ),
+        ] {
+            let failure = handshake_failure(
+                vec![CommandEvent::Stdout(b"partial".to_vec()), terminated(code)],
+                false,
+            );
+            assert!(failure.termination_observed, "{code:?}");
+            assert_eq!(failure.stage, stage);
+            assert_eq!(failure.exit_code, code);
+            assert_eq!(failure.process_id, Some(47));
+        }
+    }
+
+    #[test]
+    fn a_handshake_channel_that_closes_or_fails_leaves_the_termination_to_the_caller() {
+        for (events, close_channel) in [
+            (vec![], true),
+            (vec![CommandEvent::Stdout(b"partial".to_vec())], true),
+            (vec![CommandEvent::Error("the pipe broke".into())], false),
+        ] {
+            let failure = handshake_failure(events, close_channel);
+            assert_eq!(failure.stage, InvocationFailureStage::SpawnSidecar);
+            assert!(!failure.termination_observed);
+            assert!(!failure.is_termination_unconfirmed());
+        }
+    }
+
+    #[test]
+    fn a_silent_processor_fails_the_handshake_when_the_wait_elapses() {
+        tauri::async_runtime::block_on(async {
+            let (_sender, mut events) = tauri::async_runtime::channel::<CommandEvent>(1);
+            let failure =
+                receive_processor_handshake(&mut events, "launch_47", 47, Duration::from_millis(1))
+                    .await
+                    .expect_err("a handshake that never arrives is refused");
+            assert_eq!(failure.stage, InvocationFailureStage::SpawnSidecar);
+            assert!(
+                !failure.termination_observed,
+                "the silent process still has to be terminated"
+            );
         });
     }
 

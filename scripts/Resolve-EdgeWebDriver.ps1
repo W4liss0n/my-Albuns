@@ -26,11 +26,22 @@ $driverExecutable = Join-Path $driverRoot 'msedgedriver.exe'
 if (-not (Test-Path -LiteralPath $driverExecutable -PathType Leaf)) {
     New-Item -ItemType Directory -Force -Path $driverRoot | Out-Null
     $archive = Join-Path $driverRoot 'edgedriver_win64.zip'
-    Invoke-WebRequest `
-        -UseBasicParsing `
-        -Uri "https://msedgedriver.microsoft.com/$edgeVersion/edgedriver_win64.zip" `
-        -OutFile $archive `
-        -TimeoutSec 120
+    for ($attempt = 1; ; $attempt++) {
+        try {
+            Invoke-WebRequest `
+                -UseBasicParsing `
+                -Uri "https://msedgedriver.microsoft.com/$edgeVersion/edgedriver_win64.zip" `
+                -OutFile $archive `
+                -TimeoutSec 120
+            break
+        }
+        catch {
+            if ($attempt -ge 3) {
+                throw
+            }
+            Start-Sleep -Seconds (5 * $attempt)
+        }
+    }
     Expand-Archive -LiteralPath $archive -DestinationPath $driverRoot -Force
 }
 if (-not (Test-Path -LiteralPath $driverExecutable -PathType Leaf)) {

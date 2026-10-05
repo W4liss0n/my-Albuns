@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render } from "@testing-library/react";
 import { describe, expect, test, vi } from "vitest";
 
 import type { ContinuousCanvasLayout } from "./canvasGeometry";
@@ -39,26 +39,5 @@ describe("CanvasHorizontalScrollbar", () => {
       left: "200px",
       width: "200px",
     });
-  });
-
-  test("does not render permanent previous or next Sheet controls", () => {
-    render(
-      <CanvasHorizontalScrollbar
-        centeredSheetId="sheet-2"
-        layout={layout}
-        metrics={{ scale: 1, width: 600, height: 500 }}
-        mode={{ kind: "normal" }}
-        viewport={{ offsetX: 0 }}
-        onCenteredSheetChange={vi.fn()}
-        onViewportChange={vi.fn()}
-      />,
-    );
-
-    expect(
-      screen.queryByRole("button", { name: "Lâmina anterior" }),
-    ).not.toBeInTheDocument();
-    expect(
-      screen.queryByRole("button", { name: "Próxima lâmina" }),
-    ).not.toBeInTheDocument();
   });
 });

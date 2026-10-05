@@ -1,11 +1,11 @@
 import { act, fireEvent, waitFor } from "@testing-library/react";
 import { expect, test, vi } from "vitest";
-import { frameGeometryPreview } from "../../test/frameGeometryPreview";
-import type { ComposedFrame, FrameGeometryEdit } from "../../domain/project";
-import { interactiveComposition } from "./albumCanvasTestFixtures";
 import {
   displayWithLabel, finishPixiInitialization, getPixiLifecycle, renderCanvas, setupAlbumCanvasTestHarness,
 } from "./albumCanvasTestHarness";
+import { frameGeometryPreview } from "../../test/frameGeometryPreview";
+import type { ComposedFrame, FrameGeometryEdit } from "../../domain/project";
+import { interactiveComposition } from "./albumCanvasTestFixtures";
 
 setupAlbumCanvasTestHarness();
 

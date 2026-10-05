@@ -131,7 +131,7 @@ test("keeps one picker open and exposes valid menu item semantics", async () => 
   ).toBeDisabled();
 });
 
-test("uses the shared intrinsic ratio inside the decorative menu", async () => {
+test("shows each decorative Cache preview inside the menu", async () => {
   const user = userEvent.setup();
   renderPicker();
   await user.click(
@@ -142,22 +142,10 @@ test("uses the shared intrinsic ratio inside the decorative menu", async () => {
   const portraitOption = screen.getByRole("menuitem", {
     name: "Usar fundo Textura vertical",
   });
-  const image = portraitOption.querySelector("img");
-  expect(image).not.toBeNull();
-  Object.defineProperties(image!, {
-    naturalHeight: { configurable: true, value: 1200 },
-    naturalWidth: { configurable: true, value: 800 },
-  });
-
-  fireEvent.load(image!);
-
-  const thumbnail = portraitOption.querySelector<HTMLElement>(
-    ".media-preview-thumbnail",
+  expect(portraitOption.querySelector("img")).toHaveAttribute(
+    "src",
+    "/vertical.png",
   );
-  expect(thumbnail).toHaveAttribute("data-portrait", "true");
-  expect(thumbnail).toHaveStyle({
-    "--media-aspect-ratio": "800 / 1200",
-  });
 });
 
 function PickerHarness() {

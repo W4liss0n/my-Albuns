@@ -127,7 +127,7 @@ try {
       window.fitting.presentation.state=arguments[0];
       window.fitting.presentation.windowWidth=arguments[1];
       document.querySelector('iframe').contentWindow.presentFittingState(window.fitting.presentation);`, [scenario.state, scenario.width ?? 800]);
-    let result;
+    let result, settled = false;
     const deadline = Date.now() + 4_500;
     do {
       await new Promise(resolve => setTimeout(resolve, 100));
@@ -144,8 +144,11 @@ try {
           firstRowVisible:rowBox?Math.max(0,Math.min(rowBox.bottom,box.bottom)-Math.max(rowBox.top,box.top)):0,
           rowHeight:rowBox?.height??0,footerBottom:footer?.bottom??0,
           scrollHeight:scroll?.clientHeight??0,screenLimit:frame.contentWindow.screen.availHeight-64};`);
-      if (result.ready && (result.fits.length > 0 || scenario.stableWindow) && Date.now() - result.lastFit > 250) break;
-    } while (Date.now() < deadline);
+      settled = result.ready && (result.fits.length > 0 || scenario.stableWindow) && Date.now() - result.lastFit > 250;
+    } while (!settled && Date.now() < deadline);
+    // A state that must keep the opening size has no fit to wait for: it is
+    // observed for the whole window so a late resize is still caught.
+    assert.ok(settled || scenario.preserveOpeningSize, `${scenario.id}: the dialog did not settle before its geometry was read`);
     results.push({ id: scenario.id, ...result });
     writeFileSync(path.join(output, "results.json"), JSON.stringify(results, null, 2));
     writeFileSync(path.join(output, `${scenario.id}.png`), Buffer.from(await request("GET", `/session/${sessionId}/screenshot`), "base64"));

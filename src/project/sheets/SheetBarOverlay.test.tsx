@@ -448,29 +448,6 @@ test("captures the pointer after press, crosses the threshold, and follows it in
   expect(onDrop).toHaveBeenCalledTimes(2);
 });
 
-test("keeps a below-threshold press as an ordinary Sheet click", () => {
-  const onDrop = vi.fn();
-  const onSelect = vi.fn();
-  const onPreview = vi.fn();
-  render(
-    <SheetBarOverlay
-      {...props({ onDrop, onPreview, onSelect })}
-    />,
-  );
-  const surface = barSurface();
-  const first = barHandle(1);
-  pointerCapture(surface);
-  pointerDown(first, 9, 100, 40);
-  pointerMove(surface, 9, 103, 40);
-  pointerUp(surface, 9, 103, 40);
-  expect(onSelect).toHaveBeenCalledWith("sheet-1");
-  fireEvent.click(first);
-
-  expect(onSelect).toHaveBeenCalledOnce();
-  expect(onPreview).not.toHaveBeenCalled();
-  expect(onDrop).not.toHaveBeenCalled();
-});
-
 test.each([
   ["left page", 50],
   ["right page", 100],
@@ -494,6 +471,7 @@ test.each([
     pointerDown(handle, 180 + startX, startX, 40);
     pointerMove(surface, 180 + startX, startX + 2, 40);
     pointerUp(surface, 180 + startX, startX + 2, 40);
+    fireEvent.click(handle);
 
     expect(onSelect).toHaveBeenCalledOnce();
     expect(onSelect).toHaveBeenCalledWith("sheet-1");

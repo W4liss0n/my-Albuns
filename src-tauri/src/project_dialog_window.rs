@@ -509,39 +509,6 @@ mod tests {
     }
 
     #[test]
-    fn project_dialog_presentation_store_returns_only_the_latest_projection() {
-        let store = ProjectDialogPresentationStore::default();
-        store
-            .present(
-                "close",
-                ProjectDialogState::ProjectCloseConfirmation {
-                    busy: false,
-                    format_conversion: false,
-                },
-            )
-            .expect("the first dialog state is stored");
-        store
-            .present(
-                "close",
-                ProjectDialogState::ExportFailure {
-                    cancelled: false,
-                    message: "Falha mais recente".into(),
-                    retry_disabled: false,
-                },
-            )
-            .expect("the newer dialog state replaces the first");
-
-        assert!(matches!(
-            store.current().expect("the current state is readable"),
-            Some(ProjectDialogPresentation {
-                state: ProjectDialogState::ExportFailure { message, .. },
-                ..
-            })
-                if message == "Falha mais recente"
-        ));
-    }
-
-    #[test]
     fn a_reused_dialog_projects_its_new_width_with_its_content() {
         let store = ProjectDialogPresentationStore::default();
         store

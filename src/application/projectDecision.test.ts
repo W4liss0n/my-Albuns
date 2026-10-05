@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { expect, test, vi } from "vitest";
 import type { ProjectDialogAction, ProjectDialogPort } from "./projectDialogPort";
 import { createProjectDecisions } from "./projectDecision";

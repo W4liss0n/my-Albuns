@@ -171,31 +171,42 @@ impl RecentProjectsStore {
             Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(Vec::new()),
             Err(error) => return Err(RecentProjectsError::Io(error)),
         };
-        let envelope: RecentProjectsEnvelope =
-            serde_json::from_slice(&bytes).map_err(|_| RecentProjectsError::InvalidState)?;
-        if envelope.schema_version != RECENT_PROJECTS_SCHEMA_VERSION
-            || envelope
-                .projects
-                .iter()
-                .filter(|project| !project.favorite)
-                .count()
-                > MAX_RECENT_PROJECTS
-            || envelope
-                .projects
-                .iter()
-                .any(|project| project.project_id.is_empty())
-        {
-            return Err(RecentProjectsError::InvalidState);
-        }
-        let mut identities = std::collections::HashSet::new();
-        if !envelope
-            .projects
+        // Content this version cannot read is an empty list, and the next write
+        // replaces it: nobody has to delete this file by hand.
+        let Some(mut projects) = serde_json::from_slice::<RecentProjectsEnvelope>(&bytes)
+            .ok()
+            .filter(|envelope| envelope.schema_version == RECENT_PROJECTS_SCHEMA_VERSION)
+            .map(|envelope| envelope.projects)
+        else {
+            tracing::warn!(
+                target: "myalbuns.desktop",
+                event = "recent_projects_unreadable_content_discarded",
+            );
+            return Ok(Vec::new());
+        };
+        // A readable list keeps every record that is still valid, in stored
+        // order: the first of each identity, a favorite if any of its records
+        // was one, then the usual limit.
+        let stored = projects.len();
+        let favorites: std::collections::HashSet<String> = projects
             .iter()
-            .all(|project| identities.insert(project.project_id.as_str()))
-        {
-            return Err(RecentProjectsError::InvalidState);
+            .filter(|project| project.favorite)
+            .map(|project| project.project_id.clone())
+            .collect();
+        let mut identities = std::collections::HashSet::new();
+        projects.retain_mut(|project| {
+            project.favorite = favorites.contains(&project.project_id);
+            !project.project_id.is_empty() && identities.insert(project.project_id.clone())
+        });
+        retain_recent_and_favorites(&mut projects);
+        if projects.len() != stored {
+            tracing::warn!(
+                target: "myalbuns.desktop",
+                dropped_records = stored - projects.len(),
+                event = "recent_projects_invalid_records_dropped",
+            );
         }
-        Ok(envelope.projects)
+        Ok(projects)
     }
 
     fn publish(&self, envelope: &RecentProjectsEnvelope) -> Result<(), RecentProjectsError> {
@@ -230,11 +241,11 @@ fn display_name(path: &Path) -> String {
 
 #[cfg(test)]
 mod tests {
-    use std::path::PathBuf;
+    use std::path::{Path, PathBuf};
 
     use myalbuns_paths::{AppPaths, NativePathDto};
 
-    use super::RecentProjectsStore;
+    use super::{RecentProjectSummary, RecentProjectsStore};
 
     #[test]
     fn a_failed_promotion_keeps_the_previous_list_and_can_be_retried() {
@@ -500,5 +511,261 @@ mod tests {
         store.promote("new", path).unwrap();
         assert_eq!(store.list().unwrap().len(), 1);
         assert!(!store.list().unwrap()[0].favorite);
+    }
+
+    // -----------------------------------------------------------------------
+    // Content that cannot be read as stored heals on the next write
+
+    fn stored_record(root: &Path, id: &str, favorite: bool) -> serde_json::Value {
+        serde_json::json!({
+            "projectId": id,
+            "path": NativePathDto::from(root.join(format!("{id}.myalbuns"))),
+            "lastOpenedAtMs": 1,
+            "favorite": favorite,
+        })
+    }
+
+    fn stored_file(projects: Vec<serde_json::Value>) -> Vec<u8> {
+        serde_json::to_vec_pretty(&serde_json::json!({ "schemaVersion": 1, "projects": projects }))
+            .unwrap()
+    }
+
+    fn store_with_content(content: &[u8]) -> (tempfile::TempDir, PathBuf, RecentProjectsStore) {
+        let root = tempfile::tempdir().unwrap();
+        let paths = AppPaths::from_roots(root.path(), root.path());
+        let file = paths.recent_projects_file();
+        std::fs::create_dir_all(file.parent().unwrap()).unwrap();
+        std::fs::write(&file, content).unwrap();
+        let store = RecentProjectsStore::new(&paths);
+        (root, file, store)
+    }
+
+    fn ids(list: &[RecentProjectSummary]) -> Vec<&str> {
+        list.iter().map(|item| item.id.as_str()).collect()
+    }
+
+    /// Reads the file as any later version would: a current envelope with
+    /// distinct, named identities within the limit.
+    fn valid_stored_ids(file: &Path) -> Vec<String> {
+        let stored: serde_json::Value =
+            serde_json::from_slice(&std::fs::read(file).unwrap()).expect("the file is JSON");
+        assert_eq!(stored["schemaVersion"], 1);
+        let projects = stored["projects"].as_array().expect("the list is stored");
+        let ids: Vec<String> = projects
+            .iter()
+            .map(|project| project["projectId"].as_str().unwrap().to_owned())
+            .collect();
+        assert!(ids.iter().all(|id| !id.is_empty()));
+        assert_eq!(
+            ids.iter().collect::<std::collections::HashSet<_>>().len(),
+            ids.len()
+        );
+        assert!(
+            projects
+                .iter()
+                .filter(|project| project["favorite"] != true)
+                .count()
+                <= super::MAX_RECENT_PROJECTS
+        );
+        ids
+    }
+
+    /// Lists the stored content, promotes one more Project and reopens the
+    /// list, returning what was listed before and after the promotion.
+    fn heal_by_promoting(content: &[u8]) -> (Vec<RecentProjectSummary>, Vec<RecentProjectSummary>) {
+        let (root, file, store) = store_with_content(content);
+
+        let healed = store.list().expect("unreadable content is not an error");
+        assert_eq!(
+            std::fs::read(&file).unwrap(),
+            content,
+            "listing never rewrites the file"
+        );
+
+        store
+            .promote(
+                "promoted",
+                NativePathDto::from(root.path().join("Promovido.myalbuns")),
+            )
+            .expect("the next promotion replaces the stored content");
+        let stored = valid_stored_ids(&file);
+        assert_eq!(stored[0], "promoted");
+        let reopened = store.list().expect("the replaced content is readable");
+        assert_eq!(ids(&reopened), stored);
+        (healed, reopened)
+    }
+
+    #[test]
+    fn a_truncated_file_is_an_empty_list_that_the_next_promotion_replaces() {
+        let root = tempfile::tempdir().unwrap();
+        let complete = stored_file(vec![stored_record(root.path(), "first", true)]);
+
+        for content in [&complete[..complete.len() / 2], b"not JSON", b""] {
+            let (healed, reopened) = heal_by_promoting(content);
+            assert!(healed.is_empty());
+            assert_eq!(ids(&reopened), ["promoted"]);
+        }
+    }
+
+    #[test]
+    fn another_schema_version_is_an_empty_list_that_the_next_promotion_replaces() {
+        let root = tempfile::tempdir().unwrap();
+        let other_version = serde_json::to_vec(&serde_json::json!({
+            "schemaVersion": 2,
+            "projects": [stored_record(root.path(), "first", true)],
+        }))
+        .unwrap();
+
+        let (healed, reopened) = heal_by_promoting(&other_version);
+
+        assert!(healed.is_empty());
+        assert_eq!(ids(&reopened), ["promoted"]);
+    }
+
+    #[test]
+    fn a_list_over_the_limit_keeps_its_favorites_and_the_first_recent_projects() {
+        let root = tempfile::tempdir().unwrap();
+        let mut projects: Vec<_> = (0..25)
+            .map(|index| stored_record(root.path(), &format!("recent-{index}"), false))
+            .collect();
+        projects.push(stored_record(root.path(), "keeper", true));
+
+        let (healed, reopened) = heal_by_promoting(&stored_file(projects));
+
+        let mut expected: Vec<String> = (0..20).map(|index| format!("recent-{index}")).collect();
+        expected.push("keeper".into());
+        assert_eq!(ids(&healed), expected);
+        assert!(healed.last().unwrap().favorite);
+        // The promoted Project takes the place of the last one kept.
+        expected.remove(19);
+        expected.insert(0, "promoted".into());
+        assert_eq!(ids(&reopened), expected);
+        assert!(reopened.last().unwrap().favorite);
+    }
+
+    #[test]
+    fn a_record_without_identity_is_dropped_and_the_others_are_kept() {
+        let root = tempfile::tempdir().unwrap();
+        let content = stored_file(vec![
+            stored_record(root.path(), "first", false),
+            stored_record(root.path(), "", true),
+            stored_record(root.path(), "second", true),
+        ]);
+
+        let (healed, reopened) = heal_by_promoting(&content);
+
+        assert_eq!(ids(&healed), ["first", "second"]);
+        assert_eq!(ids(&reopened), ["promoted", "first", "second"]);
+        assert!(!reopened[1].favorite);
+        assert!(reopened[2].favorite);
+    }
+
+    #[test]
+    fn a_repeated_identity_keeps_its_first_record_and_its_favorite_mark() {
+        let root = tempfile::tempdir().unwrap();
+        let mut repeated = stored_record(root.path(), "first", true);
+        repeated["path"] =
+            serde_json::json!(NativePathDto::from(root.path().join("Outro.myalbuns")));
+        let content = stored_file(vec![
+            stored_record(root.path(), "first", false),
+            stored_record(root.path(), "second", false),
+            repeated,
+        ]);
+
+        let (healed, reopened) = heal_by_promoting(&content);
+
+        assert_eq!(ids(&healed), ["first", "second"]);
+        assert_eq!(healed[0].name, "first");
+        assert!(healed[0].favorite, "a favorite mark is never dropped");
+        assert!(!healed[1].favorite);
+        assert_eq!(ids(&reopened), ["promoted", "first", "second"]);
+        assert!(reopened[1].favorite);
+    }
+
+    #[test]
+    fn changing_a_favorite_replaces_content_with_invalid_records() {
+        let root = tempfile::tempdir().unwrap();
+        let (_root, file, store) = store_with_content(&stored_file(vec![
+            stored_record(root.path(), "first", false),
+            stored_record(root.path(), "first", false),
+            stored_record(root.path(), "", false),
+        ]));
+
+        let listed = store
+            .set_favorite("first", true)
+            .expect("the kept record becomes a favorite");
+
+        assert_eq!(ids(&listed), ["first"]);
+        assert!(listed[0].favorite);
+        assert_eq!(valid_stored_ids(&file), ["first"]);
+        assert_eq!(ids(&store.list().unwrap()), ["first"]);
+    }
+
+    #[test]
+    fn a_favorite_cannot_be_changed_in_unreadable_content() {
+        let (_root, file, store) = store_with_content(b"not JSON");
+
+        // The Project is not in the empty list, as with a healthy file.
+        assert!(matches!(
+            store.set_favorite("first", true),
+            Err(super::RecentProjectsError::InvalidState)
+        ));
+        assert_eq!(std::fs::read(&file).unwrap(), b"not JSON");
+    }
+
+    #[test]
+    fn a_file_that_cannot_be_read_stays_an_error() {
+        let root = tempfile::tempdir().unwrap();
+        let paths = AppPaths::from_roots(root.path(), root.path());
+        let file = paths.recent_projects_file();
+        std::fs::create_dir_all(&file).expect("a directory occupies the State file path");
+        let store = RecentProjectsStore::new(&paths);
+
+        assert!(matches!(
+            store.list(),
+            Err(super::RecentProjectsError::Io(_))
+        ));
+        assert!(matches!(
+            store.path_for("first"),
+            Err(super::RecentProjectsError::Io(_))
+        ));
+        assert!(matches!(
+            store.promote(
+                "first",
+                NativePathDto::from(root.path().join("first.myalbuns"))
+            ),
+            Err(super::RecentProjectsError::Io(_))
+        ));
+        assert!(matches!(
+            store.set_favorite("first", true),
+            Err(super::RecentProjectsError::Io(_))
+        ));
+        assert!(file.is_dir());
+    }
+
+    #[test]
+    fn promoting_without_an_identity_is_refused_and_writes_nothing() {
+        let root = tempfile::tempdir().unwrap();
+        let paths = AppPaths::from_roots(root.path(), root.path());
+        let store = RecentProjectsStore::new(&paths);
+
+        assert!(matches!(
+            store.promote("", NativePathDto::from(root.path().join("Sem.myalbuns"))),
+            Err(super::RecentProjectsError::InvalidState)
+        ));
+        assert!(!paths.recent_projects_file().exists());
+
+        store
+            .promote(
+                "first",
+                NativePathDto::from(root.path().join("first.myalbuns")),
+            )
+            .unwrap();
+        let before = std::fs::read(paths.recent_projects_file()).unwrap();
+        assert!(matches!(
+            store.promote("", NativePathDto::from(root.path().join("Sem.myalbuns"))),
+            Err(super::RecentProjectsError::InvalidState)
+        ));
+        assert_eq!(std::fs::read(paths.recent_projects_file()).unwrap(), before);
     }
 }

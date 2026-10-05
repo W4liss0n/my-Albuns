@@ -38,6 +38,8 @@ use windows_sys::Win32::{
 
 static NEXT_CACHE_ID: AtomicU64 = AtomicU64::new(1);
 
+#[path = "cli/final_renderer_corpus.rs"]
+mod final_renderer_corpus;
 #[path = "cli/frame_editing.rs"]
 mod frame_editing;
 

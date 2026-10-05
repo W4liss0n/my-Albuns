@@ -27,6 +27,7 @@ use crate::imaging_processor::{
     ImagingOperation, ImagingTransport, InvocationContext, InvocationControl, InvocationFailure,
     InvocationFuture,
 };
+pub(crate) use recovery_tests::paused_export_failure;
 
 struct ScriptedTransport {
     prepared_path: PathBuf,
@@ -35,10 +36,10 @@ struct ScriptedTransport {
     invocations: usize,
 }
 
-struct AlbumTransport {
-    fail: Option<ImagingFailureCode>,
-    prior_output: PathBuf,
-    prior_bytes: Vec<u8>,
+pub(crate) struct AlbumTransport {
+    pub(crate) fail: Option<ImagingFailureCode>,
+    pub(crate) prior_output: PathBuf,
+    pub(crate) prior_bytes: Vec<u8>,
 }
 impl ImagingTransport for AlbumTransport {
     fn invoke<'a>(
@@ -1044,7 +1045,7 @@ fn render_descriptor_plan_freezes_identity_and_path_without_reading_sources() {
     );
 }
 
-fn productive_snapshot(source_path: PathBuf) -> RenderSnapshot {
+pub(crate) fn productive_snapshot(source_path: PathBuf) -> RenderSnapshot {
     let root = tempfile::tempdir().expect("temporary productive Project");
     let project_path = root.path().join("ExportFixture.myalbuns");
     let mut project_context = OperationPathContext::new();

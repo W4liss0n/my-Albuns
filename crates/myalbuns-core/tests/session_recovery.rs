@@ -2,7 +2,8 @@ use std::fs;
 
 use myalbuns_core::{
     CreateAuthorization, CreateProjectRequest, InitialProject, OpenProjectRequest, ProjectCore,
-    ProjectIntent, ProjectLocation, RecoveryCheckpoint, SaveProjectOutcome,
+    ProjectIntent, ProjectLocation, RecoveryCheckpoint, RecoveryCheckpointError,
+    SaveProjectOutcome,
 };
 use myalbuns_paths::OperationPathContext;
 
@@ -165,4 +166,184 @@ fn recovering_the_saved_revision_still_requires_an_explicit_save() {
         }
     );
     assert!(!reopened.projection().state.dirty);
+}
+
+// ---------------------------------------------------------------------------
+// Rejected checkpoints
+
+struct UnsavedProject {
+    core: ProjectCore,
+    path: std::path::PathBuf,
+    project: myalbuns_core::EditableProject,
+}
+
+/// A Project saved at revision 1 with one unsaved action after it.
+fn unsaved_project(root: &std::path::Path, name: &str) -> UnsavedProject {
+    let path = root.join(format!("{name}.myalbuns"));
+    let core = ProjectCore::new()
+        .with_identity_storage_roots(root.join("leases"), root.join("identities"));
+    let mut project = core
+        .create_editable(CreateProjectRequest::new(
+            project_location(&path),
+            InitialProject::neutral(),
+            CreateAuthorization::CreateOnly,
+        ))
+        .expect("the Project is created through ProjectCore");
+    project
+        .apply(ProjectIntent::SetDpi { dpi: 240 })
+        .expect("the base action is applied");
+    project.save(1).expect("the base revision is saved");
+    project
+        .apply(ProjectIntent::SetDpi { dpi: 360 })
+        .expect("one completed action remains unsaved");
+    UnsavedProject {
+        core,
+        path,
+        project,
+    }
+}
+
+#[test]
+fn a_checkpoint_changed_after_it_was_written_is_rejected_as_invalid() {
+    const ANOTHER_PROJECT_ID: &str = "c0000000-0000-4000-8000-000000000001";
+    let root = tempfile::tempdir().expect("temporary rejected checkpoint fixture");
+    let bytes = unsaved_project(root.path(), "Projeto")
+        .project
+        .recovery_checkpoint()
+        .expect("the consolidated state is captured")
+        .to_bytes()
+        .expect("the checkpoint serializes");
+    let written: serde_json::Value =
+        serde_json::from_slice(&bytes).expect("the checkpoint is JSON");
+    let project_id = written["projectId"]
+        .as_str()
+        .expect("the checkpoint names its Project")
+        .to_owned();
+    assert_ne!(project_id, ANOTHER_PROJECT_ID);
+    let changed = |change: &dyn Fn(&mut serde_json::Value)| {
+        let mut checkpoint = written.clone();
+        change(&mut checkpoint);
+        serde_json::to_vec(&checkpoint).expect("the changed checkpoint serializes")
+    };
+
+    // Rewriting the same content is accepted, so each rejection below comes
+    // from its one change.
+    RecoveryCheckpoint::from_bytes(&changed(&|_| {}))
+        .expect("the unchanged checkpoint is accepted");
+
+    let rejected = [
+        ("a truncated file", bytes[..bytes.len() / 2].to_vec()),
+        (
+            "a field outside the closed envelope",
+            changed(&|checkpoint| checkpoint["undo"] = serde_json::json!([])),
+        ),
+        (
+            "another envelope version",
+            changed(&|checkpoint| checkpoint["schemaVersion"] = serde_json::json!(2)),
+        ),
+        (
+            "a base revision beyond the safe integer range",
+            changed(&|checkpoint| {
+                checkpoint["baseRevision"]["revision"] =
+                    serde_json::json!(9_007_199_254_740_992_u64)
+            }),
+        ),
+        (
+            "a Project identity that is not canonical",
+            changed(&|checkpoint| {
+                checkpoint["projectId"] = serde_json::json!(project_id.to_uppercase());
+                checkpoint["baseRevision"]["projectId"] =
+                    serde_json::json!(project_id.to_uppercase());
+            }),
+        ),
+        (
+            "a base revision of another Project",
+            changed(&|checkpoint| {
+                checkpoint["baseRevision"]["projectId"] = serde_json::json!(ANOTHER_PROJECT_ID)
+            }),
+        ),
+        (
+            "a creative state that is not a Project document",
+            changed(&|checkpoint| {
+                checkpoint["creativeState"]["documentType"] = serde_json::json!("other")
+            }),
+        ),
+        (
+            "a creative state of another Project",
+            changed(&|checkpoint| {
+                checkpoint["creativeState"]["projectId"] = serde_json::json!(ANOTHER_PROJECT_ID)
+            }),
+        ),
+    ];
+    let not_rejected: Vec<&str> = rejected
+        .iter()
+        .filter(|(_, bytes)| {
+            RecoveryCheckpoint::from_bytes(bytes).err()
+                != Some(RecoveryCheckpointError::InvalidCheckpoint)
+        })
+        .map(|(case, _)| *case)
+        .collect();
+    assert!(not_rejected.is_empty(), "{not_rejected:?}");
+}
+
+#[test]
+fn a_checkpoint_of_another_project_is_not_restored() {
+    let root = tempfile::tempdir().expect("temporary identity mismatch fixture");
+    let mut first = unsaved_project(root.path(), "Primeiro");
+    let second = unsaved_project(root.path(), "Segundo");
+    let foreign = second
+        .project
+        .recovery_checkpoint()
+        .expect("the other Project is consolidated");
+    drop(first.project);
+    first.project = first
+        .core
+        .open_editable(OpenProjectRequest::new(project_location(&first.path)))
+        .expect("the first Project reopens at its saved revision");
+    let before = first.project.projection();
+
+    assert_eq!(
+        first.project.restore_recovery(foreign).err(),
+        Some(RecoveryCheckpointError::IdentityMismatch)
+    );
+    assert_eq!(first.project.projection(), before);
+}
+
+#[test]
+fn a_checkpoint_is_restored_only_over_the_saved_revision_it_derives_from() {
+    let root = tempfile::tempdir().expect("temporary baseline mismatch fixture");
+    let mut fixture = unsaved_project(root.path(), "Projeto");
+    let from_revision_1 = fixture
+        .project
+        .recovery_checkpoint()
+        .expect("the unsaved action is consolidated");
+    assert_eq!(from_revision_1.base_saved_revision(), 1);
+
+    // The live Session already has unsaved work over the same saved revision.
+    let unsaved = fixture.project.projection();
+    assert_eq!(
+        fixture
+            .project
+            .restore_recovery(from_revision_1.clone())
+            .err(),
+        Some(RecoveryCheckpointError::BaselineMismatch)
+    );
+    assert_eq!(fixture.project.projection(), unsaved);
+
+    // The saved revision advanced after the checkpoint was written.
+    fixture
+        .project
+        .save(2)
+        .expect("the saved revision advances");
+    drop(fixture.project);
+    let mut reopened = fixture
+        .core
+        .open_editable(OpenProjectRequest::new(project_location(&fixture.path)))
+        .expect("the Project reopens at the later saved revision");
+    let saved = reopened.projection();
+    assert_eq!(
+        reopened.restore_recovery(from_revision_1).err(),
+        Some(RecoveryCheckpointError::BaselineMismatch)
+    );
+    assert_eq!(reopened.projection(), saved);
 }

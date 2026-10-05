@@ -42,6 +42,33 @@ test("offers only the two external-copy terminals in one accessible external dia
   expect(saveCopyAs).toHaveFocus();
 });
 
+test.each([
+  ["Salvar cópia como…", "onSaveCopyAs"],
+  ["Cancelar", "onCancel"],
+] as const)("%s reports only %s", (label, callback) => {
+  const { props } = externalCopyDialog();
+
+  fireEvent.click(screen.getByRole("button", { name: label }));
+
+  for (const name of ["onCancel", "onSaveCopyAs"] as const) {
+    expect(props[name]).toHaveBeenCalledTimes(name === callback ? 1 : 0);
+  }
+});
+
+test.each([false, true])(
+  "shows the error inside the dialog (resolving: %s) and nothing when there is none",
+  (resolving) => {
+    const { props, view } = externalCopyDialog({ resolving, error: "Destino indisponível." });
+    const notice = screen.getByText("Destino indisponível.").closest(".ui-inline-notice");
+
+    expect(notice).toHaveClass("ui-inline-notice--error");
+    expect(screen.getByRole("dialog")).toContainElement(notice as HTMLElement);
+
+    view.rerender(<ExternalCopyDecisionDialog {...props} error={null} />);
+    expect(document.querySelector(".ui-inline-notice")).not.toBeInTheDocument();
+  },
+);
+
 test("prevents duplicate decisions while the same Host attempt is resolving", () => {
   const { props } = externalCopyDialog({ resolving: true });
   const dialog = screen.getByRole("dialog", {

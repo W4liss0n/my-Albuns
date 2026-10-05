@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { beforeEach, expect, test, vi } from "vitest";
 import { invoke } from "@tauri-apps/api/core";
 import { parsePhotoshopStatus, tauriPhotoshopPort, tauriPhotoshopSettingsPort } from "./tauriPhotoshopPort";

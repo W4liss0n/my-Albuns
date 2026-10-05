@@ -348,8 +348,6 @@ fn map_path_error(error: PathFailure) -> FailureCode {
 #[cfg(test)]
 mod tests {
     #[cfg(windows)]
-    mod eye_correction_qa;
-    #[cfg(windows)]
     mod windows_paths;
 
     use std::{

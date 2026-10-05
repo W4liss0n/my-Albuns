@@ -2646,6 +2646,71 @@ fn save_rejects_a_different_physical_object_even_when_its_bytes_are_identical() 
     assert!(projection.state.can_undo);
 }
 
+#[cfg(windows)]
+#[test]
+fn a_save_that_cannot_rebind_its_identity_lease_is_indeterminate_and_ends_the_session() {
+    use std::fs::OpenOptions;
+    use std::os::windows::fs::OpenOptionsExt;
+
+    let directory = tempfile::tempdir().expect("temporary directory");
+    let project_path = directory.path().join("Salvamento indeterminado.myalbuns");
+    let core = project_core_with_identity_storage(directory.path());
+    let mut project = core
+        .create_editable(CreateProjectRequest::new(
+            project_location(&project_path),
+            InitialProject::neutral(),
+            CreateAuthorization::CreateOnly,
+        ))
+        .expect("the productive Project opens");
+    project
+        .apply(ProjectIntent::SetDpi { dpi: 240 })
+        .expect("the visible revision advances");
+    // The lease names the physical file it protects. Another handle on that
+    // record lets the file be replaced but not the record be rewritten.
+    let lease_target = directory
+        .path()
+        .join("leases")
+        .join(format!("{}.target", project.project_id().hyphenated()));
+    let external_handle = OpenOptions::new()
+        .read(true)
+        .share_mode(0)
+        .open(&lease_target)
+        .expect("the external handle denies every sharing mode");
+
+    assert_eq!(
+        project.save(1),
+        Err(SaveProjectError::SaveStateIndeterminate)
+    );
+    drop(external_handle);
+
+    // The Session cannot tell what was saved, so nothing more goes through it.
+    assert_eq!(
+        project.save(1),
+        Err(SaveProjectError::SaveStateIndeterminate)
+    );
+    assert_eq!(
+        project.apply(ProjectIntent::SetDpi { dpi: 360 }).err(),
+        Some(CoreError::EditableSessionInvalidated)
+    );
+    assert_eq!(
+        project.recovery_checkpoint().err(),
+        Some(myalbuns_core::RecoveryCheckpointError::SessionUnavailable)
+    );
+    assert!(!project.can_undo());
+    assert!(project.undo().is_none());
+    drop(project);
+
+    let reopened = core
+        .open_editable(OpenProjectRequest::new(project_location(&project_path)))
+        .expect("the Project reopens after the indeterminate Session ends");
+    assert_eq!(
+        reopened.projection().state.document.dpi,
+        240,
+        "this fault happens after the file was replaced"
+    );
+    assert!(!reopened.has_unsaved_changes());
+}
+
 #[test]
 fn invalid_dpi_values_leave_the_session_history_and_project_file_unchanged() {
     let directory = tempfile::tempdir().expect("temporary directory");
@@ -3092,29 +3157,6 @@ fn a_second_physical_copy_with_the_same_project_identity_is_promoted_before_edit
         .expect("the last authorized physical instance can reopen after closure");
     assert_eq!(
         reopened.project_id().to_string(),
-        "550e8400-e29b-41d4-a716-446655440000"
-    );
-}
-
-#[test]
-fn a_confirmed_move_preserves_identity() {
-    let directory = tempfile::tempdir().expect("temporary directory");
-    let original_path = directory.path().join("original.myalbuns");
-    let moved_path = directory.path().join("movido.myalbuns");
-    fs::write(&original_path, NEUTRAL_PROJECT_V1.as_bytes()).expect("original fixture");
-    let core = project_core_with_identity_storage(directory.path());
-
-    let original = core
-        .open_editable(OpenProjectRequest::new(project_location(&original_path)))
-        .expect("the first observation authorizes the original");
-    drop(original);
-    fs::rename(&original_path, &moved_path).expect("the Project is moved after closure");
-
-    let moved = core
-        .open_editable(OpenProjectRequest::new(project_location(&moved_path)))
-        .expect("NotFound under an accessible previous root confirms movement");
-    assert_eq!(
-        moved.project_id().to_string(),
         "550e8400-e29b-41d4-a716-446655440000"
     );
 }

@@ -290,8 +290,8 @@ async fn run_export(
         }
     };
     tokio::pin!(root_bindings_completion);
-    let root_bindings = tokio::select! {
-        bindings = &mut root_bindings_completion => bindings.map_err(|error| {
+    let root_bindings = match unless_cancelled(root_bindings_completion.as_mut(), &attempt).await {
+        Some(bindings) => bindings.map_err(|error| {
             log_imaging_failure(
                 "export_failed",
                 &request_id,
@@ -303,7 +303,7 @@ async fn run_export(
                 "Não foi possível acessar um caminho necessário à exportação (destino ou arquivo original). Verifique o destino; se a mídia estiver ausente, use Localizar imagem… no painel de imagens e tente novamente. Detalhes: {error}"
             ))
         })?,
-        () = attempt.cancelled() => {
+        None => {
             let _ = root_bindings_completion.as_mut().await;
             log_export_cancelled(
                 &request_id,
@@ -312,7 +312,7 @@ async fn run_export(
                 "capture_root_bindings",
             );
             return Err(ExportCommandError::cancelled());
-        },
+        }
     };
     let root_binding_plan_sha256 =
         root_binding_plan_sha256(&root_bindings).map_err(ExportCommandError::failed)?;
@@ -333,8 +333,8 @@ async fn run_export(
     let context = InvocationContext::new(request_id.clone(), project_id.clone());
     let lease_completion = acquisition.complete(&cache, &processor);
     tokio::pin!(lease_completion);
-    let lease = tokio::select! {
-        lease = &mut lease_completion => lease.map_err(|error| {
+    let lease = match unless_cancelled(lease_completion.as_mut(), &attempt).await {
+        Some(lease) => lease.map_err(|error| {
             log_imaging_failure(
                 "export_failed",
                 &request_id,
@@ -344,7 +344,7 @@ async fn run_export(
             );
             ExportCommandError::failed(error.to_string())
         })?,
-        () = attempt.cancelled() => {
+        None => {
             log_export_cancelled(
                 &request_id,
                 project_id.as_deref(),
@@ -352,7 +352,7 @@ async fn run_export(
                 "operation_lease",
             );
             return Err(ExportCommandError::cancelled());
-        },
+        }
     };
     tracing::info!(
         target: "myalbuns.desktop",
@@ -420,9 +420,7 @@ async fn run_export(
         }
     }
     .map_err(|mut failure| {
-        if failure.is_storage_full() {
-            storage_recoveries.retain_export(storage_volume, failure.recovery.take());
-        }
+        storage_recoveries.retain_storage_full_export(storage_volume, &mut failure);
         if failure.stage == export_pipeline::ExportFailureStage::Cancelled {
             log_export_cancelled(
                 &request_id,
@@ -466,6 +464,18 @@ async fn run_export(
         width_px: completed.width_px,
         height_px: completed.height_px,
     })
+}
+
+/// Waits for `work` unless the attempt is cancelled first. `None` leaves `work`
+/// unfinished; the caller decides whether it still has to be awaited.
+async fn unless_cancelled<F: std::future::Future>(
+    mut work: std::pin::Pin<&mut F>,
+    attempt: &ExportAttempt,
+) -> Option<F::Output> {
+    tokio::select! {
+        output = &mut work => Some(output),
+        () = attempt.cancelled() => None,
+    }
 }
 
 #[tauri::command]
@@ -531,13 +541,80 @@ mod tests {
 
     use crate::ipc_contract::{ExportCommandError, ExportCommandErrorCode, ExportEvent};
 
-    use super::export_name;
+    use super::{export_name, unless_cancelled};
+    use crate::{export_attempts::ExportAttempts, ipc_contract::CancelDisposition};
+    use std::time::Duration;
 
     #[test]
     fn export_name_sanitizes_the_project_name() {
         assert_eq!(export_name("Casamento da Júlia"), "Casamento da Júlia");
         assert_eq!(export_name("Álbum: Horizonte"), "Álbum_ Horizonte");
         assert_eq!(export_name("..."), "Projeto");
+    }
+
+    #[test]
+    fn export_name_replaces_control_characters_and_trims_spaces_and_dots() {
+        for (project_name, expected) in [
+            ("Álbum\t1\r\n2", "Álbum_1__2"),
+            ("\u{0}\u{7f}\u{85}", "___"),
+            ("a<b>c\"d/e\\f|g?h*i", "a_b_c_d_e_f_g_h_i"),
+            ("  Casamento. ", "Casamento"),
+            (". .Formatura. .", "Formatura"),
+            ("Ana . Rui", "Ana . Rui"),
+            (" . ", "Projeto"),
+            ("", "Projeto"),
+            // A trailing control character becomes `_`, which is not trimmed.
+            ("Festa.\n", "Festa._"),
+        ] {
+            assert_eq!(export_name(project_name), expected, "{project_name:?}");
+        }
+    }
+
+    #[test]
+    fn export_name_passes_windows_reserved_device_names_through() {
+        // Rejection of a reserved file stem belongs to the path plan; see
+        // `a_reserved_device_name_is_refused_at_planning_only_when_it_is_the_whole_file_stem`.
+        for name in ["CON", "nul", "COM1", "LPT9", "AUX", "PRN"] {
+            assert_eq!(export_name(name), name);
+        }
+    }
+
+    #[test]
+    fn waiting_returns_the_output_while_the_attempt_is_not_cancelled() {
+        tauri::async_runtime::block_on(async {
+            let attempts = ExportAttempts::default();
+            let attempt = attempts.begin("export-ready", "project").unwrap();
+            let work = std::future::ready(7);
+            tokio::pin!(work);
+            assert_eq!(unless_cancelled(work.as_mut(), &attempt).await, Some(7));
+        });
+    }
+
+    #[test]
+    fn cancelling_while_waiting_stops_the_wait_and_leaves_the_work_unfinished() {
+        tauri::async_runtime::block_on(async {
+            let attempts = ExportAttempts::default();
+            let attempt = attempts.begin("export-waiting", "project").unwrap();
+            let (release, released) = tokio::sync::oneshot::channel::<u8>();
+            let work = async move { released.await.unwrap() };
+            tokio::pin!(work);
+
+            assert_eq!(
+                attempts.request_cancel("export-waiting", "project"),
+                CancelDisposition::Requested
+            );
+            let outcome = tokio::time::timeout(
+                Duration::from_secs(5),
+                unless_cancelled(work.as_mut(), &attempt),
+            )
+            .await
+            .expect("the cancellation ends the wait");
+            assert_eq!(outcome, None);
+
+            // The caller may still drive the unfinished work to completion.
+            release.send(3).unwrap();
+            assert_eq!(work.await, 3);
+        });
     }
 
     #[test]
@@ -571,6 +648,16 @@ mod tests {
                 },
             ))
             .expect("the Progress event is sent");
+        channel
+            .send(ExportEvent::from_progress(
+                "export-42",
+                ExportProgress {
+                    stage: ExportProgressStage::Publishing,
+                    units: ExportProgressUnits::Unmeasured,
+                    cancellable: false,
+                },
+            ))
+            .expect("the unmeasured Progress event is sent");
 
         assert_eq!(
             *messages
@@ -598,19 +685,19 @@ mod tests {
                         "cancellable": true,
                     },
                 }),
+                json!({
+                    "event": "progress",
+                    "data": {
+                        "operationId": "export-42",
+                        "stage": "publishing",
+                        "overallPercent": 85.0,
+                        "units": {
+                            "kind": "unmeasured",
+                        },
+                        "cancellable": false,
+                    },
+                }),
             ]
-        );
-    }
-
-    #[test]
-    fn cancelled_export_is_a_typed_terminal_result() {
-        assert_eq!(
-            serde_json::to_value(ExportCommandError::cancelled())
-                .expect("the command error serializes"),
-            json!({
-                "code": "cancelled",
-                "message": "A exportação foi cancelada.",
-            })
         );
     }
 
@@ -734,32 +821,5 @@ mod tests {
                 })
             );
         }
-    }
-
-    #[test]
-    fn backend_cancelability_is_forwarded_without_adapter_decisions() {
-        assert_eq!(
-            serde_json::to_value(ExportEvent::from_progress(
-                "export-publishing",
-                ExportProgress {
-                    stage: ExportProgressStage::Publishing,
-                    units: ExportProgressUnits::Unmeasured,
-                    cancellable: false,
-                },
-            ))
-            .expect("the event serializes"),
-            json!({
-                "event": "progress",
-                "data": {
-                    "operationId": "export-publishing",
-                    "stage": "publishing",
-                    "overallPercent": 85.0,
-                    "units": {
-                        "kind": "unmeasured",
-                    },
-                    "cancellable": false,
-                },
-            })
-        );
     }
 }

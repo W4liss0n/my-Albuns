@@ -1,7 +1,7 @@
 import { rasterLimitsAt300Dpi } from "../../test/projectConfigurationFixtures";
 import { emptyLayoutCatalogPort, unusedLayoutDialogPort } from "../../test/layoutCatalogPorts";
 import { act, fireEvent, renderHook, waitFor } from "@testing-library/react";
-import { beforeEach, expect, test, vi } from "vitest";
+import { afterEach, beforeEach, expect, test, vi } from "vitest";
 
 import type { ProjectCorePort } from "../../application/projectPorts";
 import { useEditorView } from "../../state/editorView";
@@ -74,6 +74,8 @@ beforeEach(() => {
     viewport: { offsetX: 0 },
   });
 });
+
+afterEach(() => useEditorView.setState(useEditorView.getInitialState(), true));
 
 test.each(["success", "failure"])("a pending Frame edit followed by Save uses the shared queue (%s)", async (outcome) => {
   const port = projectCorePort();
@@ -338,27 +340,15 @@ test.each(["completed", "failed"] as const)(
     const applyWithOutcome = vi
       .spyOn(port, "applyWithOutcome")
       .mockImplementation(() => pending.promise);
-    const runProjectMutation: ProjectMutationRunner = {
-      run: vi.fn(async (operation) => {
-        try {
-          return {
-            status: "completed" as const,
-            projection: await operation(port, null),
-          };
-        } catch (error: unknown) {
-          return { status: "failed" as const, error };
-        }
-      }),
-      waitForIdle: async () => null,
-    };
-    const view = renderHook(() =>
-      useProjectEditorController({ projectDialogPort: unusedLayoutDialogPort,
+    const view = renderHook(() => {
+      const runProjectMutation = useProjectMutationRunner(projection.state.projectId, port);
+      return useProjectEditorController({ projectDialogPort: unusedLayoutDialogPort,
         projection,
         projectCorePort: port,
         runProjectMutation,
         onProjectionChange: vi.fn(),
-      }),
-    );
+      });
+    });
 
     let predecessor!: Promise<boolean>;
     let adjacent!: Promise<boolean>;

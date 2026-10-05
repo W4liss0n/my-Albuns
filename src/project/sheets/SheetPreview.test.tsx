@@ -7,6 +7,7 @@ import type {
   PhotoPlacementPlan,
 } from "../../domain/project";
 import { SheetPreview } from "./SheetPreview";
+import { PHOTO_BLACK_AND_WHITE_SVG_MATRIX } from "../canvas/photoBlackAndWhiteWeights";
 import { decorativeCorpus } from "../../test/decorativePreview";
 import { SheetDesignInspector } from "../inspector/SheetDesignInspector";
 
@@ -355,4 +356,45 @@ test("represents a single-page extremity as the normalized active surface", () =
     <SheetPreview sheet={{ ...singlePageSheet, activeSides: "left" }} />,
   );
   expect(preview.querySelector("[data-preview-inactive-side]")).toBeNull();
+});
+
+function photoSheetWith(blackAndWhite: boolean[]): ComposedSheet {
+  const frame = photoSheet.frames[0];
+  return {
+    ...photoSheet,
+    frames: blackAndWhite.map((value, index) => ({
+      ...frame,
+      frameId: `frame-00${index + 1}`,
+      photo: { ...frame.photo!, mediaId: `media-00${index + 1}`, blackAndWhite: value },
+    })),
+  };
+}
+
+test("a black-and-white Photo is drawn through its own luminance filter", () => {
+  const { container } = render(<SheetPreview sheet={photoSheetWith([true, true])} />);
+
+  const filterIds = ["media-001", "media-002"].map((mediaId) => {
+    const photo = container.querySelector(`[data-preview-photo-id="${mediaId}"]`)!;
+    const reference = photo.getAttribute("filter");
+    expect(reference).toMatch(/^url\(#.+\)$/);
+    const filterId = reference!.slice(5, -1);
+    const filter = container.querySelector(`filter[id="${filterId}"]`)!;
+    expect(filter).toHaveAttribute("color-interpolation-filters", "sRGB");
+    const matrices = filter.querySelectorAll("feColorMatrix");
+    expect(matrices).toHaveLength(1);
+    expect(matrices[0]).toHaveAttribute("type", "matrix");
+    expect(matrices[0]).toHaveAttribute("values", PHOTO_BLACK_AND_WHITE_SVG_MATRIX);
+    return filterId;
+  });
+  expect(filterIds[0]).not.toBe(filterIds[1]);
+  expect(container.querySelectorAll("filter")).toHaveLength(2);
+});
+
+test("a colour Photo neither declares nor references a filter", () => {
+  const { container } = render(<SheetPreview sheet={photoSheetWith([false, true])} />);
+
+  expect(container.querySelector('[data-preview-photo-id="media-001"]')).not.toHaveAttribute("filter");
+  expect(container.querySelector('[data-preview-photo-id="media-001"] filter')).toBeNull();
+  expect(container.querySelectorAll("filter, feColorMatrix")).toHaveLength(2);
+  expect(container.querySelector('[data-preview-photo-id="media-002"]')).toHaveAttribute("filter");
 });

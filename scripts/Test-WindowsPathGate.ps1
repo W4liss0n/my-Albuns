@@ -39,7 +39,7 @@ try {
 if ([string]::IsNullOrWhiteSpace($OutputPath)) {
     $OutputPath = Join-Path `
         $script:WorkspaceRoot `
-        'docs\research\artifacts\0008-windows-path-gate.json'
+        '.scratch\gate-evidence\0008-windows-path-gate.json'
 }
 elseif (-not [System.IO.Path]::IsPathRooted($OutputPath)) {
     $OutputPath = Join-Path $script:WorkspaceRoot $OutputPath

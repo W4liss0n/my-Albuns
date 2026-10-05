@@ -21,7 +21,7 @@ $cargoTargetDirectory = Resolve-MyAlbunsCargoTargetDirectory
 if ([string]::IsNullOrWhiteSpace($OutputPath)) {
     $OutputPath = Join-Path `
         $script:WorkspaceRoot `
-        'docs\research\artifacts\0004-imaging-recovery.json'
+        '.scratch\gate-evidence\0004-imaging-recovery.json'
 }
 elseif (-not [System.IO.Path]::IsPathRooted($OutputPath)) {
     $OutputPath = Join-Path $script:WorkspaceRoot $OutputPath

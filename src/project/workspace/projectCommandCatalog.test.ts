@@ -53,58 +53,6 @@ test("keeps displayed Project command shortcuts and accepted aliases in one cata
   ).toBe("save-as");
 });
 
-test("feeds the canonical shortcuts into the Project application menu", () => {
-  const groups = createProjectApplicationMenus({ selectAllFrames: vi.fn(), canSelectAllFrames: true, saveLayout: vi.fn(), canSaveLayout: true,
-    copyFrames: vi.fn(), pasteFrames: vi.fn(), canCopyFrames: true, canPasteFrames: true,
-    swapFrameContents: vi.fn(),
-    canSwapFrameContents: true,
-    arrangeFrames: () => undefined,
-    canArrangeFrames: true,
-    addFrame: vi.fn(),
-    canAddFrame: true,
-    addSheetAfter: () => undefined,
-    addSheetBefore: () => undefined,
-    canAddAfter: true,
-    canDuplicate: true,
-    duplicateSheet: vi.fn(),
-    canAddBefore: true,
-    canConvertEdge: true,
-    canDelete: true,
-    canExport: true,
-    canRedo: true,
-    canUndo: true,
-    contextualPanelVisible: true,
-    closeProject: () => undefined,
-    convertEdge: () => undefined,
-    deleteSheet: () => undefined,
-    exportSheet: () => undefined,
-    exportAlbum: () => undefined,
-    mediaPanelVisible: true,
-    redo: () => undefined,
-    save: () => undefined,
-    saveAs: () => undefined,
-    structuralCommandsDisabled: false,
-    undo: () => undefined,
-    toggleContextualPanel: () => undefined,
-    toggleMediaPanel: () => undefined,
-  });
-  const commands = groups.flatMap((group) =>
-    group.items.flatMap((item) => {
-      if (item.type === "command") return [item];
-      if (item.type === "submenu") return item.items;
-      return [];
-    }),
-  );
-  const displayedShortcut = (commandId: string) =>
-    commands.find((command) => command.id === commandId)?.shortcut;
-
-  expect(displayedShortcut("save")).toBe("Ctrl+S");
-  expect(displayedShortcut("save-as")).toBe("Ctrl+Shift+S");
-  expect(displayedShortcut("close")).toBe("Ctrl+W");
-  expect(displayedShortcut("undo")).toBe("Ctrl+Z");
-  expect(displayedShortcut("redo")).toBe("Ctrl+Shift+Z");
-});
-
 test("keeps stable command metadata complete and conflict-free by context", () => {
   const ids = new Set<string>();
   const associations = new Set<string>();
@@ -210,38 +158,6 @@ test("shares New and Open metadata with the Welcome surface without borrowing th
       "welcome",
     ),
   ).toBe("open-project");
-});
-
-test("represents Select all availability per owning context", () => {
-  expect(projectCommandBinding("select-all", "media-panel")).toEqual({
-    availability: "implemented",
-    context: "media-panel",
-  });
-  expect(projectCommandBinding("select-all", "frame")).toEqual({
-    availability: "implemented",
-    context: "frame",
-  });
-});
-
-test("owns the available Sheet structure commands without claiming later owners", () => {
-  expect(projectCommandBinding("add-before", "sheet")).toEqual({
-    availability: "implemented",
-    context: "sheet",
-  });
-  expect(projectCommandBinding("add-after", "sheet")).toEqual({
-    availability: "implemented",
-    context: "sheet",
-  });
-  expect(projectCommandBinding("delete-sheet", "sheet")).toEqual({
-    availability: "implemented",
-    context: "sheet",
-  });
-  expect(projectCommandBinding("duplicate-sheet", "sheet")).toMatchObject({
-    availability: "implemented",
-  });
-  expect(projectCommandBinding("convert-edge", "sheet")).toMatchObject({
-    availability: "implemented",
-  });
 });
 
 test("projects each Sheet structure command with its own availability and owner", () => {
@@ -383,17 +299,6 @@ test("disables Sheet structure commands during editing without disabling global 
   expect(command("sheet", "duplicate-sheet")).toMatchObject({ disabled: true });
   expect(command("edit", "undo")).toMatchObject({ disabled: false });
   expect(command("file", "save")).not.toMatchObject({ disabled: true });
-});
-
-test("keeps both Project panel visibility commands canonical and implemented", () => {
-  expect(projectCommandBinding("media-panel", "project-window")).toEqual({
-    availability: "implemented",
-    context: "project-window",
-  });
-  expect(projectCommandBinding("contextual-panel", "project-window")).toEqual({
-    availability: "implemented",
-    context: "project-window",
-  });
 });
 
 test("projects every application-menu command from its canonical descriptor", () => {

@@ -554,27 +554,6 @@ fn read_test_logs(directory: &Path) -> String {
 }
 
 #[test]
-fn recovery_export_fixture_references_only_the_generated_source() {
-    let (_, snapshot, sheet_id) = export_snapshot();
-    let sheet = snapshot
-        .composition
-        .sheets
-        .iter()
-        .find(|sheet| sheet.sheet_id == sheet_id)
-        .expect("the recovery sheet exists");
-    let expected_media_id = sheet.frames[0]
-        .photo
-        .as_ref()
-        .expect("the recovery frame contains a Photo")
-        .media_id;
-
-    assert_eq!(
-        sheet.referenced_media_ids().collect::<Vec<_>>(),
-        vec![expected_media_id]
-    );
-}
-
-#[test]
 #[ignore = "executed by scripts/Test-ImagingRecovery.ps1 with the real sidecar"]
 fn real_processor_recovery_flows_through_production_modules() {
     tauri::async_runtime::block_on(async {

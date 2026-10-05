@@ -1,5 +1,5 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { afterEach, expect, test, vi } from "vitest";
+import { expect, test, vi } from "vitest";
 
 import type {
   ProjectDialogAction,
@@ -300,10 +300,6 @@ function renderControl({
   );
   return { dialog, exportHarness, view };
 }
-
-afterEach(() => {
-  vi.useRealTimers();
-});
 
 test("folder recovery publishes the unsaved projection and resumes once after closing Problems", async () => {
   const problems = [{ mediaId: "photo-1", fileName: "Foto.jpg", state: "absent" as const }];

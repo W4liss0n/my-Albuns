@@ -1,9 +1,5 @@
 import { Filter, GlProgram } from "pixi.js";
-
-// Integer sRGB luminance from the accepted renderer contract (design 0019).
-const weights = [54, 183, 19] as const;
-const matrixRow = [...weights.map((weight) => weight / 256), 0, 0];
-export const PHOTO_BLACK_AND_WHITE_SVG_MATRIX = [...matrixRow, ...matrixRow, ...matrixRow, 0, 0, 0, 1, 0].join(" ");
+import { PHOTO_BLACK_AND_WHITE_WEIGHTS } from "./photoBlackAndWhiteWeights";
 
 // Standard PixiJS v8 filter coordinates; the production Canvas uses WebGL.
 const vertex = `
@@ -31,7 +27,7 @@ void main() {
     return;
   }
   vec3 rgb = floor(color.rgb / color.a * 255.0 + 0.5);
-  float luminance = floor((dot(rgb, vec3(${weights.map((weight) => `${weight}.0`).join(", ")})) + 128.0) / 256.0) / 255.0;
+  float luminance = floor((dot(rgb, vec3(${PHOTO_BLACK_AND_WHITE_WEIGHTS.map((weight) => `${weight}.0`).join(", ")})) + 128.0) / 256.0) / 255.0;
   finalColor = vec4(vec3(luminance) * color.a, color.a);
 }`;
 

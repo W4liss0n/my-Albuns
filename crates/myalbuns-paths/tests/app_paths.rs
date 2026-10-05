@@ -4,7 +4,6 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use directories::BaseDirs;
 use myalbuns_paths::{
     AppPaths, AppPathsError, CacheArtifactFormat, ExportPathPlan, ExportWriteAuthorization,
     OperationPathContext, PathRootKind, RootBindingPlan, project_data_namespace,
@@ -52,42 +51,24 @@ fn exposes_each_data_category_under_its_approved_root() {
     );
     assert_eq!(paths.state_dir(), Path::new(r"C:\Local\MyAlbuns2\State"));
     assert_eq!(
+        paths.recent_projects_file(),
+        Path::new(r"C:\Local\MyAlbuns2\State\recent-projects.json")
+    );
+    assert_eq!(
+        paths.workspace_preferences_file(),
+        Path::new(r"C:\Local\MyAlbuns2\State\workspace-preferences.json")
+    );
+    assert_eq!(
+        paths.project_identity_leases_dir(),
+        Path::new(r"C:\Local\MyAlbuns2\State\ProjectIdentityLeases")
+    );
+    assert_eq!(
         paths
             .webview_data_directory("project-host-01")
             .expect("the host namespace is safe"),
         Path::new(r"C:\Local\MyAlbuns2\State\WebView2\project-host-01")
     );
     assert_eq!(paths.logs_dir(), Path::new(r"C:\Local\MyAlbuns2\Logs"));
-}
-
-#[test]
-fn derives_the_recent_projects_state_file_from_the_central_local_root() {
-    let paths = AppPaths::from_roots(Path::new(r"C:\Roaming"), Path::new(r"C:\Local"));
-
-    assert_eq!(
-        paths.recent_projects_file(),
-        Path::new(r"C:\Local\MyAlbuns2\State\recent-projects.json")
-    );
-}
-
-#[test]
-fn derives_the_workspace_preferences_state_file_from_the_central_local_root() {
-    let paths = AppPaths::from_roots(Path::new(r"C:\Roaming"), Path::new(r"C:\Local"));
-
-    assert_eq!(
-        paths.workspace_preferences_file(),
-        Path::new(r"C:\Local\MyAlbuns2\State\workspace-preferences.json")
-    );
-}
-
-#[test]
-fn derives_the_project_identity_lease_root_from_the_central_local_state() {
-    let paths = AppPaths::from_roots(Path::new(r"C:\Roaming"), Path::new(r"C:\Local"));
-
-    assert_eq!(
-        paths.project_identity_leases_dir(),
-        Path::new(r"C:\Local\MyAlbuns2\State\ProjectIdentityLeases")
-    );
 }
 
 #[test]
@@ -266,23 +247,6 @@ fn validates_cache_artifacts_without_choosing_a_transport_protocol() {
             .validate_cache_artifact(Path::new(r"C:\Local\MyAlbuns2\Cache\..\private.jpg"))
             .unwrap_err(),
         AppPathsError::CacheArtifactOutsideRoot
-    );
-}
-
-#[test]
-fn discovers_roaming_and_local_roots_from_the_operating_system() {
-    let known_folders =
-        BaseDirs::new().expect("the test environment must expose user data folders");
-
-    let paths = AppPaths::discover().expect("AppPaths must discover the same folders");
-
-    assert_eq!(
-        paths.roaming_root(),
-        known_folders.data_dir().join("MyAlbuns2")
-    );
-    assert_eq!(
-        paths.local_root(),
-        known_folders.data_local_dir().join("MyAlbuns2")
     );
 }
 
@@ -1142,14 +1106,8 @@ fn rejects_a_cache_namespace_redirected_by_a_directory_link() {
         .expect("the Cache plan is valid");
     std::fs::create_dir_all(paths.cache_dir()).expect("the Cache parent exists");
     let project_directory = paths.cache_dir().join("project-01");
-    if let Err(error) = create_directory_link(external.path(), &project_directory) {
-        if error.kind() == std::io::ErrorKind::PermissionDenied
-            || error.raw_os_error() == Some(1314)
-        {
-            return;
-        }
-        panic!("the directory link could not be created: {error}");
-    }
+    create_directory_link(external.path(), &project_directory)
+        .expect("the directory link is created");
 
     assert_eq!(
         paths.prepare_cache_storage(&cache).unwrap_err(),
@@ -1159,7 +1117,28 @@ fn rejects_a_cache_namespace_redirected_by_a_directory_link() {
 
 #[cfg(windows)]
 fn create_directory_link(source: &Path, destination: &Path) -> std::io::Result<()> {
-    std::os::windows::fs::symlink_dir(source, destination)
+    match std::os::windows::fs::symlink_dir(source, destination) {
+        // Symbolic links need a privilege most accounts lack; a junction
+        // redirects the directory the same way without it.
+        Err(error)
+            if error.kind() == std::io::ErrorKind::PermissionDenied
+                || error.raw_os_error() == Some(1314) =>
+        {
+            let output = std::process::Command::new("cmd")
+                .args(["/c", "mklink", "/J"])
+                .arg(destination)
+                .arg(source)
+                .output()?;
+            if output.status.success() {
+                Ok(())
+            } else {
+                Err(std::io::Error::other(
+                    String::from_utf8_lossy(&output.stderr).into_owned(),
+                ))
+            }
+        }
+        result => result,
+    }
 }
 
 #[cfg(windows)]

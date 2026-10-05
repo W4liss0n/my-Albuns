@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { expect, test } from "vitest";
 import { representativeProjection } from "../test/projectFixtures";
 import { adjacentViewerDemand, sheetViewerMediaIds, viewerPreviewState } from "../application/imageViewerModel";

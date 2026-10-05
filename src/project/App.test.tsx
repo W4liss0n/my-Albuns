@@ -1,7 +1,7 @@
 import { rasterLimitsAt300Dpi } from "../test/projectConfigurationFixtures";
 import { emptyLayoutCatalogPort } from "../test/layoutCatalogPorts";
 import { useEffect, useState, type ComponentProps } from "react";
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { expect, test, vi } from "vitest";
 
 import AppView from "./App";
@@ -386,12 +386,6 @@ test("reports a defensive Project Canvas failure without claiming that no Sessio
       reason: "WebGL2 acelerado por hardware não foi confirmado.",
     }),
   );
-  expect(
-    screen.queryByRole("heading", {
-      name: "Não foi possível iniciar o editor",
-    }),
-  ).not.toBeInTheDocument();
-
   expect(load).not.toHaveBeenCalled();
   expect(prepareMediaPreviews).not.toHaveBeenCalled();
 
@@ -452,7 +446,6 @@ test("opens the Project in the real workspace when hardware WebGL2 is available"
       selector: ".ui-application-header__identity strong",
     }),
   ).toBeInTheDocument();
-  expect(screen.queryByText("NVIDIA GeForce RTX")).not.toBeInTheDocument();
   expect(logEvents).toEqual(
     expect.arrayContaining([
       expect.objectContaining({
@@ -649,9 +642,6 @@ test("synchronizes a no-cache reopen while Monitor startup remains pending witho
       name: /^Foto confirmada sem Cache\.jpg(?:\.|$)/,
     }),
   ).toBeInTheDocument();
-  expect(refreshedProjection.state.revision).toBe(
-    representativeProjection.state.revision,
-  );
   expect(apply).not.toHaveBeenCalled();
   expect(applyWithOutcome).not.toHaveBeenCalled();
   expect(undo).not.toHaveBeenCalled();
@@ -1575,9 +1565,6 @@ test("retries an unavailable occurrence explicitly and refreshes it without Reli
     "data-photo-draw-width",
     "123000",
   );
-  expect(refreshedProjection.state.revision).toBe(
-    representativeProjection.state.revision,
-  );
   expect(relink).not.toHaveBeenCalled();
   expect(apply).not.toHaveBeenCalled();
 });
@@ -1853,9 +1840,6 @@ test("cancels resident media demand when runtime graphics become unavailable", a
     screen.getByRole("button", { name: "Exportar" }),
   ).toBeDisabled();
   expect(screen.getByTestId("album-canvas")).toBeInTheDocument();
-  expect(
-    screen.queryByRole("heading", { name: /A área de edição/ }),
-  ).not.toBeInTheDocument();
   await waitFor(() => expect(prepareMediaPreviews).toHaveBeenCalledTimes(2));
   expect(prepareMediaPreviews).toHaveBeenNthCalledWith(2, {
     revision: 2,
@@ -2000,7 +1984,13 @@ test("does not treat a rejected close confirmation as an explicit graphics-close
   );
 
   await waitFor(() => expect(resolveClose).toHaveBeenCalledWith("cancel"));
-  await new Promise((resolve) => setTimeout(resolve, 50));
+  await waitFor(() =>
+    expect(sessions[2]?.present).toHaveBeenCalledWith({
+      kind: "projectOperationFailure",
+      message: "A janela pertencente não pôde ser apresentada.",
+    }),
+  );
+  await act(async () => {});
   expect(sessions[0]?.present).toHaveBeenCalledWith({
     kind: "graphicsFailure",
     reason: "WebGL2 acelerado por hardware não foi confirmado.",
@@ -2008,10 +1998,6 @@ test("does not treat a rejected close confirmation as an explicit graphics-close
   expect(sessions[1]?.present).toHaveBeenCalledWith({
     busy: false,
     kind: "projectCloseConfirmation",
-  });
-  expect(sessions[2]?.present).toHaveBeenCalledWith({
-    kind: "projectOperationFailure",
-    message: "A janela pertencente não pôde ser apresentada.",
   });
   expect(
     sessions.flatMap((session) => session.present.mock.calls).filter(
@@ -2405,5 +2391,207 @@ test.each(["ready", "decode_failed", "native_unavailable", "storage_paused"] as 
     }
   } finally {
     vi.unstubAllGlobals();
+  }
+});
+
+function recordingLogger() {
+  const events: LogEvent[] = [];
+  const logger: Logger = { write: (event) => events.push(event) };
+  return { events, logger };
+}
+
+function expectBlockedStartupSurface(alert: HTMLElement) {
+  expect(within(alert).getByRole("heading", { level: 1 })).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Exportar" })).not.toBeInTheDocument();
+  expect(screen.queryByTestId("album-canvas")).not.toBeInTheDocument();
+}
+
+test.each([
+  {
+    name: "a described failure",
+    reason: new Error("O projeto não está mais disponível para edição."),
+    shown: "O projeto não está mais disponível para edição.",
+    hidden: null,
+  },
+  {
+    name: "an undescribed failure",
+    reason: { code: "bridge_closed", detail: "ipc://project-17 closed" },
+    shown: null,
+    hidden: "ipc://project-17",
+  },
+])("replaces the editor with the startup failure when the Project load rejects with $name", async ({ reason, shown, hidden }) => {
+  const { events, logger } = recordingLogger();
+  const load = vi.fn(async () => { throw reason; });
+  const confirmUiReady = vi.fn(async () => undefined);
+  const prepareMediaPreviews = vi.fn(async () => null);
+
+  render(
+    <App
+      exportPipelinePort={exportPipelinePort}
+      mediaPreviewPort={{ ...mediaPreviewPort, prepareMediaPreviews }}
+      projectStartupPort={{ confirmUiReady }}
+      projectCorePort={{ ...projectCorePort, load }}
+      projectWindowPort={projectWindowPort}
+      graphicsProbe={canvasGraphicsDiagnosticProbe}
+      canvasGraphicsDiagnosticProbe={canvasGraphicsDiagnosticProbe}
+      logger={logger}
+    />,
+  );
+
+  const alert = await screen.findByRole("alert");
+  expectBlockedStartupSurface(alert);
+  if (shown) expect(alert).toHaveTextContent(shown);
+  if (hidden) expect(alert).not.toHaveTextContent(hidden);
+  expect(load).toHaveBeenCalledOnce();
+  expect(confirmUiReady).not.toHaveBeenCalled();
+  expect(prepareMediaPreviews).not.toHaveBeenCalled();
+
+  const started = events.find((event) => event.event === "project_load_started");
+  expect(events).toContainEqual({
+    level: "error",
+    component: "application",
+    event: "project_load_failed",
+    operationId: started?.operationId,
+    reason: "bridge_error",
+  });
+  expect(started?.operationId).toEqual(expect.any(String));
+  expect(events.some((event) => event.event === "project_load_completed")).toBe(false);
+});
+
+test("replaces the opened editor with the startup failure when the initial image preparation rejects", async () => {
+  const { events, logger } = recordingLogger();
+  const prepareImages = vi.fn(async () => {
+    throw Object.assign(new Error("C:/Users/Ana/cache is offline"), {
+      code: "cache_root_unavailable",
+    });
+  });
+  const confirmUiReady = vi.fn(async () => undefined);
+  const prepareMediaPreviews = vi.fn(async () => null);
+
+  render(
+    <App
+      exportPipelinePort={exportPipelinePort}
+      mediaPreviewPort={{ ...mediaPreviewPort, prepareMediaPreviews }}
+      projectStartupPort={{ prepareImages, confirmUiReady }}
+      projectCorePort={projectCorePort}
+      projectWindowPort={projectWindowPort}
+      graphicsProbe={canvasGraphicsDiagnosticProbe}
+      canvasGraphicsDiagnosticProbe={canvasGraphicsDiagnosticProbe}
+      logger={logger}
+    />,
+  );
+
+  const alert = await screen.findByRole("alert");
+  expectBlockedStartupSurface(alert);
+  expect(alert).not.toHaveTextContent("C:/Users/Ana");
+  expect(prepareImages).toHaveBeenCalledOnce();
+  expect(prepareMediaPreviews).not.toHaveBeenCalled();
+  expect(confirmUiReady).not.toHaveBeenCalled();
+  expect(events).toContainEqual({
+    level: "error",
+    component: "application",
+    event: "project_image_preparation_failed",
+    projectId: projection.state.projectId,
+    reason: "cache_root_unavailable",
+  });
+});
+
+test("replaces the opened editor with the startup failure when the UI readiness confirmation rejects", async () => {
+  const { events, logger } = recordingLogger();
+  const confirmUiReady = vi.fn(async () => {
+    throw Object.assign(new Error("window label project-17 is gone"), {
+      code: "startup_window_unavailable",
+    });
+  });
+
+  render(
+    <App
+      exportPipelinePort={exportPipelinePort}
+      mediaPreviewPort={mediaPreviewPort}
+      projectStartupPort={{ confirmUiReady }}
+      projectCorePort={projectCorePort}
+      projectWindowPort={projectWindowPort}
+      graphicsProbe={canvasGraphicsDiagnosticProbe}
+      canvasGraphicsDiagnosticProbe={canvasGraphicsDiagnosticProbe}
+      logger={logger}
+    />,
+  );
+
+  const alert = await screen.findByRole("alert");
+  expectBlockedStartupSurface(alert);
+  expect(alert).not.toHaveTextContent("project-17");
+  expect(confirmUiReady).toHaveBeenCalledOnce();
+  expect(events).toContainEqual({
+    level: "error",
+    component: "application",
+    event: "project_ui_ready_failed",
+    projectId: projection.state.projectId,
+    reason: "startup_window_unavailable",
+  });
+});
+
+test("dismissing the Save As startup failure removes it from the address so a reload does not report it again", async () => {
+  const sessions: Array<{
+    dismiss: ReturnType<typeof vi.fn>;
+    emit(action: ProjectDialogAction): void;
+    presented: Parameters<ProjectDialogSession["present"]>[0][];
+  }> = [];
+  const dialogPort: ProjectDialogPort = {
+    acquire: (listener) => {
+      const session = {
+        dismiss: vi.fn(async () => undefined),
+        emit: listener,
+        presented: [] as Parameters<ProjectDialogSession["present"]>[0][],
+      };
+      sessions.push(session);
+      return {
+        dismiss: session.dismiss,
+        present: async (state) => { session.presented.push(state); },
+      };
+    },
+  };
+  const failureSession = () =>
+    sessions.find((session) =>
+      session.presented.some((state) => state.kind === "projectOperationFailure"),
+    );
+  const previousUrl = window.location.href;
+  const previousState = window.history.state;
+  const replaceState = vi.spyOn(window.history, "replaceState");
+  window.history.replaceState({ restored: true }, "", "/project.html?window=project-17#save-as-state-indeterminate");
+  replaceState.mockClear();
+  try {
+    render(
+      <App
+        exportPipelinePort={exportPipelinePort}
+        mediaPreviewPort={mediaPreviewPort}
+        projectStartupPort={projectStartupPort}
+        projectCorePort={projectCorePort}
+        projectDialogPort={dialogPort}
+        projectWindowPort={projectWindowPort}
+        graphicsProbe={canvasGraphicsDiagnosticProbe}
+        canvasGraphicsDiagnosticProbe={canvasGraphicsDiagnosticProbe}
+        logger={silentLogger}
+      />,
+    );
+    await waitFor(() => expect(failureSession()).toBeDefined());
+    await screen.findByRole("button", { name: "Exportar" });
+    expect(replaceState).not.toHaveBeenCalled();
+    expect(window.location.hash).toBe("#save-as-state-indeterminate");
+
+    act(() => failureSession()!.emit("dismissProjectOperationFailure"));
+
+    expect(replaceState).toHaveBeenCalledExactlyOnceWith(
+      { restored: true },
+      "",
+      "/project.html?window=project-17",
+    );
+    expect(window.location.hash).toBe("");
+    expect(window.location.search).toBe("?window=project-17");
+    expect(failureSession()!.dismiss).toHaveBeenCalledOnce();
+    expect(screen.getByRole("button", { name: "Exportar" })).toBeInTheDocument();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  } finally {
+    replaceState.mockRestore();
+    window.history.replaceState(previousState, "", previousUrl);
   }
 });

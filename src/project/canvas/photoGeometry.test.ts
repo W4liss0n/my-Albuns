@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { expect, test } from "vitest";
 
 import placementFixture from "../../../tests/fixtures/photo-placement-cases.json";

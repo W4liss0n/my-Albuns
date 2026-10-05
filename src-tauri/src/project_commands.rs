@@ -946,11 +946,14 @@ pub(crate) fn map_save_project_error(error: ProjectHostSaveError) -> SaveProject
 #[cfg(test)]
 mod tests {
     use myalbuns_core::{PathFailure, SaveAsProjectError, SaveProjectError};
+    use myalbuns_paths::AppPathsError;
     use serde_json::json;
 
     use crate::project_host::{ProjectHostSaveAsError, ProjectHostSaveError};
 
-    use super::{map_save_as_project_error, map_save_project_error};
+    use super::{
+        map_save_as_operation_path_error, map_save_as_project_error, map_save_project_error,
+    };
 
     #[test]
     fn maps_every_save_as_failure_to_stable_wire_data_without_messages() {
@@ -1036,17 +1039,46 @@ mod tests {
         }
     }
 
+    /// The wire code of each Save failure. Neither match has a wildcard, so a
+    /// new failure does not compile until its code is named here.
+    fn save_failure_code(error: &ProjectHostSaveError) -> &'static str {
+        match error {
+            ProjectHostSaveError::Project(SaveProjectError::StaleRevision { .. }) => {
+                "stale_revision"
+            }
+            ProjectHostSaveError::Project(
+                SaveProjectError::FormatConversionConfirmationRequired,
+            ) => "format_conversion_confirmation_required",
+            ProjectHostSaveError::Project(SaveProjectError::PersistedBaselineConflict) => {
+                "persisted_baseline_conflict"
+            }
+            ProjectHostSaveError::Project(SaveProjectError::Path(path)) => match path {
+                PathFailure::NotFound => "not_found",
+                PathFailure::Unavailable => "unavailable",
+                PathFailure::AccessDenied => "access_denied",
+                PathFailure::InvalidPath => "invalid_path",
+                PathFailure::UnexpectedObjectType => "unexpected_object_type",
+                PathFailure::Conflict => "conflict",
+                PathFailure::IoFailure => "io_failure",
+            },
+            ProjectHostSaveError::Project(SaveProjectError::SaveStateIndeterminate) => {
+                "save_state_indeterminate"
+            }
+            ProjectHostSaveError::RecoveryCleanupFailed => "recovery_cleanup_failed",
+            ProjectHostSaveError::SessionUnavailable => "session_unavailable",
+        }
+    }
+
     #[test]
     fn maps_every_save_failure_to_stable_wire_data_without_messages() {
-        let stale = serde_json::to_value(map_save_project_error(ProjectHostSaveError::Project(
-            SaveProjectError::StaleRevision {
-                expected: 3,
-                current: 4,
-            },
-        )))
-        .expect("the stale-revision command error serializes");
+        let stale = ProjectHostSaveError::Project(SaveProjectError::StaleRevision {
+            expected: 3,
+            current: 4,
+        });
+        assert_eq!(save_failure_code(&stale), "stale_revision");
         assert_eq!(
-            stale,
+            serde_json::to_value(map_save_project_error(stale))
+                .expect("the stale-revision command error serializes"),
             json!({
                 "code": "stale_revision",
                 "expectedRevision": 3,
@@ -1055,59 +1087,86 @@ mod tests {
         );
 
         let cases = [
-            (
-                ProjectHostSaveError::Project(SaveProjectError::PersistedBaselineConflict),
-                "persisted_baseline_conflict",
-            ),
-            (
-                ProjectHostSaveError::Project(SaveProjectError::Path(PathFailure::NotFound)),
-                "not_found",
-            ),
-            (
-                ProjectHostSaveError::Project(SaveProjectError::Path(PathFailure::Unavailable)),
-                "unavailable",
-            ),
-            (
-                ProjectHostSaveError::Project(SaveProjectError::Path(PathFailure::AccessDenied)),
-                "access_denied",
-            ),
-            (
-                ProjectHostSaveError::Project(SaveProjectError::Path(PathFailure::InvalidPath)),
-                "invalid_path",
-            ),
-            (
-                ProjectHostSaveError::Project(SaveProjectError::Path(
-                    PathFailure::UnexpectedObjectType,
-                )),
-                "unexpected_object_type",
-            ),
-            (
-                ProjectHostSaveError::Project(SaveProjectError::Path(PathFailure::Conflict)),
-                "conflict",
-            ),
-            (
-                ProjectHostSaveError::Project(SaveProjectError::Path(PathFailure::IoFailure)),
-                "io_failure",
-            ),
-            (
-                ProjectHostSaveError::Project(SaveProjectError::SaveStateIndeterminate),
-                "save_state_indeterminate",
-            ),
-            (
-                ProjectHostSaveError::RecoveryCleanupFailed,
-                "recovery_cleanup_failed",
-            ),
-            (
-                ProjectHostSaveError::SessionUnavailable,
-                "session_unavailable",
-            ),
+            ProjectHostSaveError::Project(SaveProjectError::FormatConversionConfirmationRequired),
+            ProjectHostSaveError::Project(SaveProjectError::PersistedBaselineConflict),
+            ProjectHostSaveError::Project(SaveProjectError::Path(PathFailure::NotFound)),
+            ProjectHostSaveError::Project(SaveProjectError::Path(PathFailure::Unavailable)),
+            ProjectHostSaveError::Project(SaveProjectError::Path(PathFailure::AccessDenied)),
+            ProjectHostSaveError::Project(SaveProjectError::Path(PathFailure::InvalidPath)),
+            ProjectHostSaveError::Project(SaveProjectError::Path(
+                PathFailure::UnexpectedObjectType,
+            )),
+            ProjectHostSaveError::Project(SaveProjectError::Path(PathFailure::Conflict)),
+            ProjectHostSaveError::Project(SaveProjectError::Path(PathFailure::IoFailure)),
+            ProjectHostSaveError::Project(SaveProjectError::SaveStateIndeterminate),
+            ProjectHostSaveError::RecoveryCleanupFailed,
+            ProjectHostSaveError::SessionUnavailable,
         ];
 
-        for (error, expected_code) in cases {
+        let mut mapped = std::collections::BTreeSet::from(["stale_revision"]);
+        for error in cases {
+            let expected_code = save_failure_code(&error);
             let value = serde_json::to_value(map_save_project_error(error))
                 .expect("the command error serializes");
             assert_eq!(value, json!({ "code": expected_code }));
             assert!(value.get("message").is_none());
+            mapped.insert(expected_code);
+        }
+        // One distinct code per failure named in `save_failure_code`.
+        assert_eq!(mapped.len(), 13);
+    }
+
+    #[test]
+    fn maps_every_operation_path_failure_of_save_as_to_stable_wire_data() {
+        // No wildcard: a new path failure does not compile until it is listed.
+        let expected_code = |error: AppPathsError| match error {
+            AppPathsError::OperationPathAccessDenied => "access_denied",
+            AppPathsError::OperationPathUnavailable => "unavailable",
+            AppPathsError::OperationPathIoFailure | AppPathsError::KnownFoldersUnavailable => {
+                "io_failure"
+            }
+            AppPathsError::InvalidProjectNamespace
+            | AppPathsError::InvalidStateNamespace
+            | AppPathsError::InvalidCacheArtifact
+            | AppPathsError::InvalidExportPath
+            | AppPathsError::InvalidOperationPath
+            | AppPathsError::UnsupportedOperationNamespace
+            | AppPathsError::PathRootNotBound
+            | AppPathsError::CacheArtifactOutsideRoot
+            | AppPathsError::CacheStorageUnavailable
+            | AppPathsError::CacheStorageFull
+            | AppPathsError::CacheStorageOutsideRoot
+            | AppPathsError::ExportStorageUnavailable
+            | AppPathsError::ExportStorageFull
+            | AppPathsError::ExportStorageOutsideDestination
+            | AppPathsError::ExportTargetConflict => "invalid_path",
+        };
+        let cases = [
+            AppPathsError::KnownFoldersUnavailable,
+            AppPathsError::InvalidProjectNamespace,
+            AppPathsError::InvalidStateNamespace,
+            AppPathsError::InvalidCacheArtifact,
+            AppPathsError::InvalidExportPath,
+            AppPathsError::InvalidOperationPath,
+            AppPathsError::UnsupportedOperationNamespace,
+            AppPathsError::PathRootNotBound,
+            AppPathsError::OperationPathAccessDenied,
+            AppPathsError::OperationPathUnavailable,
+            AppPathsError::OperationPathIoFailure,
+            AppPathsError::CacheArtifactOutsideRoot,
+            AppPathsError::CacheStorageUnavailable,
+            AppPathsError::CacheStorageFull,
+            AppPathsError::CacheStorageOutsideRoot,
+            AppPathsError::ExportStorageUnavailable,
+            AppPathsError::ExportStorageFull,
+            AppPathsError::ExportStorageOutsideDestination,
+            AppPathsError::ExportTargetConflict,
+        ];
+
+        for error in cases {
+            let value = serde_json::to_value(map_save_as_operation_path_error(error))
+                .expect("the Save As command error serializes");
+            assert_eq!(value, json!({ "code": expected_code(error) }), "{error:?}");
         }
     }
 }

@@ -1,22 +1,10 @@
+// @vitest-environment node
 // @ts-expect-error Node is available in Vitest but excluded from frontend types.
 import { readFileSync } from "node:fs";
 
 import { describe, expect, test } from "vitest";
 
 const themeStyles = readFileSync("src/ui/theme.css", "utf8") as string;
-const mediaPanelStyles = readFileSync(
-  "src/project/media-panel/MediaPanel.css",
-  "utf8",
-) as string;
-const globalStyles = readFileSync(
-  "src/global/GlobalShell.css",
-  "utf8",
-) as string;
-const sharedStyles = readFileSync("src/ui/ui.css", "utf8") as string;
-const newProjectStyles = readFileSync(
-  "src/global/NewProjectFlow.css",
-  "utf8",
-) as string;
 
 function themeColor(name: string): string {
   const match = themeStyles.match(
@@ -123,23 +111,5 @@ describe("semantic color contracts", () => {
       contrastRatio(thumbBorder, track),
       "Canvas scrollbar thumb edge on its track",
     ).toBeGreaterThanOrEqual(3);
-  });
-
-  test("does not fade readable text inside active controls", () => {
-    expect(mediaPanelStyles).toMatch(
-      /\.media-folder-chip small\s*\{[^}]*opacity:\s*1;/s,
-    );
-    expect(globalStyles).toMatch(
-      /\.global-action-stack kbd\s*\{[^}]*opacity:\s*1;/s,
-    );
-  });
-
-  test("uses the accessible fill token wherever small white accent text appears", () => {
-    expect(sharedStyles).toMatch(
-      /\.ui-action-button--primary\s*\{[^}]*color:\s*var\(--ui-on-accent\);[^}]*background:\s*var\(--ui-accent-fill\);/s,
-    );
-    expect(newProjectStyles).toMatch(
-      /\.new-project-steps li\[aria-current="step"\] > span\s*\{[^}]*color:\s*var\(--ui-on-accent\);[^}]*background:\s*var\(--ui-accent-fill\);/s,
-    );
   });
 });

@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { beforeEach, expect, test, vi } from "vitest";
@@ -128,4 +129,19 @@ test("prefers an owned presentation emitted during initial hydration", async () 
       retryDisabled: false,
     },
   });
+});
+
+test("releases the live subscription when the initial hydration fails", async () => {
+  const listener = vi.fn();
+  const unlisten = vi.fn();
+  const failure = new Error("dialog host unavailable");
+  vi.mocked(listen).mockResolvedValue(unlisten);
+  vi.mocked(invoke).mockRejectedValue(failure);
+
+  await expect(
+    tauriProjectDialogClient.onPresentation(listener),
+  ).rejects.toBe(failure);
+
+  expect(unlisten).toHaveBeenCalledOnce();
+  expect(listener).not.toHaveBeenCalled();
 });

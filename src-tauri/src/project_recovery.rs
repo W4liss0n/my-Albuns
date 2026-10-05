@@ -413,37 +413,53 @@ mod tests {
     }
 
     #[test]
-    fn an_interrupted_sibling_write_never_replaces_the_last_complete_checkpoint() {
+    fn a_failed_replacement_keeps_the_last_complete_checkpoint_and_no_temporary() {
+        use std::os::windows::fs::OpenOptionsExt;
+
         let root = tempfile::tempdir().expect("temporary interrupted Recovery fixture");
-        let project = create_project(root.path(), "Projeto");
-        let authority = authority(&project.project);
-        let checkpoint = project
-            .project
+        let mut project = create_project(root.path(), "Projeto").project;
+        let authority = authority(&project);
+        let complete = project
             .recovery_checkpoint()
             .expect("the checkpoint is consolidated");
         let store = store(root.path());
         store
-            .publish(&authority, &checkpoint)
+            .publish(&authority, &complete)
             .expect("the complete checkpoint is published");
+        project
+            .apply(ProjectIntent::SetDpi { dpi: 420 })
+            .expect("a later action is completed");
+        let later = project
+            .recovery_checkpoint()
+            .expect("the later checkpoint is consolidated");
         let final_path = store
             .checkpoint_path(&authority)
             .expect("the checkpoint path is valid");
-        let interrupted = final_path.with_extension("json.interrupted.tmp");
-        std::fs::write(&interrupted, b"{\"schemaVersion\":")
-            .expect("the interrupted sibling remains partial");
+        let held = std::fs::OpenOptions::new()
+            .read(true)
+            .share_mode(0)
+            .open(&final_path)
+            .expect("another handle blocks the replacement");
 
-        let loaded = store
-            .load(&authority)
-            .expect("the complete checkpoint remains readable")
-            .expect("the complete checkpoint remains present");
+        assert!(store.publish(&authority, &later).is_err());
+        drop(held);
 
         assert_eq!(
-            loaded.to_bytes().expect("the loaded checkpoint serializes"),
-            checkpoint
+            store
+                .load(&authority)
+                .expect("the complete checkpoint remains readable")
+                .expect("the complete checkpoint remains present")
+                .to_bytes()
+                .expect("the loaded checkpoint serializes"),
+            complete
                 .to_bytes()
                 .expect("the prior checkpoint serializes")
         );
-        assert!(interrupted.is_file());
+        let siblings = std::fs::read_dir(final_path.parent().expect("the checkpoint has a parent"))
+            .expect("the checkpoint directory is readable")
+            .map(|entry| entry.expect("the entry is readable").path())
+            .collect::<Vec<_>>();
+        assert_eq!(siblings, [final_path]);
     }
 
     #[test]
@@ -509,14 +525,73 @@ mod tests {
     }
 
     #[test]
+    fn an_unreadable_checkpoint_is_invalid_data_and_is_preserved() {
+        let root = tempfile::tempdir().expect("temporary rejected Recovery fixture");
+        let first = create_project(root.path(), "Primeiro");
+        let second = create_project(root.path(), "Segundo");
+        let first_authority = authority(&first.project);
+        let store = store(root.path());
+        let complete = first
+            .project
+            .recovery_checkpoint()
+            .expect("the first checkpoint is consolidated");
+        store
+            .publish(&first_authority, &complete)
+            .expect("the first checkpoint is published");
+        let path = store
+            .checkpoint_path(&first_authority)
+            .expect("the checkpoint path is valid");
+        let complete = std::fs::read(&path).expect("the published checkpoint is readable");
+        // A valid checkpoint that another Project wrote, under this identity.
+        let of_another_project = second
+            .project
+            .recovery_checkpoint()
+            .expect("the second checkpoint is consolidated")
+            .to_bytes()
+            .expect("the second checkpoint serializes");
+
+        for unreadable in [
+            complete[..complete.len() / 2].to_vec(),
+            b"not a checkpoint".to_vec(),
+            of_another_project,
+        ] {
+            std::fs::write(&path, &unreadable).expect("the checkpoint is replaced");
+
+            let error = store
+                .load(&first_authority)
+                .expect_err("the checkpoint is refused");
+
+            assert_eq!(error.kind(), std::io::ErrorKind::InvalidData);
+            assert_eq!(
+                std::fs::read(&path).expect("the refused checkpoint remains"),
+                unreadable
+            );
+        }
+
+        assert!(
+            store
+                .finish(&first_authority)
+                .expect("finishing removes even a checkpoint that cannot be read")
+        );
+        assert!(
+            store
+                .load(&first_authority)
+                .expect("the namespace is readable again")
+                .is_none()
+        );
+    }
+
+    #[test]
     fn nearby_completed_actions_publish_only_the_latest_consolidated_state() {
         tauri::async_runtime::block_on(async {
             let root = tempfile::tempdir().expect("temporary debounced Recovery fixture");
             let mut project = create_project(root.path(), "Projeto").project;
             let authority = authority(&project);
             let store = store(root.path());
+            // Debounce timing is covered through the Host; here each scheduled
+            // worker is driven directly so the outcome never depends on the clock.
             let coordinator =
-                RecoveryCoordinator::with_delay(store.clone(), Duration::from_millis(60));
+                RecoveryCoordinator::with_delay(store.clone(), Duration::from_secs(3600));
             coordinator
                 .schedule(
                     authority.clone(),
@@ -525,6 +600,7 @@ mod tests {
                         .expect("the first action is consolidated"),
                 )
                 .expect("the first action is scheduled");
+            let replaced = coordinator.state.lock().unwrap().generation;
             project
                 .apply(ProjectIntent::SetDpi { dpi: 420 })
                 .expect("the nearby action is completed");
@@ -536,19 +612,24 @@ mod tests {
                         .expect("the latest action is consolidated"),
                 )
                 .expect("the latest action replaces the pending publication");
+            let latest = coordinator.state.lock().unwrap().generation;
 
-            tokio::time::sleep(Duration::from_millis(20)).await;
+            coordinator
+                .publish_if_current(replaced)
+                .expect("the replaced worker finishes");
             assert!(
                 store
                     .load(&authority)
-                    .expect("the namespace is readable before the delay")
+                    .expect("the namespace is readable after the replaced worker")
                     .is_none()
             );
-            tokio::time::sleep(Duration::from_millis(100)).await;
+            coordinator
+                .publish_if_current(latest)
+                .expect("the latest worker publishes");
             let bytes = store
                 .load(&authority)
-                .expect("the checkpoint is readable after the delay")
-                .expect("the checkpoint is published after the delay")
+                .expect("the checkpoint is readable after the latest worker")
+                .expect("the checkpoint is published by the latest worker")
                 .to_bytes()
                 .expect("the checkpoint serializes");
             let document: serde_json::Value =
@@ -565,7 +646,7 @@ mod tests {
             let authority = authority(&project);
             let store = store(root.path());
             let coordinator =
-                RecoveryCoordinator::with_delay(store.clone(), Duration::from_millis(50));
+                RecoveryCoordinator::with_delay(store.clone(), Duration::from_secs(3600));
             coordinator
                 .schedule(
                     authority.clone(),
@@ -574,13 +655,16 @@ mod tests {
                         .expect("the completed action is consolidated"),
                 )
                 .expect("the action is scheduled");
+            let cancelled = coordinator.state.lock().unwrap().generation;
 
             assert!(
                 !coordinator
                     .finish(&authority)
                     .expect("nothing was published yet")
             );
-            tokio::time::sleep(Duration::from_millis(100)).await;
+            coordinator
+                .publish_if_current(cancelled)
+                .expect("the cancelled worker finishes");
 
             assert!(
                 store

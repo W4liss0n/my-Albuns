@@ -89,6 +89,17 @@ for (let index = 0; index < count; index += 1) {
   await wait(40);
   samples.push({ index, first, settled: sample(index), expected: [...previews[index].rgb, 255] });
 }
+// Black and white must reach the first render: the same loaded Photo turns
+// into the integer luminance of design 0019 without a colour frame in between.
+const colourFrame = input.composition.sheets[0].frames[0];
+const [red, green, blue] = previews[0].rgb;
+const luminance = Math.floor((54 * red + 183 * green + 19 * blue + 128) / 256);
+const blackAndWhiteSample = { colour: sample(0), first: [] as number[], expected: [luminance, luminance, luminance, 255] };
+input.composition.sheets[0].frames[0] = { ...colourFrame, photo: { ...colourFrame.photo!, blackAndWhite: true } };
+scene.update(input, 500);
+blackAndWhiteSample.first = sample(0);
+input.composition.sheets[0].frames[0] = colourFrame;
+scene.update(input, 500);
 // A new generation of the same media must replace the visible pixels only
 // after its asynchronous texture load completes.
 const replacementUrl = `data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="600" height="400"><rect width="600" height="400" fill="#216abb"/></svg>')}`;
@@ -127,5 +138,5 @@ thumbnailSample.pending = sampleThumbnail();
 for (let attempt = 0; attempt < 200 && !loadedMediaPreviewImage(thumbnailUrl); attempt += 1) await wait(10);
 thumbnailSample.ready = sampleThumbnail();
 app.render();
-Object.assign(window, { photoPlacementTest: { samples, svgSample, openingSample, replacementSample, thumbnailSample } });
+Object.assign(window, { photoPlacementTest: { samples, blackAndWhiteSample, svgSample, openingSample, replacementSample, thumbnailSample } });
 document.body.dataset.ready = "true";

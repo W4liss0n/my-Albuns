@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { expect, test, vi } from "vitest";
 import type { ViewerPresentation } from "../application/imageViewerWindow";
 import { observeViewerPresentation } from "./viewerObservation";

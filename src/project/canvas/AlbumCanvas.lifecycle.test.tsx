@@ -1,12 +1,6 @@
 import { StrictMode } from "react";
 import { act, render, waitFor } from "@testing-library/react";
 import { expect, test, vi } from "vitest";
-
-import type { LogEvent, Logger } from "../../application/logging";
-import { composition } from "./albumCanvasTestFixtures";
-import type { CanvasGraphicsDiagnosticProbe } from "./canvasGraphicsDiagnosticProbeContext";
-import { createContinuousCanvasLayout } from "./canvasGeometry";
-import { LoggingProvider } from "../loggingContext";
 import {
   AlbumCanvas,
   finishPixiInitialization,
@@ -14,6 +8,12 @@ import {
   renderCanvas,
   setupAlbumCanvasTestHarness,
 } from "./albumCanvasTestHarness";
+
+import type { LogEvent, Logger } from "../../application/logging";
+import { composition } from "./albumCanvasTestFixtures";
+import type { CanvasGraphicsDiagnosticProbe } from "./canvasGraphicsDiagnosticProbeContext";
+import { createContinuousCanvasLayout } from "./canvasGeometry";
+import { LoggingProvider } from "../loggingContext";
 
 setupAlbumCanvasTestHarness();
 const pixiLifecycle = getPixiLifecycle();

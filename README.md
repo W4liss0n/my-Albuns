@@ -46,9 +46,11 @@ Essa configuração prioriza o tamanho e a execução do programa e pode aumenta
 o tempo da compilação. A medição está na
 [comparação de compilações Release](docs/research/2026-09-17-otimizacao-da-compilacao-release.md).
 
-`npm run validate` é o comando padrão: prepara o Processador de Imagens e executa
-build, contratos, tipos, testes
-React, testes da automação e verificações Rust sem abrir o MyAlbuns. O relatório
+`npm run validate` é o comando padrão: confere formatação Rust e tipos, executa
+testes React, testes da automação e as quatro regressões do Canvas em navegador
+sem janela (gestos de Quadro, inserção de Fotos, troca de conteúdo entre Quadros
+e isolamento de comandos entre janelas), prepara o Processador de Imagens e então
+executa build, contratos e verificações Rust sem abrir o MyAlbuns. O relatório
 e os logs por etapa ficam em `.tools/validation/`. Durante uma edição, os comandos
 de teste focados continuam disponíveis; não é necessário repetir a suíte inteira.
 

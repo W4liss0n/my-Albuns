@@ -1,4 +1,7 @@
-use std::path::{Path, PathBuf};
+use std::{
+    ffi::OsString,
+    path::{Path, PathBuf},
+};
 
 use myalbuns_paths::AppPaths;
 use tracing_appender::{
@@ -109,7 +112,11 @@ pub fn init_local_logging(
 /// starts the sidecar. Local discovery is only the fallback for an independent
 /// Processador execution.
 pub fn sidecar_log_directory(app_paths: &AppPaths) -> PathBuf {
-    std::env::var_os(LOG_DIRECTORY_ENV)
+    log_directory(std::env::var_os(LOG_DIRECTORY_ENV), app_paths)
+}
+
+fn log_directory(configured: Option<OsString>, app_paths: &AppPaths) -> PathBuf {
+    configured
         .filter(|value| !value.is_empty())
         .map(PathBuf::from)
         .unwrap_or_else(|| app_paths.logs_dir())
@@ -130,7 +137,7 @@ mod tests {
 
     use myalbuns_paths::AppPaths;
 
-    use super::{LOG_DIRECTORY_ENV, ProcessRole, safe_log_identifier, sidecar_log_directory};
+    use super::{ProcessRole, log_directory, safe_log_identifier};
 
     #[test]
     fn process_roles_have_stable_distinct_log_identities() {
@@ -153,14 +160,26 @@ mod tests {
 
     #[test]
     fn sidecar_directory_defaults_to_the_central_application_paths() {
-        if std::env::var_os(LOG_DIRECTORY_ENV).is_none() {
-            let app_paths = AppPaths::from_roots(Path::new(r"C:\Roaming"), Path::new(r"C:\Local"));
+        let app_paths = AppPaths::from_roots(Path::new(r"C:\Roaming"), Path::new(r"C:\Local"));
 
-            assert_eq!(
-                sidecar_log_directory(&app_paths),
-                Path::new(r"C:\Local\MyAlbuns2\Logs")
-            );
-        }
+        assert_eq!(
+            log_directory(None, &app_paths),
+            Path::new(r"C:\Local\MyAlbuns2\Logs")
+        );
+        assert_eq!(
+            log_directory(Some("".into()), &app_paths),
+            Path::new(r"C:\Local\MyAlbuns2\Logs")
+        );
+    }
+
+    #[test]
+    fn sidecar_directory_follows_the_one_supplied_by_the_host() {
+        let app_paths = AppPaths::from_roots(Path::new(r"C:\Roaming"), Path::new(r"C:\Local"));
+
+        assert_eq!(
+            log_directory(Some(r"D:\Host\Logs".into()), &app_paths),
+            Path::new(r"D:\Host\Logs")
+        );
     }
 
     #[test]

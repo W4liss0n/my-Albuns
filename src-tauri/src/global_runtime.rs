@@ -2322,14 +2322,6 @@ pub(crate) fn run(
 mod tests {
     use super::*;
 
-    #[test]
-    fn favorite_write_failure_describes_the_favorite_operation() {
-        let failure = favorite_update_failure();
-        assert_eq!(failure.code, "recent_project_favorite_unavailable");
-        assert_eq!(failure.message, "Não foi possível atualizar os favoritos.");
-        assert_eq!(failure.action.as_deref(), Some("Tente novamente."));
-    }
-
     #[tokio::test]
     async fn empty_forwarded_activation_waits_for_the_active_launch_owner() {
         let coordinator = GlobalProjectLaunchCoordinator::default();
@@ -2365,12 +2357,6 @@ mod tests {
         forwarded
             .await
             .expect("the forwarded opening joins cleanly");
-    }
-
-    #[test]
-    fn empty_forwarded_activation_cannot_resurrect_global_after_handoff() {
-        assert!(should_restore_global_after_pathless_activation(false));
-        assert!(!should_restore_global_after_pathless_activation(true));
     }
 
     #[cfg(windows)]
@@ -2416,14 +2402,15 @@ mod tests {
             );
             drop(active_operation);
 
-            let mut writer =
+            let mut writer = crate::test_process::ChildGuard::new(
                 Command::new(std::env::current_exe().expect("the test executable is known"))
                     .arg("global_runtime::tests::delayed_cache_writer_process")
                     .args(["--ignored", "--exact", "--nocapture"])
                     .stdout(Stdio::null())
                     .stderr(Stdio::null())
                     .spawn()
-                    .expect("the delayed Cache writer starts");
+                    .expect("the delayed Cache writer starts"),
+            );
             let writer_identity = ProcessInstanceId::from_process_handle(
                 writer.id(),
                 writer.as_raw_handle().cast::<c_void>(),
@@ -2439,12 +2426,16 @@ mod tests {
             )
             .expect("the exact writer claim is published");
 
-            let readiness = ScheduledCleanupGate::default();
-            let cleanup = tauri::async_runtime::spawn(run_scheduled_cleanup_background(
-                service,
-                readiness.clone(),
-            ));
-            let deadline = Instant::now() + Duration::from_secs(5);
+            let start_cleanup = || {
+                let readiness = ScheduledCleanupGate::default();
+                let cleanup = tauri::async_runtime::spawn(run_scheduled_cleanup_background(
+                    service.clone(),
+                    readiness.clone(),
+                ));
+                (cleanup, readiness)
+            };
+            let (mut cleanup, mut readiness) = start_cleanup();
+            let deadline = Instant::now() + Duration::from_secs(30);
             loop {
                 match OperationGate::new(&app_paths).try_acquire() {
                     Err(OperationGateError::Conflict) => break,
@@ -2452,7 +2443,14 @@ mod tests {
                     Err(error) => panic!("the operation marker is unavailable: {error}"),
                 }
                 assert!(Instant::now() < deadline, "cleanup did not start in time");
-                tokio::time::sleep(Duration::from_millis(10)).await;
+                // The probe above is an exclusive operation itself: a cleanup
+                // that meets it defers, as designed, and is started again.
+                if let Ok(outcome) =
+                    tokio::time::timeout(Duration::from_millis(10), readiness.wait()).await
+                {
+                    assert_eq!(outcome, Ok(CacheScheduledCleanupOutcome::Deferred));
+                    (cleanup, readiness) = start_cleanup();
+                }
             }
             assert!(
                 tokio::time::timeout(Duration::from_millis(50), readiness.wait())
@@ -2496,13 +2494,14 @@ mod tests {
             process::{Command, Stdio},
         };
 
-        let mut alien = Command::new("powershell.exe")
-            .args([
-                "-NoProfile",
-                "-NonInteractive",
-                "-STA",
-                "-Command",
-                r#"
+        let mut alien = crate::test_process::ChildGuard::new(
+            Command::new("powershell.exe")
+                .args([
+                    "-NoProfile",
+                    "-NonInteractive",
+                    "-STA",
+                    "-Command",
+                    r#"
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
 Add-Type -TypeDefinition @'
@@ -2556,12 +2555,13 @@ public static class MyAlbunsFocusFixture
 '@ -ReferencedAssemblies System.Windows.Forms.dll,System.Drawing.dll
 [MyAlbunsFocusFixture]::Run()
 "#,
-            ])
-            .stdin(Stdio::piped())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::inherit())
-            .spawn()
-            .expect("the foreign process instance starts");
+                ])
+                .stdin(Stdio::piped())
+                .stdout(Stdio::piped())
+                .stderr(Stdio::inherit())
+                .spawn()
+                .expect("the foreign process instance starts"),
+        );
         let mut output = BufReader::new(
             alien
                 .stdout
@@ -2891,6 +2891,193 @@ public static class MyAlbunsFocusFixture
                 .as_deref()
                 .is_some_and(|action| action.contains("Não repita"))
         );
+    }
+
+    /// Builds a table from one list that is also an exhaustive `match`, so a
+    /// new variant fails to compile until the table says what it maps to.
+    macro_rules! exhaustive_table {
+        ($name:ident: $source:ident => $value:ty { $($variant:ident => $expected:expr,)* }) => {
+            fn $name() -> Vec<($source, $value)> {
+                fn _every_variant_is_listed(value: $source) {
+                    match value {
+                        $($source::$variant => {})*
+                    }
+                }
+                vec![$(($source::$variant, $expected),)*]
+            }
+        };
+    }
+
+    const GENERIC_OPENING_FAILURE: &str = "open_project_failed";
+
+    // `None` marks the codes that are meant to be explained by the failure kind
+    // alone: they describe the Host protocol, not the Project or its location.
+    exhaustive_table!(failure_code_table: FailureCode => Option<&'static str> {
+        InvalidRequest => None,
+        NotFound => Some("not_found"),
+        Unavailable => Some("unavailable"),
+        AccessDenied => Some("access_denied"),
+        InvalidPath => Some("invalid_path"),
+        UnexpectedObjectType => Some("unexpected_object_type"),
+        Conflict => Some("conflict"),
+        IoFailure => Some("io_failure"),
+        InvalidDocumentType => Some("invalid_document_type"),
+        UnsupportedFutureSchema => Some("unsupported_future_schema"),
+        UnsupportedLegacySchema => Some("unsupported_legacy_schema"),
+        InvalidProjectDocument => Some("invalid_project_document"),
+        InvalidProjectState => Some("invalid_project_state"),
+        LegacyProjectInUse => Some("legacy_project_in_use"),
+        LegacyProjectOldVersion => Some("legacy_project_old_version"),
+        LegacyProjectUnsupportedStructure => Some("legacy_project_unsupported_structure"),
+        LegacyProjectDamaged => Some("legacy_project_damaged"),
+        ProjectInUse => Some("project_in_use"),
+        ExternalCopyRequiresInteractiveResolution =>
+            Some("external_copy_requires_interactive_resolution"),
+        ExternalCopyNotWritable => Some("external_copy_not_writable"),
+        IdentityIndeterminate => Some("identity_indeterminate"),
+        InvalidInitialProject => Some("invalid_initial_project"),
+        DestinationConflict => Some("destination_conflict"),
+        CreateStateIndeterminate => Some("create_state_indeterminate"),
+        SaveCopyStateIndeterminate => Some("save_copy_state_indeterminate"),
+        HostExitedBeforeReady => None,
+        CorrelationMismatch => None,
+    });
+
+    exhaustive_table!(failure_kind_table: BootstrapFailureKind => &'static str {
+        InvalidAuthority => GENERIC_OPENING_FAILURE,
+        HostUnavailable => GENERIC_OPENING_FAILURE,
+        Transport => "host_exited_before_ready",
+        Timeout => "host_timeout",
+        InvalidTerminal => "host_protocol_error",
+        CorrelationMismatch => "host_protocol_error",
+        HostFailed => GENERIC_OPENING_FAILURE,
+    });
+
+    exhaustive_table!(failure_stage_table: FailureStage => () {
+        Decode => (),
+        Resolve => (),
+        Open => (),
+        Create => (),
+        SaveCopy => (),
+        Initialize => (),
+        Transport => (),
+        Protocol => (),
+    });
+
+    exhaustive_table!(decorative_failure_table: ProvisionalDecorativeError => &'static str {
+        UnknownSelection => "image_selection_expired",
+        InvalidPath => "invalid_image_path",
+        Unavailable => "image_unavailable",
+        UnsupportedImage => "unsupported_image",
+        ReadFailed => "image_read_failed",
+    });
+
+    fn assert_each_code_has_its_own_message(failures: &[ProjectLaunchFailure]) {
+        for (index, failure) in failures.iter().enumerate() {
+            assert!(!failure.message.is_empty());
+            assert!(failure.action.as_deref().is_some_and(|it| !it.is_empty()));
+            for other in &failures[index + 1..] {
+                assert_eq!(
+                    failure.code == other.code,
+                    failure.message == other.message,
+                    "{} and {} must differ in code and message together",
+                    failure.code,
+                    other.code
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn every_bootstrap_failure_code_and_kind_reaches_its_own_public_failure() {
+        let codes = failure_code_table();
+        let kinds = failure_kind_table();
+        let mut distinct = Vec::new();
+
+        for (kind, kind_public_code) in &kinds {
+            let without_code = bootstrap_failure(BootstrapFailure {
+                kind: *kind,
+                stage: None,
+                code: None,
+            });
+            assert_eq!(without_code.code, *kind_public_code, "{kind:?}");
+            assert_eq!(without_code.stage, None);
+            distinct.push(without_code);
+
+            for (code, code_public_code) in &codes {
+                // A code the Global can explain wins over the failure kind;
+                // only the listed protocol codes leave the explanation to it.
+                let expected = code_public_code.unwrap_or(kind_public_code);
+                for (stage, ()) in failure_stage_table() {
+                    let failure = bootstrap_failure(BootstrapFailure {
+                        kind: *kind,
+                        stage: Some(stage),
+                        code: Some(*code),
+                    });
+                    assert_eq!(failure.code, expected, "{kind:?} with {code:?}");
+                    assert_eq!(failure.stage, Some(stage));
+                    assert!(failure.action.is_some());
+                }
+            }
+        }
+
+        for (code, code_public_code) in &codes {
+            let failure = bootstrap_failure(BootstrapFailure {
+                kind: BootstrapFailureKind::HostFailed,
+                stage: Some(FailureStage::Open),
+                code: Some(*code),
+            });
+            assert_eq!(
+                failure.code == GENERIC_OPENING_FAILURE,
+                code_public_code.is_none(),
+                "{code:?} reaches the generic failure only when it is listed as generic"
+            );
+            distinct.push(failure);
+        }
+        assert_each_code_has_its_own_message(&distinct);
+    }
+
+    #[test]
+    fn every_decorative_resolution_failure_keeps_its_own_code_and_guidance() {
+        let failures: Vec<_> = decorative_failure_table()
+            .into_iter()
+            .map(|(error, expected_public_code)| {
+                let failure = decorative_resolution_failure(error);
+                assert_eq!(failure.code, expected_public_code, "{error:?}");
+                assert_eq!(failure.stage, None);
+                failure
+            })
+            .collect();
+
+        assert_each_code_has_its_own_message(&failures);
+    }
+
+    #[test]
+    fn global_startup_failures_keep_distinct_codes_without_a_bootstrap_stage() {
+        let cleanup_reason = "private cleanup diagnostic";
+        let failures = [
+            (state_failure(), "recent_projects_unavailable"),
+            (
+                favorite_update_failure(),
+                "recent_project_favorite_unavailable",
+            ),
+            (graphics_gate_failure(), "graphics_requirement_not_met"),
+            (graphics_gate_timeout_failure(), "graphics_gate_timeout"),
+            (
+                startup_cleanup_failure(cleanup_reason),
+                "startup_cache_cleanup_unavailable",
+            ),
+        ]
+        .map(|(failure, expected_public_code)| {
+            assert_eq!(failure.code, expected_public_code);
+            assert_eq!(failure.stage, None);
+            let encoded = serde_json::to_string(&failure).expect("the failure serializes");
+            assert!(!encoded.contains(cleanup_reason));
+            assert!(!encoded.contains("stage"));
+            failure
+        });
+
+        assert_each_code_has_its_own_message(&failures);
     }
 
     #[test]

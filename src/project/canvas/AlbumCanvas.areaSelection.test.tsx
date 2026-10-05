@@ -1,7 +1,7 @@
 import { act, fireEvent } from "@testing-library/react";
 import { expect, test, vi } from "vitest";
-import { interactiveComposition } from "./albumCanvasTestFixtures";
 import { displayWithLabel, finishPixiInitialization, getPixiLifecycle, renderCanvas, setupAlbumCanvasTestHarness } from "./albumCanvasTestHarness";
+import { interactiveComposition } from "./albumCanvasTestFixtures";
 
 setupAlbumCanvasTestHarness();
 
@@ -111,8 +111,9 @@ test("releasing the mouse after Escape does not turn the cancelled drag into an 
   const view = await harness();
   view.start(0, 0);
   view.move(210, 90);
+  vi.useFakeTimers();
   fireEvent.keyDown(window, { key: "Escape" });
-  await act(async () => { await new Promise((resolve) => setTimeout(resolve, 5)); });
+  act(() => { vi.advanceTimersByTime(5); });
   view.finish(210, 90);
   const sheet = displayWithLabel("canvas-sheet-sheet-001");
   act(() => sheet.emit("pointertap", { target: sheet, button: 0, detail: 1 }));

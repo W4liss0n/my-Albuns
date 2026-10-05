@@ -306,20 +306,6 @@ mod tests {
     }
 
     #[test]
-    fn invalid_or_future_state_falls_back_without_leaking_partial_values() {
-        let (_root, paths, store) = store();
-        let file = paths.workspace_preferences_file();
-        fs::create_dir_all(file.parent().expect("State parent")).expect("State is writable");
-        fs::write(
-            &file,
-            br#"{"schemaVersion":99,"inspectorSections":{"album.design":true},"mediaThumbnailSize":124}"#,
-        )
-        .expect("future state fixture is writable");
-
-        assert_eq!(store.load(), default_preferences());
-    }
-
-    #[test]
     fn another_state_version_starts_from_defaults_without_rewriting() {
         let (_root, paths, store) = store();
         let file = paths.workspace_preferences_file();

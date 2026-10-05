@@ -1,3 +1,4 @@
+// @vitest-environment node
 // @ts-expect-error Node is available in Vitest but excluded from frontend types.
 import { readdirSync, readFileSync } from "node:fs";
 // @ts-expect-error Node is available in Vitest but excluded from frontend types.

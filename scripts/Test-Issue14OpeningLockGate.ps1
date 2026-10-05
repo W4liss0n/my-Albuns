@@ -23,7 +23,7 @@ $workspaceRoot = $script:WorkspaceRoot
 if ([string]::IsNullOrWhiteSpace($OutputPath)) {
     $OutputPath = Join-Path `
         $workspaceRoot `
-        'docs\research\artifacts\0040-issue-14-opening-lock.json'
+        '.scratch\gate-evidence\0040-issue-14-opening-lock.json'
 }
 elseif (-not [System.IO.Path]::IsPathRooted($OutputPath)) {
     $OutputPath = Join-Path $workspaceRoot $OutputPath

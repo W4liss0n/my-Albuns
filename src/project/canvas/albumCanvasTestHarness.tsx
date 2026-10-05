@@ -74,6 +74,10 @@ const pixiLifecycle = vi.hoisted(() => ({
   spriteTextures: [] as unknown[],
   generatedTextures: [] as Array<{ options: Record<string, unknown>; destroy: (destroySource?: boolean) => void }>,
   fillGradients: [] as Array<{ destroyCount: number }>,
+  filters: [] as Array<{
+    destroyCalls: unknown[][];
+    options: { glProgram?: { options: Record<string, unknown> } };
+  }>,
 }));
 
 export function getPixiLifecycle() {
@@ -188,6 +192,14 @@ vi.mock("pixi.js", () => {
 
     on(name: string, handler: (event: unknown) => void) {
       this.handlers.set(name, handler);
+      return this;
+    }
+
+    once(name: string, handler: (event: unknown) => void) {
+      this.handlers.set(name, (event) => {
+        this.handlers.delete(name);
+        handler(event);
+      });
       return this;
     }
 
@@ -414,6 +426,16 @@ vi.mock("pixi.js", () => {
     FederatedPointerEvent: class {},
     FederatedWheelEvent: class {},
     FillGradient,
+    Filter: class {
+      destroyCalls: unknown[][] = [];
+      constructor(readonly options: Record<string, unknown>) {
+        pixiLifecycle.filters.push(this);
+      }
+      destroy(...args: unknown[]) { this.destroyCalls.push(args); }
+    },
+    GlProgram: class {
+      constructor(readonly options: Record<string, unknown>) {}
+    },
     Graphics,
     Rectangle: class {
       constructor(
@@ -638,6 +660,7 @@ export function setupAlbumCanvasTestHarness() {
     pixiLifecycle.spriteTextures.length = 0;
     pixiLifecycle.generatedTextures.length = 0;
     pixiLifecycle.fillGradients.length = 0;
+    pixiLifecycle.filters.length = 0;
     vi.stubGlobal(
       "ResizeObserver",
       class {

@@ -179,41 +179,6 @@ mod tests {
     }
 
     #[test]
-    fn beginning_a_lease_resolves_the_global_conflict_before_waiting_for_processor() {
-        tauri::async_runtime::block_on(async {
-            let root = tempdir().expect("the staged acquisition fixture exists");
-            let paths = app_paths(root.path());
-            let gate = OperationGate::new(&paths);
-            let cache = CacheEngine::default();
-            let processor = ImagingProcessor::default();
-            let occupied_processor = processor
-                .reserve()
-                .await
-                .expect("the Processor can be reserved");
-
-            let acquisition = OperationLease::begin(&gate)
-                .expect("the first caller resolves the gate immediately");
-            assert!(
-                OperationLease::begin(&gate).is_err(),
-                "a concurrent caller receives a conflict before progress can start"
-            );
-
-            let mut completion = Box::pin(acquisition.complete(&cache, &processor));
-            assert!(
-                tokio::time::timeout(Duration::from_millis(20), &mut completion)
-                    .await
-                    .is_err(),
-                "the acquisition waits for the Processor only after owning the gate"
-            );
-            drop(completion);
-
-            OperationLease::begin(&gate)
-                .expect("cancelling the completion releases the partial gate grant");
-            drop(occupied_processor);
-        });
-    }
-
-    #[test]
     fn cancelling_while_waiting_for_processor_releases_gate() {
         tauri::async_runtime::block_on(async {
             let root = tempdir().expect("the Processor-cancellation fixture exists");
@@ -232,6 +197,10 @@ mod tests {
                     .await
                     .is_err(),
                 "the attempt must be waiting after acquiring the gate"
+            );
+            assert!(
+                OperationLease::begin(&gate).is_err(),
+                "a concurrent caller receives a conflict before progress can start"
             );
             drop(pending);
 

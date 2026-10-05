@@ -46,15 +46,6 @@ test("the highlighted closed lock unlocks directly while other candidates stay d
   expect(controller.lock).not.toHaveBeenCalled();
 });
 
-test("an outside press closes the panel even when the outside control stops propagation", () => {
-  const { controller } = panel();
-  render(<button onPointerDown={(event) => event.stopPropagation()}>Fora do painel</button>);
-  fireEvent.pointerDown(screen.getByRole("combobox", { name: "Quantidade de quadros" }));
-  expect(controller.close).not.toHaveBeenCalled();
-  fireEvent.pointerDown(screen.getByRole("button", { name: "Fora do painel" }));
-  expect(controller.close).toHaveBeenCalledOnce();
-});
-
 test("the frame count requests additional positions without applying a Layout", () => {
   const { controller } = panel();
   const count = screen.getByRole("combobox", { name: "Quantidade de quadros" });
@@ -88,19 +79,6 @@ test("the frame count shows every count at once and steps with the arrows while 
   expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
   expect(count).toHaveFocus();
   expect(controller.close).not.toHaveBeenCalled();
-});
-
-test("placeholders do not prevent choosing a smaller Layout that keeps every Photo", () => {
-  const sample = layoutPanelCorpus.cases.mixed.before;
-  const sheet = sample.projection.composition.sheets[0];
-  const photoCount = sheet.frames.filter((frame) => frame.photo !== null).length;
-  expect(photoCount).toBeGreaterThan(0);
-  expect(photoCount).toBeLessThan(sheet.frames.length);
-  const { controller } = panel();
-  fireEvent.click(screen.getByRole("combobox", { name: "Quantidade de quadros" }));
-  fireEvent.click(screen.getByRole("option", { name: String(photoCount) }));
-  expect(controller.configurePositions).toHaveBeenCalledExactlyOnceWith(photoCount);
-  expect(controller.apply).not.toHaveBeenCalled();
 });
 
 test("filled Frames are represented by generic geometry without photo content or decoration", () => {

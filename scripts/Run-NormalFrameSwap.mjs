@@ -15,7 +15,7 @@ const evidence = { schemaVersion: 1, gate: 'normal-frame-swap-gestures', collect
   sourceInputs: { initial: source(), final: null }, passed: false, cleanupCompleted: false, scenarios: [] };
 mkdirSync(output, { recursive: true });
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
-const browser = createHeadlessBrowserSession({ root, output, windowSize: '1024,859', requestTimeoutMilliseconds: 60000 });
+const browser = createHeadlessBrowserSession({ root, output, windowSize: '1024,859', requestTimeoutMilliseconds: 120000 });
 let request, session;
 try {
   const started = await browser.start();
@@ -27,7 +27,20 @@ try {
   const pointer = actions => request('POST', `/session/${session}/actions`, {actions:[{type:'pointer',id:'mouse',parameters:{pointerType:'mouse'},actions}]});
   const move = point => ({type:'pointerMove',origin:'viewport',...point,duration:120});
   const point = () => execute("return window.normalSwapTest.point('swap-frame-0')");
-  const state = () => execute("return {photos:document.body.dataset.frameSwapAllPhotos,selection:document.body.dataset.frameSwapSelection,intent:document.body.dataset.frameSwapLastIntent,editing:document.querySelector('.canvas-host canvas')?.getAttribute('aria-label')?.startsWith('Canvas da Lâmina em edição')} ");
+  // Waits for the gesture's own outcome instead of a fixed pause, so a slow
+  // runner neither fails early nor passes before the page reacted.
+  const until = async (description, read, accept) => {
+    const deadline = Date.now() + 10000;
+    for (;;) {
+      const value = await read();
+      if (accept(value)) return value;
+      assert.ok(Date.now() < deadline, description);
+      await delay(25);
+    }
+  };
+  const gestureEnded = () => until('the Frame gesture must end',
+    () => execute('return document.querySelector(".canvas-host canvas").classList.contains("pixi-canvas--frame-gesture")'), active => !active);
+  const state = () => execute("return {photos:document.body.dataset.frameSwapAllPhotos,selection:document.body.dataset.frameSwapSelection,intent:document.body.dataset.frameSwapLastIntent,editing:document.querySelector('.canvas-host canvas')?.getAttribute('aria-label')?.startsWith('área de edição da lâmina em edição')} ");
   for (const name of ['click','double-click','alt-pan','cross-sheet-scroll','escape','feedback']) {
     await request('POST', `/session/${session}/url`, {url:`http://127.0.0.1:${port}/previews/workspace-preview.html?frame=swap&swap=cross-photos&mode=normal`});
     let ready = false;
@@ -36,20 +49,19 @@ try {
       if(ready)break;
       await delay(100);
     }
-    assert.ok(ready,'Canvas must render'); await delay(300);
-    const initial=await state(), source=await point();
+    assert.ok(ready,'Canvas must render');
+    const initial=await until('the swap fixture must expose its Photos', state, current => Boolean(current.photos)), source=await point();
     if(name==='click'||name==='double-click') {
       const click=[move(source),{type:'pointerDown',button:0},{type:'pointerUp',button:0}];
       await pointer(name==='double-click' ? [...click,{type:'pause',duration:60},{type:'pointerDown',button:0},{type:'pointerUp',button:0}] : click);
-      await delay(200);
-      if(name==='click')assert.equal((await state()).selection,'swap-frame-0');
-      else assert.equal((await state()).editing,true);
+      if(name==='click')await until('a click must select the Frame', state, current => current.selection==='swap-frame-0');
+      else await until('a double click must enter Sheet editing', state, current => current.editing===true);
       assert.equal((await state()).photos,initial.photos);
     } else if(name==='alt-pan') {
       await key('keyDown','\uE00A');
       await pointer([move(source),{type:'pointerDown',button:0},move({x:source.x+30,y:source.y+15}),{type:'pointerUp',button:0}]);
-      await key('keyUp','\uE00A'); await delay(200);
-      const intent=JSON.parse((await state()).intent);
+      await key('keyUp','\uE00A');
+      const intent=JSON.parse((await until('Alt drag must commit a Photo transform', state, current => Boolean(current.intent))).intent);
       assert.equal(intent.kind,'transformPhoto'); assert.equal(intent.frameId,'swap-frame-0');
       assert.notEqual(intent.deltaPanX,0); assert.equal((await state()).photos,initial.photos);
     } else if(name==='feedback') {
@@ -80,19 +92,18 @@ try {
       if(name==='escape') {
         await pointer(begin);
         await key('keyDown','\uE00C'); await key('keyUp','\uE00C');
-        await pointer([{type:'pointerUp',button:0}]); await delay(200);
+        await pointer([{type:'pointerUp',button:0}]); await gestureEnded();
         assert.equal((await state()).photos,initial.photos); assert.equal((await state()).selection,'');
       } else {
         const target=await execute(`const point=window.normalSwapTest.point('swap-frame-4');
-          const scrollbar=document.querySelector('[role="scrollbar"][aria-label="Navegação horizontal das Lâminas"]');
+          const scrollbar=document.querySelector('[role="scrollbar"][aria-label="Navegação horizontal das lâminas"]');
           return {x:Math.round(point.x-Number(scrollbar.getAttribute('aria-valuemax'))+Number(scrollbar.getAttribute('aria-valuenow'))),y:point.y};`);
         // One W3C sequence retains native button/capture state across the edge pause.
         await pointer([...begin,{type:'pause',duration:1800},move(target),{type:'pause',duration:100},{type:'pointerUp',button:0}]);
-        await delay(300);
+        const after=await until('the cross-Sheet drop must swap the Photos', state,
+          current => current.photos==='00000000-0000-4000-8000-000000000002,00000000-0000-4000-8000-000000000002,empty,empty,00000000-0000-4000-8000-000000000001,empty');
         const revealed=await execute("return window.normalSwapTest.point('swap-frame-4')");
         assert.ok(revealed.x>bounds.left&&revealed.x<bounds.right-170,'auto-scroll must reveal the destination');
-        const after=await state();
-        assert.equal(after.photos,'00000000-0000-4000-8000-000000000002,00000000-0000-4000-8000-000000000002,empty,empty,00000000-0000-4000-8000-000000000001,empty');
         assert.equal(after.selection,'');
       }
     }

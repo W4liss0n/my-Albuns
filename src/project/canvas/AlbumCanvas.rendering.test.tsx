@@ -1,5 +1,15 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { expect, test, vi } from "vitest";
+import {
+  advancePixiTicker,
+  AlbumCanvas,
+  displayWithLabel,
+  displayWithHandler,
+  finishPixiInitialization,
+  getPixiLifecycle,
+  renderCanvas,
+  setupAlbumCanvasTestHarness,
+} from "./albumCanvasTestHarness";
 
 import finalRendererCorpus from "../../../tests/fixtures/final-renderer-cases-v1.json";
 import type { LogEvent, Logger } from "../../application/logging";
@@ -11,16 +21,6 @@ import {
 } from "./albumCanvasTestFixtures";
 import { createContinuousCanvasLayout } from "./canvasGeometry";
 import { MediaThumbnail } from "../media-panel/MediaThumbnail";
-import {
-  advancePixiTicker,
-  AlbumCanvas,
-  displayWithLabel,
-  displayWithHandler,
-  finishPixiInitialization,
-  getPixiLifecycle,
-  renderCanvas,
-  setupAlbumCanvasTestHarness,
-} from "./albumCanvasTestHarness";
 
 setupAlbumCanvasTestHarness();
 const pixiLifecycle = getPixiLifecycle();
@@ -640,6 +640,9 @@ test("enters sheet editing by a double click on either surface or Frame", async 
   await finishPixiInitialization();
   const sheet = displayWithHandler("pointertap");
 
+  sheet.emit("pointertap", { button: 0, target: sheet, detail: 1 });
+  expect(onEditSheet).not.toHaveBeenCalled();
+
   sheet.emit("pointertap", { button: 0, target: sheet, detail: 2 });
   expect(onEditSheet).toHaveBeenCalledWith("sheet-001");
 
@@ -687,29 +690,6 @@ test("leaves right-button taps on the Pixi surface, Frame, and Sheet Bar to the 
   expect(onFocusSheet).not.toHaveBeenCalled();
   expect(onSelectFrame).not.toHaveBeenCalled();
   expect(onEditSheet).not.toHaveBeenCalled();
-});
-
-test("editing mode materializes only its isolated sheet", async () => {
-  renderCanvas({
-    compositionPlan: threeSheetComposition,
-    mode: { kind: "sheet-editing", sheetId: "sheet-002" },
-  });
-  await finishPixiInitialization();
-  const world = pixiLifecycle.instances[0].stage.children[0] as {
-    children: unknown[];
-  };
-
-  expect(world.children).toHaveLength(1);
-  expect(
-    pixiLifecycle.displays.some(
-      (display) => display.label === "sheet-focus-sheet-002",
-    ),
-  ).toBe(true);
-  expect(
-    pixiLifecycle.displays.some(
-      (display) => display.label === "sheet-focus-sheet-001",
-    ),
-  ).toBe(false);
 });
 
 test.each([
@@ -1029,19 +1009,6 @@ test("keeps the Layout button and its Bar visible while the DOM action has focus
   fireEvent.blur(button);
   await act(async () => { await vi.advanceTimersByTimeAsync(160); });
   expect(currentBarNode("sheet-bar-sheet-001").alpha).toBe(0);
-});
-
-test("enters Sheet Edit Mode on the second pointer tap of a Sheet", async () => {
-  const onEditSheet = vi.fn();
-  renderCanvas({ onEditSheet });
-  await finishPixiInitialization();
-
-  const sheet = displayWithLabel("canvas-sheet-sheet-001");
-  sheet.emit("pointertap", { button: 0, detail: 1, target: sheet });
-  expect(onEditSheet).not.toHaveBeenCalled();
-
-  sheet.emit("pointertap", { button: 0, detail: 2, target: sheet });
-  expect(onEditSheet).toHaveBeenCalledWith("sheet-001");
 });
 
 test.each([
@@ -1629,54 +1596,6 @@ test("uses the loaded photo when the unused-media filter removes its thumbnail i
   ]);
 });
 
-test("materializes a transparent Decorative from the shared Cache URL", async () => {
-  const previewUrl =
-    "http://myalbuns-cache.localhost/decorative-token";
-  const texture = { label: "decorative-cache-preview" };
-  const decorativeComposition: CompositionPlan = {
-    ...composition,
-    sheets: [
-      {
-        ...composition.sheets[0],
-        overlays: [
-          {
-            mediaId: "decorative-overlay",
-            name: "Overlay translúcido.png",
-            drawRect: {
-              x: 0,
-              y: 0,
-              width: composition.sheets[0].widthUm,
-              height: composition.sheets[0].heightUm,
-            },
-          },
-        ],
-      },
-    ],
-  };
-
-  renderCanvas({
-    compositionPlan: decorativeComposition,
-    mediaPreviewUrls: {
-      "decorative-overlay": previewUrl,
-    },
-  });
-  await finishPixiInitialization();
-
-  expect(pixiLifecycle.assetLoads).toEqual([previewUrl]);
-
-  await act(async () => {
-    pixiLifecycle.resolveAssetLoads[0]?.(texture);
-    await Promise.resolve();
-    await Promise.resolve();
-  });
-  await waitFor(() => {
-    expect(pixiLifecycle.spriteTextures).toEqual([texture]);
-    expect(
-      displayWithLabel("decorative-overlay-decorative-overlay"),
-    ).toBeDefined();
-  });
-});
-
 test("renders Background and Overlay from opaque Cache representations and reports visible demand", async () => {
   const backgroundTexture = { label: "background-cache-preview" };
   const overlayTexture = { label: "overlay-cache-preview" };
@@ -1742,6 +1661,9 @@ test("renders Background and Overlay from opaque Cache representations and repor
     await Promise.resolve();
   });
   await waitFor(() => {
+    expect(pixiLifecycle.spriteTextures).toEqual(
+      expect.arrayContaining([backgroundTexture, overlayTexture]),
+    );
     expect(displayWithLabel("background-media-background-media"))
       .toBeDefined();
     expect(displayWithLabel("decorative-overlay-overlay-media"))
@@ -2334,4 +2256,135 @@ test("slides intermediate Pixi Sheets while the dragged Sheet yields to the plac
   expect(third.visible).toBe(true);
   await advancePixiTicker(140);
   expect(second.position.x).toBe(initialPositions[1]);
+});
+
+// The 1200 x 500 px Canvas fits the Sheet height into 500 - 2 * 28 = 444 px
+// and centres a lone Sheet horizontally. A 600 x 300 mm Sheet is therefore
+// drawn at 1.48 px/mm with its top-left corner at (156, 28); a 600 x 222 mm
+// Sheet at 2 px/mm with its corner at (0, 28).
+test.each([
+  {
+    name: "a spread",
+    compositionPlan: composition,
+    canvasBounds: { left: 0, top: 0, width: 1_200, height: 500 },
+    // 148 px right and 74 px below the Sheet corner: 100 mm and 50 mm.
+    client: { x: 304, y: 102 },
+    expected: { sheetId: "sheet-001", xUm: 100_000, yUm: 50_000 },
+  },
+  {
+    name: "a right single Page, measured from the Page and not from the inactive side",
+    compositionPlan: createSinglePageComposition("right"),
+    canvasBounds: { left: 0, top: 0, width: 1_200, height: 500 },
+    // 518 px right of the Sheet corner is 350 mm into the opened Sheet, that
+    // is 50 mm into the 300 mm Page on its right half.
+    client: { x: 674, y: 102 },
+    expected: { sheetId: "sheet-001", xUm: 50_000, yUm: 50_000 },
+  },
+  {
+    name: "a Canvas displayed at half its backing size away from the window origin",
+    compositionPlan: composition,
+    canvasBounds: { left: 100, top: 40, width: 600, height: 250 },
+    // Each CSS px covers two backing px: (152, 51) CSS px into the element is
+    // the same backing point as the first case.
+    client: { x: 252, y: 91 },
+    expected: { sheetId: "sheet-001", xUm: 100_000, yUm: 50_000 },
+  },
+  {
+    name: "a Sheet drawn at 2 px/mm",
+    compositionPlan: {
+      ...composition,
+      sheets: [{ ...composition.sheets[0], heightUm: 222_000 }],
+    },
+    canvasBounds: { left: 0, top: 0, width: 1_200, height: 500 },
+    // 200 px right and 100 px below the Sheet corner: 100 mm and 50 mm.
+    client: { x: 200, y: 128 },
+    expected: { sheetId: "sheet-001", xUm: 100_000, yUm: 50_000 },
+  },
+])(
+  "sends the dropped Photo point in Sheet micrometres for $name",
+  async ({ compositionPlan, canvasBounds, client, expected }) => {
+    const onResolvePhotoDropTarget = vi.fn(async () => ({
+      kind: "sheet" as const,
+      sheetId: "sheet-001",
+    }));
+    const onDropPhoto = vi.fn(async () => true);
+    const view = renderCanvas({
+      compositionPlan,
+      onResolvePhotoDropTarget,
+      onDropPhoto,
+    });
+    await finishPixiInitialization();
+    vi.spyOn(
+      pixiLifecycle.instances[0].canvas,
+      "getBoundingClientRect",
+    ).mockReturnValue({
+      ...canvasBounds,
+      x: canvasBounds.left,
+      y: canvasBounds.top,
+      right: canvasBounds.left + canvasBounds.width,
+      bottom: canvasBounds.top + canvasBounds.height,
+      toJSON: () => ({}),
+    });
+
+    view.rerenderCanvas({
+      mediaDrag: {
+        gestureId: 1,
+        mediaId: "media-002",
+        kind: "photo",
+        x: client.x,
+        y: client.y,
+        shiftKey: false,
+        phase: "drop",
+      },
+    });
+    await waitFor(() => expect(onDropPhoto).toHaveBeenCalledOnce());
+
+    expect(onResolvePhotoDropTarget).toHaveBeenCalledOnce();
+    const calls = [
+      onResolvePhotoDropTarget.mock.calls[0] as unknown[],
+      onDropPhoto.mock.calls[0] as unknown[],
+    ];
+    for (const [mediaId, point] of calls) {
+      expect(mediaId).toBe("media-002");
+      const { sheetId, xUm, yUm } = point as {
+        sheetId: string;
+        xUm: number;
+        yUm: number;
+      };
+      expect(sheetId).toBe(expected.sheetId);
+      expect(Number.isInteger(xUm) && Number.isInteger(yUm)).toBe(true);
+      // The point is floored: binary division may land one micrometre short.
+      expect(Math.abs(xUm - expected.xUm)).toBeLessThanOrEqual(1);
+      expect(Math.abs(yUm - expected.yUm)).toBeLessThanOrEqual(1);
+    }
+  },
+);
+
+test("does not resolve a Photo drop over the inactive side of a right single Page", async () => {
+  const onResolvePhotoDropTarget = vi.fn(async () => ({
+    kind: "sheet" as const,
+    sheetId: "sheet-001",
+  }));
+  const onDropPhoto = vi.fn(async () => true);
+  const onPhotoDragCancel = vi.fn();
+  const view = renderCanvas({
+    compositionPlan: createSinglePageComposition("right"),
+    onResolvePhotoDropTarget,
+    onDropPhoto,
+    onPhotoDragCancel,
+  });
+  await finishPixiInitialization();
+  vi.spyOn(
+    pixiLifecycle.instances[0].canvas,
+    "getBoundingClientRect",
+  ).mockReturnValue({
+    left: 0, top: 0, width: 1_200, height: 500, right: 1_200, bottom: 500, x: 0, y: 0, toJSON: () => ({}),
+  });
+
+  // 148 px right of the Sheet corner is 100 mm into the inactive left half.
+  view.rerenderCanvas({ mediaDrag: { gestureId: 1, mediaId: "media-002", kind: "photo", x: 304, y: 102, shiftKey: false, phase: "drop" } });
+
+  expect(onPhotoDragCancel).toHaveBeenCalledOnce();
+  expect(onResolvePhotoDropTarget).not.toHaveBeenCalled();
+  expect(onDropPhoto).not.toHaveBeenCalled();
 });

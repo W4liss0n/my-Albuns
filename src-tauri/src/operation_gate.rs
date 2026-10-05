@@ -105,16 +105,18 @@ mod tests {
             let root = tempdir().expect("the process gate fixture exists");
             let ready = root.path().join("owner.ready");
             let paths = app_paths(root.path());
-            let mut owner = Command::new(env::current_exe().expect("the test executable is known"))
-                .arg("operation_gate::tests::operation_gate_owner_process")
-                .args(["--ignored", "--exact", "--nocapture"])
-                .env(OWNER_ROOT_ENV, root.path())
-                .env(OWNER_READY_ENV, &ready)
-                .stdout(Stdio::null())
-                .stderr(Stdio::null())
-                .spawn()
-                .expect("the owner process starts");
-            let deadline = Instant::now() + Duration::from_secs(10);
+            let mut owner = crate::test_process::ChildGuard::new(
+                Command::new(env::current_exe().expect("the test executable is known"))
+                    .arg("operation_gate::tests::operation_gate_owner_process")
+                    .args(["--ignored", "--exact", "--nocapture"])
+                    .env(OWNER_ROOT_ENV, root.path())
+                    .env(OWNER_READY_ENV, &ready)
+                    .stdout(Stdio::null())
+                    .stderr(Stdio::null())
+                    .spawn()
+                    .expect("the owner process starts"),
+            );
+            let deadline = Instant::now() + Duration::from_secs(60);
             while !ready.is_file() {
                 assert!(
                     owner

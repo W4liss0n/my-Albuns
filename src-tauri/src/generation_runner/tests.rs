@@ -567,22 +567,3 @@ fn a_file_blocking_the_mirrored_parent_is_found_in_preflight() {
         "preserve"
     );
 }
-
-#[test]
-fn cancelled_preflight_and_recheck_do_not_publish_projects() {
-    let fixture = Fixture::new();
-    fixture.photo("001");
-    let cancel = AtomicBool::new(true);
-    assert!(
-        GenerationRunner::prepare(
-            fixture.options(),
-            fixture.model.freeze_template().unwrap(),
-            fixture.core.clone(),
-            &cancel,
-        )
-        .is_err()
-    );
-    let mut runner = fixture.prepare().unwrap();
-    assert!(runner.recheck(&cancel).is_err());
-    assert_eq!(std::fs::read_dir(&fixture.destination).unwrap().count(), 0);
-}

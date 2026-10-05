@@ -368,21 +368,9 @@ test("uses only the minimal Tauri core, event, and window bridges", () => {
   expect(projectWindowCapability).not.toContain("dialog:");
 });
 
-test("consumes the generated import result at the Tauri boundary", () => {
-  const projectPortSource = sourceFiles["./tauriProjectPorts.ts"];
-
-  expect(projectPortSource).toContain(
-    'import type { ImportMediaResult as IpcImportMediaResult } from "../contracts/generated/ImportMediaResult";',
-  );
-  expect(projectPortSource).toContain(
-    'invokeImageProcessing<IpcImportMediaResult>("import_media", { selection }, onProgress)',
-  );
-});
-
 test("initializes the native dialog used by the productive relink command", () => {
   expect(projectCommandsSource).toContain("app.dialog()");
   expect(productRuntimeSource).toContain(
     ".plugin(tauri_plugin_dialog::init())",
   );
-  expect(projectWindowCapability).not.toContain("dialog:");
 });

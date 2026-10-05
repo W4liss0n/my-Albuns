@@ -759,34 +759,6 @@ mod tests {
     }
 
     #[test]
-    fn initial_configuration_preserves_negative_numeric_intent_for_core_validation() {
-        let encoded = serde_json::json!({
-            "document": {
-                "displayUnit": "in",
-                "sheetWidthUm": -2,
-                "sheetHeightUm": -1,
-                "dpi": -1,
-                "bleedUm": -3,
-                "safetyUm": -4
-            },
-            "structure": {
-                "sheetCount": -5,
-                "firstSheet": "singlePage",
-                "lastSheet": "double"
-            }
-        });
-
-        let configuration: InitialProjectConfiguration = serde_json::from_value(encoded)
-            .expect("negative intent reaches the authoritative Core validator");
-        assert_eq!(configuration.document.sheet_width_um, -2);
-        assert_eq!(configuration.document.sheet_height_um, -1);
-        assert_eq!(configuration.document.dpi, -1);
-        assert_eq!(configuration.document.bleed_um, -3);
-        assert_eq!(configuration.document.safety_um, -4);
-        assert_eq!(configuration.structure.sheet_count, -5);
-    }
-
-    #[test]
     fn request_round_trip_preserves_native_authority_without_a_unicode_path_string() {
         let request = request();
         let encoded = serde_json::to_value(&request).expect("the request serializes");

@@ -25,7 +25,7 @@ test("native scenarios are independent selections and unknown selections fail cl
 });
 
 test("local desktop gates stop before toolchain, build or application launch", () => {
-  for (const script of ["Test-FocusedOwnedDialogGate.ps1", "Test-ProjectCloseGate.ps1", "Test-ProductiveJourney.ps1", "Test-DevLifecycle.ps1", "Test-Issue14OpeningLockGate.ps1", "Test-WindowsPathGate.ps1", "Test-ImagingRecovery.ps1", "Test-SaveAsJourney.ps1", "Test-SessionRecoveryJourney.ps1"]) {
+  for (const script of ["Test-FocusedOwnedDialogGate.ps1", "Test-ProjectCloseGate.ps1", "Test-ProductiveJourney.ps1", "Test-DevLifecycle.ps1", "Test-Issue14OpeningLockGate.ps1", "Test-WindowsPathGate.ps1", "Test-ImagingRecovery.ps1"]) {
     const result = powershell('& $env:MYALBUNS_TEST_GATE', { MYALBUNS_TEST_GATE: path.join(scripts, script) });
     assert.notEqual(result.status, 0, script);
     assert.match(result.stderr, /Visible native tests are disabled locally/, script);
@@ -120,7 +120,7 @@ test("native manifest rewrites remain clean after a Windows checkout", () => {
 test("default validation calls only the declared headless checks", () => {
   const validation = readFileSync(path.join(scripts, "Validate-Headless.ps1"), "utf8");
   assert.doesNotMatch(validation, /Test-FocusedOwnedDialogGate|Test-ProductiveJourney|Run-RealCanvasGate|AllowVisibleWindows/);
-  for (const command of ["sidecar:prepare", "build", "test:owned-window-fitting", "test:automation", "quality:rust", "test:rust"]) assert.ok(validation.includes(command));
+  for (const command of ["sidecar:prepare", "build", "test:owned-window-fitting", "test:automation", "test:frame-gestures", "test:photo-placement", "test:normal-frame-swap", "test:command-windows", "quality:rust", "test:rust"]) assert.ok(validation.includes(command));
   assert.ok(validation.indexOf("frontend-build") < validation.indexOf("owned-window-fitting"), "the fitting regression must exercise the frontend produced by this validation");
   assert.ok(validation.indexOf("sidecar:prepare") < validation.indexOf("frontend-build"), "the processor must exist before Tauri generates IPC contracts in a fresh checkout");
   const workflow = readFileSync(path.join(workspace, ".github/workflows/validation.yml"), "utf8");

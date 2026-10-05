@@ -21,7 +21,7 @@ $workspaceRoot = $script:WorkspaceRoot
 if ([string]::IsNullOrWhiteSpace($OutputPath)) {
     $OutputPath = Join-Path `
         $workspaceRoot `
-        'docs\research\artifacts\0023-productive-journey.json'
+        '.scratch\gate-evidence\0023-productive-journey.json'
 }
 elseif (-not [System.IO.Path]::IsPathRooted($OutputPath)) {
     $OutputPath = Join-Path $workspaceRoot $OutputPath

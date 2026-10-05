@@ -60,6 +60,7 @@ test("cache recovery awaits cleanup, uses determinate progress and waits again o
   await act(async () => action("cancelStorage"));
   const count = present.mock.calls.length;
   hook.rerender({ enabled: false }); hook.rerender({ enabled: true });
+  await act(async () => {});
   expect(present).toHaveBeenCalledTimes(count);
   expect(onResumed).not.toHaveBeenCalled();
 });
