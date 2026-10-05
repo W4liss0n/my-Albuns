@@ -1,4 +1,5 @@
 mod application_modality;
+mod automation;
 mod batch_exclusivity;
 mod batch_runner;
 mod batch_window;
@@ -124,6 +125,11 @@ pub fn run() {
         eprintln!("não foi possível executar o MyAlbuns: {error}");
         std::process::exit(1);
     }
+}
+
+/// Runs one automation session for another program and returns its exit code.
+pub fn run_cli() -> i32 {
+    automation::run(std::env::args_os())
 }
 
 fn run_selected_runtime_role() -> Result<(), Box<dyn std::error::Error>> {

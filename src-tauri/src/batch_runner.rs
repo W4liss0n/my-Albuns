@@ -639,4 +639,4 @@ fn walk_files(
 }
 
 #[cfg(test)]
-mod tests;
+pub(crate) mod tests;
