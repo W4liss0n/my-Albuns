@@ -687,6 +687,9 @@ export function ProjectWorkspace({
     navigateToNextSheet: () => controller.navigateToAdjacentSheet("next"),
     navigateToPreviousSheet: () =>
       controller.navigateToAdjacentSheet("previous"),
+    cycleToNextLayout: () => { void controller.cycleLayout("next"); },
+    cycleToPreviousLayout: () => { void controller.cycleLayout("previous"); },
+    layoutCycleActive: sheetNavigationActive,
     redo: controller.redo,
     save: controller.save,
     saveAs: controller.saveAs,

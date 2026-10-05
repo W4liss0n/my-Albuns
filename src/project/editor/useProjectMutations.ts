@@ -8,6 +8,7 @@ import { edgeConversionLoss, type EdgeConversionLoss } from "../../application/e
 import type { ProjectDialogPort } from "../../application/projectDialogPort";
 import type { CanvasPhotoDropPoint } from "../canvas/albumCanvasContract";
 import type { PrepareImportedMedia } from "../../application/mediaPreviews";
+import { nextLayoutIndex, type LayoutCycleDirection } from "../layouts/layoutCycle";
 
 import type {
   ComposedFrame,
@@ -147,6 +148,24 @@ export function useProjectMutations({
       const target = current.state.album.sheets.find((sheet) => sheet.id === sheetId);
       if (target?.activeSides !== "both") return current;
       const next = await imageProcessing.run((publish) => port.apply({ kind: "swapSheetSides", sheetId }, publish));
+      applied = true;
+      return next;
+    }, true);
+    return completed && applied;
+  }
+
+  // Query and apply in the same queued operation: a mutation between them would
+  // change the revision and the Core would refuse the stale selection.
+  async function cycleLayout(sheetId: string, direction: LayoutCycleDirection) {
+    let applied = false;
+    const completed = await runWithErrorFeedback(async (port, latestProjection) => {
+      const current = latestProjection ?? projection;
+      if (!current.state.album.sheets.some((sheet) => sheet.id === sheetId)) return current;
+      const query = await port.queryLayouts(sheetId);
+      const candidateIndex = nextLayoutIndex(query, direction);
+      if (candidateIndex === null) return current;
+      const next = await imageProcessing.run((publish) => port.apply(
+        { kind: "applyLayout", selection: { queryId: query.queryId, candidateIndex } }, publish));
       applied = true;
       return next;
     }, true);
@@ -535,6 +554,7 @@ export function useProjectMutations({
     commitFrameGeometry,
     swapFrameContentsAtPoint,
     swapSheetSides,
+    cycleLayout,
     orientPhotos,
     togglePhotoBlackAndWhite,
     commitPhotoAngle,

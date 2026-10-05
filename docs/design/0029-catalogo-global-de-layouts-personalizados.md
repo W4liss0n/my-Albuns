@@ -2,7 +2,7 @@
 status: accepted
 document: design
 date: 2026-09-09
-updated: 2026-09-10
+updated: 2026-10-05
 ticket: 27
 implementation-readiness: ready-for-agent
 ---
@@ -69,8 +69,9 @@ consulta obsoleta. Reabrir o Painel permite repetir uma consulta.
 
 A sessão do Core conserva o catálogo fora das revisões do Projeto. Undo/Redo
 não restaura versões globais antigas. A organização automática recebe essa
-fonte explicitamente e mantém a prioridade: Último Layout, Favoritos,
-Personalizados, Gerador e reserva. A etapa de Favoritos é implementada pelo
+fonte explicitamente e mantém a prioridade: Último Layout, Personalizados
+favoritos, Personalizados, Automáticos favoritos, Gerador e reserva
+(ordem atualizada em 05/10/2026). A etapa de Favoritos é implementada pelo
 ticket #29.
 
 ## Feedback e exclusão

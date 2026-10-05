@@ -228,7 +228,19 @@ impl LayoutRules {
         // Saved layouts remain available for explicit selection. Automatic
         // arrangement must preserve the orientation of each current Frame and
         // never prints a Photo to the edges of a whole Page on its own.
-        if let Some(candidate) = listing.candidates.iter().find(|candidate| {
+        // Priority: the last applied Layout, then custom favorites, custom,
+        // automatic favorites and automatic. The sort is stable, so each group
+        // keeps the listing order. The keyboard Layout cycle uses the same groups.
+        let mut prioritized: Vec<&LayoutCandidate> = listing.candidates.iter().collect();
+        prioritized.sort_by_key(|candidate| {
+            if candidate.is_last_applied {
+                0
+            } else {
+                1 + u8::from(candidate.layout.origin != LayoutOrigin::Custom) * 2
+                    + u8::from(candidate.favorite_id.is_none())
+            }
+        });
+        if let Some(candidate) = prioritized.into_iter().find(|candidate| {
             let positions = &candidate.layout.definition.positions;
             positions
                 .iter()

@@ -2,7 +2,7 @@
 status: accepted
 document: design
 date: 2026-09-09
-updated: 2026-09-24
+updated: 2026-10-05
 ticket: 29
 implementation-readiness: ready-for-agent
 ---
@@ -38,8 +38,17 @@ A apresentação lista o Último Layout compatível, os Favoritos, os Personaliz
 globais e o Gerador; cada seção preserva essa ordem. Favoritos usam primeiro
 `order` e, em empate, seu UUID. A criação recebe a próxima ordem disponível e a
 exclusão conserva as ordens existentes. Undo/Redo restaura identidade e ordem.
-A aplicação automática mantém Último Layout, primeiro Favorito compatível,
-primeiro Personalizado, Gerador e reserva como sequência de prioridade.
+Desde 05/10/2026 a aplicação automática usa a mesma ordem da troca por
+teclado: Último Layout compatível, Personalizados favoritos, Personalizados,
+Automáticos favoritos, Gerador e reserva. Dentro de cada grupo vale a ordem
+da listagem (`order` dos Favoritos, criação dos Personalizados, nota do
+Gerador). Antes, todo Favorito precedia os Personalizados sem estrela.
+
+A troca por teclado (`↑` e `↓`, design 0018) usa os mesmos grupos:
+a interface reordena a listagem recebida de forma estável por origem e por
+estrela, o que resulta em Personalizados favoritos, Personalizados, Automáticos
+favoritos e Automáticos. Dentro de cada grupo vale a ordem da listagem, e o
+Último Layout conserva a primeira posição do seu grupo, como o painel mostra.
 
 A cópia favorita continua disponível quando a origem global muda ou desaparece.
 A lixeira só aparece quando existe uma entrada global da mesma geometria.

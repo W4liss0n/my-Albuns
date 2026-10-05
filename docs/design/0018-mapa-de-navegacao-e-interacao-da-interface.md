@@ -2,7 +2,7 @@
 status: accepted
 document: design
 date: 2026-08-27
-updated: 2026-08-30
+updated: 2026-10-02
 ticket: 4-programa-05-arquitetura-de-ui-mapa-de-telas-e-interacao-do-editor
 ---
 
@@ -146,6 +146,7 @@ sem quebrar os rótulos nem alterar ordem, foco ou semântica.
 
 - O Canvas contínuo mantém todas as Lâminas interativas e sem Zoom manual.
 - As teclas físicas `←` e `→` centralizam a Lâmina física anterior e seguinte pelo catálogo público de comandos. Não existem botões permanentes de anterior/próxima nos cantos; controles editáveis, diálogos, menus, Modo de edição e gestos com semântica própria conservam ownership do teclado.
+- As teclas físicas `↑` e `↓` aplicam o próximo e o anterior Layout à Lâmina centralizada pelo mesmo catálogo (`next-layout` e `previous-layout`), sem abrir o Painel de layouts. O ciclo percorre Personalizados favoritos, Personalizados, Automáticos favoritos e Automáticos, parte do Último Layout aplicado e volta ao início nas extremidades; candidatos que exigem o cadeado ficam fora e uma Lâmina travada ignora as teclas sem aviso. Valem as mesmas condições de ativação e de ownership das setas horizontais; com o Painel de layouts aberto, a tecla reutiliza a consulta preparada do painel.
 - A roda navega horizontalmente sobre toda a superfície e Barra da Lâmina, sem zona morta assimétrica; um controle só a retém quando possui semântica específica de wheel.
 - Abrir ou dispensar o menu contextual não navega, seleciona ou centraliza. O alvo clicado permanece explícito para seus comandos, independentemente da Lâmina centralizada.
 - Barra da Lâmina e Grade iniciam a mesma operação de reordenação, mas não compartilham a semântica do clique: a Barra seleciona/ativa sem navegar nem alterar `viewport.offsetX`, enquanto a Grade centraliza a Lâmina.

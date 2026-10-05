@@ -35,8 +35,11 @@ interface ProjectCommandShortcutHandlers {
   canRedo: boolean;
   canUndo: boolean;
   closeProject(): void;
+  cycleToNextLayout(): void;
+  cycleToPreviousLayout(): void;
   deleteSheet(): void;
   disabled: boolean;
+  layoutCycleActive: boolean;
   navigateToNextSheet(): void;
   navigateToPreviousSheet(): void;
   redo(): void;
@@ -65,8 +68,11 @@ export function useProjectCommandShortcuts({
   canRedo,
   canUndo,
   closeProject,
+  cycleToNextLayout,
+  cycleToPreviousLayout,
   deleteSheet,
   disabled,
+  layoutCycleActive,
   navigateToNextSheet,
   navigateToPreviousSheet,
   redo,
@@ -133,6 +139,12 @@ export function useProjectCommandShortcuts({
         return;
       }
       if (
+        (command === "next-layout" || command === "previous-layout") &&
+        (!layoutCycleActive || ownsEditingKeys(event.target))
+      ) {
+        return;
+      }
+      if (
         (command === "undo" ||
           command === "redo" ||
           command === "delete-sheet") &&
@@ -151,7 +163,9 @@ export function useProjectCommandShortcuts({
         command === "redo" ||
         command === "delete-sheet" ||
         command === "previous-sheet" ||
-        command === "next-sheet";
+        command === "next-sheet" ||
+        command === "next-layout" ||
+        command === "previous-layout";
       if (!handledCommand) return;
 
       event.preventDefault();
@@ -188,6 +202,12 @@ export function useProjectCommandShortcuts({
         case "next-sheet":
           navigateToNextSheet();
           break;
+        case "next-layout":
+          cycleToNextLayout();
+          break;
+        case "previous-layout":
+          cycleToPreviousLayout();
+          break;
       }
     };
     window.addEventListener("keydown", handleProjectCommand);
@@ -209,8 +229,11 @@ export function useProjectCommandShortcuts({
     canRedo,
     canUndo,
     closeProject,
+    cycleToNextLayout,
+    cycleToPreviousLayout,
     deleteSheet,
     disabled,
+    layoutCycleActive,
     navigateToNextSheet,
     navigateToPreviousSheet,
     redo,

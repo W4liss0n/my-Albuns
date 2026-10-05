@@ -18,6 +18,7 @@ import { useProjectMutations } from "./useProjectMutations";
 import type { ProjectMutationRunner } from "./useProjectMutationRunner";
 import { useProjectNavigation } from "./useProjectNavigation";
 import { useLayoutPanel } from "../layouts/useLayoutPanel";
+import { nextLayoutIndex, type LayoutCycleDirection } from "../layouts/layoutCycle";
 import { useLayoutCatalog } from "../layouts/useLayoutCatalog";
 import type { ProjectDialogPort } from "../../application/projectDialogPort";
 
@@ -300,6 +301,24 @@ export function useProjectEditorController({
     return mutations.swapSheetSides(sheetId);
   };
 
+  const cycleLayout = (direction: LayoutCycleDirection) => {
+    const sheetId = layoutPanel.visible ? layoutPanel.sheetId : navigation.centeredSheetId;
+    if (!sheetId || structuralCommandsDisabled || structuralMutationPendingRef.current ||
+        canvasMode.kind !== "normal") {
+      return Promise.resolve(false);
+    }
+    flushPropertyDrafts();
+    // An open panel already holds the prepared query; reuse it instead of replacing its handle.
+    if (layoutPanel.visible && layoutPanel.query && layoutPanel.sheetId === sheetId) {
+      const index = nextLayoutIndex(layoutPanel.query, direction);
+      return index === null ? Promise.resolve(false) : layoutPanel.apply(index);
+    }
+    const applied = mutations.cycleLayout(sheetId, direction);
+    // A fresh query replaces the prepared handle; a panel still loading must query again.
+    if (layoutPanel.visible) void applied.then(() => layoutPanel.refresh());
+    return applied;
+  };
+
   const canvasProps: AlbumCanvasProps = {
     frameGapUm: projection.state.layoutSettings.gapUm,
     displayUnit: projection.state.document.displayUnit,
@@ -479,6 +498,7 @@ export function useProjectEditorController({
     canvasProps,
     navigateToSheet: navigation.navigateToSheet,
     navigateToAdjacentSheet: navigation.navigateToAdjacentSheet,
+    cycleLayout,
     applyAlbumInformation: mutations.applyAlbumInformation,
     applyAlbumDesign: mutations.applyAlbumDesign,
     applyDpi: mutations.applyDpi,

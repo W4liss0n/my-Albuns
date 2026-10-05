@@ -2,7 +2,7 @@
 status: ready-for-agent
 document: product-spec
 implementation-readiness: decision-tickets-required
-updated: 2026-10-01
+updated: 2026-10-05
 ---
 
 # Programa de Diagramação de Álbuns
@@ -902,7 +902,7 @@ validação das superfícies descritas nesta seção.
 - Ao confirmar um Layout, a faixa mantém as miniaturas visíveis enquanto atualiza a consulta do mesmo alvo. As ações dessas miniaturas ficam indisponíveis até a consulta vigente estar pronta, sem esvaziar nem piscar o Painel.
 - O último Layout aplicado é uma cópia local de sua geometria original e de sua categoria de origem. Permanece primeiro dentro dessa seção enquanto compatível e pode ser reaplicado depois de edições manuais ou da remoção da origem global.
 - Dentro de cada seção, a ordem é: Último Layout aplicado, quando pertencer à categoria; Favoritos do Projeto; e demais candidatos. Uma definição possui somente uma preview por seção, mesmo quando é simultaneamente a última aplicada e favorita. A mesma geometria pode aparecer em `Automáticos` e `Personalizados`; a deduplicação ocorre somente dentro de cada origem.
-- Para aplicação automática, a prioridade global é: Último Layout aplicado compatível, primeiro Favorito do Projeto, primeiro Layout personalizado global e primeiro Layout do sistema. Dentro de cada grupo, prevalece a ordem exibida em sua seção.
+- Para aplicação automática, a prioridade global é: Último Layout aplicado compatível, primeiro Layout personalizado favorito, primeiro Layout personalizado global, primeiro Layout do sistema favorito e primeiro Layout do sistema. Dentro de cada grupo, prevalece a ordem exibida em sua seção. As teclas `↑` e `↓` percorrem esses mesmos grupos na Lâmina centralizada.
 - Layouts do sistema são produzidos pelo Gerador de Layouts.
 - O Gerador considera quantidade, orientações dos Frames, a proporção de cada Foto colocada, formato e dimensões da superfície, margem e intervalo. Cada sugestão conserva as orientações vertical, horizontal ou quadrada dos Frames consultados e procura dar a cada Frame com Foto a proporção da Foto como ela é mostrada, podendo variar tamanhos, proporções dentro da orientação e posições espaciais sem reordenar a Pilha visual.
 - No Painel de Layouts, um Frame vazio é consultado sem orientação: cada sugestão o faz vertical ou horizontal. Isso vale também para os Frames pedidos pelo seletor de quantidade. Nas automações, os Frames vazios conservam a orientação atual.
