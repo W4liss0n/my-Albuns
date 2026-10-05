@@ -23,7 +23,8 @@ jobs:
   headless:
     name: Headless validation
     runs-on: windows-2022
-    timeout-minutes: 45
+    # A run without a target cache took 45 minutes with every step passing.
+    timeout-minutes: 75
     defaults:
       run:
         shell: powershell
