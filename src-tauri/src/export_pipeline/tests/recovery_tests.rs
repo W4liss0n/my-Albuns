@@ -181,6 +181,37 @@ fn storage_recovery_restarts_only_unfinished_files_and_preserves_the_snapshot() 
     }
 }
 
+/// A real storage-full failure that retains its live preparation under `root`,
+/// for the modules that own what happens to a paused export.
+pub(crate) fn paused_export_failure(root: &std::path::Path) -> super::super::ExportFailure {
+    let plan = skip_export_plan(
+        root,
+        myalbuns_core::ExportMode::Sheet,
+        myalbuns_core::ExportFormat::Png,
+    );
+    let mut paths = OperationPathContext::new();
+    for path in plan.required_paths() {
+        paths.capture(&path).unwrap();
+    }
+    let mut transport = InterruptedRender {
+        fail: true,
+        ..Default::default()
+    };
+    let failure = tokio::runtime::Runtime::new()
+        .unwrap()
+        .block_on(super::super::execute_album(
+            &mut transport,
+            plan,
+            &paths.freeze(),
+            &ExportExecutionControl::default(),
+            &|_| {},
+            &context("skip-existing"),
+        ))
+        .unwrap_err();
+    assert!(failure.recovery.is_some());
+    failure
+}
+
 #[test]
 fn discarding_a_paused_export_releases_originals_and_cleans_only_its_preparation() {
     let root = tempfile::tempdir().unwrap();

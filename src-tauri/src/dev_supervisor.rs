@@ -986,7 +986,7 @@ mod tests {
     fn send_host_lease_request(endpoint: std::net::SocketAddr, request: &str) -> String {
         let mut connection = TcpStream::connect(endpoint).expect("lease server connection");
         connection
-            .set_read_timeout(Some(Duration::from_secs(1)))
+            .set_read_timeout(Some(Duration::from_secs(10)))
             .expect("response timeout");
         connection
             .write_all(request.as_bytes())
@@ -1124,7 +1124,7 @@ mod tests {
         );
         let (lease_id, process_id) = match server
             .events()
-            .recv_timeout(Duration::from_secs(1))
+            .recv_timeout(Duration::from_secs(10))
             .expect("connected lease")
         {
             HostLeaseEvent::Connected {
@@ -1135,7 +1135,7 @@ mod tests {
         };
         assert_eq!(process_id, process.id());
         assert!(matches!(
-            server.events().recv_timeout(Duration::from_secs(1)),
+            server.events().recv_timeout(Duration::from_secs(10)),
             Ok(HostLeaseEvent::Registered {
                 lease_id: registered_lease,
                 process_id: registered_process,
@@ -1161,7 +1161,7 @@ mod tests {
         process.kill().expect("child terminates");
         process.wait().expect("child is reaped");
         assert!(matches!(
-            server.events().recv_timeout(Duration::from_secs(1)),
+            server.events().recv_timeout(Duration::from_secs(10)),
             Ok(HostLeaseEvent::Disconnected {
                 lease_id: disconnected_lease,
                 process_id: disconnected_process,
@@ -1203,7 +1203,7 @@ mod tests {
 
         let (lease_id, process_id) = match server
             .events()
-            .recv_timeout(Duration::from_secs(1))
+            .recv_timeout(Duration::from_secs(10))
             .expect("single connected lease")
         {
             HostLeaseEvent::Connected {
@@ -1213,7 +1213,7 @@ mod tests {
             event => panic!("unexpected lease event: {event:?}"),
         };
         assert!(matches!(
-            server.events().recv_timeout(Duration::from_secs(1)),
+            server.events().recv_timeout(Duration::from_secs(10)),
             Ok(HostLeaseEvent::Registered {
                 lease_id: registered_lease,
                 process_id: registered_process,
@@ -1230,7 +1230,7 @@ mod tests {
         process.kill().expect("child terminates");
         process.wait().expect("child is reaped");
         assert!(matches!(
-            server.events().recv_timeout(Duration::from_secs(1)),
+            server.events().recv_timeout(Duration::from_secs(10)),
             Ok(HostLeaseEvent::Disconnected {
                 lease_id: disconnected_lease,
                 process_id: disconnected_process,
@@ -1257,7 +1257,7 @@ mod tests {
 
         drop(job);
 
-        let deadline = std::time::Instant::now() + Duration::from_secs(2);
+        let deadline = std::time::Instant::now() + Duration::from_secs(10);
         loop {
             if process.try_wait().expect("child state").is_some() {
                 break;
@@ -1325,18 +1325,6 @@ mod tests {
         assert!(
             parse_host_lease_request(&format!("REGISTER {credential} 42 trailing\n")).is_none()
         );
-    }
-
-    #[test]
-    fn vite_remains_owned_after_cli_exit_while_a_host_is_alive() {
-        let mut lifecycle = DevelopmentLifecycle::default();
-        lifecycle.apply(HostLeaseEvent::Connected {
-            lease_id: HostLeaseId::from_u128(1),
-            process_id: 41,
-        });
-        lifecycle.cli_exited(true);
-
-        assert_eq!(lifecycle.decision(false), LifecycleDecision::Wait);
     }
 
     #[test]

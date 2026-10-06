@@ -1,9 +1,13 @@
 # Validation operating policy
 
-Use `npm run validate` for headless validation during interactive work. It first
-builds the imaging processor required by Tauri, including on a fresh checkout, then runs
-frontend build/contracts/types, frontend tests, automation tests, Rust quality
-and Rust tests serially, retaining logs and a report in `.tools/validation/`.
+Use `npm run validate` for headless validation during interactive work. It runs
+the checks that need no compilation first (Rust formatting, frontend types,
+frontend tests, automation tests and the four headless-browser Canvas
+regressions: `test:frame-gestures`, `test:photo-placement`,
+`test:normal-frame-swap`, `test:command-windows`), then builds the imaging processor required
+by Tauri, including on a fresh checkout, and runs frontend build/contracts,
+Rust quality and Rust tests, retaining logs and a report in `.tools/validation/`.
+Steps run serially and stop at the first failure.
 Focused test commands remain available while editing. The headless default
 never launches MyAlbuns or a Win32 window fixture.
 

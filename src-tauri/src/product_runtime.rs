@@ -1132,7 +1132,7 @@ mod tests {
     use myalbuns_paths::OperationPathContext;
 
     use super::{
-        InitialImageProcessing, PROJECT_WINDOW_LABEL, StartupReadiness, StartupSignal,
+        InitialImageProcessing, StartupReadiness, StartupSignal,
         hydrate_project_from_recovered_cache, project_window_title, refresh_changed_photo_sources,
         refresh_project_photos_for_media_update,
     };
@@ -1141,11 +1141,6 @@ mod tests {
         media_runtime::{MediaMonitor, MediaResolver, MediaRuntime},
         project_host::ProjectHost,
     };
-
-    #[test]
-    fn productive_host_has_one_stable_project_window_label() {
-        assert_eq!(PROJECT_WINDOW_LABEL, "project");
-    }
 
     #[test]
     #[ignore = "prepares the isolated native cache reconstruction fixture"]

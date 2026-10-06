@@ -2,12 +2,20 @@ $ErrorActionPreference = 'Stop'
 $workspaceRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 $reportRoot = Join-Path $workspaceRoot '.tools\validation'
 New-Item -ItemType Directory -Force -Path $reportRoot | Out-Null
+# Checks that need no compilation run first, so a formatting, type or unit
+# failure reports before the Rust builds start.
 $steps = @(
+    @{ name = 'rust-format'; arguments = @('run', 'format:rust') },
+    @{ name = 'frontend-types'; arguments = @('run', 'typecheck') },
+    @{ name = 'frontend-tests'; arguments = @('test') },
+    @{ name = 'automation-tests'; arguments = @('run', 'test:automation') },
+    @{ name = 'frame-gestures'; arguments = @('run', 'test:frame-gestures') },
+    @{ name = 'photo-placement'; arguments = @('run', 'test:photo-placement') },
+    @{ name = 'normal-frame-swap'; arguments = @('run', 'test:normal-frame-swap') },
+    @{ name = 'command-windows'; arguments = @('run', 'test:command-windows') },
     @{ name = 'processor-build'; arguments = @('run', 'sidecar:prepare') },
     @{ name = 'frontend-build'; arguments = @('run', 'build') },
     @{ name = 'owned-window-fitting'; arguments = @('run', 'test:owned-window-fitting') },
-    @{ name = 'frontend-tests'; arguments = @('test') },
-    @{ name = 'automation-tests'; arguments = @('run', 'test:automation') },
     @{ name = 'rust-quality'; arguments = @('run', 'quality:rust') },
     @{ name = 'rust-tests'; arguments = @('run', 'test:rust') }
 )

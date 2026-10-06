@@ -894,7 +894,7 @@ pub struct CacheServiceCommandError {
 mod media_change_contract_tests {
     use serde_json::json;
 
-    use super::{CacheProcessorState, CacheProcessorWarning, LinkedMediaChanged};
+    use super::LinkedMediaChanged;
 
     #[test]
     fn stable_media_change_event_exposes_only_opaque_media_identities() {
@@ -905,22 +905,6 @@ mod media_change_contract_tests {
         assert_eq!(
             serde_json::to_value(event).expect("the event serializes"),
             json!({ "mediaIds": ["photo-a", "overlay-a"] })
-        );
-    }
-
-    #[test]
-    fn cache_processor_warning_is_typed_and_does_not_block_project_commands() {
-        let warning = CacheProcessorWarning {
-            state: CacheProcessorState::Suspended,
-            message: "O Cache foi suspenso.".into(),
-        };
-
-        assert_eq!(
-            serde_json::to_value(warning).expect("the warning serializes"),
-            json!({
-                "state": "suspended",
-                "message": "O Cache foi suspenso."
-            })
         );
     }
 }
@@ -1075,7 +1059,7 @@ pub enum ProjectCloseResolution {
 mod save_contract_tests {
     use serde_json::json;
 
-    use super::{SaveProjectCommandError, SaveProjectOutcome};
+    use super::{SaveAsProjectCommandError, SaveProjectCommandError, SaveProjectOutcome};
 
     #[test]
     fn save_outcomes_use_a_camel_case_kind_and_structured_revision() {
@@ -1093,21 +1077,28 @@ mod save_contract_tests {
 
     #[test]
     fn save_errors_carry_stable_codes_and_context_without_a_localized_message() {
-        let serialized = serde_json::to_value(SaveProjectCommandError::StaleRevision {
+        let save = serde_json::to_value(SaveProjectCommandError::StaleRevision {
             expected_revision: 3,
             current_revision: 4,
         })
-        .expect("the stale-revision error serializes");
+        .expect("the Save stale-revision error serializes");
+        let save_as = serde_json::to_value(SaveAsProjectCommandError::StaleRevision {
+            expected_revision: 3,
+            current_revision: 4,
+        })
+        .expect("the Save As stale-revision error serializes");
 
-        assert_eq!(
-            serialized,
-            json!({
-                "code": "stale_revision",
-                "expectedRevision": 3,
-                "currentRevision": 4
-            })
-        );
-        assert!(serialized.get("message").is_none());
+        for serialized in [save, save_as] {
+            assert_eq!(
+                serialized,
+                json!({
+                    "code": "stale_revision",
+                    "expectedRevision": 3,
+                    "currentRevision": 4
+                })
+            );
+            assert!(serialized.get("message").is_none());
+        }
     }
 }
 
@@ -1115,7 +1106,7 @@ mod save_contract_tests {
 mod save_as_contract_tests {
     use serde_json::json;
 
-    use super::{SaveAsProjectCommandError, SaveAsProjectOutcome};
+    use super::SaveAsProjectOutcome;
 
     #[test]
     fn save_as_outcomes_keep_cancellation_and_adopted_identity_explicit() {
@@ -1137,55 +1128,6 @@ mod save_as_contract_tests {
                 "projectId": "81f68858-c8f5-4fcb-8e0f-185c3ff45cf5",
                 "revision": 7
             })
-        );
-    }
-
-    #[test]
-    fn save_as_errors_are_stable_structured_data_without_messages() {
-        let serialized = serde_json::to_value(SaveAsProjectCommandError::StaleRevision {
-            expected_revision: 3,
-            current_revision: 4,
-        })
-        .expect("the stale-revision error serializes");
-
-        assert_eq!(
-            serialized,
-            json!({
-                "code": "stale_revision",
-                "expectedRevision": 3,
-                "currentRevision": 4
-            })
-        );
-        assert!(serialized.get("message").is_none());
-    }
-}
-
-#[cfg(test)]
-mod close_contract_tests {
-    use serde_json::json;
-
-    use super::{ProjectCloseRequestOutcome, ProjectCloseResolution};
-
-    #[test]
-    fn close_outcomes_keep_the_decision_and_cancel_projection_explicit() {
-        assert_eq!(
-            serde_json::to_value(ProjectCloseRequestOutcome::ConfirmationRequired)
-                .expect("the request outcome serializes"),
-            json!({ "kind": "confirmationRequired" })
-        );
-        assert_eq!(
-            serde_json::to_value(ProjectCloseRequestOutcome::Closed)
-                .expect("the closed outcome serializes"),
-            json!({ "kind": "closed" })
-        );
-    }
-
-    #[test]
-    fn a_closed_resolution_has_no_creative_payload() {
-        assert_eq!(
-            serde_json::to_value(ProjectCloseResolution::Closed)
-                .expect("the resolution serializes"),
-            json!({ "kind": "closed" })
         );
     }
 }

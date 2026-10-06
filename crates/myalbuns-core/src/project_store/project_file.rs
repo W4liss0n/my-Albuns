@@ -1368,3 +1368,122 @@ impl<'de> Visitor<'de> for DocumentHeaderVisitor {
         Ok(header)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::collections::{BTreeMap, BTreeSet};
+
+    use serde_json::Value;
+
+    use super::{ProjectFile, decode};
+
+    const COMPLETE_FIXTURE: &[u8] =
+        include_bytes!("../../tests/fixtures/project_file_v1/complete.myalbuns");
+
+    const UNLISTED_FIELD: &str = "unlisted";
+
+    /// Fields of the contract that `complete.myalbuns` does not carry, as
+    /// `field of {the fields of its object}`. Regenerating the fixture is a
+    /// decision about the persisted format, so a gap stays listed until then.
+    const FIELDS_MISSING_FROM_THE_COMPLETE_FIXTURE: &[&str] = &["mapping of {content, mapping}"];
+
+    fn object_pointers(value: &Value, pointer: String, found: &mut Vec<String>) {
+        match value {
+            Value::Object(fields) => {
+                for (name, field) in fields {
+                    object_pointers(field, format!("{pointer}/{name}"), found);
+                }
+                found.push(pointer);
+            }
+            Value::Array(items) => {
+                for (index, item) in items.iter().enumerate() {
+                    object_pointers(item, format!("{pointer}/{index}"), found);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    /// The fields the file contract accepts in the object at `pointer`, read
+    /// from the rejection of a field that it does not list.
+    fn fields_accepted_at(document: &Value, pointer: &str) -> Option<BTreeSet<String>> {
+        let mut probed = document.clone();
+        probed
+            .pointer_mut(pointer)
+            .and_then(Value::as_object_mut)
+            .unwrap()
+            .insert(UNLISTED_FIELD.into(), Value::Null);
+        let bytes = serde_json::to_vec(&probed).unwrap();
+        let rejection = match serde_json::from_slice::<ProjectFile>(&bytes) {
+            Err(rejection) => rejection.to_string(),
+            // Only an alternative that has no field of its own can be probed
+            // without a rejection: it carries nothing the fixture could lack.
+            Ok(_) => {
+                let object = document
+                    .pointer(pointer)
+                    .and_then(Value::as_object)
+                    .unwrap();
+                assert_eq!(
+                    object.len(),
+                    1,
+                    "{pointer} accepts a field outside the contract"
+                );
+                return None;
+            }
+        };
+        assert!(decode(&bytes).is_err(), "{pointer}");
+        // A path is text or exact code units; neither form names its fields.
+        if rejection.starts_with("data did not match any variant of untagged enum PathDto") {
+            return None;
+        }
+        let listed = rejection
+            .strip_prefix(&format!("unknown field `{UNLISTED_FIELD}`, "))
+            .unwrap_or_else(|| panic!("{pointer} was rejected for another reason: {rejection}"));
+        Some(
+            listed
+                .split('`')
+                .skip(1)
+                .step_by(2)
+                .map(str::to_owned)
+                .collect(),
+        )
+    }
+
+    #[test]
+    fn the_complete_fixture_carries_every_field_of_every_object_it_contains() {
+        let document: Value = serde_json::from_slice(COMPLETE_FIXTURE).unwrap();
+        let mut pointers = Vec::new();
+        object_pointers(&document, String::new(), &mut pointers);
+
+        // One entry per kind of object, told apart by the fields it accepts.
+        let mut carried: BTreeMap<BTreeSet<String>, BTreeSet<String>> = BTreeMap::new();
+        for pointer in &pointers {
+            let Some(accepted) = fields_accepted_at(&document, pointer) else {
+                continue;
+            };
+            let object = document
+                .pointer(pointer)
+                .and_then(Value::as_object)
+                .unwrap();
+            carried
+                .entry(accepted)
+                .or_default()
+                .extend(object.keys().cloned());
+        }
+        let missing = carried
+            .iter()
+            .flat_map(|(accepted, present)| {
+                let object = accepted.iter().cloned().collect::<Vec<_>>().join(", ");
+                accepted
+                    .difference(present)
+                    .map(move |field| format!("{field} of {{{object}}}"))
+            })
+            .collect::<Vec<_>>();
+
+        assert_eq!(
+            missing, FIELDS_MISSING_FROM_THE_COMPLETE_FIXTURE,
+            "a persisted field needs a value in complete.myalbuns: extend the recipe in \
+             tests/project_file_v1.rs and regenerate the fixture"
+        );
+    }
+}

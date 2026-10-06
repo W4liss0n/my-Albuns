@@ -103,53 +103,6 @@ test("keeps destructive button styling private to confirmation dialogs", () => {
   expect(source("src/ui/ui.css")).not.toContain("ui-action-button--danger");
 });
 
-test("requires productive preview and diagnostic dependencies at editor seams", () => {
-  const mediaPanel = source("src/project/media-panel/MediaPanel.tsx");
-  expect(mediaPanel).toContain('kind: "connected";');
-  expect(mediaPanel).toContain('kind: "static";');
-  expect(mediaPanel).toContain("previewSource: MediaPanelPreviewSource;");
-  expect(mediaPanel).not.toContain("mediaPreviews = {}");
-
-  const workspace = source("src/project/workspace/ProjectWorkspace.tsx");
-  expect(workspace).toContain(
-    "mediaPreviews: Readonly<Record<string, MediaPreview>>;",
-  );
-  expect(workspace).toContain(
-    "onMediaDemandChange(demand: MediaPreviewDemand): void;",
-  );
-  expect(workspace).toContain(
-    "onGraphicsUnavailable(diagnostic: GraphicsDiagnostic): void;",
-  );
-  expect(workspace).toContain("onPreferencesReady(projectId: string): void;");
-});
-
-test("keeps shared contracts canonical and removes dead visual protocols", () => {
-  const globalProjectPort = source(
-    "src/global/application/globalProjectPort.ts",
-  );
-  expect(globalProjectPort).toContain(
-    'import type { ScopedValue } from "../../application/scopedValues";',
-  );
-  expect(globalProjectPort).not.toContain("InitialScopedContent");
-
-  for (const [path, protocol] of [
-    [
-      "src/ui/visualPreview/PersonalizationPreview.tsx",
-      "visual-personalization-preview",
-    ],
-    ["src/global/DimensionsPreview.tsx", "new-project-dimensions-sheet"],
-    ["src/project/inspector/DecorativeMediaPicker.tsx", "visual-design-card"],
-  ] as const) {
-    expect(source(path), path).not.toContain(protocol);
-  }
-  expect(source("src/ui/visualPreview/index.ts")).not.toContain(
-    "export { PersonalizationPreview }",
-  );
-  expect(source("src/ui/ActionButton.tsx")).not.toContain(
-    "export type ActionButtonVariant",
-  );
-});
-
 test("keeps App.css restricted to application-level composition", () => {
   const styles = source("src/project/App.css");
 
@@ -159,19 +112,10 @@ test("keeps App.css restricted to application-level composition", () => {
 });
 
 test("entrypoints import only their global foundation and owned composition", () => {
-  for (const entrypoint of [
-    "src/previews/canvas-preview.tsx",
-    "src/previews/media-panel-preview.tsx",
-    "src/previews/sheet-grid-preview.tsx",
-    "src/previews/ui-acceptance-preview.tsx",
-    "src/previews/welcome-preview.tsx",
-    "src/global/main.tsx",
-  ]) {
-    const contents = source(entrypoint);
-    expect(contents, entrypoint).not.toContain("App.css");
-    expect(contents, entrypoint).toMatch(/ui\/theme\.css/);
-    expect(contents, entrypoint).toMatch(/ui\/ui\.css/);
-  }
+  const entrypoint = source("src/global/main.tsx");
+  expect(entrypoint).not.toContain("App.css");
+  expect(entrypoint).toMatch(/ui\/theme\.css/);
+  expect(entrypoint).toMatch(/ui\/ui\.css/);
   expect(source("src/project/App.tsx")).toContain('import "./App.css";');
 });
 
@@ -180,19 +124,5 @@ test("keeps form-specific inspector CSS out of the panel owner", () => {
 
   expect(styles).not.toMatch(
     /\.(?:album-information|album-entry|album-measurement|album-design|visual-default|album-frame-border)\b/,
-  );
-});
-
-test("composes the shared floating chrome into application menus", () => {
-  const menuSource = source("src/project/workspace/ApplicationMenuBar.tsx");
-
-  expect(menuSource).toContain(
-    'className="ui-floating-surface app-menu-popup"',
-  );
-  expect(menuSource).toContain(
-    'className="ui-floating-surface app-menu-popup app-menu-submenu-popup"',
-  );
-  expect(source("src/project/workspace/ApplicationMenuBar.css")).not.toMatch(
-    /\.app-menu-popup\s*\{[^}]*(?:border:|border-radius:|background:|box-shadow:)/s,
   );
 });

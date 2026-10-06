@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { beforeEach, expect, test } from "vitest";
 
 import { useEditorView } from "./editorView";

@@ -15,7 +15,7 @@ const evidence = { schemaVersion: 1, gate: 'command-window-isolation', collected
   sourceInputs: { initial: source(), final: null }, passed: false, cleanupCompleted: false, checks: [] };
 mkdirSync(output, { recursive: true });
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
-const browser = createHeadlessBrowserSession({ root, output, windowSize: '1440,900', requestTimeoutMilliseconds: 60000 });
+const browser = createHeadlessBrowserSession({ root, output, windowSize: '1440,900', requestTimeoutMilliseconds: 120000 });
 let request, session;
 try {
   const started = await browser.start();
@@ -37,7 +37,7 @@ try {
     assert.fail(`${description}: ${JSON.stringify(last)}`);
   }
   const state = () => execute(`return {
-    editing: document.querySelector('.canvas-host canvas')?.getAttribute('aria-label').startsWith('Canvas da Lâmina em edição') ?? null,
+    editing: document.querySelector('.canvas-host canvas')?.getAttribute('aria-label').startsWith('área de edição da lâmina em edição') ?? null,
     count: document.body.dataset.clipboardCount ?? null,
     selection: document.body.dataset.clipboardSelection ?? null,
     clipboard: document.body.dataset.clipboardAvailable ?? null,

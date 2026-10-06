@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { refreshSheetStructureFixture } from "./projectFixtures";
 import { describe, expect, test } from "vitest";
 

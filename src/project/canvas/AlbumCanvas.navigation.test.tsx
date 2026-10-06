@@ -1,11 +1,5 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { expect, test, vi } from "vitest";
-
-import { threeSheetComposition } from "./albumCanvasTestFixtures";
-import {
-  continuousCanvasScale,
-  createContinuousCanvasLayout,
-} from "./canvasGeometry";
 import {
   AlbumCanvas,
   displayWithLabel,
@@ -14,6 +8,12 @@ import {
   renderCanvas,
   setupAlbumCanvasTestHarness,
 } from "./albumCanvasTestHarness";
+
+import { threeSheetComposition } from "./albumCanvasTestFixtures";
+import {
+  continuousCanvasScale,
+  createContinuousCanvasLayout,
+} from "./canvasGeometry";
 
 setupAlbumCanvasTestHarness();
 const pixiLifecycle = getPixiLifecycle();

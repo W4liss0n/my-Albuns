@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { invoke } from "@tauri-apps/api/core";
 import { beforeEach, expect, test, vi } from "vitest";
 import { tauriExportMediaPort } from "./tauriExportMediaPort";

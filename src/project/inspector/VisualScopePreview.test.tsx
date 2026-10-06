@@ -196,6 +196,10 @@ test.each(["left", "right"] as const)("a real single page only exposes its activ
   render(<VisualScopePreview content={{ kind: "sheet", sheet: { ...source, activeSides: side }, mediaPreviewUrls: {} }}
     label="Página única" scope={side} onScopeChange={onScopeChange} />);
   expect(screen.getAllByRole("button")).toHaveLength(1);
+  expect(screen.getByRole("button")).toHaveAttribute("aria-pressed", "true");
+  expect(screen.getByRole("group", { name: "Página única" })).toHaveStyle({
+    "--visual-scope-aspect-ratio": `${source.widthUm * 2} / ${source.heightUm}`,
+  });
   fireEvent.click(screen.getByRole("button"));
   expect(onScopeChange).toHaveBeenCalledExactlyOnceWith(side);
   expect(screen.getByRole("img", { name: "Prévia da lâmina 01" })).toBeInTheDocument();

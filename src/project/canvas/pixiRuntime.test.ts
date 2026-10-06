@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { UboSystem, loadTextures } from "pixi.js";
 import { describe, expect, it } from "vitest";
 

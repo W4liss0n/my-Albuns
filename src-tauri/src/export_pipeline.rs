@@ -483,4 +483,4 @@ fn discard_failed_preparation(preparation: PreparedExportStorage, context: &Invo
 }
 
 #[cfg(test)]
-mod tests;
+pub(crate) mod tests;

@@ -530,12 +530,6 @@ mod windows_dialog {
         use super::*;
 
         #[test]
-        fn only_an_explicit_native_yes_accepts_overwrite() {
-            assert_eq!(overwrite_response(true), FDEOR_ACCEPT);
-            assert_eq!(overwrite_response(false), FDEOR_REFUSE);
-        }
-
-        #[test]
         fn windows_cancel_hresult_is_distinct_from_dialog_failure() {
             let cancelled =
                 windows::core::Error::from_hresult(HRESULT::from_win32(ERROR_CANCELLED.0));

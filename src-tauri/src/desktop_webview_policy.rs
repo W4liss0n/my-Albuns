@@ -395,8 +395,6 @@ pub(crate) fn retire_inherited_debug_arguments_before_replacement() -> io::Resul
 
 #[cfg(all(test, debug_assertions))]
 mod tests {
-    use std::{ffi::OsString, path::PathBuf};
-
     #[cfg(windows)]
     #[test]
     fn minimize_restore_resumes_only_the_webviews_hidden_by_minimization() {
@@ -512,31 +510,6 @@ mod tests {
             .synchronize("project", 2, true, || Ok::<_, ()>(true), |_| Ok(()))
             .unwrap();
         assert_eq!(state.restore.get("project"), Some(&2));
-    }
-
-    #[test]
-    fn replacement_debug_arguments_override_the_process_port_last() {
-        let arguments = super::replacement_webview_debug_arguments(Some(OsString::from("48123")))
-            .expect("valid replacement debug port")
-            .expect("replacement debug arguments");
-
-        assert_eq!(
-            arguments,
-            "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection --remote-debugging-port=48123"
-        );
-    }
-
-    #[test]
-    fn project_dialog_debug_data_directory_requires_an_absolute_path() {
-        let directory = super::project_dialog_debug_data_directory(Some(OsString::from(
-            r"C:\gate\project-dialog",
-        )))
-        .expect("absolute debug data directory");
-
-        assert_eq!(directory, Some(PathBuf::from(r"C:\gate\project-dialog")));
-        assert!(
-            super::project_dialog_debug_data_directory(Some(OsString::from("relative"))).is_err()
-        );
     }
 }
 

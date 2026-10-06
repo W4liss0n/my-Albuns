@@ -141,6 +141,125 @@ mod tests {
     }
 
     #[test]
+    fn relink_is_refused_while_the_original_cannot_be_proved_absent() {
+        let root = tempfile::tempdir().unwrap();
+        let replacement = root.path().join("renamed.png");
+        image::RgbImage::new(16, 24).save(&replacement).unwrap();
+        // A folder where the Original was answers, but not as a missing file.
+        let occupied = root.path().join("occupied.png");
+        std::fs::create_dir(&occupied).unwrap();
+        let mut context = OperationPathContext::new();
+        context.capture(&replacement).unwrap();
+        let roots = context.freeze();
+        let propose = |logical_path: PathBuf| {
+            MediaResolver.propose_relink_in_plan(
+                &MediaBinding {
+                    media_id: "selected".into(),
+                    kind: MediaKind::Photo,
+                    logical_path,
+                },
+                replacement.clone(),
+                &roots,
+            )
+        };
+
+        assert!(propose(root.path().join("absent.png")).is_ok());
+        assert!(propose(occupied).is_err());
+        // A drive that is no longer mapped has no root in the attempt's plan.
+        let unmapped = PathBuf::from(r"\\servidor\acervo\Fotos\original.png");
+        assert!(!roots.covers(&unmapped));
+        assert!(propose(unmapped).is_err());
+    }
+
+    /// A junction redirects a folder without the privilege a symbolic link needs.
+    #[cfg(windows)]
+    fn create_junction(link: &Path, target: &Path) {
+        let output = std::process::Command::new("cmd")
+            .args(["/c", "mklink", "/J"])
+            .arg(link)
+            .arg(target)
+            .output()
+            .unwrap();
+        assert!(
+            output.status.success(),
+            "{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn a_found_entry_that_is_a_link_is_refused_instead_of_followed() {
+        let root = tempfile::tempdir().unwrap();
+        let folder = root.path().join("Fotos");
+        let elsewhere = root.path().join("Outro local");
+        for directory in [&folder, &elsewhere] {
+            std::fs::create_dir(directory).unwrap();
+        }
+        std::fs::write(folder.join("direta.png"), b"candidate").unwrap();
+        let binding = |name: &str| MediaBinding {
+            media_id: name.into(),
+            kind: MediaKind::Photo,
+            logical_path: PathBuf::from(r"Z:\antiga").join(name),
+        };
+        let mut context = OperationPathContext::new();
+        context.capture(&folder).unwrap();
+        let roots = context.freeze();
+        let find = |bindings: &[MediaBinding]| {
+            MediaResolver.find_relink_candidates(&folder, bindings, &roots)
+        };
+
+        create_junction(&folder.join("redirecionada.png"), &elsewhere);
+        let direct = find(&[binding("direta.png")]).unwrap();
+        assert_eq!(
+            direct["direta.png"],
+            folder.join("direta.png"),
+            "a link nobody asked for does not disturb the search"
+        );
+        let refused = find(&[binding("direta.png"), binding("redirecionada.png")]).unwrap_err();
+
+        std::fs::remove_dir(&elsewhere).unwrap();
+        assert_eq!(
+            find(&[binding("redirecionada.png")]).unwrap_err(),
+            refused,
+            "a broken link is refused the same way"
+        );
+        let unlisted = MediaResolver
+            .find_relink_candidates(&elsewhere, &[binding("direta.png")], &roots)
+            .unwrap_err();
+        assert_ne!(
+            refused, unlisted,
+            "the refusal blames the link, not the folder"
+        );
+    }
+
+    #[test]
+    fn a_folder_that_cannot_be_listed_is_reported_instead_of_searched() {
+        let root = tempfile::tempdir().unwrap();
+        let file = root.path().join("Fotos.png");
+        std::fs::write(&file, b"not a folder").unwrap();
+        let binding = MediaBinding {
+            media_id: "photo-1".into(),
+            kind: MediaKind::Photo,
+            logical_path: PathBuf::from(r"Z:\antiga\Foto.png"),
+        };
+        let mut context = OperationPathContext::new();
+        context.capture(root.path()).unwrap();
+        let roots = context.freeze();
+        let find = |folder: &Path| {
+            MediaResolver.find_relink_candidates(folder, std::slice::from_ref(&binding), &roots)
+        };
+
+        assert_eq!(find(root.path()), Ok(HashMap::new()));
+        let missing = find(&root.path().join("Removida")).unwrap_err();
+        assert_eq!(find(&file).unwrap_err(), missing);
+        // A share that is not bound in the attempt's plan cannot be reached.
+        let unreachable = PathBuf::from(r"\\servidor\acervo\Fotos");
+        assert!(!roots.covers(&unreachable));
+        assert_eq!(find(&unreachable).unwrap_err(), missing);
+    }
+
+    #[test]
     fn replacement_accepts_present_or_absent_images_but_relink_still_requires_absence() {
         let root = tempfile::tempdir().unwrap();
         let original = root.path().join("original.png");

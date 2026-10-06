@@ -1,6 +1,10 @@
 use myalbuns_core::{
-    FrameOrientation, LayoutGenerationStatus, LayoutPermission, LayoutQuery, LayoutScope,
-    generate_layouts,
+    FrameOrientation, LayoutGenerationStatus, LayoutParameters, LayoutPermission, LayoutQuery,
+    LayoutScope, LayoutSurface, LayoutSurfaceKind, generate_layouts,
+};
+use proptest::{
+    prelude::*,
+    test_runner::{FileFailurePersistence, RngSeed},
 };
 
 #[test]
@@ -105,25 +109,6 @@ fn physical_scaling_preserves_the_order_and_normalized_compositions() {
                 ] {
                     assert!((a * 7 - b).abs() <= 7, "{}: quantization", example["id"]);
                 }
-            }
-        }
-    }
-}
-
-#[test]
-fn quantization_keeps_squares_square_and_does_not_invent_central_crossings() {
-    for permission in ["pagesOnly", "pagesAndSheet"] {
-        for (margin, gap) in [(15001, 7501), (0, 0), (0, 1)] {
-            let query: LayoutQuery = serde_json::from_value(serde_json::json!({
-                "surface":{"type":"doubleSheet","widthUm":500501,"heightUm":250501},
-                "frameOrientations":["square","horizontal","vertical","square","square"],
-                "permission":permission,"marginUm":margin,"gapUm":gap,"minimumSideUm":20000
-            }))
-            .unwrap();
-            let result = generate_layouts(&query);
-            assert_eq!(result.status, LayoutGenerationStatus::Candidates);
-            for c in result.candidates {
-                assert_generated_geometry(&query, &c.definition, "quantization");
             }
         }
     }
@@ -319,64 +304,216 @@ fn double_sheet_query(
     .unwrap()
 }
 
-fn mixes(count: usize) -> impl Iterator<Item = Vec<FrameOrientation>> {
-    (0..=count).map(move |vertical| {
-        let mut orientations = vec![FrameOrientation::Vertical; vertical];
-        orientations.resize(count, FrameOrientation::Horizontal);
-        orientations
-    })
-}
-
-#[test]
-fn double_sheets_offer_valid_suggestions_under_both_permissions() {
-    for (width, height) in [(600000, 300000), (400000, 300000), (800000, 300000)] {
-        for count in 1..=8 {
-            for orientations in mixes(count) {
-                for permission in [LayoutPermission::PagesAndSheet, LayoutPermission::PagesOnly] {
-                    let query = double_sheet_query(width, height, &orientations, permission);
-                    let case = format!("{width}x{height} {orientations:?} {permission:?}");
-                    let result = generate_layouts(&query);
-                    assert_eq!(result.status, LayoutGenerationStatus::Candidates, "{case}");
-                    for candidate in &result.candidates {
-                        assert_generated_geometry(&query, &candidate.definition, &case);
-                    }
-                }
-            }
-        }
+/// Every property runs the same generated queries on every machine: a fixed
+/// seed, a fixed number of cases, and failures kept beside the tests so that a
+/// counterexample found once is tried first from then on.
+fn generated_queries() -> ProptestConfig {
+    ProptestConfig {
+        cases: 64,
+        rng_seed: RngSeed::Fixed(0x6D79_416C_6275_6E73),
+        failure_persistence: Some(Box::new(FileFailurePersistence::Direct(
+            "tests/proptest-regressions/layout_generator.txt",
+        ))),
+        ..ProptestConfig::default()
     }
 }
 
-#[test]
-fn common_frame_counts_are_not_left_to_the_reserve() {
-    use FrameOrientation::{Horizontal, Vertical};
-    let page = |width, height, orientations: Vec<FrameOrientation>| -> LayoutQuery {
-        serde_json::from_value(serde_json::json!({
-            "surface": {"type":"singlePage", "widthUm":width, "heightUm":height},
-            "frameOrientations": orientations,
-            "permission": "pagesOnly",
-            "marginUm":15000, "gapUm":5000, "minimumSideUm":20000
-        }))
-        .unwrap()
-    };
-    // Version 1 left these to the reserve, which also changed orientations.
-    let queries = [
-        page(300000, 300000, vec![Vertical; 4]),
-        page(300000, 300000, vec![Horizontal; 4]),
-        page(200000, 300000, vec![Vertical; 4]),
-        page(200000, 300000, vec![Vertical; 6]),
-        page(200000, 300000, vec![Horizontal; 12]),
-        page(200000, 300000, vec![Horizontal; 15]),
-        double_sheet_query(800000, 300000, &[Vertical], LayoutPermission::PagesAndSheet),
-        double_sheet_query(800000, 300000, &[Vertical], LayoutPermission::PagesOnly),
-        double_sheet_query(400000, 300000, &[Horizontal], LayoutPermission::PagesOnly),
+fn any_permission() -> impl Strategy<Value = LayoutPermission> {
+    prop_oneof![
+        Just(LayoutPermission::PagesOnly),
+        Just(LayoutPermission::PagesAndSheet),
+    ]
+}
+
+fn query(
+    kind: LayoutSurfaceKind,
+    (width_um, height_um): (i64, i64),
+    frame_orientations: Vec<Option<FrameOrientation>>,
+    permission: LayoutPermission,
+    (margin_um, gap_um, minimum_side_um): (i64, i64, i64),
+) -> LayoutQuery {
+    LayoutQuery {
+        surface: LayoutSurface {
+            kind,
+            width_um,
+            height_um,
+        },
+        frame_orientations,
+        frame_proportions: Vec::new(),
+        permission,
+        parameters: LayoutParameters {
+            margin_um,
+            gap_um,
+            minimum_side_um,
+        },
+    }
+}
+
+/// Up to `maximum` Frames of the two orientations a Photo usually has.
+fn vertical_and_horizontal_frames(
+    maximum: usize,
+) -> impl Strategy<Value = Vec<Option<FrameOrientation>>> {
+    prop::collection::vec(
+        prop_oneof![
+            Just(Some(FrameOrientation::Vertical)),
+            Just(Some(FrameOrientation::Horizontal)),
+        ],
+        1..=maximum,
+    )
+}
+
+/// Any Album the product accepts at its usual sizes, with up to eight Frames
+/// of any orientation, free ones included, and any valid Layout settings.
+fn any_album_query() -> impl Strategy<Value = LayoutQuery> {
+    let surface = prop_oneof![
+        (100_000..=600_000_i64, 100_000..=600_000_i64)
+            .prop_map(|size| (LayoutSurfaceKind::SinglePage, size)),
+        (200_000..=1_200_000_i64, 100_000..=600_000_i64)
+            .prop_map(|size| (LayoutSurfaceKind::DoubleSheet, size)),
     ];
-    for query in queries {
+    let orientation = prop_oneof![
+        Just(None),
+        Just(Some(FrameOrientation::Vertical)),
+        Just(Some(FrameOrientation::Horizontal)),
+        Just(Some(FrameOrientation::Square)),
+    ];
+    (
+        surface,
+        prop::collection::vec(orientation, 1..=8),
+        any_permission(),
+        (0..=30_000_i64, 0..=15_000_i64, 10_000..=40_000_i64),
+    )
+        .prop_map(|((kind, size), orientations, permission, parameters)| {
+            query(kind, size, orientations, permission, parameters)
+        })
+}
+
+/// Double Sheets whose measures never divide evenly: odd sizes, squares among
+/// the Frames, and Margins and Gaps of a few micrometres or one past a round one.
+fn odd_measure_query() -> impl Strategy<Value = LayoutQuery> {
+    let odd = |range: std::ops::RangeInclusive<i64>| range.prop_map(|half| 2 * half + 1);
+    let orientation = prop_oneof![
+        Just(FrameOrientation::Square),
+        Just(FrameOrientation::Vertical),
+        Just(FrameOrientation::Horizontal),
+    ];
+    (
+        (odd(200_000..=400_000), odd(100_000..=200_000)),
+        prop::collection::vec(orientation, 0..=5),
+        any_permission(),
+        prop_oneof![0..=2_i64, 15_000..=15_002_i64],
+        prop_oneof![0..=2_i64, 7_500..=7_502_i64],
+    )
+        .prop_map(|(size, others, permission, margin_um, gap_um)| {
+            let mut orientations = vec![Some(FrameOrientation::Square)];
+            orientations.extend(others.into_iter().map(Some));
+            query(
+                LayoutSurfaceKind::DoubleSheet,
+                size,
+                orientations,
+                permission,
+                (margin_um, gap_um, 20_000),
+            )
+        })
+}
+
+/// Double Sheets between two portrait and two wide Pages, with the Layout
+/// settings a new Project starts from.
+fn usual_double_sheet_query() -> impl Strategy<Value = LayoutQuery> {
+    (
+        400_000..=800_000_i64,
+        vertical_and_horizontal_frames(8),
+        any_permission(),
+    )
+        .prop_map(|(width_um, orientations, permission)| {
+            query(
+                LayoutSurfaceKind::DoubleSheet,
+                (width_um, 300_000),
+                orientations,
+                permission,
+                (15_000, 5_000, 20_000),
+            )
+        })
+}
+
+/// What version 1 left to the reserve: a Page of Frames that all share one
+/// orientation, and a double Sheet with a single Frame.
+fn repeated_orientation_query() -> impl Strategy<Value = LayoutQuery> {
+    let orientation = prop_oneof![
+        Just(FrameOrientation::Vertical),
+        Just(FrameOrientation::Horizontal),
+    ];
+    prop_oneof![
+        (200_000..=300_000_i64, orientation.clone(), 1..=15_usize).prop_map(
+            |(width_um, orientation, count)| query(
+                LayoutSurfaceKind::SinglePage,
+                (width_um, 300_000),
+                vec![Some(orientation); count],
+                LayoutPermission::PagesOnly,
+                (15_000, 5_000, 20_000),
+            )
+        ),
+        (400_000..=800_000_i64, orientation, any_permission()).prop_map(
+            |(width_um, orientation, permission)| query(
+                LayoutSurfaceKind::DoubleSheet,
+                (width_um, 300_000),
+                vec![Some(orientation)],
+                permission,
+                (15_000, 5_000, 20_000),
+            )
+        ),
+    ]
+}
+
+/// One to twenty suggestions, each one keeping every geometric invariant.
+fn assert_suggestions(query: &LayoutQuery, result: &myalbuns_core::LayoutGeneration) {
+    let case = format!("{query:?}");
+    assert_eq!(result.status, LayoutGenerationStatus::Candidates, "{case}");
+    assert!((1..=20).contains(&result.candidates.len()), "{case}");
+    // The uniform grid comes back alone, when nothing else fits.
+    let uniform_allowed = result.candidates.len() == 1;
+    for candidate in &result.candidates {
+        assert_geometry(query, &candidate.definition, &case, uniform_allowed);
+    }
+}
+
+proptest! {
+    #![proptest_config(generated_queries())]
+
+    #[test]
+    fn every_suggestion_for_a_valid_query_keeps_the_geometric_invariants(
+        query in any_album_query()
+    ) {
         let result = generate_layouts(&query);
-        let case = format!("{query:?}");
-        assert_eq!(result.status, LayoutGenerationStatus::Candidates, "{case}");
-        for candidate in &result.candidates {
-            assert_geometry(&query, &candidate.definition, &case, true);
+        if result.status == LayoutGenerationStatus::NoCandidates {
+            prop_assert!(result.candidates.is_empty());
+        } else {
+            assert_suggestions(&query, &result);
         }
+        prop_assert_eq!(&result, &generate_layouts(&query));
+    }
+
+    #[test]
+    fn quantization_keeps_squares_square_and_does_not_invent_central_crossings(
+        query in odd_measure_query()
+    ) {
+        let result = generate_layouts(&query);
+        prop_assume!(result.status != LayoutGenerationStatus::NoCandidates);
+        assert_suggestions(&query, &result);
+    }
+
+    #[test]
+    fn double_sheets_offer_valid_suggestions_under_both_permissions(
+        query in usual_double_sheet_query()
+    ) {
+        assert_suggestions(&query, &generate_layouts(&query));
+    }
+
+    #[test]
+    fn common_frame_counts_are_not_left_to_the_reserve(
+        query in repeated_orientation_query()
+    ) {
+        assert_suggestions(&query, &generate_layouts(&query));
     }
 }
 

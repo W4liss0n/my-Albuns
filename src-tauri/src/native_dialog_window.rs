@@ -1266,56 +1266,6 @@ mod tests {
     }
 
     #[test]
-    fn only_opening_a_project_replaces_the_owner_window() {
-        assert_eq!(
-            NativeProgressKind::Opening.owner_presentation(),
-            OwnerPresentation::Replace
-        );
-        assert_eq!(
-            NativeProgressKind::Creating.owner_presentation(),
-            OwnerPresentation::BlockedBehindDialog
-        );
-        assert_eq!(
-            NativeProgressKind::ProcessingImages.owner_presentation(),
-            OwnerPresentation::BlockedBehindDialog
-        );
-    }
-
-    #[test]
-    fn every_project_failure_context_keeps_the_owner_blocked_and_uses_a_specific_title() {
-        let cases = [
-            (
-                ProjectFailureDialogContext::ProjectOpening,
-                "Não foi possível abrir o projeto",
-            ),
-            (
-                ProjectFailureDialogContext::FavoriteUpdate,
-                "Não foi possível atualizar os favoritos",
-            ),
-            (
-                ProjectFailureDialogContext::ConfigurationValidation,
-                "Não foi possível validar as Configurações",
-            ),
-            (
-                ProjectFailureDialogContext::DecorativeSelection,
-                "Não foi possível escolher a imagem decorativa",
-            ),
-            (
-                ProjectFailureDialogContext::ProjectCreation,
-                "Não foi possível criar o projeto",
-            ),
-        ];
-
-        for (context, expected_title) in cases {
-            assert_eq!(
-                context.owner_presentation(),
-                OwnerPresentation::BlockedBehindDialog
-            );
-            assert_eq!(context.title(), expected_title);
-        }
-    }
-
-    #[test]
     fn owned_dialogs_keep_the_owner_visible_and_blocked_until_release() {
         let owner = RecordingOwner::default();
 

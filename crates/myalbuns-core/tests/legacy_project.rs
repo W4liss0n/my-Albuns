@@ -398,6 +398,271 @@ fn formats_before_2_0_and_single_sided_middle_sheets_are_refused() {
     );
 }
 
+#[test]
+fn formats_2_0_and_2_1_convert_like_2_2() {
+    // The reader accepts the three versions through the same schema, so these
+    // fixtures differ from the 2.2 one only in the version they declare.
+    let (current, _) = convert(&LegacyFixture::new(), &[]);
+    for format_version in ["2.0", "2.1"] {
+        let mut fixture = LegacyFixture::new();
+        fixture.format_version = format_version;
+
+        let (saved, notes) = convert(&fixture, &[]);
+
+        assert_eq!(
+            saved["documentType"], "myalbuns.project",
+            "{format_version}"
+        );
+        for part in ["album", "layoutSettings", "visualDefaults", "sheets"] {
+            assert_eq!(
+                saved["project"][part], current["project"][part],
+                "{format_version}: {part}"
+            );
+        }
+        assert_eq!(
+            saved["project"]["favoriteLayouts"].as_array().map(Vec::len),
+            Some(1),
+            "{format_version}"
+        );
+        assert!(notes.is_empty(), "{format_version}: {notes:?}");
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Damaged files
+
+/// One Photo in one Frame, so every table has a row to damage.
+fn damageable_fixture() -> LegacyFixture {
+    let mut fixture = LegacyFixture::new().image("img_foto", "Foto.jpg", false, "");
+    let mut photo_frame = frame(
+        "b0000000-0000-4000-8000-000000000001",
+        100.0,
+        100.0,
+        1000.0,
+        1200.0,
+    );
+    photo_frame["image_id"] = json!("img_foto");
+    fixture.sheets[1]["frames"] = json!([photo_frame]);
+    fixture
+}
+
+fn changed_fixture(change: impl FnOnce(&mut LegacyFixture)) -> Opened {
+    let mut fixture = damageable_fixture();
+    change(&mut fixture);
+    fixture_file(&fixture)
+}
+
+/// A valid old Project changed afterwards through SQLite itself.
+fn changed_by_sql(statement: &str) -> Opened {
+    let opened = fixture_file(&damageable_fixture());
+    Connection::open(&opened.path)
+        .expect("the old database opens")
+        .execute_batch(statement)
+        .unwrap_or_else(|error| panic!("{statement}: {error}"));
+    opened
+}
+
+fn changed_bytes(change: impl FnOnce(Vec<u8>) -> Vec<u8>) -> Opened {
+    let opened = fixture_file(&damageable_fixture());
+    let bytes = fs::read(&opened.path).unwrap();
+    fs::write(&opened.path, change(bytes)).unwrap();
+    opened
+}
+
+/// Both ways of reading the file refuse it and leave its bytes alone.
+fn assert_refused(case: &str, opened: &Opened, failure: DocumentFailure) {
+    let before = fs::read(&opened.path).unwrap();
+    assert_eq!(
+        opened
+            .core
+            .open_editable(OpenProjectRequest::new(project_location(&opened.path)))
+            .err(),
+        Some(OpenProjectError::Document(failure)),
+        "{case}"
+    );
+    assert_eq!(
+        opened
+            .core
+            .load_persisted_revision(LoadProjectRequest::new(project_location(&opened.path)))
+            .err(),
+        Some(LoadProjectError::Document(failure)),
+        "{case}"
+    );
+    assert_eq!(fs::read(&opened.path).unwrap(), before, "{case}");
+}
+
+#[test]
+fn the_damageable_fixture_itself_opens() {
+    let opened = fixture_file(&damageable_fixture());
+
+    let project = opened
+        .core
+        .open_editable(OpenProjectRequest::new(project_location(&opened.path)))
+        .expect("every damaged case below starts from a Project that opens");
+
+    assert_eq!(project.project().media().len(), 1);
+}
+
+#[test]
+fn a_damaged_old_project_is_refused_without_touching_the_file() {
+    let cases = [
+        // The database itself
+        (
+            "a truncated database",
+            changed_bytes(|bytes| bytes[..bytes.len() / 2].to_vec()),
+        ),
+        (
+            "a database header followed by noise",
+            changed_bytes(|bytes| {
+                let mut noise = bytes[..16].to_vec();
+                noise.resize(bytes.len(), 0xA5);
+                noise
+            }),
+        ),
+        (
+            "a database page overwritten",
+            changed_bytes(|mut bytes| {
+                let last_page = bytes.len() - 4096;
+                bytes[last_page..].fill(0xA5);
+                bytes
+            }),
+        ),
+        // Metadata
+        (
+            "no metadata row",
+            changed_by_sql("DELETE FROM project_metadata"),
+        ),
+        (
+            "a metadata column missing",
+            changed_by_sql("ALTER TABLE project_metadata DROP COLUMN safe_margin"),
+        ),
+        (
+            "a metadata value of the wrong type",
+            changed_by_sql("UPDATE project_metadata SET dpi = 'trezentos'"),
+        ),
+        (
+            "a format version nobody wrote",
+            changed_fixture(|fixture| fixture.format_version = "2.3"),
+        ),
+        (
+            "another canonical model",
+            changed_by_sql("UPDATE project_metadata SET canonical_model_version = 1"),
+        ),
+        (
+            "no canonical model",
+            changed_by_sql("UPDATE project_metadata SET canonical_model_version = NULL"),
+        ),
+        (
+            "default settings that are not JSON",
+            changed_by_sql("UPDATE project_metadata SET default_settings = '{'"),
+        ),
+        (
+            "default settings of the wrong shape",
+            changed_fixture(|fixture| fixture.metadata = json!([1])),
+        ),
+        // Images
+        (
+            "an image column missing",
+            changed_by_sql("ALTER TABLE images DROP COLUMN data"),
+        ),
+        (
+            "an image value of the wrong type",
+            changed_by_sql("UPDATE images SET data = x'00FF'"),
+        ),
+        (
+            "image data that is not JSON",
+            changed_by_sql("UPDATE images SET data = '{'"),
+        ),
+        // Sheets and Frames
+        (
+            "a Sheet column missing",
+            changed_by_sql("ALTER TABLE laminas DROP COLUMN data"),
+        ),
+        (
+            "a Sheet value of the wrong type",
+            changed_by_sql("UPDATE laminas SET data = x'00FF'"),
+        ),
+        (
+            "Sheet data that is not JSON",
+            changed_by_sql("UPDATE laminas SET data = '{' WHERE index_position = 1"),
+        ),
+        (
+            "a Sheet without one of its pages",
+            changed_fixture(|fixture| {
+                fixture.sheets[0]
+                    .as_object_mut()
+                    .unwrap()
+                    .remove("left_page");
+            }),
+        ),
+        (
+            "a Frame without geometry",
+            changed_fixture(|fixture| {
+                fixture.sheets[1]["frames"][0]
+                    .as_object_mut()
+                    .unwrap()
+                    .remove("geometry");
+            }),
+        ),
+        (
+            "a Frame geometry of the wrong type",
+            changed_fixture(|fixture| {
+                fixture.sheets[1]["frames"][0]["geometry"]["width"] = json!("larga")
+            }),
+        ),
+        // Measures no Album can have
+        (
+            "a DPI of zero",
+            changed_by_sql("UPDATE project_metadata SET dpi = 0"),
+        ),
+        (
+            "a DPI above the supported range",
+            changed_by_sql("UPDATE project_metadata SET dpi = 1201"),
+        ),
+        (
+            "a Sheet without width",
+            changed_by_sql("UPDATE project_metadata SET width = 0"),
+        ),
+        (
+            "a Sheet without height",
+            changed_by_sql("UPDATE project_metadata SET height = 0.4"),
+        ),
+        (
+            "a Sheet wider than any Album",
+            changed_by_sql("UPDATE project_metadata SET width = 1e30"),
+        ),
+        (
+            "margins the current Album refuses",
+            changed_by_sql("UPDATE project_metadata SET cut_margin = 1000, safe_margin = 1000"),
+        ),
+    ];
+
+    for (case, opened) in &cases {
+        assert_refused(case, opened, DocumentFailure::LegacyProjectDamaged);
+    }
+}
+
+#[test]
+fn a_database_without_the_canonical_tables_is_refused_as_an_older_format() {
+    for table in ["images", "laminas"] {
+        let opened = changed_by_sql(&format!("DROP TABLE {table}"));
+
+        assert_refused(table, &opened, DocumentFailure::LegacyProjectOldVersion);
+    }
+}
+
+#[test]
+fn unreadable_favorites_do_not_stop_an_old_project_from_opening() {
+    let opened = changed_by_sql("UPDATE project_metadata SET layout_favorites_state = '{'");
+
+    let project = opened
+        .core
+        .open_editable(OpenProjectRequest::new(project_location(&opened.path)))
+        .expect("the old program also ignored unreadable favorites");
+
+    assert!(project.requires_format_conversion());
+}
+
 // ---------------------------------------------------------------------------
 // Conversion
 
@@ -779,10 +1044,10 @@ fn a_read_only_export_composes_photos_with_their_observed_dimensions() {
 /// (local copies of client files, never committed) and saves a converted
 /// copy beside it, for comparison with the old program.
 #[test]
+#[ignore = "requires MYALBUNS_LEGACY_SAMPLES with local copies of real old projects"]
 fn local_copies_of_real_old_projects_convert() {
-    let Ok(directory) = std::env::var("MYALBUNS_LEGACY_SAMPLES") else {
-        return;
-    };
+    let directory = std::env::var("MYALBUNS_LEGACY_SAMPLES")
+        .expect("MYALBUNS_LEGACY_SAMPLES names the folder with the local copies");
     let root = tempfile::tempdir().unwrap();
     let core = project_core(root.path());
     for entry in fs::read_dir(&directory).unwrap() {

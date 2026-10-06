@@ -696,7 +696,7 @@ mod validation_tests {
     use super::*;
 
     /// Two textured photos whose synthetic faces pass the pair validation.
-    fn synthetic_pair(folder: &Path) -> CorrectionSource {
+    pub(super) fn synthetic_pair(folder: &Path) -> CorrectionSource {
         let target = folder.join("target.png");
         let reference = folder.join("reference.png");
         RgbaImage::from_fn(200, 200, |x, y| {
@@ -1016,167 +1016,451 @@ mod validation_tests {
     }
 }
 
+/// The branches that refuse a photo, a face or a replacement. The module
+/// reports them as text, so each expected message comes from the simplest call
+/// that reaches the same branch instead of from a copy of the wording.
 #[cfg(test)]
-mod qa_tests {
+mod refusal_tests {
     use super::*;
+    use crate::ipc_contract::ViewerFacePoint;
 
-    #[cfg(windows)]
-    fn process_cpu_time() -> std::time::Duration {
-        #[repr(C)]
-        #[derive(Default)]
-        struct FileTime {
-            low: u32,
-            high: u32,
-        }
-        #[link(name = "kernel32")]
-        unsafe extern "system" {
-            fn GetCurrentProcess() -> *mut std::ffi::c_void;
-            fn GetProcessTimes(
-                process: *mut std::ffi::c_void,
-                created: *mut FileTime,
-                exited: *mut FileTime,
-                kernel: *mut FileTime,
-                user: *mut FileTime,
-            ) -> i32;
-        }
-        let (mut created, mut exited, mut kernel, mut user) = (
-            FileTime::default(),
-            FileTime::default(),
-            FileTime::default(),
-            FileTime::default(),
-        );
-        let ok = unsafe {
-            GetProcessTimes(
-                GetCurrentProcess(),
-                &mut created,
-                &mut exited,
-                &mut kernel,
-                &mut user,
-            )
-        };
-        assert_ne!(ok, 0);
-        let ticks = |time: FileTime| (u64::from(time.high) << 32) | u64::from(time.low);
-        std::time::Duration::from_nanos((ticks(kernel) + ticks(user)) * 100)
+    fn landmarks() -> Vec<ViewerFacePoint> {
+        vec![
+            ViewerFacePoint {
+                x: 0.5,
+                y: 0.5,
+                z: 0.0
+            };
+            468
+        ]
     }
 
-    fn real_pair() -> (PathBuf, PathBuf, Face, Face) {
-        let root = Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../.scratch/fixtures/correcao-de-olhos/rostos");
-        let results: serde_json::Value =
-            serde_json::from_slice(&std::fs::read(root.join("render-pair-results.json")).unwrap())
-                .unwrap();
-        (
-            root.join("failing.jpg"),
-            root.join("reference.jpg"),
-            serde_json::from_value(results[0]["faces"][0].clone()).unwrap(),
-            serde_json::from_value(results[1]["faces"][0].clone()).unwrap(),
-        )
+    fn unusable_landmark() -> String {
+        point(&Face(vec![]), 0, 100, 100)
+            .err()
+            .expect("a missing landmark is refused")
     }
 
-    #[test]
-    #[ignore = "requires the ignored 24 MP real-photo QA fixtures"]
-    #[cfg(windows)]
-    fn benchmark_serial_native_render_with_supersession_checkpoints() {
-        let (target_path, reference_path, target, reference) = real_pair();
-        let source_hashes = (
-            source_digest(&target_path).unwrap(),
-            source_digest(&reference_path).unwrap(),
-        );
-        let preview = |checkpoint: &dyn Fn(RenderStage) -> Result<(), String>| {
-            render_preview(
-                &target_path,
-                &reference_path,
-                &target,
-                &reference,
-                checkpoint,
-            )
-        };
-        let measure = |label: &str, run: &dyn Fn() -> Vec<u8>| {
-            let wall = std::time::Instant::now();
-            let cpu = process_cpu_time();
-            let preview = run();
-            let elapsed = wall.elapsed();
-            let cpu = process_cpu_time() - cpu;
-            let preview_hash = Sha256::digest(preview);
-            println!(
-                "{label} wall_ms={} cpu_ms={} preview_sha256={:x}",
-                elapsed.as_millis(),
-                cpu.as_millis(),
-                preview_hash
-            );
-            preview_hash.to_vec()
-        };
-        let single = measure("single_pair", &|| preview(&|_| Ok(())).unwrap());
-        // This controls native processing work, not concurrent Tauri command or window latency.
-        let uncancelled = measure("three_requests_uncancelled_serial", &|| {
-            let mut result = None;
-            for _ in 0..3 {
-                result = Some(preview(&|_| Ok(())).unwrap());
-            }
-            result.unwrap()
-        });
-        let checkpointed = measure("three_requests_checkpointed_serial", &|| {
-            let stages = std::sync::Mutex::new(Vec::new());
-            let superseded_at_encode = |stage| {
-                stages.lock().unwrap().push(stage);
-                if stage == RenderStage::Encode {
-                    Err("superseded".into())
-                } else {
-                    Ok(())
-                }
-            };
-            assert_eq!(preview(&superseded_at_encode).unwrap_err(), "superseded");
-            // The next queued request is invalidated before decoding.
-            let superseded_at_decode = |stage| {
-                stages.lock().unwrap().push(stage);
-                Err("superseded".into())
-            };
-            assert_eq!(preview(&superseded_at_decode).unwrap_err(), "superseded");
-            let current = preview(&|stage| {
-                stages.lock().unwrap().push(stage);
-                Ok(())
-            })
+    fn unsupported_profile() -> String {
+        validate_profile(b"").expect_err("an empty profile is not sRGB")
+    }
+
+    fn png(folder: &Path, name: &str, width: u32, height: u32) -> PathBuf {
+        let path = folder.join(name);
+        RgbaImage::from_pixel(width, height, Rgba([190, 40, 20, 255]))
+            .save_with_format(&path, ImageFormat::Png)
             .unwrap();
-            let stages = stages.into_inner().unwrap();
-            let count = |wanted| stages.iter().filter(|&&stage| stage == wanted).count();
-            println!(
-                "burst_after decode={} composite={} encode_reached={}",
-                count(RenderStage::Decode),
-                count(RenderStage::Composite),
-                count(RenderStage::Encode)
-            );
-            current
-        });
-        assert_eq!(single, uncancelled);
-        assert_eq!(single, checkpointed);
-        assert_eq!(source_digest(&target_path).unwrap(), source_hashes.0);
-        assert_eq!(source_digest(&reference_path).unwrap(), source_hashes.1);
+        path
+    }
+
+    fn png_with_profile(folder: &Path, name: &str, profile: &[u8]) -> PathBuf {
+        let path = folder.join(name);
+        let mut encoder = image::codecs::png::PngEncoder::new(File::create(&path).unwrap());
+        encoder.set_icc_profile(profile.to_vec()).unwrap();
+        encoder
+            .write_image(&[128; 24 * 16 * 4], 24, 16, ExtendedColorType::Rgba8)
+            .unwrap();
+        path
+    }
+
+    fn crc32(bytes: &[u8]) -> u32 {
+        let mut crc = !0_u32;
+        for byte in bytes {
+            crc ^= u32::from(*byte);
+            for _ in 0..8 {
+                crc = if crc & 1 == 0 {
+                    crc >> 1
+                } else {
+                    (crc >> 1) ^ 0xEDB8_8320
+                };
+            }
+        }
+        !crc
+    }
+
+    /// A PNG that declares its size and carries no pixels: enough for every
+    /// check made before decoding, and unreadable after them.
+    fn png_declaring(folder: &Path, name: &str, width: u32, height: u32) -> PathBuf {
+        let mut bytes = vec![137, 80, 78, 71, 13, 10, 26, 10];
+        let mut header = Vec::new();
+        header.extend(width.to_be_bytes());
+        header.extend(height.to_be_bytes());
+        header.extend([8, 0, 0, 0, 0]);
+        for (kind, data) in [(b"IHDR", header.as_slice()), (b"IDAT", &[]), (b"IEND", &[])] {
+            bytes.extend((data.len() as u32).to_be_bytes());
+            let mut chunk = kind.to_vec();
+            chunk.extend(data);
+            bytes.extend(&chunk);
+            bytes.extend(crc32(&chunk).to_be_bytes());
+        }
+        let path = folder.join(name);
+        std::fs::write(&path, bytes).unwrap();
+        path
+    }
+
+    fn names(folder: &Path) -> Vec<String> {
+        let mut names = std::fs::read_dir(folder)
+            .unwrap()
+            .map(|entry| entry.unwrap().file_name().to_string_lossy().into_owned())
+            .collect::<Vec<_>>();
+        names.sort();
+        names
+    }
+
+    /// The test host supplies the legacy profile; the product recognizes it by
+    /// digest and never reads it from the operating system.
+    #[cfg(windows)]
+    fn legacy_windows_profile() -> Vec<u8> {
+        let system_root = std::env::var_os("SystemRoot").expect("Windows defines SystemRoot");
+        std::fs::read(
+            PathBuf::from(system_root)
+                .join("System32/spool/drivers/color/sRGB Color Space Profile.icm"),
+        )
+        .expect("Windows supplies its standard sRGB profile")
     }
 
     #[test]
-    #[ignore = "requires the ignored 24 MP real-photo QA fixtures"]
-    fn profiles_real_pair_in_desktop_crate() {
-        let (target_path, reference_path, target, reference) = real_pair();
-        let start = std::time::Instant::now();
-        let target_digest = source_digest(&target_path).unwrap();
-        let reference_digest = source_digest(&reference_path).unwrap();
-        let preview = render_preview(&target_path, &reference_path, &target, &reference, |_| {
-            Ok(())
-        })
-        .unwrap();
-        assert_eq!(source_digest(&target_path).unwrap(), target_digest);
-        assert_eq!(source_digest(&reference_path).unwrap(), reference_digest);
-        let elapsed = start.elapsed().as_millis();
-        println!(
-            "desktop_prepare_with_digests_ms={elapsed} preview_bytes={}",
-            preview.len()
+    fn landmarks_must_be_present_finite_and_close_to_the_photo() {
+        let refused = unusable_landmark();
+        let with = |change: fn(&mut ViewerFacePoint)| {
+            let mut points = landmarks();
+            change(&mut points[33]);
+            point(&Face(points), 33, 200, 100)
+        };
+        for (name, change) in [
+            (
+                "x is not a number",
+                (|point| point.x = f32::NAN) as fn(&mut ViewerFacePoint),
+            ),
+            ("y is not a number", |point| point.y = f32::NAN),
+            ("z is not a number", |point| point.z = f32::NAN),
+            ("x is infinite", |point| point.x = f32::INFINITY),
+            ("y is infinite", |point| point.y = f32::NEG_INFINITY),
+            ("x is left of the margin", |point| point.x = -0.11),
+            ("x is right of the margin", |point| point.x = 1.11),
+            ("y is above the margin", |point| point.y = -0.11),
+            ("y is below the margin", |point| point.y = 1.11),
+        ] {
+            assert_eq!(with(change).err(), Some(refused.clone()), "{name}");
+        }
+        assert_eq!(
+            point(&Face(landmarks()), 468, 200, 100).err(),
+            Some(refused),
+            "a landmark the detector did not send"
         );
-        if let Ok(budget) = std::env::var("EYE_PREPARE_BUDGET_MS") {
-            let budget: u128 = budget.parse().unwrap();
+        for (name, change, expected) in [
+            (
+                "inside the photo",
+                (|point| (point.x, point.y) = (0.25, 0.75)) as fn(&mut ViewerFacePoint),
+                (50.0, 75.0),
+            ),
+            (
+                "on the near margin",
+                |point| (point.x, point.y) = (-0.1, -0.1),
+                (-20.0, -10.0),
+            ),
+            (
+                "on the far margin",
+                |point| (point.x, point.y) = (1.1, 1.1),
+                (220.0, 110.0),
+            ),
+        ] {
+            let scaled = with(change).unwrap_or_else(|error| panic!("{name}: {error}"));
             assert!(
-                elapsed < budget,
-                "24 MP desktop preparation exceeded local {budget} ms budget"
+                (scaled.x - expected.0).abs() < 0.001 && (scaled.y - expected.1).abs() < 0.001,
+                "{name}: ({}, {})",
+                scaled.x,
+                scaled.y
             );
         }
+    }
+
+    #[test]
+    fn an_eye_narrower_than_eight_pixels_is_refused_as_a_face_too_small() {
+        let eye_spanning = |fraction: f32| {
+            let mut points = landmarks();
+            points[33].x = 0.5;
+            points[133].x = 0.5 + fraction;
+            eye(&Face(points), (1_000, 1_000), (33, 133), (159, 145))
+        };
+        let too_small = eye_spanning(0.0079).err().expect("7.9 pixels are too few");
+        assert_ne!(too_small, unusable_landmark());
+        assert_eq!(eye_spanning(0.0).err(), Some(too_small));
+        let accepted =
+            eye_spanning(0.0081).unwrap_or_else(|error| panic!("8.1 pixels are enough: {error}"));
+        assert!((accepted.width - 8.1).abs() < 0.01, "{}", accepted.width);
+    }
+
+    #[test]
+    fn an_eye_whose_surroundings_leave_the_reference_is_refused_without_painting() {
+        let eye_at = |x: f32, y: f32| Eye {
+            center: V2 { x, y },
+            along: V2 { x: 1.0, y: 0.0 },
+            width: 40.0,
+            openness: 0.2,
+        };
+        let reference = RgbaImage::from_fn(200, 200, |x, y| {
+            Rgba([(x * 5 % 256) as u8, (y * 3 % 256) as u8, 60, 255])
+        });
+        let untouched = RgbaImage::from_pixel(200, 200, Rgba([80, 100, 120, 255]));
+        let mut target = untouched.clone();
+
+        // With the reference eye on the corner, most of the skin around it is
+        // outside the reference photo.
+        let near_border = transplant_eye(
+            &mut target,
+            &reference,
+            &eye_at(100.0, 100.0),
+            &eye_at(0.0, 0.0),
+        )
+        .expect_err("too little skin can be matched");
+        assert_eq!(target, untouched, "a refused eye changes no pixel");
+
+        transplant_eye(
+            &mut target,
+            &reference,
+            &eye_at(100.0, 100.0),
+            &eye_at(100.0, 100.0),
+        )
+        .expect("an eye inside the reference is transplanted");
+        assert_ne!(target, untouched);
+        assert_ne!(near_border, unusable_landmark());
+    }
+
+    #[test]
+    fn only_the_known_srgb_profiles_are_accepted() {
+        let refused = unsupported_profile();
+        for profile in SRGB_PROFILES {
+            validate_profile(profile).expect("a bundled sRGB profile is accepted");
+            assert_eq!(
+                validate_profile(&profile[1..]).err(),
+                Some(refused.clone()),
+                "a truncated profile is another profile"
+            );
+        }
+        assert_eq!(
+            validate_profile(&[0; 3_144]).err(),
+            Some(refused),
+            "the length of the legacy profile is not its identity"
+        );
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn the_legacy_windows_srgb_profile_is_accepted_only_by_its_exact_bytes() {
+        let folder = tempfile::tempdir().unwrap();
+        let legacy = legacy_windows_profile();
+        validate_profile(&legacy).expect("the legacy sRGB profile is accepted by digest");
+        open_upright(&png_with_profile(folder.path(), "legacy.png", &legacy))
+            .expect("a photo carrying the legacy profile opens");
+
+        let mut altered = legacy;
+        altered[100] ^= 1;
+        assert_eq!(
+            validate_profile(&altered).err(),
+            Some(unsupported_profile())
+        );
+    }
+
+    #[test]
+    fn a_photo_with_another_color_profile_is_neither_opened_nor_replaced() {
+        let folder = tempfile::tempdir().unwrap();
+        let original = png_with_profile(folder.path(), "wide-gamut.png", b"not an sRGB profile");
+        let before = std::fs::read(&original).unwrap();
+
+        assert_eq!(open_upright(&original).err(), Some(unsupported_profile()));
+        assert_eq!(
+            commit_replacement(
+                &original,
+                RgbaImage::from_pixel(24, 16, Rgba([20, 30, 40, 255])),
+                source_digest(&original).unwrap(),
+            )
+            .err(),
+            Some(unsupported_profile())
+        );
+        assert_eq!(std::fs::read(&original).unwrap(), before);
+        assert_eq!(names(folder.path()), ["wide-gamut.png"]);
+    }
+
+    #[test]
+    fn photos_over_ten_thousand_pixels_or_thirty_six_megapixels_are_refused_before_decoding() {
+        let folder = tempfile::tempdir().unwrap();
+        let too_large = open_upright(&png(folder.path(), "wide.png", 10_001, 1))
+            .expect_err("10 001 pixels of width are over the limit");
+        assert_ne!(too_large, unsupported_profile());
+        assert_eq!(
+            open_upright(&png(folder.path(), "tall.png", 1, 10_001)).err(),
+            Some(too_large.clone())
+        );
+        assert_eq!(
+            open_upright(&png(folder.path(), "widest.png", 10_000, 1))
+                .expect("10 000 pixels of width are accepted")
+                .dimensions(),
+            (10_000, 1)
+        );
+
+        // 6001 x 6000 fits both edges and exceeds 36 MP. The file has no pixels,
+        // so only a check made before decoding can name the size as the reason.
+        assert_eq!(
+            open_upright(&png_declaring(folder.path(), "area.png", 6_001, 6_000)).err(),
+            Some(too_large.clone())
+        );
+        let unreadable = open_upright(&png_declaring(folder.path(), "limit.png", 6_000, 6_000))
+            .expect_err("a file without pixels cannot be read");
+        assert_ne!(
+            unreadable, too_large,
+            "exactly 36 MP passes the size check and fails only at decoding"
+        );
+    }
+
+    #[test]
+    fn the_original_must_be_a_supported_format_that_matches_its_extension() {
+        let folder = tempfile::tempdir().unwrap();
+        let image = DynamicImage::ImageRgba8(RgbaImage::from_pixel(24, 16, Rgba([1, 2, 3, 255])));
+        let saved = |name: &str, format: ImageFormat| {
+            let path = folder.path().join(name);
+            image.save_with_format(&path, format).unwrap();
+            path
+        };
+        for (name, format) in [
+            ("photo.jpg", ImageFormat::Jpeg),
+            ("PHOTO.JPEG", ImageFormat::Jpeg),
+            ("photo.png", ImageFormat::Png),
+            ("photo.tif", ImageFormat::Tiff),
+            ("photo.TIFF", ImageFormat::Tiff),
+        ] {
+            assert_eq!(original_format(&saved(name, format)), Ok(format), "{name}");
+        }
+
+        // The extension alone decides; these bytes are a valid PNG.
+        let unsupported = original_format(&saved("photo.bmp", ImageFormat::Png))
+            .expect_err("only JPEG, PNG and TIFF originals are replaced");
+        assert_eq!(
+            original_format(&saved("photo", ImageFormat::Png)).err(),
+            Some(unsupported.clone()),
+            "a file without extension"
+        );
+        let mismatched = original_format(&saved("jpeg-inside.png", ImageFormat::Jpeg))
+            .expect_err("the content is not what the extension says");
+        assert_ne!(mismatched, unsupported);
+        assert_eq!(
+            original_format(&saved("png-inside.jpg", ImageFormat::Png)).err(),
+            Some(mismatched.clone())
+        );
+
+        for (name, refusal) in [("photo.bmp", unsupported), ("jpeg-inside.png", mismatched)] {
+            let original = folder.path().join(name);
+            let before = std::fs::read(&original).unwrap();
+            let entries = names(folder.path());
+            assert_eq!(
+                commit_replacement(
+                    &original,
+                    RgbaImage::from_pixel(24, 16, Rgba([20, 30, 40, 255])),
+                    source_digest(&original).unwrap(),
+                )
+                .err(),
+                Some(refusal),
+                "{name}"
+            );
+            assert_eq!(std::fs::read(&original).unwrap(), before);
+            assert_eq!(
+                names(folder.path()),
+                entries,
+                "nothing is staged for {name}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_correction_of_another_size_is_refused_before_anything_is_staged() {
+        let folder = tempfile::tempdir().unwrap();
+        let original = png(folder.path(), "photo.png", 24, 16);
+        let before = std::fs::read(&original).unwrap();
+        let staging = folder.path().join("probe.stage");
+        let rotated = RgbaImage::from_pixel(16, 24, Rgba([20, 30, 40, 255]));
+
+        let wrong_size = encode_replacement(rotated.clone(), &original, &staging)
+            .expect_err("a 16 x 24 correction does not fit a 24 x 16 photo");
+        assert!(!staging.exists());
+        assert_eq!(
+            commit_replacement(&original, rotated, source_digest(&original).unwrap()).err(),
+            Some(wrong_size)
+        );
+        assert_eq!(std::fs::read(&original).unwrap(), before);
+        assert_eq!(names(folder.path()), ["photo.png"]);
+
+        encode_replacement(
+            RgbaImage::from_pixel(24, 16, Rgba([20, 30, 40, 255])),
+            &original,
+            &staging,
+        )
+        .expect("the same size is staged");
+        assert!(staging.is_file());
+    }
+
+    #[test]
+    fn a_changed_target_refuses_to_save_before_reading_it_and_keeps_the_newer_file() {
+        let folder = tempfile::tempdir().unwrap();
+        let source = super::validation_tests::synthetic_pair(folder.path());
+        // Not even a photo any more: only the comparison made before composing
+        // can still name the change as the reason.
+        std::fs::write(&source.target, b"replaced by another program").unwrap();
+        let newer = std::fs::read(&source.target).unwrap();
+        let reference = std::fs::read(&source.reference).unwrap();
+
+        assert_eq!(replace_original(&source).err(), Some(TARGET_CHANGED.into()));
+
+        assert_eq!(std::fs::read(&source.target).unwrap(), newer);
+        assert_eq!(std::fs::read(&source.reference).unwrap(), reference);
+        assert_eq!(std::fs::read_dir(folder.path()).unwrap().count(), 2);
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn a_failed_file_replacement_keeps_the_original_and_leaves_no_staging_or_backup() {
+        use std::os::windows::fs::OpenOptionsExt;
+        use windows_sys::Win32::Storage::FileSystem::FILE_SHARE_READ;
+
+        let folder = tempfile::tempdir().unwrap();
+        let original = png(folder.path(), "photo.png", 24, 16);
+        let before = std::fs::read(&original).unwrap();
+        let digest = source_digest(&original).unwrap();
+        let corrected = RgbaImage::from_pixel(24, 16, Rgba([30, 100, 180, 255]));
+        // Files of an earlier, interrupted correction belong to nobody now.
+        let leftover = folder.path().join(".myalbuns-eye-earlier.stage");
+        std::fs::write(&leftover, b"left by an earlier attempt").unwrap();
+
+        // Another program keeps the photo open for reading only: it can still be
+        // read and compared, and it cannot be replaced.
+        let held = std::fs::OpenOptions::new()
+            .read(true)
+            .share_mode(FILE_SHARE_READ)
+            .open(&original)
+            .expect("the photo is held open");
+        let probe = folder.path().join("probe.stage");
+        std::fs::write(&probe, b"probe").unwrap();
+        let refused = replace_file(&original, &probe, &folder.path().join("probe.backup"))
+            .expect_err("the held photo cannot be replaced");
+        std::fs::remove_file(&probe).unwrap();
+
+        assert_eq!(
+            commit_replacement(&original, corrected.clone(), digest).err(),
+            Some(refused),
+            "the correction was staged and only its replacement failed"
+        );
+        assert_eq!(std::fs::read(&original).unwrap(), before);
+        assert_eq!(
+            names(folder.path()),
+            [".myalbuns-eye-earlier.stage", "photo.png"],
+            "neither the staged file nor a backup stays behind"
+        );
+
+        drop(held);
+        let backup = commit_replacement(&original, corrected, digest)
+            .expect("the replacement succeeds once the photo is released");
+        assert_ne!(std::fs::read(&original).unwrap(), before);
+        assert_eq!(std::fs::read(&backup).unwrap(), before);
+        assert!(leftover.is_file());
+        assert_eq!(names(folder.path()).len(), 3);
     }
 }

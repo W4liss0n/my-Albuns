@@ -6,7 +6,11 @@
 //! contract changes on purpose:
 //! `cargo test -p myalbuns-core --test project_file_v1 -- --ignored write_complete_fixture`.
 
-use std::{fs, path::Path};
+use std::{
+    collections::BTreeSet,
+    fs,
+    path::{Path, PathBuf},
+};
 
 use myalbuns_core::*;
 use myalbuns_paths::OperationPathContext;
@@ -170,28 +174,10 @@ fn the_photo_zoom_is_accepted_up_to_five_times_and_rejected_above() {
     );
 }
 
-#[test]
-fn development_files_before_the_first_public_version_are_rejected_without_writing() {
-    let root = tempfile::tempdir().unwrap();
-    let path = root.path().join("Desenvolvimento.myalbuns");
-    let mut document: serde_json::Value = serde_json::from_slice(FIXTURES[1].1).unwrap();
-    document["schemaVersion"] = serde_json::json!(12);
-    let bytes = serde_json::to_vec(&document).unwrap();
-    fs::write(&path, &bytes).unwrap();
-    assert_eq!(
-        core(root.path())
-            .load_persisted_revision(LoadProjectRequest::new(location(&path)))
-            .unwrap_err(),
-        LoadProjectError::Document(DocumentFailure::UnsupportedFutureSchema { version: 12 })
-    );
-    assert_eq!(fs::read(&path).unwrap(), bytes);
-}
-
-#[test]
-#[ignore = "regenerates tests/fixtures/project_file_v1/complete.myalbuns"]
-fn write_complete_fixture() {
-    let root = tempfile::tempdir().unwrap();
-    let path = root.path().join("Completo.myalbuns");
+/// The recipe of `complete.myalbuns`: every persisted feature, applied through
+/// the public Core and not saved yet.
+fn complete_project(root: &Path) -> (EditableProject, PathBuf) {
+    let path = root.join("Completo.myalbuns");
     let mut input: serde_json::Value =
         serde_json::from_slice(include_bytes!("fixtures/project_file_v1/photo.myalbuns")).unwrap();
     let media = input["project"]["media"].as_array_mut().unwrap();
@@ -206,7 +192,7 @@ fn write_complete_fixture() {
         "path": { "windowsUtf16": [67, 58, 92, 99, 97, 112, 97, 55296, 46, 112, 110, 103] }
     }));
     fs::write(&path, serde_json::to_vec(&input).unwrap()).unwrap();
-    let mut project = core(root.path())
+    let mut project = core(root)
         .open_editable(OpenProjectRequest::new(location(&path)))
         .unwrap();
     let initial = project.projection();
@@ -361,10 +347,157 @@ fn write_complete_fixture() {
             },
         })
         .unwrap();
+    (project, path)
+}
+
+#[test]
+#[ignore = "regenerates tests/fixtures/project_file_v1/complete.myalbuns"]
+fn write_complete_fixture() {
+    let root = tempfile::tempdir().unwrap();
+    let (mut project, path) = complete_project(root.path());
     project.save(project.revision()).unwrap();
     drop(project);
 
     let target = Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("tests/fixtures/project_file_v1/complete.myalbuns");
     fs::copy(&path, target).unwrap();
+}
+
+fn key_paths(value: &serde_json::Value, path: &str, found: &mut BTreeSet<String>) {
+    match value {
+        serde_json::Value::Object(fields) => {
+            for (name, field) in fields {
+                let path = format!("{path}.{name}");
+                key_paths(field, &path, found);
+                found.insert(path);
+            }
+        }
+        serde_json::Value::Array(items) => {
+            for item in items {
+                key_paths(item, &format!("{path}[]"), found);
+            }
+        }
+        _ => {}
+    }
+}
+
+fn written_key_paths(bytes: &[u8]) -> BTreeSet<String> {
+    let mut found = BTreeSet::new();
+    key_paths(&serde_json::from_slice(bytes).unwrap(), "", &mut found);
+    found
+}
+
+#[test]
+fn the_recipe_of_the_complete_fixture_still_writes_every_key_the_fixture_carries() {
+    let root = tempfile::tempdir().unwrap();
+    let (mut project, path) = complete_project(root.path());
+    project.save(project.revision()).unwrap();
+    drop(project);
+
+    assert_eq!(
+        written_key_paths(&fs::read(&path).unwrap()),
+        written_key_paths(FIXTURES[5].1)
+    );
+}
+
+/// The complete recipe plus what one document can still add to it: a side
+/// that keeps half of a content applied to both sides of its Sheet.
+fn maximal_project(root: &Path) -> (EditableProject, PathBuf) {
+    let (mut project, path) = complete_project(root);
+    let sheet_id = project.projection().state.album.sheets[1].id.clone();
+    project
+        .apply(ProjectIntent::ApplyDecorative {
+            sheet_id: sheet_id.clone(),
+            media_id: "00000000-0000-4000-8000-000000000020".parse().unwrap(),
+            role: DecorativeRole::Background,
+            scope: DecorativeScope::BothSides,
+        })
+        .unwrap();
+    project
+        .apply(ProjectIntent::EditSheetVisual {
+            sheet_id,
+            scope: DecorativeScope::Left,
+            change: SheetVisualChange::BackgroundColor {
+                rgb: "#C4D6E7".into(),
+            },
+        })
+        .unwrap();
+    (project, path)
+}
+
+#[test]
+fn a_project_with_every_persisted_feature_reopens_equal_and_is_written_the_same_way_twice() {
+    let root = tempfile::tempdir().unwrap();
+    let (mut project, path) = maximal_project(root.path());
+    project.save(project.revision()).unwrap();
+    let expected = project.project().clone();
+    let original_id = project.project_id().hyphenated().to_string();
+    drop(project);
+    let written = fs::read(&path).unwrap();
+    let paths = written_key_paths(&written);
+    assert!(
+        paths.is_superset(&written_key_paths(FIXTURES[5].1)),
+        "the maximal Project writes everything the complete fixture carries"
+    );
+    assert!(paths.contains(".project.sheets[].visuals.background.right.mapping"));
+
+    let mut reopened = core(root.path())
+        .open_editable(OpenProjectRequest::new(location(&path)))
+        .unwrap();
+    assert_eq!(reopened.project(), &expected);
+    assert!(!reopened.has_unsaved_changes());
+
+    let copy = root.path().join("Completo copy.myalbuns");
+    reopened
+        .save_as(SaveAsProjectRequest::new(
+            reopened.revision(),
+            location(&copy),
+            SaveAsAuthorization::CreateOnly,
+        ))
+        .unwrap();
+    let copied_id = reopened.project_id().hyphenated().to_string();
+    drop(reopened);
+    let rewritten = fs::read_to_string(&copy).unwrap();
+    assert_eq!(
+        rewritten.replacen(&copied_id, &original_id, 1).as_bytes(),
+        written,
+        "the same Project is written byte for byte a second time"
+    );
+}
+
+#[test]
+#[ignore = "documents a fixture gap: complete.myalbuns has no side that keeps half of a both-sides content, so `mapping` and the right Background side are never written back byte for byte"]
+fn everything_a_maximal_project_writes_appears_in_the_complete_fixture() {
+    let root = tempfile::tempdir().unwrap();
+    let (mut project, path) = maximal_project(root.path());
+    project.save(project.revision()).unwrap();
+    drop(project);
+
+    let fixture = written_key_paths(FIXTURES[5].1);
+    let missing = written_key_paths(&fs::read(&path).unwrap())
+        .difference(&fixture)
+        .cloned()
+        .collect::<Vec<_>>();
+    assert_eq!(missing, Vec::<String>::new());
+}
+
+#[test]
+#[ignore = "documents a suspected defect: an object that names an alternative without fields, such as {\"kind\": \"none\"}, accepts unknown fields and drops them on the next save"]
+fn an_unknown_field_beside_an_alternative_without_fields_is_rejected() {
+    let root = tempfile::tempdir().unwrap();
+    let path = root.path().join("Desconhecido.myalbuns");
+    let mut document: serde_json::Value = serde_json::from_slice(FIXTURES[0].1).unwrap();
+    assert_eq!(
+        document["project"]["visualDefaults"]["frameBorder"]["kind"],
+        "none"
+    );
+    document["project"]["visualDefaults"]["frameBorder"]["widthUm"] = serde_json::json!(1_500);
+    fs::write(&path, serde_json::to_vec(&document).unwrap()).unwrap();
+
+    assert_eq!(
+        core(root.path())
+            .load_persisted_revision(LoadProjectRequest::new(location(&path)))
+            .unwrap_err(),
+        LoadProjectError::Document(DocumentFailure::InvalidProjectDocument)
+    );
 }

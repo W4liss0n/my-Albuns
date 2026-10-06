@@ -737,22 +737,24 @@ mod tests {
             panic!("the parent must be primary");
         };
 
-        let mut child = Command::new(std::env::current_exe().expect("the test executable exists"))
-            .args([
-                "--exact",
-                "global_activation::tests::forwarder_helper_process",
-                "--ignored",
-                "--nocapture",
-            ])
-            .env(HELPER_ROOT_ENV, root.path())
-            .env(HELPER_PROJECT_ENV, &project)
-            .spawn()
-            .expect("the second executable process starts");
+        let mut child = crate::test_process::ChildGuard::new(
+            Command::new(std::env::current_exe().expect("the test executable exists"))
+                .args([
+                    "--exact",
+                    "global_activation::tests::forwarder_helper_process",
+                    "--ignored",
+                    "--nocapture",
+                ])
+                .env(HELPER_ROOT_ENV, root.path())
+                .env(HELPER_PROJECT_ENV, &project)
+                .spawn()
+                .expect("the second executable process starts"),
+        );
         let expected_client =
             ProcessInstanceId::from_process_handle(child.id(), child.as_raw_handle().cast())
                 .expect("the second process is captured exactly");
         let activation = primary
-            .receive_timeout(Duration::from_secs(5))
+            .receive_timeout(Duration::from_secs(30))
             .expect("the primary receives the process activation");
 
         assert_eq!(activation.client, expected_client);

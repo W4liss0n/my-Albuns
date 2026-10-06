@@ -17,4 +17,5 @@ windows-sys.workspace = true
 
 [dev-dependencies]
 image = { workspace = true, features = ["jpeg", "png"] }
+proptest.workspace = true
 tempfile.workspace = true

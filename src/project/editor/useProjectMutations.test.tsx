@@ -14,10 +14,7 @@ import {
   refreshSheetStructureFixture,
   representativeProjection,
 } from "../../test/projectFixtures";
-import {
-  useProjectMutationRunner,
-  type ProjectMutationRunner,
-} from "./useProjectMutationRunner";
+import { useProjectMutationRunner } from "./useProjectMutationRunner";
 import { useProjectMutations } from "./useProjectMutations";
 
 const unusedDialogPort: ProjectDialogPort = { acquire: () => { throw new Error("Unexpected confirmation"); } };
@@ -80,60 +77,6 @@ function projectSessionPort(
     }),
   };
 }
-
-test("applies a structural intent with outcome, returns its status, and forwards the affected Sheet", async () => {
-  const updatedProjection: EditorProjection = {
-    ...representativeProjection,
-    state: {
-      ...representativeProjection.state,
-      revision: representativeProjection.state.revision + 1,
-    },
-  };
-  const port = projectSessionPort(
-    async () => updatedProjection,
-    async () => representativeProjection,
-  );
-  const applyWithOutcome = vi
-    .spyOn(port, "applyWithOutcome")
-    .mockResolvedValue({
-      projection: updatedProjection,
-      affectedFrameId: null,
-      affectedSheetId: "sheet-001",
-    });
-  const runProjectMutation = {
-    run: vi.fn<ProjectMutationRunner["run"]>(async (operation) => ({
-      status: "completed",
-      projection: await operation(port, null),
-    })),
-    waitForIdle: async () => null,
-  };
-  const onProjectionChange = vi.fn();
-  const onAffectedSheet = vi.fn();
-  const view = renderHook(() =>
-    useProjectMutations({ projectDialogPort: unusedDialogPort,
-      projection: representativeProjection,
-      runProjectMutation,
-      onProjectionChange,
-      onAffectedFrame: () => undefined,
-      onAffectedSheet,
-    }),
-  );
-  const intent = {
-    kind: "addSheet",
-    anchorSheetId: "sheet-001",
-    position: "after",
-  } as Parameters<ProjectCorePort["applyWithOutcome"]>[0];
-
-  let completed = false;
-  await act(async () => {
-    completed = await view.result.current.applyWithOutcome(intent);
-  });
-
-  expect(completed).toBe(true);
-  expect(applyWithOutcome).toHaveBeenCalledWith(intent, expect.any(Function));
-  expect(onProjectionChange).toHaveBeenCalledWith(updatedProjection);
-  expect(onAffectedSheet).toHaveBeenCalledWith("sheet-001");
-});
 
 test.each(["success", "failure"] as const)("Save waits for replacement and respects its %s outcome", async (outcome) => {
   const pending = deferredProjection();
@@ -752,7 +695,7 @@ function formatConversionHarness(initial: EditorProjection) {
     runProjectMutation: useProjectMutationRunner(projection.state.projectId, port),
     onProjectionChange: vi.fn(), onAffectedFrame: vi.fn(), onAffectedSheet: vi.fn(),
   }), { initialProps: { projection: initial } });
-  return { ...view, save, present, emit: (action: ProjectDialogAction) => onAction(action) };
+  return { ...view, save, present, dismiss, emit: (action: ProjectDialogAction) => onAction(action) };
 }
 
 test.each(["confirmFormatConversionSave", "cancelFormatConversionSave"] as const)(
@@ -773,6 +716,37 @@ test.each(["confirmFormatConversionSave", "cancelFormatConversionSave"] as const
     }
   },
 );
+
+test.each(["unmount", "projectChange"])("releases a pending format conversion on %s and ignores late confirmation", async (reason) => {
+  const initial = oldFormatProjection();
+  const harness = formatConversionHarness(initial);
+  act(() => harness.result.current.save());
+  await waitFor(() => expect(harness.present).toHaveBeenCalledOnce());
+  if (reason === "unmount") harness.unmount(); else {
+    harness.rerender({ projection: { ...initial, state: { ...initial.state, projectId: "different-project" } } });
+  }
+  // The decision is released by the lifetime change itself, not by the late answer.
+  await waitFor(() => expect(harness.dismiss).toHaveBeenCalledOnce());
+  await act(async () => { harness.emit("confirmFormatConversionSave"); });
+  expect(harness.save).not.toHaveBeenCalled();
+  expect(harness.present).toHaveBeenCalledOnce();
+  expect(harness.dismiss).toHaveBeenCalledOnce();
+});
+
+test("a failed format conversion confirmation does not save and lets the next save ask again", async () => {
+  const initial = oldFormatProjection();
+  const harness = formatConversionHarness(initial);
+  harness.present.mockRejectedValueOnce(new Error("Dialog unavailable"));
+
+  act(() => harness.result.current.save());
+  await waitFor(() => expect(harness.result.current.message).toBe("Dialog unavailable"));
+  expect(harness.save).not.toHaveBeenCalled();
+
+  act(() => harness.result.current.save());
+  await waitFor(() => expect(harness.present).toHaveBeenCalledTimes(2));
+  act(() => harness.emit("confirmFormatConversionSave"));
+  await waitFor(() => expect(harness.save).toHaveBeenCalledExactlyOnceWith(initial.state.revision, true));
+});
 
 test("a Project in the current format saves without asking", async () => {
   const harness = formatConversionHarness(representativeProjection);

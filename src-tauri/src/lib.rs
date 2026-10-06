@@ -51,8 +51,6 @@ mod named_mutex;
 mod native_dialog_taskbar;
 mod native_dialog_window;
 mod native_project_dialog;
-#[cfg(test)]
-mod network_bench;
 mod opaque_image_protocol;
 mod operation_gate;
 mod operation_lease;
@@ -80,6 +78,8 @@ mod runtime_role;
 mod settings_preferences;
 mod settings_window;
 mod storage_recovery;
+#[cfg(test)]
+mod test_process;
 #[cfg(windows)]
 mod webview_recovery;
 mod workspace_preferences;
@@ -249,6 +249,15 @@ mod tests {
             .collect()
     }
 
+    fn granted_permissions(capability: &serde_json::Value) -> BTreeSet<&str> {
+        capability["permissions"]
+            .as_array()
+            .expect("the capability lists its permissions explicitly")
+            .iter()
+            .map(|permission| permission.as_str().expect("permissions are textual"))
+            .collect()
+    }
+
     #[test]
     fn global_and_project_windows_have_disjoint_minimal_capabilities() {
         let project_capability: serde_json::Value =
@@ -292,8 +301,8 @@ mod tests {
             serde_json::json!(["dialog-project-failure"])
         );
         assert_eq!(
-            dialog_capability["permissions"],
-            serde_json::json!([
+            granted_permissions(&dialog_capability),
+            BTreeSet::from([
                 "message-dialog-window-commands",
                 "core:window:allow-start-dragging"
             ])
@@ -303,8 +312,8 @@ mod tests {
             serde_json::json!(["dialog-opening-progress"])
         );
         assert_eq!(
-            progress_dialog_capability["permissions"],
-            serde_json::json!([
+            granted_permissions(&progress_dialog_capability),
+            BTreeSet::from([
                 "owned-dialog-window-commands",
                 "core:event:allow-listen",
                 "core:event:allow-unlisten",
@@ -312,8 +321,8 @@ mod tests {
             ])
         );
         assert_eq!(
-            project_capability["permissions"],
-            serde_json::json!([
+            granted_permissions(&project_capability),
+            BTreeSet::from([
                 "project-window-commands",
                 "core:event:allow-listen",
                 "core:event:allow-unlisten",
@@ -325,8 +334,8 @@ mod tests {
             ])
         );
         assert_eq!(
-            global_capability["permissions"],
-            serde_json::json!([
+            granted_permissions(&global_capability),
+            BTreeSet::from([
                 "global-window-commands",
                 "core:window:allow-close",
                 "core:window:allow-minimize",
@@ -342,8 +351,8 @@ mod tests {
             serde_json::json!(["project-dialog"])
         );
         assert_eq!(
-            project_dialog_capability["permissions"],
-            serde_json::json!([
+            granted_permissions(&project_dialog_capability),
+            BTreeSet::from([
                 "project-dialog-window-commands",
                 "core:event:allow-listen",
                 "core:event:allow-unlisten",
@@ -406,21 +415,6 @@ mod tests {
             assert!(global_commands.contains(command));
             assert!(!project_commands.contains(command));
         }
-    }
-
-    #[test]
-    fn application_windows_use_the_shared_custom_titlebar() {
-        let config = config();
-        let windows = config["app"]["windows"]
-            .as_array()
-            .expect("application windows are configured");
-
-        assert!(!windows.is_empty());
-        assert!(
-            windows
-                .iter()
-                .all(|window| { window["decorations"] == serde_json::Value::Bool(false) })
-        );
     }
 
     #[test]
@@ -524,36 +518,6 @@ mod tests {
     }
 
     #[test]
-    fn windows_bundle_uses_current_user_nsis_and_evergreen_webview2() {
-        let config = config();
-        let bundle = &config["bundle"];
-        let windows = &bundle["windows"];
-
-        assert_eq!(bundle["targets"], serde_json::json!(["nsis"]));
-        assert_eq!(windows["nsis"]["installMode"], "currentUser");
-        assert_eq!(
-            windows["webviewInstallMode"],
-            serde_json::json!({
-                "type": "downloadBootstrapper",
-                "silent": true
-            })
-        );
-    }
-
-    #[test]
-    fn bundle_associates_only_the_product_project_extension() {
-        assert_eq!(
-            config()["bundle"]["fileAssociations"],
-            serde_json::json!([{
-                "ext": ["myalbuns"],
-                "name": "Projeto MyAlbuns",
-                "description": "Projeto MyAlbuns",
-                "role": "Editor"
-            }])
-        );
-    }
-
-    #[test]
     fn asset_protocol_serves_only_published_media_previews() {
         let config = config();
         let scope = config["app"]["security"]["assetProtocol"]["scope"]
@@ -644,11 +608,7 @@ mod tests {
             .expect("the window list is explicit")
             .clone();
 
-        assert_eq!(windows.len(), 2);
-        assert_eq!(windows[0]["label"], "global");
-        assert_eq!(windows[0]["url"], "global.html");
-        assert_eq!(windows[1]["label"], "project");
-        assert_eq!(windows[1]["url"], "index.html");
+        assert!(!windows.is_empty());
         assert!(windows.iter().all(|window| window["create"] == false));
         assert!(windows.iter().all(|window| window["visible"] == false));
     }

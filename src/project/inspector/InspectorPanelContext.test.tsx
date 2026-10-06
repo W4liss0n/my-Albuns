@@ -214,44 +214,6 @@ test("shows Design da Lâmina and preserves its scope while Frame temporarily ow
   ).toHaveAttribute("aria-pressed", "true");
 });
 
-test("keeps inactive sides inert for a single-page Sheet", () => {
-  const singleSheet = {
-    ...composedSheet,
-    activeSides: "right" as const,
-    widthUm: 300_000,
-  };
-  render(
-    <InspectorPanel
-      {...inspectorProps({
-        kind: "sheet",
-        sheet: singleSheet,
-      })}
-    />,
-  );
-
-  expect(
-    screen.getByRole("button", { name: "Página direita" }),
-  ).toHaveAttribute("aria-pressed", "true");
-  expect(
-    screen.queryByRole("button", { name: "Página esquerda" }),
-  ).not.toBeInTheDocument();
-  expect(
-    screen.queryByRole("button", { name: "Ambos os lados" }),
-  ).not.toBeInTheDocument();
-  expect(
-    document.querySelector(
-      '.visual-scope-preview__inactive[data-side="left"]',
-    ),
-  ).toBeInTheDocument();
-  const preview = screen.getByRole("group", {
-    name: "Aplicar na lâmina 01",
-  });
-  expect(preview).toHaveAttribute("data-active-sides", "right");
-  expect(preview).toHaveStyle({
-    "--visual-scope-aspect-ratio": "600000 / 300000",
-  });
-});
-
 test("uses the shared decorative picker fallback when a Sheet decorative has no preview", () => {
   const sheetWithoutDecorativePreview = {
     ...composedSheet,

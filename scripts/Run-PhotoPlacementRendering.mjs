@@ -10,7 +10,7 @@ mkdirSync(output, { recursive: true });
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 const evidence = { gate: 'photo-placement-rendering', collectedAtUtc: new Date().toISOString(),
   passed: false, cleanupCompleted: false, samples: [] };
-const browser = createHeadlessBrowserSession({ root, output, windowSize: '1100,800', requestTimeoutMilliseconds: 10000 });
+const browser = createHeadlessBrowserSession({ root, output, windowSize: '1100,800', requestTimeoutMilliseconds: 120000 });
 let request, session;
 try {
   const started = await browser.start();
@@ -27,6 +27,7 @@ try {
   }
   assert.ok(ready, 'Photo placement fixture must finish');
   evidence.samples = await execute('return window.photoPlacementTest.samples');
+  evidence.blackAndWhiteSample = await execute('return window.photoPlacementTest.blackAndWhiteSample');
   evidence.svgSample = await execute('return window.photoPlacementTest.svgSample');
   evidence.openingSample = await execute('return window.photoPlacementTest.openingSample');
   evidence.replacementSample = await execute('return window.photoPlacementTest.replacementSample');
@@ -37,6 +38,8 @@ try {
     assert.deepEqual(sample.first, sample.expected, `Photo ${sample.index + 1} must have image pixels in its first render`);
     assert.deepEqual(sample.settled, sample.first, `Photo ${sample.index + 1} must not change from fallback to image`);
   }
+  assert.notEqual(evidence.blackAndWhiteSample.colour[0], evidence.blackAndWhiteSample.colour[1], 'The black-and-white sample must start from a coloured Photo');
+  assert.deepEqual(evidence.blackAndWhiteSample.first, evidence.blackAndWhiteSample.expected, 'A black-and-white Photo must show grey luminance pixels in its first render');
   assert.deepEqual(evidence.svgSample.actual, evidence.svgSample.expected, 'SVG previews must retain rasterized image pixels');
   assert.deepEqual(evidence.openingSample.beforeUrl, [0, 0, 0, 0], 'Opening must not show synthetic artwork before the preview URL arrives');
   assert.deepEqual(evidence.openingSample.beforeTexture, [0, 0, 0, 0], 'Opening must not show synthetic artwork while the texture loads');
@@ -46,6 +49,7 @@ try {
   assert.deepEqual(evidence.thumbnailSample.pending, evidence.thumbnailSample.before, 'The thumbnail must retain the previous pixels while the new image loads');
   assert.deepEqual(evidence.thumbnailSample.ready, evidence.thumbnailSample.expected, 'The thumbnail must present the loaded replacement');
   console.log('PASS: 12 additions show the loaded photo on the first render, with identical settled pixels.');
+  console.log('PASS: a black-and-white photo shows grey luminance pixels on its first render.');
   console.log('PASS: project opening stays free of synthetic photo pixels until the real preview loads.');
   console.log('PASS: thumbnail and Canvas retain their previous pixels until each replacement is ready.');
 } catch (error) {

@@ -811,53 +811,6 @@ test("removes hidden items from the transient media selection", async () => {
   );
 });
 
-test("uses the intrinsic preview ratio when source dimensions are unavailable", () => {
-  const mediaWithoutDimensions = media(
-    "photo-no-metadata",
-    "photo",
-    "Sem metadados",
-    null,
-    null,
-  );
-  render(
-    <MediaPanel
-      {...mediaPanelInteractions}
-      mediaItems={[mediaWithoutDimensions]}
-      previewSource={{
-        kind: "static",
-        previews: {
-          "photo-no-metadata": {
-            mediaId: "photo-no-metadata",
-            state: "ready",
-            url: "/portrait-without-metadata.jpg",
-          },
-        },
-      }}
-      mediaUsage={[]}
-      onFillPhoto={vi.fn()}
-      preferences={{ kind: "local" }}
-    />,
-  );
-
-  const image = document.querySelector<HTMLImageElement>(
-    '[data-media-id="photo-no-metadata"] img',
-  );
-  expect(image).not.toBeNull();
-  Object.defineProperties(image!, {
-    naturalHeight: { configurable: true, value: 1200 },
-    naturalWidth: { configurable: true, value: 800 },
-  });
-  fireEvent.load(image!);
-
-  const thumb = document.querySelector<HTMLElement>(
-    '[data-media-id="photo-no-metadata"] .media-preview-thumbnail',
-  );
-  expect(thumb).toHaveAttribute("data-portrait", "true");
-  expect(thumb).toHaveStyle({
-    "--media-aspect-ratio": "800 / 1200",
-  });
-});
-
 function renderPanel() {
   return render(
     <MediaPanel

@@ -59,6 +59,7 @@ license = "MIT"
 [workspace.dependencies]
 directories = "6"
 image = { version = "0.25", default-features = false }
+proptest = "1"
 rusqlite = { version = "0.40", default-features = false, features = ["bundled", "serialize"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["raw_value"] }

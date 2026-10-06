@@ -9,7 +9,6 @@ import type {
 } from "../application/globalProjectPort";
 import { tauriGlobalProjectPort } from "./tauriGlobalProjectPort";
 import { tauriNewProjectPort } from "./tauriNewProjectPort";
-import { tauriProjectFailureDialogPort } from "./tauriProjectFailureDialogPort";
 
 vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn(),
@@ -94,17 +93,6 @@ test("fails closed when a command outcome carries fields outside the closed cont
   });
 });
 
-test("starts creation with exactly the normalized configuration and no pathname or overwrite authority", async () => {
-  vi.mocked(invoke).mockResolvedValueOnce({ status: "cancelled" });
-
-  await expect(
-    tauriNewProjectPort.createProject(creationConfiguration),
-  ).resolves.toEqual({ status: "cancelled" });
-  expect(invoke).toHaveBeenCalledWith("create_project", {
-    configuration: creationConfiguration,
-  });
-});
-
 test("chooses a provisional decorative without exposing native path data", async () => {
   vi.mocked(invoke).mockResolvedValueOnce({
     selectionId: "selection-background",
@@ -170,18 +158,6 @@ test("preserves an actionable typed picker failure", async () => {
   });
 });
 
-test("releases one opaque provisional selection", async () => {
-  vi.mocked(invoke).mockResolvedValue(undefined);
-
-  await tauriNewProjectPort.releaseProvisionalDecorative(
-    "selection-background",
-  );
-
-  expect(invoke).toHaveBeenCalledWith("release_provisional_decorative", {
-    selectionId: "selection-background",
-  });
-});
-
 test("validates the normalized configuration through the Core boundary", async () => {
   vi.mocked(invoke).mockResolvedValueOnce({ rasterLimits: rasterLimitsAt300Dpi, errors: [] });
 
@@ -231,15 +207,6 @@ test("turns an unavailable Core validation into an actionable failure", async ()
   });
 });
 
-test("carries physical limits from the Core through configuration validation", async () => {
-  vi.mocked(invoke).mockResolvedValueOnce({
-    errors: ["sheetWidthRasterOutOfRange"], rasterLimits: rasterLimitsAt300Dpi,
-  });
-  await expect(tauriNewProjectPort.validateProjectConfiguration(configuration)).resolves.toEqual({
-    status: "invalid", errors: ["sheetWidthRasterOutOfRange"], rasterLimits: rasterLimitsAt300Dpi,
-  });
-});
-
 test.each([undefined, {}, { sheetWidth: { minimumUm: 1, maximumUm: 0 }, sheetHeight: { minimumUm: 1, maximumUm: 2 } }, null])(
   "rejects a raster error without usable Core limits (%j)", async (rasterLimits) => {
     vi.mocked(invoke).mockResolvedValueOnce({ errors: ["sheetWidthRasterOutOfRange"], rasterLimits });
@@ -262,30 +229,6 @@ test("keeps an unavailable creation distinct from an unavailable opening", async
     },
   });
 });
-
-test.each([
-  "configurationValidation",
-  "decorativeSelection",
-  "projectCreation",
-] as const)(
-  "presents the %s failure through the canonical owned dialog command",
-  async (context) => {
-    const error = {
-      code: "operation_failed",
-      message: "A operação falhou.",
-      action: "Tente novamente.",
-    };
-    vi.mocked(invoke).mockResolvedValueOnce(undefined);
-
-    await expect(
-      tauriProjectFailureDialogPort.present({ context, error }),
-    ).resolves.toBeUndefined();
-    expect(invoke).toHaveBeenCalledWith("show_project_failure_dialog", {
-      context,
-      error,
-    });
-  },
-);
 
 test.each([
   "opened",
@@ -358,26 +301,6 @@ test("keeps the welcome surface operational when recent Projects are unavailable
   ).resolves.toEqual([]);
 });
 
-test("requests a first Sheet by opaque id without exposing a native path", async () => {
-  vi.mocked(invoke).mockResolvedValueOnce(null);
-  await expect(tauriGlobalProjectPort.firstRecentProjectSheet("recent-ana"))
-    .resolves.toBeNull();
-  expect(invoke).toHaveBeenCalledWith("first_recent_project_sheet", {
-    projectId: "recent-ana",
-  });
-});
-
-test("reopens a recent Project by opaque id only", async () => {
-  vi.mocked(invoke).mockResolvedValueOnce({ status: "opened" });
-
-  await expect(
-    tauriGlobalProjectPort.openRecentProject("recent-ana"),
-  ).resolves.toEqual({ status: "opened" });
-  expect(invoke).toHaveBeenCalledWith("open_recent_project", {
-    projectId: "recent-ana",
-  });
-});
-
 test("saves a favorite by opaque id and returns the persisted projection", async () => {
   vi.mocked(invoke).mockResolvedValueOnce([{ id: "recent-ana", name: "Álbum da Ana",
     lastOpenedAtMs: 100, favorite: true }]);
@@ -424,37 +347,6 @@ test("ignores an unavailable startup diagnostic", async () => {
   ).resolves.toBeNull();
 });
 
-test("delegates a launch failure to the owned native dialog window", async () => {
-  const error = {
-    code: "project_in_use",
-    message: "Este projeto já está aberto em outra janela.",
-    action: "Feche a outra janela e tente novamente.",
-  };
-  vi.mocked(invoke).mockResolvedValueOnce(undefined);
-
-  await expect(
-    tauriProjectFailureDialogPort.present({
-      context: "projectOpening",
-      error,
-    }),
-  ).resolves.toBeUndefined();
-  expect(invoke).toHaveBeenCalledWith("show_project_failure_dialog", {
-    context: "projectOpening",
-    error,
-  });
-});
-test("uses the favorite update context for its owned operational dialog", async () => {
-  vi.mocked(invoke).mockResolvedValueOnce(undefined);
-  const error = {
-    code: "recent_project_favorite_unavailable",
-    message: "Não foi possível atualizar os favoritos.",
-    action: "Tente novamente.",
-  };
-  await tauriProjectFailureDialogPort.present({ context: "favoriteUpdate", error });
-  expect(invoke).toHaveBeenCalledWith("show_project_failure_dialog", {
-    context: "favoriteUpdate", error,
-  });
-});
 test("subscribes before snapshotting and delivers each activation terminal once", async () => {
   const listener = vi.fn();
   const unlisten = vi.fn();

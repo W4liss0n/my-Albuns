@@ -2,6 +2,8 @@ name: Validation
 
 on:
   pull_request:
+  push:
+    branches: [main]
   workflow_dispatch:
     inputs:
       native_runner:
@@ -21,7 +23,8 @@ jobs:
   headless:
     name: Headless validation
     runs-on: windows-2022
-    timeout-minutes: 45
+    # A run without a target cache took 45 minutes with every step passing.
+    timeout-minutes: 75
     defaults:
       run:
         shell: powershell
@@ -47,6 +50,12 @@ jobs:
             .tools/cargo/registry
             .tools/cargo/git
           key: windows-2022-rust-${{ hashFiles('rust-toolchain.toml', 'Cargo.lock') }}
+      # Compiled dependencies only change with the lockfile or the toolchain.
+      # Runs on main seed this cache for pull requests.
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: target
+          key: windows-2022-target-${{ hashFiles('rust-toolchain.toml', 'Cargo.lock') }}
       - name: Use the runner temporary directory for isolated fixtures
         run: |
           "TEMP=$env:RUNNER_TEMP" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append

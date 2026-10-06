@@ -1,8 +1,8 @@
 import { act } from "@testing-library/react";
 import { expect, test } from "vitest";
+import { finishPixiInitialization, getPixiLifecycle, renderCanvas, setupAlbumCanvasTestHarness } from "./albumCanvasTestHarness";
 import type { CompositionPlan } from "../../domain/project";
 import { interactiveComposition } from "./albumCanvasTestFixtures";
-import { finishPixiInitialization, getPixiLifecycle, renderCanvas, setupAlbumCanvasTestHarness } from "./albumCanvasTestHarness";
 
 setupAlbumCanvasTestHarness();
 

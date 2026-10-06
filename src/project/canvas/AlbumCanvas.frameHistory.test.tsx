@@ -2,15 +2,15 @@ import { emptyLayoutCatalogPort, unusedLayoutDialogPort } from "../../test/layou
 import { useLayoutEffect, useState } from "react";
 import { act, fireEvent, render, waitFor } from "@testing-library/react";
 import { expect, test, vi } from "vitest";
+import {
+  AlbumCanvas, finishPixiInitialization, getPixiLifecycle, setupAlbumCanvasTestHarness,
+} from "./albumCanvasTestHarness";
 import { frameGeometryPreview } from "../../test/frameGeometryPreview";
 
 import type { ProjectCorePort } from "../../application/projectPorts";
 import type { EditorProjection } from "../../domain/project";
 import { useEditorView } from "../../state/editorView";
 import { representativeProjection } from "../../test/projectFixtures";
-import {
-  AlbumCanvas, finishPixiInitialization, getPixiLifecycle, setupAlbumCanvasTestHarness,
-} from "./albumCanvasTestHarness";
 import { useProjectEditorController } from "../editor/useProjectEditorController";
 import { useProjectMutationRunner } from "../editor/useProjectMutationRunner";
 

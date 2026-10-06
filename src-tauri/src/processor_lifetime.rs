@@ -300,7 +300,7 @@ mod tests {
     const PROCESS_SYNCHRONIZE: u32 = 0x0010_0000;
 
     fn wait_for_file(path: &std::path::Path, child: &mut std::process::Child, label: &str) {
-        let deadline = Instant::now() + Duration::from_secs(10);
+        let deadline = Instant::now() + Duration::from_secs(60);
         while !path.is_file() {
             assert!(
                 child
@@ -355,16 +355,18 @@ mod tests {
     #[test]
     fn attach_rejects_a_recycled_pid_identity_without_containing_or_killing_the_observed_process() {
         let root = tempfile::tempdir().expect("the worker fixture exists");
-        let mut worker = Command::new(env::current_exe().expect("the test executable is known"))
-            .arg("processor_lifetime::tests::processor_lifetime_worker_process")
-            .args(["--ignored", "--exact", "--nocapture"])
-            .env(WORKER_SPAWNED_ENV, root.path().join("spawned"))
-            .env(WORKER_ACTIVE_ENV, root.path().join("active"))
-            .stdin(Stdio::piped())
-            .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .spawn()
-            .expect("the unrelated observed process starts");
+        let mut worker = crate::test_process::ChildGuard::new(
+            Command::new(env::current_exe().expect("the test executable is known"))
+                .arg("processor_lifetime::tests::processor_lifetime_worker_process")
+                .args(["--ignored", "--exact", "--nocapture"])
+                .env(WORKER_SPAWNED_ENV, root.path().join("spawned"))
+                .env(WORKER_ACTIVE_ENV, root.path().join("active"))
+                .stdin(Stdio::piped())
+                .stdout(Stdio::null())
+                .stderr(Stdio::null())
+                .spawn()
+                .expect("the unrelated observed process starts"),
+        );
         let observed = child_identity(&worker);
         let recycled = ProcessInstanceId::from_wire(
             observed.process_id(),
@@ -439,16 +441,18 @@ mod tests {
         use myalbuns_paths::CacheWriterSlot;
         let root = tempfile::tempdir().unwrap();
         let (app_paths, paths) = cache_fixture(root.path());
-        let mut worker = Command::new(env::current_exe().unwrap())
-            .arg("processor_lifetime::tests::processor_lifetime_worker_process")
-            .args(["--ignored", "--exact", "--nocapture"])
-            .env(WORKER_SPAWNED_ENV, root.path().join("second.spawned"))
-            .env(WORKER_ACTIVE_ENV, root.path().join("second.active"))
-            .stdin(Stdio::piped())
-            .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .spawn()
-            .unwrap();
+        let mut worker = crate::test_process::ChildGuard::new(
+            Command::new(env::current_exe().unwrap())
+                .arg("processor_lifetime::tests::processor_lifetime_worker_process")
+                .args(["--ignored", "--exact", "--nocapture"])
+                .env(WORKER_SPAWNED_ENV, root.path().join("second.spawned"))
+                .env(WORKER_ACTIVE_ENV, root.path().join("second.active"))
+                .stdin(Stdio::piped())
+                .stdout(Stdio::null())
+                .stderr(Stdio::null())
+                .spawn()
+                .unwrap(),
+        );
         let exact = child_identity(&worker);
         let stale =
             ProcessInstanceId::from_wire(exact.process_id(), exact.creation_time_wire() + 1)
@@ -508,16 +512,18 @@ mod tests {
         let claim_path = cache_writer_claim_path(&paths);
         let worker_spawned = root.path().join("guarded-worker.spawned");
         let worker_active = root.path().join("guarded-worker.active");
-        let mut worker = Command::new(env::current_exe().expect("the test executable is known"))
-            .arg("processor_lifetime::tests::processor_lifetime_worker_process")
-            .args(["--ignored", "--exact", "--nocapture"])
-            .env(WORKER_SPAWNED_ENV, &worker_spawned)
-            .env(WORKER_ACTIVE_ENV, &worker_active)
-            .stdin(Stdio::piped())
-            .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .spawn()
-            .expect("the exact writer fixture starts");
+        let mut worker = crate::test_process::ChildGuard::new(
+            Command::new(env::current_exe().expect("the test executable is known"))
+                .arg("processor_lifetime::tests::processor_lifetime_worker_process")
+                .args(["--ignored", "--exact", "--nocapture"])
+                .env(WORKER_SPAWNED_ENV, &worker_spawned)
+                .env(WORKER_ACTIVE_ENV, &worker_active)
+                .stdin(Stdio::piped())
+                .stdout(Stdio::null())
+                .stderr(Stdio::null())
+                .spawn()
+                .expect("the exact writer fixture starts"),
+        );
         wait_for_file(&worker_spawned, &mut worker, "the exact writer");
         let claim = CacheWriterClaim {
             schema_version: CACHE_WRITER_CLAIM_SCHEMA_VERSION,
@@ -592,14 +598,16 @@ mod tests {
     fn terminating_the_host_closes_its_job_and_terminates_the_active_processor() {
         let root = tempfile::tempdir().expect("the processor lifetime fixture exists");
         let host_ready = root.path().join("host.ready");
-        let mut host = Command::new(env::current_exe().expect("the test executable is known"))
-            .arg("processor_lifetime::tests::processor_lifetime_host_process")
-            .args(["--ignored", "--exact", "--nocapture"])
-            .env(HOST_READY_ENV, &host_ready)
-            .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .spawn()
-            .expect("the independent Host process starts");
+        let mut host = crate::test_process::ChildGuard::new(
+            Command::new(env::current_exe().expect("the test executable is known"))
+                .arg("processor_lifetime::tests::processor_lifetime_host_process")
+                .args(["--ignored", "--exact", "--nocapture"])
+                .env(HOST_READY_ENV, &host_ready)
+                .stdout(Stdio::null())
+                .stderr(Stdio::null())
+                .spawn()
+                .expect("the independent Host process starts"),
+        );
         wait_for_file(&host_ready, &mut host, "the Host");
         let processor_ids = std::fs::read_to_string(&host_ready)
             .unwrap()
@@ -661,7 +669,7 @@ mod tests {
         for slot in myalbuns_paths::CacheWriterSlot::ALL {
             let worker_spawned = root.join(format!("worker-{}.spawned", slot.index()));
             let worker_active = root.join(format!("worker-{}.active", slot.index()));
-            let mut worker =
+            let mut worker = crate::test_process::ChildGuard::new(
                 Command::new(env::current_exe().expect("the test executable is known"))
                     .arg("processor_lifetime::tests::processor_lifetime_worker_process")
                     .args(["--ignored", "--exact", "--nocapture"])
@@ -671,7 +679,8 @@ mod tests {
                     .stdout(Stdio::null())
                     .stderr(Stdio::null())
                     .spawn()
-                    .expect("the Processor fixture starts");
+                    .expect("the Processor fixture starts"),
+            );
             wait_for_file(&worker_spawned, &mut worker, "the Processor");
             let mut lifetime = ProcessorChildLifetime::attach(child_identity(&worker))
                 .expect("the Host contains its Processor before dispatch");
@@ -688,8 +697,8 @@ mod tests {
             lifetimes.push(lifetime);
             workers.push(worker);
         }
-        std::fs::write(
-            host_ready,
+        crate::test_process::publish_ready(
+            std::path::Path::new(&host_ready),
             workers
                 .iter()
                 .map(|worker| worker.id().to_string())

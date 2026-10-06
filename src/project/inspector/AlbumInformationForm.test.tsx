@@ -109,17 +109,6 @@ function ProjectionHarness({
   );
 }
 
-test("allows composed dimension drafts for Core validation", () => {
-  renderForm({ sheetStates: representativeProjection.state.album.sheets });
-
-  const dimensions = screen.getByRole("group", { name: "Dimensão da lâmina" });
-  for (const label of ["Largura", "Altura"]) {
-    const input = within(dimensions).getByRole("textbox", { name: label });
-    expect(input).toBeEnabled();
-    expect(input.closest(".ui-text-field")).not.toHaveAttribute("data-placeholder-feature");
-  }
-});
-
 test("revalidates a blocked crop when source observations arrive without a History revision", async () => {
   const onValidate = vi.fn<ComponentProps<typeof AlbumInformationForm>["onValidate"]>()
     .mockResolvedValue({ rasterLimits: rasterLimitsAt300Dpi, errors: ["sheetDimensionsUnknownPhotoSize"], impact: null });
@@ -134,16 +123,6 @@ test("revalidates a blocked crop when source observations arrive without a Histo
   onValidate.mockResolvedValue({ rasterLimits: rasterLimitsAt300Dpi, errors: [], impact: validImpact });
   view.rerender(<ProjectionHarness {...props} photoSources={sources.map((source) => ({ ...source }))} />);
   await waitFor(() => expect(screen.getByRole("button", { name: "Aplicar" })).toBeEnabled());
-});
-
-test("enables composed edge conversion through the Core Layout flow", () => {
-  renderForm({ sheetStates: representativeProjection.state.album.sheets });
-
-  for (const label of ["Primeira lâmina", "Última lâmina"]) {
-    const select = screen.getByRole("combobox", { name: label });
-    expect(select).toBeEnabled();
-    expect(select.closest(".album-information-field")).not.toHaveAttribute("data-placeholder-feature");
-  }
 });
 
 test("edits every Album information field and submits one complete candidate", async () => {
@@ -540,6 +519,8 @@ test("revalidates a pending dimension draft when composed geometry arrives", asy
     ),
   );
   expect(screen.getByRole("button", { name: "Aplicar" })).toBeDisabled();
+  expect(screen.getByRole("textbox", { name: "Largura" })).toBeEnabled();
+  expect(screen.getByRole("textbox", { name: "Altura" })).toBeEnabled();
 
   fireEvent.click(screen.getByRole("button", { name: "Restaurar Largura" }));
   fireEvent.click(screen.getByRole("button", { name: "Restaurar Altura" }));
@@ -596,6 +577,9 @@ test("lets a pending edge conversion be restored when edge content arrives", asy
   );
   expect(
     screen.getByRole("combobox", { name: "Primeira lâmina" }),
+  ).toBeEnabled();
+  expect(
+    screen.getByRole("combobox", { name: "Última lâmina" }),
   ).toBeEnabled();
   fireEvent.click(
     screen.getByRole("button", { name: "Restaurar Primeira lâmina" }),

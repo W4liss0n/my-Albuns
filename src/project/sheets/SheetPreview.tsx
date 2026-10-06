@@ -13,7 +13,7 @@ import {
   SHEET_VISUAL_STYLE,
 } from "../canvas/sheetVisualStyle";
 import "./SheetPreview.css";
-import { PHOTO_BLACK_AND_WHITE_SVG_MATRIX } from "../canvas/photoBlackAndWhite";
+import { PHOTO_BLACK_AND_WHITE_SVG_MATRIX } from "../canvas/photoBlackAndWhiteWeights";
 
 export interface SheetPreviewViewport {
   readonly xUm: number;

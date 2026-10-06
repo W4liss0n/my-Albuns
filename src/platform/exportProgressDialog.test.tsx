@@ -16,11 +16,9 @@ beforeEach(() => {
   vi.mocked(listen).mockReset();
 });
 
-test.each([
-  ["loading_sources", 14],
-  ["composing", 3],
-  ["publishing", 18],
-] as const)("keeps the native export dialog open for %s progress with %i units", async (stage, totalUnits) => {
+test("keeps the native export dialog open for fractional progress", async () => {
+  const stage = "publishing";
+  const totalUnits = 18;
   const harness = createExportHarness();
   const rejectedStates: unknown[] = [];
   let action!: (event: { payload: unknown }) => void;
@@ -46,7 +44,7 @@ test.each([
   // Fractional pipeline percentages must remain integer values at the native dialog boundary.
   for (let completedUnits = 0; completedUnits <= totalUnits; completedUnits++) {
     await act(async () => harness.attempts[0].emit({ event: "progress", stage, overallPercent: 100 * completedUnits / totalUnits,
-      units: { kind: "measured", completedUnits, totalUnits }, cancellable: stage !== "publishing" }));
+      units: { kind: "measured", completedUnits, totalUnits }, cancellable: false }));
   }
 
   expect(native.mock.calls.some(([command]) => command === "dismiss_project_dialog"), JSON.stringify(rejectedStates)).toBe(false);

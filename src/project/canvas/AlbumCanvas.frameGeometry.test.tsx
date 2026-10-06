@@ -1,13 +1,13 @@
 import { act, fireEvent, waitFor } from "@testing-library/react";
 import { expect, test, vi } from "vitest";
-import { frameGeometryPreview } from "../../test/frameGeometryPreview";
-
-import type { ComposedFrame, FrameGeometryEdit, FrameResizeHandle } from "../../domain/project";
-import { interactiveComposition } from "./albumCanvasTestFixtures";
 import {
   displayWithLabel, finishPixiInitialization, getPixiLifecycle,
   renderCanvas, setupAlbumCanvasTestHarness,
 } from "./albumCanvasTestHarness";
+import { frameGeometryPreview } from "../../test/frameGeometryPreview";
+
+import type { ComposedFrame, FrameGeometryEdit, FrameResizeHandle } from "../../domain/project";
+import { interactiveComposition } from "./albumCanvasTestFixtures";
 
 setupAlbumCanvasTestHarness();
 
@@ -309,10 +309,14 @@ test("coalesces slow previews and queues the released position before a pending 
   expect(frameGeometry.preview).toHaveBeenCalledOnce();
   await act(async () => first.resolve([interactiveComposition.sheets[0].frames[0]]));
   expect(frameGeometry.preview).toHaveBeenCalledTimes(2);
-  expect(frameGeometry.preview.mock.calls[1][0].gesture).toMatchObject({ deltaXUm: Math.round(40 / 1.48 / 0.001) });
+  expect(frameGeometry.preview.mock.calls[1][0].gesture).toMatchObject({
+    deltaXUm: Math.round(40 / 1.48 / 0.001), deltaYUm: Math.round(10 / 1.48 / 0.001),
+  });
   fireEvent.pointerUp(window, { pointerId: 7, clientX: 150, clientY: 115 });
   expect(frameGeometry.commit).toHaveBeenCalledOnce();
-  expect(frameGeometry.commit.mock.calls[0][0].gesture).toMatchObject({ deltaXUm: Math.round(50 / 1.48 / 0.001) });
+  expect(frameGeometry.commit.mock.calls[0][0].gesture).toMatchObject({
+    deltaXUm: Math.round(50 / 1.48 / 0.001), deltaYUm: Math.round(15 / 1.48 / 0.001),
+  });
   await act(async () => last.resolve([{ ...interactiveComposition.sheets[0].frames[0],
     clipRect: { x: 40_000, y: 20_000, width: 300_000, height: 200_000 } }]));
   expect(latestFrame().position).toMatchObject({ x: 0, y: 0 });
@@ -364,12 +368,12 @@ test.each(["project", "mode", "blocking-operation", "confirmed-geometry"])(
     // A cancelled drag must not keep normal Canvas selection disabled.
     view.rerenderCanvas({ mode: { kind: "normal" } });
     vi.mocked(view.onSelectFrame).mockClear();
-    await waitFor(() => {
-      act(() => latestFrame().emit("pointertap", {
-        button: 0, altKey: false, stopPropagation: vi.fn(), nativeEvent: { detail: 1 },
-      }));
-      expect(view.onSelectFrame).toHaveBeenCalledWith("frame-001");
-    });
+    // The tap suppression resets on a zero-delay timer; a later one runs after it.
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)); });
+    act(() => latestFrame().emit("pointertap", {
+      button: 0, altKey: false, stopPropagation: vi.fn(), nativeEvent: { detail: 1 },
+    }));
+    expect(view.onSelectFrame).toHaveBeenCalledWith("frame-001");
   },
 );
 

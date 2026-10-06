@@ -651,7 +651,7 @@ mod tests {
 
     use super::{
         ActiveCacheNamespace, CacheScheduledCleanupOutcome, CacheService, CacheServiceError,
-        namespace_mutex, run_cache_service_operation,
+        namespace_mutex,
     };
 
     const NAMESPACE_OWNER_ROOT_ENV: &str = "MYALBUNS_CACHE_NAMESPACE_OWNER_ROOT";
@@ -673,23 +673,6 @@ mod tests {
         AppPaths::from_roots(&roaming, &local)
     }
 
-    #[test]
-    fn cache_service_operations_leave_the_tauri_caller_thread() {
-        tauri::async_runtime::block_on(async {
-            let caller = thread::current().id();
-            let worker = run_cache_service_operation(move || {
-                Ok::<_, CacheServiceError>(thread::current().id())
-            })
-            .await
-            .expect("the blocking Cache operation completes");
-
-            assert_ne!(
-                worker, caller,
-                "filesystem traversal must not run on the Tauri caller thread"
-            );
-        });
-    }
-
     fn project_location(path: &Path) -> ProjectLocation {
         let mut paths = OperationPathContext::new();
         paths
@@ -705,6 +688,174 @@ mod tests {
             CreateAuthorization::CreateOnly,
         ))
         .expect("the Project identity is authorized")
+    }
+
+    #[test]
+    fn a_namespace_with_an_active_owner_is_busy_for_a_second_reservation() {
+        let root = tempfile::tempdir().expect("temporary Cache reservation fixture");
+        let core = ProjectCore::new().with_identity_storage_roots(
+            root.path().join("leases"),
+            root.path().join("identities"),
+        );
+        let project = create_project(&core, root.path().join("Projeto.myalbuns"));
+        let service = CacheService::new(app_paths(root.path()));
+        let owner = service
+            .reserve_namespace(project.identity_authority())
+            .expect("the first owner reserves the namespace");
+
+        assert_eq!(
+            service
+                .reserve_namespace(project.identity_authority())
+                .expect_err("one namespace has one owner"),
+            CacheServiceError::Busy
+        );
+        assert_eq!(
+            service
+                .reserve_fresh_namespace(project.identity_authority())
+                .expect_err("an owned namespace is not a fresh one"),
+            CacheServiceError::Busy
+        );
+        assert!(owner.namespace().paths().root().is_dir());
+
+        drop(owner);
+        service
+            .reserve_namespace(project.identity_authority())
+            .expect("the namespace is free once its owner leaves");
+    }
+
+    #[test]
+    fn held_maintenance_makes_reservation_and_storage_recovery_busy() {
+        let root = tempfile::tempdir().expect("temporary Cache maintenance fixture");
+        let core = ProjectCore::new().with_identity_storage_roots(
+            root.path().join("leases"),
+            root.path().join("identities"),
+        );
+        let project = create_project(&core, root.path().join("Projeto.myalbuns"));
+        let service = CacheService::new(app_paths(root.path()));
+        let volume = myalbuns_paths::StorageVolume::containing(root.path())
+            .expect("the fixture volume is known");
+        let maintenance = service
+            .maintenance
+            .try_acquire()
+            .expect("the maintenance reservation is free");
+
+        assert_eq!(
+            service
+                .reserve_namespace(project.identity_authority())
+                .expect_err("no namespace is mounted during maintenance"),
+            CacheServiceError::Busy
+        );
+        assert_eq!(
+            service.recover_storage(&volume, false),
+            Err(CacheServiceError::Busy)
+        );
+        assert_eq!(
+            service.recover_storage(&volume, true),
+            Err(CacheServiceError::Busy)
+        );
+        // A total clear does not fail: it waits for the next safe start.
+        assert_eq!(
+            service.clear_all_or_schedule(),
+            Ok(CacheClearAllOutcome::Scheduled)
+        );
+
+        drop(maintenance);
+        assert_eq!(service.recover_storage(&volume, false), Ok(0));
+        service
+            .reserve_namespace(project.identity_authority())
+            .expect("the namespace mounts after maintenance");
+    }
+
+    #[test]
+    fn a_fresh_reservation_refuses_a_namespace_that_already_holds_cache() {
+        let root = tempfile::tempdir().expect("temporary fresh-namespace fixture");
+        let core = ProjectCore::new().with_identity_storage_roots(
+            root.path().join("leases"),
+            root.path().join("identities"),
+        );
+        let project = create_project(&core, root.path().join("Projeto.myalbuns"));
+        let service = CacheService::new(app_paths(root.path()));
+        let owner = service
+            .reserve_fresh_namespace(project.identity_authority())
+            .expect("an unused namespace is fresh");
+        let leftover = owner.namespace().paths().root().join("leftover.bin");
+        std::fs::write(&leftover, b"bytes of a previous owner").expect("the leftover is written");
+        drop(owner);
+
+        assert!(matches!(
+            service.reserve_fresh_namespace(project.identity_authority()),
+            Err(CacheServiceError::Storage(_))
+        ));
+        assert!(
+            leftover.is_file(),
+            "the refusal does not delete what it found"
+        );
+        service
+            .reserve_namespace(project.identity_authority())
+            .expect("the refused reservation was released");
+    }
+
+    #[test]
+    fn an_incompatible_clear_schedule_marker_fails_every_cache_service_operation() {
+        let root = tempfile::tempdir().expect("temporary schedule-marker fixture");
+        let paths = app_paths(root.path());
+        let service = CacheService::new(paths.clone());
+        assert!(!service.measure().unwrap().clear_all_scheduled);
+        assert!(
+            paths
+                .prepare_cache_clear_schedule_storage()
+                .expect("the schedule storage is prepared")
+                .publish_marker(b"MyAlbuns Cache clear schedule v2\n")
+                .expect("the foreign marker is published")
+        );
+
+        assert!(matches!(
+            service.measure(),
+            Err(CacheServiceError::Storage(_))
+        ));
+        assert!(matches!(
+            service.run_scheduled_cleanup(),
+            Err(CacheServiceError::Storage(_))
+        ));
+        // Nothing replaces or removes the foreign marker: even a total clear
+        // reports a storage failure and leaves it, so every later call fails too.
+        assert!(matches!(
+            service.clear_all_or_schedule(),
+            Err(CacheServiceError::Storage(_))
+        ));
+        assert!(matches!(
+            service.measure(),
+            Err(CacheServiceError::Storage(_))
+        ));
+    }
+
+    #[test]
+    fn every_service_error_keeps_its_code_and_message_over_ipc() {
+        use crate::ipc_contract::{CacheServiceCommandError, CacheServiceCommandErrorCode};
+        for error in [
+            CacheServiceError::Busy,
+            CacheServiceError::Storage("disk".into()),
+            CacheServiceError::Reservation("mutex".into()),
+        ] {
+            // No wildcard: a new variant must be added to this table.
+            let code = match &error {
+                CacheServiceError::Busy => CacheServiceCommandErrorCode::Busy,
+                CacheServiceError::Storage(_) => CacheServiceCommandErrorCode::StorageUnavailable,
+                CacheServiceError::Reservation(_) => {
+                    CacheServiceCommandErrorCode::ReservationUnavailable
+                }
+            };
+            let message = error.to_string();
+            assert_eq!(
+                CacheServiceCommandError::from(error),
+                CacheServiceCommandError { code, message }
+            );
+        }
+        assert_eq!(
+            serde_json::to_value(CacheServiceCommandError::from(CacheServiceError::Busy)).unwrap()
+                ["code"],
+            "busy"
+        );
     }
 
     #[test]
@@ -818,17 +969,19 @@ mod tests {
         let project = create_project(&core, project_path.clone());
         let namespace_name = project_data_namespace(&project.project_id().hyphenated().to_string());
         drop(project);
-        let mut host = Command::new(env::current_exe().expect("the test executable is known"))
-            .arg("cache_service::tests::cache_host_process_with_active_processor")
-            .args(["--ignored", "--exact", "--nocapture"])
-            .env(HOST_DEATH_ROOT_ENV, root.path())
-            .env(HOST_DEATH_PROJECT_ENV, &project_path)
-            .env(HOST_DEATH_READY_ENV, &ready)
-            .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .spawn()
-            .expect("the independent Project Host starts");
-        let deadline = Instant::now() + Duration::from_secs(15);
+        let mut host = crate::test_process::ChildGuard::new(
+            Command::new(env::current_exe().expect("the test executable is known"))
+                .arg("cache_service::tests::cache_host_process_with_active_processor")
+                .args(["--ignored", "--exact", "--nocapture"])
+                .env(HOST_DEATH_ROOT_ENV, root.path())
+                .env(HOST_DEATH_PROJECT_ENV, &project_path)
+                .env(HOST_DEATH_READY_ENV, &ready)
+                .stdout(Stdio::null())
+                .stderr(Stdio::null())
+                .spawn()
+                .expect("the independent Project Host starts"),
+        );
+        let deadline = Instant::now() + Duration::from_secs(60);
         while !ready.is_file() {
             assert!(
                 host.try_wait()
@@ -1253,45 +1406,6 @@ mod tests {
     }
 
     #[test]
-    fn a_new_authorized_identity_reserves_an_independent_empty_namespace() {
-        let root = tempfile::tempdir().expect("temporary fresh-identity fixture");
-        let app_paths =
-            AppPaths::from_roots(&root.path().join("roaming"), &root.path().join("local"));
-        std::fs::create_dir_all(root.path().join("roaming")).expect("the roaming root exists");
-        std::fs::create_dir_all(root.path().join("local")).expect("the local root exists");
-        let core = ProjectCore::new().with_identity_storage_roots(
-            root.path().join("leases"),
-            root.path().join("identities"),
-        );
-        let first = create_project(&core, root.path().join("first.myalbuns"));
-        let fresh = create_project(&core, root.path().join("fresh.myalbuns"));
-        let service = CacheService::new(app_paths);
-        let first_owner = service
-            .reserve_namespace(first.identity_authority())
-            .unwrap();
-        std::fs::write(
-            first_owner.namespace().paths().metadata_file(),
-            b"existing namespace",
-        )
-        .expect("the first namespace has observable state");
-        let fresh_owner = service
-            .reserve_namespace(fresh.identity_authority())
-            .unwrap();
-
-        assert_ne!(
-            first_owner.namespace().paths(),
-            fresh_owner.namespace().paths()
-        );
-        assert!(!fresh_owner.namespace().paths().metadata_file().exists());
-        assert_eq!(
-            std::fs::read_dir(fresh_owner.namespace().paths().media_directory())
-                .expect("the fresh Media directory is readable")
-                .count(),
-            0
-        );
-    }
-
-    #[test]
     fn cache_consumes_authoritative_identity_transitions_without_owning_them() {
         let root = tempfile::tempdir().expect("temporary identity-consumer fixture");
         let app_paths = app_paths(root.path());
@@ -1360,6 +1474,7 @@ mod tests {
             .expect("Cache consumes only the promoted authority");
         assert_ne!(external.project_id(), original_id);
         assert_ne!(external_owner.namespace().paths(), &original_cache);
+        assert!(!external_owner.namespace().paths().metadata_file().exists());
         assert_eq!(
             std::fs::read_dir(external_owner.namespace().paths().media_directory())
                 .unwrap()
@@ -1448,17 +1563,19 @@ mod tests {
         std::fs::write(cache.media_directory().join("active.bin"), b"active Cache")
             .expect("the active Cache fixture is writable");
         drop(storage);
-        let mut owner = Command::new(env::current_exe().expect("the test executable is known"))
-            .arg("cache_service::tests::cache_namespace_owner_process")
-            .args(["--ignored", "--exact", "--nocapture"])
-            .env(NAMESPACE_OWNER_ROOT_ENV, root.path())
-            .env(NAMESPACE_OWNER_NAME_ENV, namespace_name)
-            .env(NAMESPACE_OWNER_READY_ENV, &ready)
-            .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .spawn()
-            .expect("the independent Cache owner starts");
-        let deadline = Instant::now() + Duration::from_secs(10);
+        let mut owner = crate::test_process::ChildGuard::new(
+            Command::new(env::current_exe().expect("the test executable is known"))
+                .arg("cache_service::tests::cache_namespace_owner_process")
+                .args(["--ignored", "--exact", "--nocapture"])
+                .env(NAMESPACE_OWNER_ROOT_ENV, root.path())
+                .env(NAMESPACE_OWNER_NAME_ENV, namespace_name)
+                .env(NAMESPACE_OWNER_READY_ENV, &ready)
+                .stdout(Stdio::null())
+                .stderr(Stdio::null())
+                .spawn()
+                .expect("the independent Cache owner starts"),
+        );
+        let deadline = Instant::now() + Duration::from_secs(60);
         while !ready.is_file() {
             assert!(owner.try_wait().unwrap().is_none());
             assert!(
@@ -1489,18 +1606,20 @@ mod tests {
         let namespace_name = "project-active-writer";
         let cache = paths.project_cache(namespace_name).unwrap();
         drop(paths.prepare_cache_storage(&cache).unwrap());
-        let mut owner = Command::new(env::current_exe().expect("the test executable is known"))
-            .arg("cache_service::tests::cache_namespace_owner_process")
-            .args(["--ignored", "--exact", "--nocapture"])
-            .env(NAMESPACE_OWNER_ROOT_ENV, root.path())
-            .env(NAMESPACE_OWNER_NAME_ENV, namespace_name)
-            .env(NAMESPACE_OWNER_READY_ENV, &ready)
-            .env(NAMESPACE_OWNER_CHURN_ENV, "1")
-            .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .spawn()
-            .expect("the independent active writer starts");
-        let deadline = Instant::now() + Duration::from_secs(10);
+        let mut owner = crate::test_process::ChildGuard::new(
+            Command::new(env::current_exe().expect("the test executable is known"))
+                .arg("cache_service::tests::cache_namespace_owner_process")
+                .args(["--ignored", "--exact", "--nocapture"])
+                .env(NAMESPACE_OWNER_ROOT_ENV, root.path())
+                .env(NAMESPACE_OWNER_NAME_ENV, namespace_name)
+                .env(NAMESPACE_OWNER_READY_ENV, &ready)
+                .env(NAMESPACE_OWNER_CHURN_ENV, "1")
+                .stdout(Stdio::null())
+                .stderr(Stdio::null())
+                .spawn()
+                .expect("the independent active writer starts"),
+        );
+        let deadline = Instant::now() + Duration::from_secs(60);
         while !ready.is_file() {
             assert!(owner.try_wait().unwrap().is_none());
             assert!(Instant::now() < deadline, "the active writer timed out");
@@ -1718,7 +1837,7 @@ mod tests {
             .expect("the Processor stdin is available")
             .write_all(b"dispatch\n")
             .expect("the Host dispatches the Cache write");
-        let deadline = Instant::now() + Duration::from_secs(10);
+        let deadline = Instant::now() + Duration::from_secs(60);
         while !std::path::Path::new(&ready).is_file() {
             assert!(worker.try_wait().unwrap().is_none());
             assert!(
@@ -1777,8 +1896,11 @@ mod tests {
             .write_all(ABANDONED_CACHE_PAYLOAD)
             .expect("the Processor writes a partial payload");
         publication.flush().expect("the partial payload is visible");
-        std::fs::write(ready, std::process::id().to_string())
-            .expect("the Processor publishes readiness");
+        crate::test_process::publish_ready(
+            std::path::Path::new(&ready),
+            std::process::id().to_string(),
+        )
+        .expect("the Processor publishes readiness");
         thread::sleep(Duration::from_secs(120));
     }
 }

@@ -48,6 +48,18 @@ impl StorageRecoveries {
             );
     }
 
+    /// Only a storage-full failure pauses the export; its live preparation moves
+    /// here so the user can free space and resume.
+    pub(crate) fn retain_storage_full_export(
+        &self,
+        volume: Option<StorageVolume>,
+        failure: &mut crate::export_pipeline::ExportFailure,
+    ) {
+        if failure.is_storage_full() {
+            self.retain_export(volume, failure.recovery.take());
+        }
+    }
+
     pub(crate) fn take_export(
         &self,
         id: &str,
@@ -276,5 +288,80 @@ mod tests {
         assert!(!recoveries.status("export", &cache).unwrap().can_clear_cache);
         recoveries.finish("export");
         assert!(recoveries.status("export", &cache).is_none());
+    }
+}
+
+#[cfg(test)]
+mod export_recovery_tests {
+    use super::*;
+    use crate::export_pipeline::{ExportFailure, ExportFailureStage, tests::paused_export_failure};
+
+    fn current_export_id(recoveries: &StorageRecoveries) -> String {
+        recoveries.0.lock().unwrap()["export"].id.clone()
+    }
+
+    #[test]
+    fn a_retained_export_is_taken_once_and_only_by_its_current_id() {
+        let root = tempfile::tempdir().unwrap();
+        let mut failure = paused_export_failure(root.path());
+        let recoveries = StorageRecoveries::default();
+        assert!(
+            recoveries.take_export("never-retained").is_err(),
+            "nothing is paused yet"
+        );
+
+        recoveries.retain_export(None, failure.recovery.take());
+        let id = current_export_id(&recoveries);
+        assert!(recoveries.take_export("unknown-id").is_err());
+        assert!(
+            recoveries.is_paused("export"),
+            "a refused id leaves the paused export in place"
+        );
+
+        let recovery = recoveries
+            .take_export(&id)
+            .unwrap()
+            .expect("the retained preparation is returned");
+        assert_eq!(recovery.request_id(), "skip-existing");
+        assert!(!recoveries.is_paused("export"));
+        assert!(
+            recoveries.take_export(&id).is_err(),
+            "the same paused export cannot be resumed twice"
+        );
+    }
+
+    #[test]
+    fn a_newer_failure_makes_the_previous_export_id_stale() {
+        let root = tempfile::tempdir().unwrap();
+        let mut failure = paused_export_failure(root.path());
+        let recoveries = StorageRecoveries::default();
+        recoveries.retain_export(None, failure.recovery.take());
+        let stale = current_export_id(&recoveries);
+
+        // A later storage-full failure without a live preparation replaces the entry.
+        recoveries.retain_export(None, None);
+        let current = current_export_id(&recoveries);
+        assert_ne!(stale, current);
+        assert!(recoveries.take_export(&stale).is_err());
+        assert!(recoveries.is_paused("export"));
+        assert!(recoveries.take_export(&current).unwrap().is_none());
+    }
+
+    #[test]
+    fn only_a_storage_full_failure_pauses_the_export_and_keeps_its_preparation() {
+        let recoveries = StorageRecoveries::default();
+        let mut other = ExportFailure::new(ExportFailureStage::Prepare, "not a storage failure");
+        recoveries.retain_storage_full_export(None, &mut other);
+        assert!(!recoveries.is_paused("export"));
+
+        let root = tempfile::tempdir().unwrap();
+        let mut failure = paused_export_failure(root.path());
+        recoveries.retain_storage_full_export(None, &mut failure);
+        assert!(
+            failure.recovery.is_none(),
+            "the live preparation moves out of the failure sent to the UI"
+        );
+        let id = current_export_id(&recoveries);
+        assert!(recoveries.take_export(&id).unwrap().is_some());
     }
 }

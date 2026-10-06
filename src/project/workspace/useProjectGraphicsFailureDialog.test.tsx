@@ -199,14 +199,14 @@ test("bounds automatic recovery but rearms after every cancelled close terminal"
   await waitFor(() => expect(onCloseProject).toHaveBeenCalledOnce());
   await act(async () => Promise.resolve());
   view.rerender({ closeCancelRevision: 1 });
-  await waitFor(() => expect(dialog.sessions).toHaveLength(2));
-  await new Promise((resolve) => setTimeout(resolve, 50));
+  await waitFor(() => expect(onCloseProject).toHaveBeenCalledTimes(2));
+  await act(async () => {});
   expect(dialog.sessions).toHaveLength(2);
   expect(onCloseProject).toHaveBeenCalledTimes(2);
 
   view.rerender({ closeCancelRevision: 2 });
-  await waitFor(() => expect(dialog.sessions).toHaveLength(3));
-  await new Promise((resolve) => setTimeout(resolve, 50));
+  await waitFor(() => expect(onCloseProject).toHaveBeenCalledTimes(3));
+  await act(async () => {});
   expect(dialog.sessions).toHaveLength(3);
   expect(onCloseProject).toHaveBeenCalledTimes(3);
 });

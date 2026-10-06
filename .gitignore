@@ -13,7 +13,11 @@ src-tauri/binaries/*.exe
 .scratch/topology-spike-target/
 .scratch/topology-corpus/
 .scratch/ui-acceptance/
+.scratch/gate-evidence/
 .scratch/frame-gesture-evidence/
+.scratch/normal-frame-swap-gestures/
+.scratch/command-window-isolation/
+.scratch/favorite-visibility/
 .scratch/productive-journey-evidence/
 .scratch/focused-owned-dialog-evidence/
 .scratch/project-close-evidence/

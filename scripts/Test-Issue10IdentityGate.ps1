@@ -19,7 +19,7 @@ if (-not $IsWindows -and $env:OS -ne 'Windows_NT') {
 if ([string]::IsNullOrWhiteSpace($OutputPath)) {
     $OutputPath = Join-Path `
         $script:WorkspaceRoot `
-        'docs\research\artifacts\0035-issue-10-identity-gate.json'
+        '.scratch\gate-evidence\0035-issue-10-identity-gate.json'
 }
 elseif (-not [System.IO.Path]::IsPathRooted($OutputPath)) {
     $OutputPath = Join-Path $script:WorkspaceRoot $OutputPath

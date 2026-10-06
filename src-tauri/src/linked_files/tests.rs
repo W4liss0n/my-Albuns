@@ -145,27 +145,35 @@ fn work_overlaps_and_keeps_the_input_order() {
 fn interrupted_work_answers_at_once_and_starts_no_further_item() {
     let interrupted = AtomicBool::new(false);
     let started = Arc::new(AtomicUsize::new(0));
+    let finished = Arc::new(AtomicUsize::new(0));
     let item = Duration::from_millis(400);
-    let began = Instant::now();
-    let result = std::thread::scope(|scope| {
-        scope.spawn(|| {
-            std::thread::sleep(Duration::from_millis(40));
+    let (result, answered) = std::thread::scope(|scope| {
+        // Interrupt only once every worker holds a running item.
+        let interruption = scope.spawn(|| {
+            while started.load(Ordering::Acquire) < CONCURRENCY {
+                std::thread::yield_now();
+            }
             interrupted.store(true, Ordering::Release);
+            Instant::now()
         });
-        let started = Arc::clone(&started);
-        map_concurrently_unless((0..400).collect(), &interrupted, move |index| {
+        let (started, finished) = (Arc::clone(&started), Arc::clone(&finished));
+        let result = map_concurrently_unless((0..400).collect(), &interrupted, move |index| {
             started.fetch_add(1, Ordering::AcqRel);
             std::thread::sleep(item);
+            finished.fetch_add(1, Ordering::AcqRel);
             index
-        })
+        });
+        (result, interruption.join().unwrap().elapsed())
     });
-    let answered = began.elapsed();
     assert_eq!(result, None);
     assert!(
         answered < item / 2,
-        "answered after {answered:?}, while the running items take {item:?}"
+        "answered {answered:?} after the interruption, while the running items take {item:?}"
     );
-    std::thread::sleep(item * 2);
+    while finished.load(Ordering::Acquire) < CONCURRENCY {
+        std::thread::sleep(Duration::from_millis(5));
+    }
+    std::thread::sleep(Duration::from_millis(50));
     assert_eq!(
         started.load(Ordering::Acquire),
         CONCURRENCY,
@@ -303,6 +311,71 @@ fn a_share_that_stopped_answering_fails_at_once_until_it_answers_again() {
     }
 }
 
+static UNANSWERED_PROBES: AtomicUsize = AtomicUsize::new(0);
+
+#[test]
+fn an_access_that_finds_a_share_unreachable_remembers_its_root() {
+    let files = LinkedFiles::with_unreachable_roots(
+        |_| {
+            UNANSWERED_PROBES.fetch_add(1, Ordering::AcqRel);
+            false
+        },
+        Duration::from_secs(3600),
+        Duration::ZERO,
+    );
+    // The loopback address refuses a share that does not exist at once,
+    // without leaving this computer.
+    let share = format!(r"\\127.0.0.1\myalbuns-{}\", uuid::Uuid::new_v4().simple());
+    let shared = PathBuf::from(format!(r"{share}Cliente\a.jpg"));
+    let mut paths = OperationPathContext::new();
+    paths
+        .capture_with_binding(&shared, Path::new(&share))
+        .unwrap();
+    let plan = paths.freeze();
+    let root = plan.remote_root(&shared).unwrap().to_path_buf();
+    let binding = MediaBinding {
+        media_id: "photo".into(),
+        kind: MediaKind::Photo,
+        logical_path: shared.clone(),
+    };
+    assert!(!files.unreachable.contains(&root));
+
+    assert_eq!(
+        files.observe_one(&plan, &binding).availability,
+        MediaAvailability::Unavailable
+    );
+    assert!(
+        files.unreachable.contains(&root),
+        "the access itself records that the server did not answer"
+    );
+
+    // The same memory behind a slow share: an access that reached the
+    // server again would wait for it.
+    let latency = Duration::from_secs(5);
+    let slow = LinkedFiles {
+        unreachable: files.unreachable,
+        latency: Some(latency),
+    };
+    let started = Instant::now();
+    assert_eq!(
+        slow.observe_one(&plan, &binding).availability,
+        MediaAvailability::Unavailable
+    );
+    assert!(matches!(
+        slow.list_folder(&plan, shared.parent().unwrap()),
+        Err(ListFolderError::Resolve(ResolveError::Unavailable))
+    ));
+    assert!(
+        started.elapsed() < latency,
+        "no later access waited for the server"
+    );
+    assert_eq!(
+        UNANSWERED_PROBES.load(Ordering::Acquire),
+        0,
+        "the root is probed again only after the probe interval"
+    );
+}
+
 #[test]
 fn a_local_root_that_disappears_is_never_remembered_as_unreachable() {
     let files =
@@ -367,6 +440,65 @@ fn a_folder_lists_its_entries_without_following_anything_but_links() {
         results[1]
             .as_ref()
             .is_ok_and(|folder| folder.entries.is_empty())
+    );
+}
+
+/// A junction redirects a folder without the privilege a symbolic link needs.
+#[cfg(windows)]
+fn create_junction(link: &Path, target: &Path) {
+    let output = std::process::Command::new("cmd")
+        .args(["/c", "mklink", "/J"])
+        .arg(link)
+        .arg(target)
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
+#[cfg(windows)]
+#[test]
+fn a_listed_link_is_marked_and_followed_and_a_broken_one_does_not_fail_the_folder() {
+    let root = tempfile::tempdir().unwrap();
+    let folder = root.path().join("Fotos");
+    let target = root.path().join("destino");
+    let removed = root.path().join("removido");
+    for directory in [&folder, &target, &removed] {
+        std::fs::create_dir(directory).unwrap();
+    }
+    std::fs::write(folder.join("a.jpg"), b"12345").unwrap();
+    create_junction(&folder.join("redirecionada"), &target);
+    create_junction(&folder.join("quebrada"), &removed);
+    std::fs::remove_dir(&removed).unwrap();
+    let mut paths = OperationPathContext::new();
+    paths.capture(&folder).unwrap();
+
+    let listed = LinkedFiles::new()
+        .list_folder(&paths.freeze(), &folder)
+        .unwrap();
+    let mut entries = listed
+        .entries
+        .iter()
+        .map(|entry| {
+            (
+                entry.name.to_string_lossy().into_owned(),
+                entry.link,
+                entry.directory,
+            )
+        })
+        .collect::<Vec<_>>();
+    entries.sort();
+    assert_eq!(
+        entries,
+        [
+            ("a.jpg".to_owned(), false, false),
+            // Nothing answers behind the broken link, so it is not a folder.
+            ("quebrada".to_owned(), true, false),
+            ("redirecionada".to_owned(), true, true),
+        ]
     );
 }
 

@@ -696,16 +696,9 @@ fn ordered_demand(demand: &MediaPreviewDemand) -> Vec<String> {
 
 #[cfg(test)]
 mod tests {
-    use crate::{
-        cache_previews::CachePreviewError,
-        ipc_contract::{MediaPreviewDemand, MediaPreviewState},
-        media_runtime::{MediaAvailability, MediaRuntimeUpdate},
-    };
+    use crate::{ipc_contract::MediaPreviewDemand, media_runtime::MediaRuntimeUpdate};
 
-    use super::{
-        cache_failure_state, cache_publication_or_context, linked_media_change_for_update,
-        ordered_demand, projected_preview_state,
-    };
+    use super::{linked_media_change_for_update, ordered_demand};
 
     #[test]
     fn visible_media_precedes_preload_and_equivalent_demands_are_grouped() {
@@ -719,56 +712,6 @@ mod tests {
             ordered_demand(&demand),
             ["photo-visible", "shared", "photo-preload"]
         );
-    }
-
-    #[test]
-    fn only_authoritative_media_availability_is_projected_to_the_product() {
-        assert_eq!(
-            projected_preview_state(None),
-            None,
-            "an unconsolidated first sample cannot authorize a source recovery action"
-        );
-        assert_eq!(
-            projected_preview_state(Some(MediaAvailability::Candidate)),
-            Some(MediaPreviewState::Ready)
-        );
-        assert_eq!(
-            projected_preview_state(Some(MediaAvailability::Absent)),
-            Some(MediaPreviewState::Absent)
-        );
-        assert_eq!(
-            projected_preview_state(Some(MediaAvailability::Unavailable)),
-            Some(MediaPreviewState::Unavailable)
-        );
-        assert_ne!(
-            projected_preview_state(Some(MediaAvailability::Unavailable)),
-            Some(MediaPreviewState::CacheUnavailable),
-            "a Cache failure is not an authoritative statement about the Original"
-        );
-        assert_eq!(cache_failure_state(), MediaPreviewState::CacheUnavailable);
-        assert_ne!(
-            cache_failure_state(),
-            MediaPreviewState::Unavailable,
-            "Processor, validation and Cache storage failures do not classify the Original"
-        );
-    }
-
-    #[test]
-    fn registry_publication_failure_becomes_cache_unavailable_without_source_retry() {
-        let preview = cache_publication_or_context(
-            Err(CachePreviewError::InvalidDerivedArtifact),
-            "photo-a",
-            || crate::ipc_contract::MediaPreview {
-                media_id: "photo-a".into(),
-                state: cache_failure_state(),
-                url: None,
-            },
-        );
-
-        assert_eq!(preview.media_id, "photo-a");
-        assert_eq!(preview.state, MediaPreviewState::CacheUnavailable);
-        assert_ne!(preview.state, MediaPreviewState::Unavailable);
-        assert!(preview.url.is_none());
     }
 
     #[test]

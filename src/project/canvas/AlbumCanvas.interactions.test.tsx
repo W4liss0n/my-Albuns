@@ -1,13 +1,5 @@
 import { act, render } from "@testing-library/react";
 import { expect, test, vi } from "vitest";
-
-import type { PhotoTransformDelta } from "./AlbumCanvas";
-import {
-  interactiveComposition,
-  pannedInteractiveComposition,
-  rotatedInteractiveComposition,
-} from "./albumCanvasTestFixtures";
-import { createContinuousCanvasLayout } from "./canvasGeometry";
 import {
   AlbumCanvas,
   displayWithHandler,
@@ -18,6 +10,15 @@ import {
   renderCanvas,
   setupAlbumCanvasTestHarness,
 } from "./albumCanvasTestHarness";
+
+import type { CompositionPlan } from "../../domain/project";
+import type { PhotoTransformDelta } from "./AlbumCanvas";
+import {
+  interactiveComposition,
+  pannedInteractiveComposition,
+  rotatedInteractiveComposition,
+} from "./albumCanvasTestFixtures";
+import { createContinuousCanvasLayout } from "./canvasGeometry";
 
 setupAlbumCanvasTestHarness();
 const pixiLifecycle = getPixiLifecycle();
@@ -597,3 +598,181 @@ test("does not route Alt Pan or Zoom to a Photo while editing the sheet", async 
 
   expect(onTransformCommit).not.toHaveBeenCalled();
 });
+
+// A portrait Photo (300 x 400 mm at fill) in the 300 x 200 mm Frame: the only
+// slack is vertical, 100 mm on each side of the centre.
+const portraitInteractiveComposition: CompositionPlan = {
+  frameBorder: { kind: "none" },
+  sheets: [
+    {
+      ...interactiveComposition.sheets[0],
+      frames: [
+        {
+          ...interactiveComposition.sheets[0].frames[0],
+          photo: {
+            ...interactiveComposition.sheets[0].frames[0].photo!,
+            drawRect: { x: 0, y: -100_000, width: 300_000, height: 400_000 },
+            placement: {
+              ...interactiveComposition.sheets[0].frames[0].photo!.placement,
+              current: {
+                center: { x: 150_000, y: 100_000 },
+                size: { width: 300_000, height: 400_000 },
+              },
+              panToCenter: { xx: 0, xy: 0, yx: 0, yy: 100_000 },
+              panToCenterPerZoom: { xx: 150_000, xy: 0, yx: 0, yy: 200_000 },
+              sizePerZoom: { width: 300_000, height: 400_000 },
+            },
+          },
+        },
+      ],
+    },
+  ],
+};
+
+const mirroredInteractiveComposition: CompositionPlan = {
+  frameBorder: { kind: "none" },
+  sheets: [
+    {
+      ...interactiveComposition.sheets[0],
+      frames: [
+        {
+          ...interactiveComposition.sheets[0].frames[0],
+          photo: {
+            ...interactiveComposition.sheets[0].frames[0].photo!,
+            mirrorX: true,
+          },
+        },
+      ],
+    },
+  ],
+};
+
+// The continuous Canvas fits the Sheet height into 500 - 2 * 28 = 444 screen
+// px, so a 300 mm Sheet is drawn at 1.48 px/mm and a 222 mm Sheet at 2 px/mm.
+// A pointer travel of d screen px therefore moves the Photo d / scale mm, and
+// Pan is that travel divided by the slack between Photo and Frame (Pan 1 puts
+// the Photo edge on the Frame edge).
+test.each([
+  {
+    name: "a landscape Photo at 1.48 px/mm",
+    compositionPlan: interactiveComposition,
+    sheetHeightUm: 300_000,
+    scale: 1.48,
+    // 37 px = 25 mm of the 50 mm horizontal slack; there is no vertical slack.
+    pointer: { x: 37, y: 20 },
+    zoom: 1,
+    expected: { x: 0.5, y: 0 },
+  },
+  {
+    name: "a landscape Photo at 2 px/mm",
+    compositionPlan: interactiveComposition,
+    sheetHeightUm: 222_000,
+    scale: 2,
+    // 37 px = 18.5 mm of the 50 mm horizontal slack.
+    pointer: { x: 37, y: 20 },
+    zoom: 1,
+    expected: { x: 0.37, y: 0 },
+  },
+  {
+    name: "a portrait Photo at 1.48 px/mm",
+    compositionPlan: portraitInteractiveComposition,
+    sheetHeightUm: 300_000,
+    scale: 1.48,
+    // 74 px = 50 mm of the 100 mm vertical slack; there is no horizontal slack.
+    pointer: { x: 20, y: 74 },
+    zoom: 1,
+    expected: { x: 0, y: 0.5 },
+  },
+  {
+    name: "a portrait Photo at 2 px/mm",
+    compositionPlan: portraitInteractiveComposition,
+    sheetHeightUm: 222_000,
+    scale: 2,
+    // 74 px = 37 mm of the 100 mm vertical slack.
+    pointer: { x: 20, y: 74 },
+    zoom: 1,
+    expected: { x: 0, y: 0.37 },
+  },
+  {
+    // The 6000 x 4000 Photo turned 90 degrees covers 450 x 675 mm at Zoom 1.5:
+    // 75 mm of horizontal and 237.5 mm of vertical slack. Its own X axis now
+    // runs down the Sheet and its Y axis runs to the left.
+    name: "a Photo rotated 90 degrees at 1.48 px/mm",
+    compositionPlan: rotatedInteractiveComposition,
+    sheetHeightUm: 300_000,
+    scale: 1.48,
+    // 37 px = 25 mm to the right, 74 px = 50 mm down.
+    pointer: { x: 37, y: 74 },
+    zoom: 1.5,
+    expected: { x: 50 / 237.5, y: -25 / 75 },
+  },
+  {
+    name: "a Photo rotated 90 degrees at 2 px/mm",
+    compositionPlan: rotatedInteractiveComposition,
+    sheetHeightUm: 222_000,
+    scale: 2,
+    // 37 px = 18.5 mm to the right, 74 px = 37 mm down.
+    pointer: { x: 37, y: 74 },
+    zoom: 1.5,
+    expected: { x: 37 / 237.5, y: -18.5 / 75 },
+  },
+  {
+    // The Core placement plan already carries the mirrored axes; the Canvas
+    // must not flip the pointer travel a second time.
+    name: "a mirrored landscape Photo at 1.48 px/mm",
+    compositionPlan: mirroredInteractiveComposition,
+    sheetHeightUm: 300_000,
+    scale: 1.48,
+    pointer: { x: 37, y: 20 },
+    zoom: 1,
+    expected: { x: 0.5, y: 0 },
+  },
+])(
+  "converts the pointer travel of an unsaturated Pan into the exact normalized offset for $name",
+  async ({ compositionPlan, sheetHeightUm, scale, pointer, zoom, expected }) => {
+    const onTransformPreview = vi.fn();
+    const onTransformCommit = vi.fn(
+      async (_delta: PhotoTransformDelta) => true,
+    );
+    renderCanvas({
+      compositionPlan: {
+        ...compositionPlan,
+        sheets: compositionPlan.sheets.map((sheet) => ({
+          ...sheet,
+          heightUm: sheetHeightUm,
+        })),
+      },
+      onTransformPreview,
+      onTransformCommit,
+    });
+    await finishPixiInitialization();
+    expect(displayWithLabel("album-world").scale.x).toBeCloseTo(scale, 9);
+
+    displayWithLabel("canvas-frame-frame-001").emit("pointerdown", {
+      altKey: true,
+      global: { x: 100, y: 100 },
+      stopPropagation: vi.fn(),
+    });
+    pixiLifecycle.instances[0].stage.emit("globalpointermove", {
+      global: { x: 100 + pointer.x, y: 100 + pointer.y },
+    });
+
+    expect(onTransformPreview).toHaveBeenLastCalledWith({
+      frameId: "frame-001",
+      panX: expect.closeTo(expected.x, 9),
+      panY: expect.closeTo(expected.y, 9),
+      zoom,
+    });
+
+    pixiLifecycle.instances[0].stage.emit("pointerup", {
+      global: { x: 100 + pointer.x, y: 100 + pointer.y },
+    });
+
+    expect(onTransformCommit).toHaveBeenCalledExactlyOnceWith({
+      frameId: "frame-001",
+      deltaPanX: expect.closeTo(expected.x, 9),
+      deltaPanY: expect.closeTo(expected.y, 9),
+      deltaZoom: 0,
+    });
+  },
+);

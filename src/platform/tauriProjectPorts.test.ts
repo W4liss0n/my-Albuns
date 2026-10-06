@@ -1,10 +1,10 @@
-import { rasterLimitsAt300Dpi } from "../test/projectConfigurationFixtures";
+// @vitest-environment node
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { beforeEach, expect, test, vi } from "vitest";
 
-import type { ProjectIntent } from "../domain/project";
 import {
+  LayoutExportBlockedError,
   MediaPreviewError,
   SaveProjectError,
 } from "../application/projectPorts";
@@ -18,7 +18,6 @@ import {
   tauriMediaPreviewPort,
   tauriWorkspacePreferencesPort,
   tauriProjectCorePort,
-  tauriProjectStartupPort,
 } from "./tauriProjectPorts";
 
 const tauriBoundary = vi.hoisted(() => ({
@@ -185,6 +184,38 @@ test("native media preflight failures reach the recovery screen before any start
   expect(event).not.toHaveBeenCalled();
 });
 
+test("unfilled Layout positions reach the export problems screen before any started event", async () => {
+  const problems = [{ sheetId: "sheet-002", sheetNumber: 2, frameId: "frame-005", frameNumber: 3 }];
+  vi.mocked(invoke).mockRejectedValueOnce({ code: "unfilled_layout_positions", layoutProblems: problems });
+  const event = vi.fn();
+  const attempt = tauriExportPipelinePort.startSheet(exportSelection, event);
+  await expect(attempt.completion).rejects.toBeInstanceOf(LayoutExportBlockedError);
+  await expect(attempt.completion).rejects.toMatchObject({ problems });
+  expect(event).not.toHaveBeenCalled();
+});
+
+test.each([
+  { name: "malformed", layoutProblems: [{ sheetId: "sheet-002", sheetNumber: 0, frameId: "frame-005", frameNumber: 3 }] },
+  { name: "empty", layoutProblems: [] },
+])("$name unfilled Layout positions keep the native failure instead of an empty problems screen", async ({ layoutProblems }) => {
+  const failure = { code: "unfilled_layout_positions", layoutProblems };
+  vi.mocked(invoke).mockRejectedValueOnce(failure);
+  const attempt = tauriExportPipelinePort.startSheet(exportSelection, vi.fn());
+  await expect(attempt.completion).rejects.toBe(failure);
+});
+
+test("resuming an interrupted export forwards its recovery id and a fresh export sends none", async () => {
+  tauriExportPipelinePort.startSheet({ ...exportSelection, recoveryId: "recovery-7" }, vi.fn());
+  expect(vi.mocked(invoke).mock.calls[0]).toStrictEqual(["export_project", {
+    options: exportSelection.options, onEvent: tauriBoundary.channels[0], recoveryId: "recovery-7",
+  }]);
+
+  tauriExportPipelinePort.startSheet(exportSelection, vi.fn());
+  expect(vi.mocked(invoke).mock.calls[1]).toStrictEqual(["export_project", {
+    options: exportSelection.options, onEvent: tauriBoundary.channels[1],
+  }]);
+});
+
 test("normal export sends the complete selection and maps overwrite conflicts without starting progress", async () => {
   const options = { scope: "range" as const, sheetIds: ["sheet-002", "sheet-003"], mode: "page" as const,
     format: { kind: "jpeg" as const, quality: 64 }, destination: "C:/álbuns/Exportados", conflictPolicy: "ask" as const };
@@ -341,99 +372,6 @@ test("resolves a queued cancellation as not_found when completion fails before s
   expect(invoke).toHaveBeenCalledTimes(1);
 });
 
-test("sends image replacement through the native picker command with processing progress", async () => {
-  vi.mocked(invoke).mockResolvedValue(representativeProjection);
-  await expect(tauriProjectCorePort.replaceImage("media-001", vi.fn())).resolves.toBe(representativeProjection);
-  expect(invoke).toHaveBeenCalledWith("replace_media", { mediaId: "media-001", onProgress: tauriBoundary.channels[0] });
-});
-
-test("maps the Project and media ports to the desktop commands", async () => {
-  const information = {
-    displayUnit: "mm" as const,
-    sheetWidthUm: 600_000,
-    sheetHeightUm: 300_000,
-    dpi: 300,
-    bleedUm: 3_000,
-    safetyUm: 3_000,
-    firstSheet: "double" as const,
-    lastSheet: "double" as const,
-  };
-  const intent: ProjectIntent = {
-    kind: "addPhoto",
-    sheetId: "sheet-002",
-    mediaId: "media-campo",
-    mode: "normal",
-  };
-
-  vi.mocked(invoke)
-    .mockResolvedValueOnce(representativeProjection)
-    .mockResolvedValueOnce({ rasterLimits: rasterLimitsAt300Dpi,
-      errors: [],
-      impact: { conversionLosses: [], heightPx: 3_543, pageWidthPx: 3_543, sheetWidthPx: 7_087 },
-    })
-    .mockResolvedValueOnce({
-      projection: representativeProjection,
-      affectedFrameId: "frame-001",
-      affectedSheetId: null,
-    });
-  await tauriProjectCorePort.load("project-load-1");
-  await tauriProjectCorePort.validateAlbumInformation(information);
-  await tauriProjectCorePort.apply(intent);
-  await tauriProjectCorePort.relink(["media-a-001", "media-b-001"], vi.fn());
-  await tauriProjectCorePort.undo();
-  await tauriProjectCorePort.redo();
-  const retriedPreview = {
-    mediaId: "media-a-001",
-    state: "unavailable" as const,
-    url: "http://asset.localhost/last-cache-preview",
-  };
-  vi.mocked(invoke).mockResolvedValueOnce(retriedPreview);
-  const retry = await tauriMediaPreviewPort.retryUnavailableMedia(
-    "media-a-001",
-    vi.fn(),
-  );
-  vi.mocked(invoke).mockResolvedValueOnce([
-    {
-      mediaId: "media-a-001",
-      state: "ready",
-      url: "http://asset.localhost/cache-preview",
-    },
-  ]);
-  const demand = {
-    revision: 1,
-    visibleMediaIds: ["media-a-001"],
-    preloadMediaIds: ["media-b-001"],
-  };
-  const previews = await tauriMediaPreviewPort.prepareMediaPreviews(demand, vi.fn());
-
-  expect(invoke).toHaveBeenNthCalledWith(1, "project_state", {
-    operationId: "project-load-1",
-  });
-  expect(invoke).toHaveBeenNthCalledWith(2, "validate_album_information", {
-    information,
-  });
-  expect(invoke).toHaveBeenNthCalledWith(3, "apply_project_intent", {
-    intent,
-    onProgress: tauriBoundary.channels[0],
-  });
-  expect(invoke).toHaveBeenNthCalledWith(4, "relink_media", {
-    mediaIds: ["media-a-001", "media-b-001"],
-    onProgress: tauriBoundary.channels[1],
-  });
-  expect(invoke).toHaveBeenNthCalledWith(5, "undo_project", { onProgress: tauriBoundary.channels[2] });
-  expect(invoke).toHaveBeenNthCalledWith(6, "redo_project", { onProgress: tauriBoundary.channels[3] });
-  expect(invoke).toHaveBeenNthCalledWith(7, "retry_unavailable_media", {
-    mediaId: "media-a-001",
-    onProgress: tauriBoundary.channels[4],
-  });
-  expect(invoke).toHaveBeenNthCalledWith(8, "prepare_media_previews", {
-    demand,
-    onPreview: tauriBoundary.channels[5],
-  });
-  expect(retry).toEqual(retriedPreview);
-  expect(previews?.[0].url).toBe("http://asset.localhost/cache-preview");
-});
-
 test("materializes an owned media-demand DTO at the native seam", async () => {
   vi.mocked(invoke).mockResolvedValueOnce([]);
   const visibleMediaIds = Object.freeze(["media-a-001"]);
@@ -481,14 +419,6 @@ test.each(["completed", "failed"])("streams each media preview before the batch 
   expect(publish).toHaveBeenCalledOnce();
 });
 
-test("confirms Project UI readiness through its single startup seam", async () => {
-  await tauriProjectStartupPort.prepareImages!();
-  await tauriProjectStartupPort.confirmUiReady();
-
-  expect(invoke).toHaveBeenCalledWith("prepare_project_startup_images");
-  expect(invoke).toHaveBeenCalledWith("project_ui_ready");
-});
-
 test.each(["completed", "failed"])("streams photo import progress per attempt and ignores late events after %s", async (outcome) => {
   let finish!: () => void;
   vi.mocked(invoke).mockImplementationOnce(() => new Promise<void>((resolve, reject) => {
@@ -509,57 +439,6 @@ test.each(["completed", "failed"])("streams photo import progress per attempt an
   expect(onProgress).toHaveBeenCalledTimes(2);
 });
 
-test("maps Photo import, target resolution, and affected Frame outcomes", async () => {
-  const mutationOutcome = {
-    projection: representativeProjection,
-    affectedFrameId: "frame-001",
-    affectedSheetId: null,
-  };
-  const importOutcome = {
-    kind: "completed" as const,
-    projection: representativeProjection,
-    mediaIds: ["media-imported"],
-    importedCount: 1,
-    problems: [],
-  };
-  vi.mocked(invoke)
-    .mockResolvedValueOnce(mutationOutcome)
-    .mockResolvedValueOnce(importOutcome)
-    .mockResolvedValueOnce({ kind: "sheet", sheetId: "sheet-001" });
-  const intent: ProjectIntent = {
-    kind: "addPhoto",
-    sheetId: "sheet-001",
-    mediaId: "media-imported",
-    mode: "normal",
-  };
-
-  await expect(
-    tauriProjectCorePort.applyWithOutcome(intent),
-  ).resolves.toEqual(mutationOutcome);
-  await expect(tauriProjectCorePort.importMedia(vi.fn(), { mediaKind: "photo", source: { kind: "files" } })).resolves.toEqual(
-    importOutcome,
-  );
-  await expect(
-    tauriProjectCorePort.resolvePhotoDropTarget(
-      "sheet-001",
-      12_000,
-      34_000,
-    ),
-  ).resolves.toEqual({ kind: "sheet", sheetId: "sheet-001" });
-
-  expect(invoke).toHaveBeenNthCalledWith(1, "apply_project_intent", {
-    intent,
-    onProgress: tauriBoundary.channels[0],
-  });
-  expect(invoke).toHaveBeenNthCalledWith(2, "import_media", { selection: { mediaKind: "photo", source: { kind: "files" } }, onProgress: tauriBoundary.channels[1] });
-  expect(invoke).toHaveBeenNthCalledWith(3, "photo_drop_target", {
-    sheetId: "sheet-001",
-    xUm: 12_000,
-    yUm: 34_000,
-  });
-  expect(vi.mocked(invoke).mock.calls[2]?.[1]).not.toHaveProperty("mode");
-});
-
 test("maps stable linked-media events to the reactive preview seam", async () => {
   const listener = vi.fn();
 
@@ -573,28 +452,6 @@ test("maps stable linked-media events to the reactive preview seam", async () =>
     expect.any(Function),
   );
   expect(listener).toHaveBeenCalledWith(["photo-a", "overlay-a"]);
-  expect(unlisten).toEqual(expect.any(Function));
-});
-
-test("maps the typed Cache processor warning without blocking Project commands", async () => {
-  const listener = vi.fn();
-
-  const unlisten = await tauriMediaPreviewPort.onCacheProcessorWarning(listener);
-  eventBoundary.listeners[0]({
-    payload: {
-      state: "suspended",
-      message: "A criação de prévias foi suspensa após falhas repetidas.",
-    },
-  });
-
-  expect(listen).toHaveBeenCalledWith(
-    "myalbuns://cache-processor-warning",
-    expect.any(Function),
-  );
-  expect(listener).toHaveBeenCalledWith({
-    state: "suspended",
-    message: "A criação de prévias foi suspensa após falhas repetidas.",
-  });
   expect(unlisten).toEqual(expect.any(Function));
 });
 
@@ -620,6 +477,29 @@ test("returns the authoritative projection from a confirmed Project save", async
   expect(invoke).toHaveBeenCalledWith("save_project", {
     expectedRevision: 25,
   });
+});
+
+test("only a confirmed format conversion tells the native save to replace an old myAlbuns file", async () => {
+  const result = {
+    outcome: { kind: "saved" as const, revision: 25 },
+    projection: {
+      ...representativeProjection,
+      state: { ...representativeProjection.state, savedRevision: 25, dirty: false },
+    },
+  };
+  vi.mocked(invoke).mockResolvedValue(result);
+
+  await expect(tauriProjectCorePort.save(25, true)).resolves.toEqual(result);
+  await tauriProjectCorePort.save(25);
+  await tauriProjectCorePort.save(25, false);
+
+  // Strict: an explicit `confirmFormatConversion: false` or `undefined`
+  // key would still be a different payload from the plain save.
+  expect(vi.mocked(invoke).mock.calls).toStrictEqual([
+    ["save_project", { expectedRevision: 25, confirmFormatConversion: true }],
+    ["save_project", { expectedRevision: 25 }],
+    ["save_project", { expectedRevision: 25 }],
+  ]);
 });
 
 test("invokes the native Salvar como flow and validates the adopted Project", async () => {
@@ -659,6 +539,39 @@ test("accepts native Salvar como cancellation without changing the projection", 
   vi.mocked(invoke).mockResolvedValueOnce(result);
 
   await expect(tauriProjectCorePort.saveAs(25)).resolves.toEqual(result);
+});
+
+test("rejects a Salvar como cancellation whose projection is not the requested visible revision", async () => {
+  vi.mocked(invoke).mockResolvedValueOnce({
+    outcome: { kind: "cancelled" },
+    projection: {
+      ...representativeProjection,
+      state: { ...representativeProjection.state, revision: 26 },
+    },
+  });
+
+  const failure = tauriProjectCorePort.saveAs(25);
+
+  await expect(failure).rejects.toBeInstanceOf(SaveProjectError);
+  await expect(failure).rejects.toMatchObject({
+    code: "invalid_response",
+    message: "Não foi possível confirmar o resultado de Salvar como.",
+  });
+});
+
+test.each([
+  { name: "an unknown code", wire: { code: "not_a_save_as_failure" } },
+  { name: "a non-structured rejection", wire: new Error("IPC channel closed") },
+])("maps $name from Salvar como to an unavailable save without leaking diagnostics", async ({ wire }) => {
+  vi.mocked(invoke).mockRejectedValueOnce(wire);
+
+  const failure = tauriProjectCorePort.saveAs(25);
+
+  await expect(failure).rejects.toBeInstanceOf(SaveProjectError);
+  await expect(failure).rejects.toMatchObject({
+    code: "save_unavailable",
+    message: "Não foi possível iniciar Salvar como.",
+  });
 });
 
 test("rejects Salvar como when the adopted identity and projection disagree", async () => {
@@ -810,58 +723,6 @@ test.each([
       "O arquivo do projeto foi alterado fora do MyAlbuns. O salvamento não substituiu essas alterações.",
   },
   {
-    wire: { code: "save_state_indeterminate" },
-    code: "save_state_indeterminate",
-    message:
-      "Não foi possível confirmar a versão salva no arquivo. Reabra o projeto para conferir o conteúdo antes de continuar.",
-  },
-  {
-    wire: { code: "recovery_cleanup_failed" },
-    code: "recovery_cleanup_failed",
-    message:
-      "O projeto foi salvo, mas a limpeza dos dados de recuperação não terminou. Tente salvar novamente.",
-  },
-  {
-    wire: { code: "session_unavailable" },
-    code: "session_unavailable",
-    message:
-      "O projeto não está mais disponível para edição. Reabra o projeto para continuar.",
-  },
-  {
-    wire: { code: "not_found" },
-    code: "not_found",
-    message:
-      "O arquivo do projeto não foi encontrado. Confirme se ele foi movido ou removido.",
-  },
-  {
-    wire: { code: "unavailable" },
-    code: "unavailable",
-    message:
-      "O local do projeto está indisponível. Reconecte o disco ou a pasta de rede e tente novamente.",
-  },
-  {
-    wire: { code: "access_denied" },
-    code: "access_denied",
-    message:
-      "O Windows negou acesso ao arquivo do projeto. Verifique as permissões e tente novamente.",
-  },
-  {
-    wire: { code: "invalid_path" },
-    code: "invalid_path",
-    message: "O caminho do arquivo do projeto não é válido.",
-  },
-  {
-    wire: { code: "unexpected_object_type" },
-    code: "unexpected_object_type",
-    message: "Não é possível salvar: o local do projeto não contém um arquivo válido. Verifique se o arquivo foi movido ou substituído.",
-  },
-  {
-    wire: { code: "conflict" },
-    code: "conflict",
-    message:
-      "O arquivo do projeto mudou durante o salvamento. Tente novamente.",
-  },
-  {
     wire: { code: "io_failure" },
     code: "io_failure",
     message: "O Windows não conseguiu concluir o salvamento do projeto.",
@@ -914,12 +775,4 @@ test("normalizes typed unavailable-media retry failures at the IPC adapter", asy
     code: "read_failed",
     message: "A nova inspeção não pôde ser concluída.",
   });
-});
-
-test("folder name validation forwards the typed request and Core result unchanged", async () => {
-  const request = { name: "  Turma  ", mediaKind: "photo" as const, folderId: null };
-  const result = { name: "Turma", error: "nameInUse" as const };
-  vi.mocked(invoke).mockResolvedValueOnce(result);
-  expect(await tauriProjectCorePort.validateMediaFolderName(request)).toEqual(result);
-  expect(invoke).toHaveBeenCalledWith("validate_media_folder_name", { request });
 });

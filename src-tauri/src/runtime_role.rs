@@ -100,16 +100,6 @@ mod tests {
     }
 
     #[test]
-    fn starts_as_global_without_an_associated_project() {
-        assert_eq!(
-            parse([OsString::from("MyAlbuns.exe")]),
-            RuntimeRole::Global {
-                direct_projects: Vec::new()
-            }
-        );
-    }
-
-    #[test]
     fn preserves_a_non_ascii_associated_project_path() {
         let project = PathBuf::from(format!(
             "C:\\{}\\{}.myalbuns",

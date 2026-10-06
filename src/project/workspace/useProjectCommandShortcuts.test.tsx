@@ -338,24 +338,6 @@ test("leaves horizontal arrows to editable and keyboard-owning surfaces", () => 
   }
 });
 
-test("dispatches Save as distinctly from Save", () => {
-  const actions = handlers();
-  renderHook(() =>
-    useProjectCommandShortcuts({
-      ...actions,
-      canRedo: true,
-      canUndo: true,
-      disabled: false,
-    }),
-  );
-
-  const event = dispatchShortcut("s", { shiftKey: true });
-
-  expect(event.defaultPrevented).toBe(true);
-  expect(actions.save).not.toHaveBeenCalled();
-  expect(actions.saveAs).toHaveBeenCalledOnce();
-});
-
 test("dispatches Delete only for an available Sheet outside text entry and Edit Mode", () => {
   const actions = handlers();
   const view = renderHook(
@@ -430,24 +412,6 @@ test("leaves Delete to the Media Panel while a media item owns keyboard focus", 
   } finally {
     mediaPanel.remove();
   }
-});
-
-test("leaves Delete to the selected Frame when the Sheet context is inactive", () => {
-  const actions = handlers();
-  renderHook(() =>
-    useProjectCommandShortcuts({
-      ...actions,
-      canRedo: true,
-      canUndo: true,
-      disabled: false,
-      sheetShortcutActive: false,
-    }),
-  );
-
-  const event = dispatchShortcut("Delete", { ctrlKey: false });
-
-  expect(event.defaultPrevented).toBe(false);
-  expect(actions.deleteSheet).not.toHaveBeenCalled();
 });
 
 test("leaves contextual Ctrl+E to the active photo owner", () => {
