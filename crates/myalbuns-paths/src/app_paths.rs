@@ -190,8 +190,16 @@ impl AppPaths {
         self.state_dir().join("workspace-preferences.json")
     }
 
+    pub fn project_window_placement_file(&self) -> PathBuf {
+        self.state_dir().join("project-window.json")
+    }
+
     pub fn photoshop_file(&self) -> PathBuf {
         self.state_dir().join("photoshop.json")
+    }
+
+    pub fn open_projects_dir(&self) -> PathBuf {
+        self.state_dir().join("OpenProjects")
     }
 
     pub fn project_identity_leases_dir(&self) -> PathBuf {

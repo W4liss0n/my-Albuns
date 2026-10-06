@@ -59,6 +59,14 @@ fn exposes_each_data_category_under_its_approved_root() {
         Path::new(r"C:\Local\MyAlbuns2\State\workspace-preferences.json")
     );
     assert_eq!(
+        paths.project_window_placement_file(),
+        Path::new(r"C:\Local\MyAlbuns2\State\project-window.json")
+    );
+    assert_eq!(
+        paths.open_projects_dir(),
+        Path::new(r"C:\Local\MyAlbuns2\State\OpenProjects")
+    );
+    assert_eq!(
         paths.project_identity_leases_dir(),
         Path::new(r"C:\Local\MyAlbuns2\State\ProjectIdentityLeases")
     );
