@@ -776,3 +776,27 @@ test.each([
     });
   },
 );
+
+test("Alt-Pan selects the Frame it moves, so later shortcuts reach it", async () => {
+  const onTransformCommit = vi.fn(async (_delta: PhotoTransformDelta) => true);
+  const onSelectFrame = vi.fn();
+  const onFocusSheet = vi.fn();
+  renderCanvas({
+    compositionPlan: interactiveComposition,
+    onTransformCommit,
+    onSelectFrame,
+    onFocusSheet,
+  });
+  await finishPixiInitialization();
+
+  const frame = displayWithLabel("canvas-frame-frame-001");
+  frame.emit("pointerdown", { altKey: true, global: { x: 0, y: 0 }, stopPropagation: vi.fn() });
+  expect(onSelectFrame).toHaveBeenCalledExactlyOnceWith("frame-001");
+  expect(onFocusSheet).toHaveBeenCalledWith("sheet-001");
+
+  const stage = pixiLifecycle.instances[0].stage;
+  stage.emit("globalpointermove", { global: { x: 40, y: 0 } });
+  stage.emit("pointerup", { global: { x: 40, y: 0 } });
+  expect(onTransformCommit).toHaveBeenCalledOnce();
+  expect(onTransformCommit.mock.calls[0][0].deltaPanX).toBeGreaterThan(0);
+});
