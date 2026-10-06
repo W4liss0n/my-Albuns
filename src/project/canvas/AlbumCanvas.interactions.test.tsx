@@ -351,7 +351,7 @@ test("does not reset an active Pan preview when wheel Zoom starts", async () => 
   expect(onTransformCommit.mock.calls[0][0]).toMatchObject({
     frameId: "frame-001",
     deltaPanY: 0,
-    deltaZoom: expect.closeTo(0.12, 6),
+    deltaZoom: expect.closeTo(0.06, 6),
   });
   expect(
     onTransformCommit.mock.calls[0][0].deltaPanX,
@@ -397,7 +397,7 @@ test("previews a smooth wheel zoom and commits the sequence once", async () => {
 
   wheel();
   expect(photoLayer.scale.y).toBeGreaterThan(1);
-  expect(photoLayer.position.x).toBeCloseTo(83.4, 1);
+  expect(photoLayer.position.x).toBeCloseTo(94.2, 1);
   expect(onTransformPreview).toHaveBeenLastCalledWith({
     frameId: "frame-001",
     panX: -0.9,
@@ -776,3 +776,27 @@ test.each([
     });
   },
 );
+
+test("Alt-Pan selects the Frame it moves, so later shortcuts reach it", async () => {
+  const onTransformCommit = vi.fn(async (_delta: PhotoTransformDelta) => true);
+  const onSelectFrame = vi.fn();
+  const onFocusSheet = vi.fn();
+  renderCanvas({
+    compositionPlan: interactiveComposition,
+    onTransformCommit,
+    onSelectFrame,
+    onFocusSheet,
+  });
+  await finishPixiInitialization();
+
+  const frame = displayWithLabel("canvas-frame-frame-001");
+  frame.emit("pointerdown", { altKey: true, global: { x: 0, y: 0 }, stopPropagation: vi.fn() });
+  expect(onSelectFrame).toHaveBeenCalledExactlyOnceWith("frame-001");
+  expect(onFocusSheet).toHaveBeenCalledWith("sheet-001");
+
+  const stage = pixiLifecycle.instances[0].stage;
+  stage.emit("globalpointermove", { global: { x: 40, y: 0 } });
+  stage.emit("pointerup", { global: { x: 40, y: 0 } });
+  expect(onTransformCommit).toHaveBeenCalledOnce();
+  expect(onTransformCommit.mock.calls[0][0].deltaPanX).toBeGreaterThan(0);
+});

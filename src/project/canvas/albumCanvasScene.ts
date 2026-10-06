@@ -129,6 +129,12 @@ export class AlbumCanvasScene {
         this.frameAreaSelection.start(event);
       }
     });
+    this.app.stage.on("pointertap", (event) => {
+      // A tap on the canvas outside every Sheet clears the Frame selection.
+      if (event.button !== 0 || event.target !== this.app.stage || !this.input || this.input.mediaDrag) return;
+      if (this.frameInteractions.ignoresTap || this.frameAreaSelection.ignoresTap || this.frameContentDrag.ignoresTap) return;
+      this.input.onSelectFrame(null);
+    });
     this.frameContentDragVisual = new FrameContentDragVisual(app, this.photoNodes);
     this.app.stage.eventMode = "static";
     this.app.stage.hitArea = this.app.screen;
@@ -745,8 +751,12 @@ export class AlbumCanvasScene {
           this.input.onFocusSheet(sheetId);
         },
         onPhotoPanStart: (photoNode, event) => {
-          if (this.input?.mediaDrag) return;
+          if (!this.input || this.input.mediaDrag) return;
           this.photoInteractions.startPan(photoNode, event);
+          // Alt-Pan works on this Frame, so the shortcuts that follow must too.
+          const selected = this.input.selectedFrameIds;
+          if (selected.length !== 1 || selected[0] !== photoNode.frameId) this.input.onSelectFrame(photoNode.frameId);
+          this.input.onFocusSheet(sheet.sheetId);
         },
         onPhotoContentDragStart: (frameId, event) => { if (!this.input?.mediaDrag) this.frameContentDrag.start(frameId, event); },
         onFrameContextMenu: (frameId, position) => {

@@ -4,7 +4,6 @@ import {
   advancePixiTicker,
   AlbumCanvas,
   displayWithLabel,
-  displayWithHandler,
   finishPixiInitialization,
   getPixiLifecycle,
   renderCanvas,
@@ -638,7 +637,7 @@ test("enters sheet editing by a double click on either surface or Frame", async 
     onEditSheet,
   });
   await finishPixiInitialization();
-  const sheet = displayWithHandler("pointertap");
+  const sheet = displayWithLabel("canvas-sheet-sheet-001");
 
   sheet.emit("pointertap", { button: 0, target: sheet, detail: 1 });
   expect(onEditSheet).not.toHaveBeenCalled();

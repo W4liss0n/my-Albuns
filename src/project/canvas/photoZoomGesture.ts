@@ -33,9 +33,9 @@ export function advancePhotoZoomGesture(
     ? current.baseZoom
     : clamp(step.baseZoom, step.zoomRange);
   const previousDelta = continuesCurrent ? current.delta : 0;
-  const eventDelta = clamp(-step.wheelDeltaY * 0.0012, {
-    minimum: -0.18,
-    maximum: 0.18,
+  const eventDelta = clamp(-step.wheelDeltaY * 0.0006, {
+    minimum: -0.09,
+    maximum: 0.09,
   });
   const delta = clamp(
     previousDelta + eventDelta,
