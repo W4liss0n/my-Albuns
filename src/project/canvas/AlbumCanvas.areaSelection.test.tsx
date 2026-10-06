@@ -138,3 +138,24 @@ test("a small movement stays a click, and a different pointer cannot finish the 
   expect(view.onSelectFrames).toHaveBeenCalledExactlyOnceWith([]);
   expect(displayWithLabel("frame-area-selection").visible).toBe(false);
 });
+
+test("a click on the canvas outside the Sheets clears the Frame selection", async () => {
+  const view = await harness({ mode: "normal" });
+  act(() => view.app.stage.emit("pointertap", { target: view.app.stage, button: 0, detail: 1 }));
+  expect(view.onSelectFrame).toHaveBeenCalledExactlyOnceWith(null);
+
+  vi.mocked(view.onSelectFrame).mockClear();
+  act(() => view.app.stage.emit("pointertap", { target: view.app.stage, button: 2, detail: 1 }));
+  const sheet = displayWithLabel("canvas-sheet-sheet-001");
+  act(() => view.app.stage.emit("pointertap", { target: sheet, button: 0, detail: 1 }));
+  expect(view.onSelectFrame).not.toHaveBeenCalled();
+});
+
+test("while editing a Sheet, a click outside it clears the selection once, through the area selection", async () => {
+  const view = await harness();
+  view.start(-40, -40);
+  view.finish(-40, -40);
+  act(() => view.app.stage.emit("pointertap", { target: view.app.stage, button: 0, detail: 1 }));
+  expect(view.onSelectFrames).toHaveBeenCalledExactlyOnceWith([]);
+  expect(view.onSelectFrame).not.toHaveBeenCalled();
+});
