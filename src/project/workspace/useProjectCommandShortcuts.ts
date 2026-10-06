@@ -136,9 +136,13 @@ export function useProjectCommandShortcuts({
           return;
         }
       }
+      // A selected Frame keeps Delete and Enter for itself; the arrows still
+      // navigate and rearrange the centered Sheet, as after filling a Frame.
+      const sheetCommand = sheetCommandFor(event);
       const command =
         matchProjectCommandShortcut(event, "project-window") ??
-        (sheetShortcutActive ? sheetCommandFor(event) : null);
+        (sheetCommand !== null && (sheetShortcutActive || SHEET_ARROW_COMMANDS.has(sheetCommand))
+          ? sheetCommand : null);
       if (command === null) return;
       if ((command === "new-project" || command === "open-project") && ownsEditingKeys(event.target)) return;
       if (command === "delete-sheet" && ownsEditingKeys(event.target)) return;

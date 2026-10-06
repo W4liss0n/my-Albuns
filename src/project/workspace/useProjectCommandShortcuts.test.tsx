@@ -133,6 +133,24 @@ test("Delete targets the Frame selection and never borrows the Sheet command", (
   expect(actions.deleteSheet).not.toHaveBeenCalled();
 });
 
+test("a Frame selection keeps Delete but leaves the arrows to the centered Sheet", () => {
+  const actions = handlers();
+  renderHook(() => useProjectCommandShortcuts({
+    ...actions, frameCommandsActive: true, sheetShortcutActive: false,
+    canRedo: true, canUndo: true, disabled: false,
+  }));
+  for (const key of ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"]) {
+    expect(dispatchShortcut(key, { ctrlKey: false }).defaultPrevented, key).toBe(true);
+  }
+  expect(actions.cycleToNextLayout).toHaveBeenCalledOnce();
+  expect(actions.cycleToPreviousLayout).toHaveBeenCalledOnce();
+  expect(actions.navigateToPreviousSheet).toHaveBeenCalledOnce();
+  expect(actions.navigateToNextSheet).toHaveBeenCalledOnce();
+  dispatchShortcut("Delete", { ctrlKey: false });
+  expect(actions.deleteFrames).toHaveBeenCalledOnce();
+  expect(actions.deleteSheet).not.toHaveBeenCalled();
+});
+
 test("Frame Delete respects text entry, menus, dialogs and the media-panel command context", () => {
   const actions = handlers();
   renderHook(() => useProjectCommandShortcuts({

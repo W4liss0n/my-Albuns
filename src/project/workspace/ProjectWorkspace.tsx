@@ -618,9 +618,10 @@ export function ProjectWorkspace({
   const sheetReorderGestureActive =
     sheetReorderSession.status === "preview" ||
     sheetReorderSession.status === "invalid";
+  // A Frame selected in normal mode (for example right after filling it from
+  // the media panel) does not own the arrows.
   const sheetNavigationActive =
     canvasMode.kind === "normal" &&
-    controller.selectedFrames.length === 0 &&
     mediaDrag === null &&
     sheetContextMenu === null &&
     !commandsBlocked &&
