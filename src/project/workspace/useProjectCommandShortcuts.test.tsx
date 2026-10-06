@@ -133,7 +133,129 @@ test("Delete targets the Frame selection and never borrows the Sheet command", (
   expect(actions.deleteSheet).not.toHaveBeenCalled();
 });
 
-test("Frame Delete respects text entry, menus, dialogs and the media-panel command context", () => {
+test("a Frame selection keeps Delete but leaves the arrows to the centered Sheet", () => {
+  const actions = handlers();
+  renderHook(() => useProjectCommandShortcuts({
+    ...actions, frameCommandsActive: true, sheetShortcutActive: false,
+    canRedo: true, canUndo: true, disabled: false,
+  }));
+  for (const key of ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"]) {
+    expect(dispatchShortcut(key, { ctrlKey: false }).defaultPrevented, key).toBe(true);
+  }
+  expect(actions.cycleToNextLayout).toHaveBeenCalledOnce();
+  expect(actions.cycleToPreviousLayout).toHaveBeenCalledOnce();
+  expect(actions.navigateToPreviousSheet).toHaveBeenCalledOnce();
+  expect(actions.navigateToNextSheet).toHaveBeenCalledOnce();
+  dispatchShortcut("Delete", { ctrlKey: false });
+  expect(actions.deleteFrames).toHaveBeenCalledOnce();
+  expect(actions.deleteSheet).not.toHaveBeenCalled();
+});
+
+test("R rotates and V toggles black and white on the selected Frame photos, also from a thumbnail", () => {
+  const actions = { ...handlers(), rotatePhotos: vi.fn(), togglePhotoBlackAndWhite: vi.fn() };
+  const { rerender } = renderHook((active: boolean) => useProjectCommandShortcuts({
+    ...actions, photoCommandActive: active, canRedo: true, canUndo: true, disabled: false,
+  }), { initialProps: true });
+  const media = document.createElement("div");
+  media.dataset.projectCommandContext = "media-panel";
+  const thumbnail = document.createElement("button");
+  const search = document.createElement("input");
+  media.append(thumbnail, search);
+  document.body.append(media);
+  expect(dispatchShortcut("r", { ctrlKey: false }).defaultPrevented).toBe(true);
+  expect(dispatchShortcut("V", { ctrlKey: false, shiftKey: false }, thumbnail).defaultPrevented).toBe(true);
+  expect(dispatchShortcut("r", { ctrlKey: false, repeat: true }).defaultPrevented).toBe(true);
+  expect(dispatchShortcut("r", { ctrlKey: false }, search).defaultPrevented).toBe(false);
+  expect(dispatchShortcut("r").defaultPrevented).toBe(false);
+  rerender(false);
+  expect(dispatchShortcut("v", { ctrlKey: false }).defaultPrevented).toBe(false);
+  media.remove();
+  expect(actions.rotatePhotos).toHaveBeenCalledOnce();
+  expect(actions.togglePhotoBlackAndWhite).toHaveBeenCalledOnce();
+});
+
+test("H mirrors the selected Frame photos and Ctrl+I imports files from anywhere but text entry", () => {
+  const actions = { ...handlers(), mirrorPhotos: vi.fn(), importMediaFiles: vi.fn() };
+  renderHook(() => useProjectCommandShortcuts({
+    ...actions, photoCommandActive: true, canRedo: true, canUndo: true, disabled: false,
+  }));
+  const input = document.createElement("input");
+  document.body.append(input);
+  expect(dispatchShortcut("h", { ctrlKey: false }).defaultPrevented).toBe(true);
+  expect(dispatchShortcut("i").defaultPrevented).toBe(true);
+  expect(dispatchShortcut("i", {}, input).defaultPrevented).toBe(false);
+  expect(dispatchShortcut("h", { ctrlKey: false }, input).defaultPrevented).toBe(false);
+  input.remove();
+  expect(actions.mirrorPhotos).toHaveBeenCalledOnce();
+  expect(actions.importMediaFiles).toHaveBeenCalledOnce();
+});
+
+test("menu shortcuts run their menu item only while the menu offers it", () => {
+  const actions = handlers();
+  const addAfter = vi.fn();
+  const duplicate = vi.fn();
+  const settings = vi.fn();
+  const swap = vi.fn();
+  const menuGroups = (duplicateDisabled: boolean) => [
+    { id: "sheet", label: "Lâmina", items: [
+      { availability: "implemented" as const, context: "sheet", id: "add-after", label: "Adicionar depois", onSelect: addAfter, type: "command" as const },
+      { availability: "implemented" as const, context: "sheet", id: "duplicate-sheet", label: "Duplicar lâmina", onSelect: duplicate, disabled: duplicateDisabled, type: "command" as const },
+      { id: "separator", type: "separator" as const },
+      { id: "nested", label: "Organizar", type: "submenu" as const, items: [
+        { availability: "implemented" as const, context: "frame", id: "swap-frame-contents", label: "Trocar", onSelect: swap, type: "command" as const },
+      ] },
+    ] },
+    { id: "tools", label: "Ferramentas", items: [
+      { availability: "implemented" as const, context: "project-window", id: "settings", label: "Configurações…", onSelect: settings, type: "command" as const },
+    ] },
+  ];
+  const { rerender } = renderHook((disabledItem: boolean) => useProjectCommandShortcuts({
+    ...actions, menuGroups: menuGroups(disabledItem), canRedo: true, canUndo: true, disabled: false,
+  }), { initialProps: true });
+  const media = document.createElement("div");
+  media.dataset.projectCommandContext = "media-panel";
+  const thumbnail = document.createElement("button");
+  const menu = document.createElement("div");
+  menu.setAttribute("role", "menu");
+  media.append(thumbnail);
+  document.body.append(media, menu);
+  expect(dispatchShortcut("Enter", {}, thumbnail).defaultPrevented).toBe(true);
+  expect(dispatchShortcut("d").defaultPrevented).toBe(true);
+  expect(dispatchShortcut(",").defaultPrevented).toBe(true);
+  expect(dispatchShortcut("x", { ctrlKey: false }).defaultPrevented).toBe(true);
+  expect(dispatchShortcut("Enter", { repeat: true }).defaultPrevented).toBe(true);
+  expect(dispatchShortcut("Enter", {}, menu).defaultPrevented).toBe(false);
+  rerender(false);
+  dispatchShortcut("d");
+  media.remove(); menu.remove();
+  expect(addAfter).toHaveBeenCalledOnce();
+  expect(duplicate).toHaveBeenCalledOnce();
+  expect(settings).toHaveBeenCalledOnce();
+  expect(swap).toHaveBeenCalledOnce();
+  expect(actions.navigateToNextSheet).not.toHaveBeenCalled();
+});
+
+test("Delete from the media panel reaches the selected Frame; the bracket commands do not", () => {
+  const actions = handlers();
+  renderHook(() => useProjectCommandShortcuts({
+    ...actions, frameCommandsActive: true, sheetShortcutActive: false,
+    canRedo: true, canUndo: true, disabled: false,
+  }));
+  const media = document.createElement("div");
+  media.dataset.projectCommandContext = "media-panel";
+  const thumbnail = document.createElement("button");
+  const search = document.createElement("input");
+  media.append(thumbnail, search);
+  document.body.append(media);
+  expect(dispatchShortcut("Delete", { ctrlKey: false }, thumbnail).defaultPrevented).toBe(true);
+  expect(dispatchShortcut("]", {}, thumbnail).defaultPrevented).toBe(false);
+  expect(dispatchShortcut("Delete", { ctrlKey: false }, search).defaultPrevented).toBe(false);
+  media.remove();
+  expect(actions.deleteFrames).toHaveBeenCalledOnce();
+  expect(actions.arrangeFrames).not.toHaveBeenCalled();
+});
+
+test("Frame Delete respects text entry, menus, dialogs and other command contexts", () => {
   const actions = handlers();
   renderHook(() => useProjectCommandShortcuts({
     ...actions, frameCommandsActive: true, sheetShortcutActive: false,
@@ -142,14 +264,14 @@ test("Frame Delete respects text entry, menus, dialogs and the media-panel comma
   const input = document.createElement("input");
   const editable = document.createElement("div");
   editable.setAttribute("contenteditable", "true");
-  const media = document.createElement("div");
-  media.dataset.projectCommandContext = "media-panel";
+  const folder = document.createElement("div");
+  folder.dataset.projectCommandContext = "media-folder";
   const owners = ["dialog", "menu", "menubar", "listbox", "scrollbar"].map((role) => {
     const element = document.createElement("div");
     element.setAttribute("role", role);
     return element;
   });
-  for (const owner of [input, editable, media, ...owners]) {
+  for (const owner of [input, editable, folder, ...owners]) {
     document.body.append(owner);
     expect(dispatchShortcut("Delete", { ctrlKey: false }, owner).defaultPrevented).toBe(false);
     owner.remove();

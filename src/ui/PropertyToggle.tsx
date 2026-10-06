@@ -7,7 +7,7 @@ import { AppIcon } from "./AppIcon";
 import "./PropertyToggle.css";
 
 /** An icon tool whose whole surface reflects the property's state. */
-export function PropertyToggle({ label, icon, pressed, disabled, onToggle, className, tooltipSide = "right" }: {
+export function PropertyToggle({ label, icon, pressed, disabled, onToggle, className, tooltipSide = "right", shortcut, keyShortcuts }: {
   label: string;
   icon: LucideIcon;
   pressed: boolean | "mixed";
@@ -15,6 +15,9 @@ export function PropertyToggle({ label, icon, pressed, disabled, onToggle, class
   onToggle(): void;
   className?: string;
   tooltipSide?: "left" | "right";
+  /** Shortcut shown after the label in the tooltip, such as "V". */
+  shortcut?: string;
+  keyShortcuts?: string;
 }) {
   const trigger = useRef<HTMLButtonElement>(null);
   const options = { isDisabled: disabled, delay: 600, closeDelay: 100 };
@@ -30,6 +33,7 @@ export function PropertyToggle({ label, icon, pressed, disabled, onToggle, class
         variant="quiet"
         aria-label={label}
         aria-pressed={pressed}
+        aria-keyshortcuts={keyShortcuts}
         disabled={disabled}
         onClick={onToggle}
         ref={trigger}
@@ -38,7 +42,7 @@ export function PropertyToggle({ label, icon, pressed, disabled, onToggle, class
       </ActionButton>
       {tooltip.isOpen && (
         <div {...tooltipProps} className="ui-anchored-tooltip ui-property-toggle-tooltip">
-          {label}
+          {shortcut ? `${label} (${shortcut})` : label}
         </div>
       )}
     </div>

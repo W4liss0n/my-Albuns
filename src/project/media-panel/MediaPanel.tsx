@@ -570,13 +570,6 @@ export function MediaPanel({
       setContextMenu(null);
       return;
     }
-    if (matchProjectCommandShortcut(event, "media-panel") === "remove-media") {
-      event.preventDefault();
-      event.stopPropagation();
-      if (!relinkDisabled && !importPending) onRemoveMedia([...selectedMediaIds]);
-      setContextMenu(null);
-      return;
-    }
     if (
       matchProjectCommandShortcut(event, "media-panel") !== "select-all" ||
       isTextEntryTarget(event.target)

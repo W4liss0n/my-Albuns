@@ -6128,6 +6128,49 @@ test("centers the previous and next physical Sheet with ArrowLeft and ArrowRight
   );
 });
 
+test("the arrows leave a selected Frame behind only when they change the centered Sheet", () => {
+  const physicalProjection = createThreeSheetProjection();
+  render(
+    <ProjectWorkspace
+      exportPipelinePort={exportPipelinePort}
+      projection={physicalProjection}
+      projectCorePort={projectCorePortWithApply(async () => physicalProjection)}
+      onProjectionChange={() => undefined}
+    />,
+  );
+  act(() => {
+    canvasHarness.props?.onCanvasMetricsChange?.({ width: 1_000, height: 500, scale: 0.5 });
+    useEditorView.getState().centerSheet("sheet-001");
+    useEditorView.getState().selectFrame("frame-001");
+  });
+
+  act(() => { window.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowLeft" })); });
+  expect(useEditorView.getState()).toMatchObject({ centeredSheetId: "sheet-001", selectedFrameIds: ["frame-001"] });
+
+  act(() => { window.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight" })); });
+  expect(useEditorView.getState()).toMatchObject({ centeredSheetId: "sheet-002", selectedFrameIds: [] });
+});
+
+test("scrolling another Sheet to the center leaves no Frame selected off screen", () => {
+  const physicalProjection = createThreeSheetProjection();
+  render(
+    <ProjectWorkspace
+      exportPipelinePort={exportPipelinePort}
+      projection={physicalProjection}
+      projectCorePort={projectCorePortWithApply(async () => physicalProjection)}
+      onProjectionChange={() => undefined}
+    />,
+  );
+  act(() => {
+    useEditorView.getState().centerSheet("sheet-001");
+    useEditorView.getState().selectFrame("frame-001");
+  });
+  act(() => canvasHarness.props?.onCenteredSheetChange?.("sheet-001"));
+  expect(useEditorView.getState().selectedFrameIds).toEqual(["frame-001"]);
+  act(() => canvasHarness.props?.onCenteredSheetChange?.("sheet-003"));
+  expect(useEditorView.getState()).toMatchObject({ centeredSheetId: "sheet-003", selectedFrameIds: [] });
+});
+
 test("completes Grade navigation requested before Canvas metrics exist", () => {
   render(
     <ProjectWorkspace
@@ -6787,7 +6830,25 @@ test("resolves a mode-free target while dropping a Photo in the current Canvas m
   expect(resolvePhotoDropTarget).toHaveBeenCalledTimes(2);
 });
 
-test.each(["Delete", "context menu"])("removes the selected Photos through one consolidated decision from %s", async (source) => {
+test("Delete from a selected thumbnail removes the selected Frame and never the image", async () => {
+  const dialog = projectDialogHarness();
+  const apply = vi.fn(async () => projection);
+  render(<ProjectWorkspace exportPipelinePort={exportPipelinePort} projection={projection}
+    projectDialogPort={dialog.port} projectCorePort={projectCorePortWithApply(apply)} onProjectionChange={() => undefined} />);
+  const panel = screen.getByRole("region", { name: "Painel de imagens" });
+  const photos = within(panel).getAllByRole("button").filter((button) => button.hasAttribute("data-media-id"));
+  fireEvent.click(photos[0]);
+  fireEvent.keyDown(photos[0], { key: "Delete" });
+  await act(async () => {});
+  expect(apply).not.toHaveBeenCalled();
+  act(() => useEditorView.getState().selectFrame("frame-001"));
+  fireEvent.keyDown(photos[0], { key: "Delete" });
+  await waitFor(() => expect(apply).toHaveBeenCalledOnce());
+  expect(apply).toHaveBeenCalledWith({ kind: "deleteFrames", frameIds: ["frame-001"], mode: "normal" }, expect.any(Function));
+  expect(dialog.present).not.toHaveBeenCalled();
+});
+
+test("removes the selected Photos through one consolidated decision from the context menu", async () => {
   const dialog = projectDialogHarness();
   const apply = vi.fn(async () => projection);
   const input = { ...projection, mediaUsage: projection.mediaUsage.map((usage) => ({ ...usage, count: 1 })) };
@@ -6798,11 +6859,8 @@ test.each(["Delete", "context menu"])("removes the selected Photos through one c
   fireEvent.click(photos[0]);
   fireEvent.click(photos[1], { ctrlKey: true });
   const ids = [photos[0].getAttribute("data-media-id"), photos[1].getAttribute("data-media-id")];
-  if (source === "Delete") fireEvent.keyDown(photos[1], { key: "Delete" });
-  else {
-    fireEvent.contextMenu(photos[0], { clientX: 80, clientY: 500 });
-    fireEvent.click(screen.getByRole("menuitem", { name: "Remover" }));
-  }
+  fireEvent.contextMenu(photos[0], { clientX: 80, clientY: 500 });
+  fireEvent.click(screen.getByRole("menuitem", { name: "Remover" }));
   await waitFor(() => expect(dialog.present).toHaveBeenCalledWith(expect.objectContaining({ kind: "mediaRemovalConfirmation", count: 2, usedCount: 2, busy: false })));
   expect(apply).not.toHaveBeenCalled();
   await act(async () => { dialog.emit("removeMediaKeepFrames"); });

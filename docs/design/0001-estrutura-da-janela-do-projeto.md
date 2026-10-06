@@ -323,6 +323,10 @@ Quando a Lâmina alvo possui Layout travado, a preview aplicada permanece destac
 - Em Layout travado, a mesma ação remove somente as Fotos, mantém os Frames como placeholders e não altera placeholders já vazios.
 - O menu de contexto de um Frame preenchido oferece `Abrir no Photoshop`. A ação envia somente o Arquivo vinculado original da Foto, sem aplicar seu enquadramento ou efeitos do MyAlbuns; o atalho fixo do MVP é `Ctrl + E`.
 - `Abrir no Photoshop` e seu atalho agem nas Fotos de todos os Frames preenchidos selecionados; Frames vazios são ignorados. Se algum original estiver ausente ou inacessível, nenhuma Foto é aberta.
+- `R` executa `Girar 90° à esquerda`, `H` alterna `Espelhar horizontalmente` e `V` alterna `Preto e branco` nas Fotos dos Frames selecionados, como os botões do Painel contextual, cujas dicas mostram a tecla. Valem também com o foco numa miniatura do Painel de imagens, como depois de preencher um Frame com dois cliques, e nunca em campos de texto.
+- Atalhos dos menus: `Ctrl + Enter` adiciona uma Lâmina depois da centralizada, `Ctrl + D` duplica a Lâmina centralizada, `Ctrl + Shift + E` abre `Exportar…`, `Ctrl + ,` abre as Configurações, `Ctrl + 1` e `Ctrl + 2` mostram ou ocultam o Painel de imagens e o Painel contextual, e `X` troca o conteúdo de dois Frames no Modo de edição. Cada atalho executa o item do menu correspondente e fica sem efeito quando o item está desabilitado.
+- `Ctrl + Shift + ]` traz os Frames selecionados para frente e `Ctrl + Shift + [` os envia para trás, completando `Ctrl + ]` e `Ctrl + [`.
+- `Ctrl + I` abre `Importar > Arquivos…` na aba ativa do Painel de imagens.
 - `Editar > Adicionar Frame` e `Adicionar Frame` no menu de contexto da área vazia do Canvas criam imediatamente um único placeholder centralizado e selecionado.
 - O Frame novo usa proporção `3:2` e largura de `40%` da superfície ativa, reduzida somente quando a altura disponível exigir; nunca usa um tamanho físico fixo. Em Lâmina dupla, é centralizado na Lâmina inteira e pode atravessar a divisão; em Página única, é centralizado somente na Página ativa.
 - Não existe modo de desenho nem ferramenta persistente para essa criação. O comando gera uma ação de Undo/Redo e fica indisponível em Layout travado.
@@ -381,7 +385,7 @@ Quando o Zoom ultrapassa `Ajustar Lâmina`, `Espaço` + arraste com o botão esq
 - Se uma mudança na Busca ou nos filtros ocultar itens já selecionados, eles são retirados imediatamente da seleção; os que permanecem visíveis continuam selecionados. Uma âncora ocultada também é descartada.
 - Alterar somente a Ordenação preserva os mesmos itens selecionados e a mesma âncora, acompanhando suas novas posições na grade.
 - O clique direito sobre uma mídia já selecionada preserva toda a seleção antes de abrir o menu de contexto. Sobre uma mídia não selecionada, substitui a seleção somente por ela.
-- Com o foco no Painel, `Delete` e o comando contextual `Remover` atuam sobre a seleção resultante. O mesmo atalho continua obedecendo ao contexto do Canvas quando o foco não está no Painel.
+- O comando contextual `Remover` atua sobre a seleção resultante e não tem atalho. Com o foco no Painel, `Delete` age sobre a Seleção de Frames do Canvas e não faz nada quando nenhum Frame está selecionado.
 - Não existe Caixa de seleção no Painel. Arrastar ou dar dois cliques atua somente sobre a mídia diretamente acionada e nunca insere toda a seleção múltipla na Lâmina.
 - A seleção do Painel é estado transitório da interface e não pertence ao Projeto ou ao Undo/Redo.
 - Remover uma seleção de Fotos sem uso retira diretamente os itens do Painel. Se ao menos uma estiver em uso, um único diálogo consolidado oferece `Remover tudo`, `Remover imagens e manter os Frames` e `Cancelar`, aplicando a escolha à seleção inteira.

@@ -121,6 +121,7 @@ test("Black and white has its own Effects section and exposes the mixed Photo st
   expect(screen.queryByRole("button", { name: "Ajustes e Efeitos" })).not.toBeInTheDocument();
   view.rerender(<InspectorPanel {...inspectorProps({ kind: "frame", frame: frames[0], composedPhoto: composedSheet.frames[0].photo })} photoEffects={photoEffects} />);
   expect(screen.getByRole("button", { name: "Preto e branco" })).toHaveAttribute("aria-pressed", "true");
+  expect(screen.getByRole("button", { name: "Preto e branco" })).toHaveAttribute("aria-keyshortcuts", "V");
 });
 
 test("Photo orientation controls show mixed values and target compatible Photos", () => {
@@ -137,7 +138,10 @@ test("Photo orientation controls show mixed values and target compatible Photos"
   expect(screen.getByLabelText("Giro das fotos")).toHaveTextContent("—");
   const mirror = screen.getByRole("button", { name: "Espelhar horizontalmente" });
   expect(mirror).toHaveAttribute("aria-pressed", "mixed");
-  fireEvent.click(screen.getByRole("button", { name: "Girar 90° à esquerda" }));
+  const rotate = screen.getByRole("button", { name: "Girar 90° à esquerda" });
+  expect(rotate).toHaveAttribute("aria-keyshortcuts", "R");
+  expect(rotate).toHaveAttribute("title", "Girar 90° à esquerda (R)");
+  fireEvent.click(rotate);
   fireEvent.click(mirror);
   const rotationValue = screen.getByLabelText("Giro das fotos");
   expect(screen.queryByRole("button", { name: "Restaurar giro" })).not.toBeInTheDocument();

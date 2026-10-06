@@ -1,6 +1,10 @@
 import { FlipHorizontal2, RotateCcw } from "lucide-react";
 import type { FrameSnapshot, PhotoOrientationAction } from "../../domain/project";
-import { projectCommandDescriptor } from "../../application/projectCommandCatalog";
+import {
+  projectCommandDescriptor,
+  projectCommandShortcutAria,
+  projectCommandShortcutLabel,
+} from "../../application/projectCommandCatalog";
 import { ActionButton, AppIcon, PropertyToggle } from "../../ui";
 import { PhotoAngleControl, type PhotoAngleControlActions } from "./PhotoAngleControl";
 
@@ -25,6 +29,7 @@ export function PhotoOrientationControls({ frames, disabled, onAction, angle }: 
   const angleTenths = photos.every((photo) => photo.transform.fineRotationDegrees === first.fineRotationDegrees)
     ? Math.round(first.fineRotationDegrees * 10) : null;
   const rotate = projectCommandDescriptor("rotate-photo-counterclockwise");
+  const rotateShortcut = projectCommandShortcutLabel("rotate-photo-counterclockwise");
   const mirror = projectCommandDescriptor("mirror-photo-horizontal");
   return (
     <div className="photo-orientation-controls">
@@ -47,7 +52,8 @@ export function PhotoOrientationControls({ frames, disabled, onAction, angle }: 
           <ActionButton
             density="compact"
             aria-label={rotate.label}
-            title={rotate.label}
+            aria-keyshortcuts={projectCommandShortcutAria("rotate-photo-counterclockwise")}
+            title={rotateShortcut ? `${rotate.label} (${rotateShortcut})` : rotate.label}
             disabled={disabled}
             onClick={() => onAction("rotateCounterClockwise")}
           >
@@ -56,6 +62,8 @@ export function PhotoOrientationControls({ frames, disabled, onAction, angle }: 
           <PropertyToggle
             className="photo-mirror-control"
             label={mirror.label}
+            shortcut={projectCommandShortcutLabel("mirror-photo-horizontal")}
+            keyShortcuts={projectCommandShortcutAria("mirror-photo-horizontal")}
             icon={FlipHorizontal2}
             pressed={mirrored}
             disabled={disabled}

@@ -38,6 +38,7 @@ export function FrameContextMenu({ editing = true, hasPhoto = false, canOpenInPh
       })}
       <MenuSeparator />
       <MenuItem label={projectCommandDescriptor("swap-frame-contents").label}
+          shortcut={projectCommandShortcutLabel("swap-frame-contents")}
           disabled={!canSwapContents}
           onClick={() => { onSwapContents(); onDismiss(); }} />
       <MenuItem label={projectCommandDescriptor("delete-frames").label} shortcut={projectCommandShortcutLabel("delete-frames")}

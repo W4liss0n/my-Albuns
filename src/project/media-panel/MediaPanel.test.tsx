@@ -865,7 +865,24 @@ test.each(["Importar", "Filtro, ordem e tamanho"])("the open %s popup owns short
   await user.keyboard("{Escape}");
   expect(trigger).toHaveAttribute("aria-expanded", "false");
   await user.click(photo);
-  await user.keyboard("{Delete}");
+  await user.keyboard("{Control>}e{/Control}");
+  expect(open).toHaveBeenCalledExactlyOnceWith(["photo-retrato"]);
+});
+
+test("Delete never removes images from the panel; only the menu does", async () => {
+  const user = userEvent.setup();
+  const remove = vi.fn();
+  render(<MediaPanel {...mediaPanelInteractions} mediaItems={mediaItems} mediaUsage={mediaUsage}
+    onFillPhoto={vi.fn()} previewSource={{ kind: "static" }} preferences={{ kind: "local" }}
+    onRemoveMedia={remove} />);
+  const photo = screen.getByRole("button", { name: /Retrato/ });
+  await user.click(photo);
+  expect(fireEvent.keyDown(photo, { key: "Delete" })).toBe(true);
+  expect(remove).not.toHaveBeenCalled();
+  fireEvent.contextMenu(photo);
+  const item = within(screen.getByRole("menu", { name: "Ações das imagens" })).getByRole("menuitem", { name: /Remover/ });
+  expect(item).not.toHaveTextContent("Delete");
+  fireEvent.click(item);
   expect(remove).toHaveBeenCalledExactlyOnceWith(["photo-retrato"]);
 });
 
