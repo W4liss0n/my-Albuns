@@ -16,10 +16,6 @@ import {
   createFallbackWorkspacePreferencesPort,
   type WorkspacePreferencesPort,
 } from "../../application/workspacePreferences";
-import {
-  displayUnitLabel,
-  formatMicrometers,
-} from "../../application/physicalMeasurements";
 import { sheetStructureAvailability } from "../../application/sheetStructure";
 import type { ProjectDialogPort } from "../../application/projectDialogPort";
 import type { ImageViewerWindowPort } from "../../application/imageViewerWindow";
@@ -386,7 +382,7 @@ export function ProjectWorkspace({
     : editingSheet
       ? { kind: "sheet", sheet: editingSheet }
       : { kind: "album" };
-  const projectMetadata = projectAlbumMetadata(projection, presentationUnit);
+  const projectMetadata = projectAlbumMetadata(projection);
   const exportSheet = projection.composition.sheets.find(
     (sheet) => sheet.sheetId === controller.canvasProps.centeredSheetId,
   );
@@ -1075,13 +1071,10 @@ export function ProjectWorkspace({
   );
 }
 
-function projectAlbumMetadata(
-  projection: EditorProjection,
-  presentationUnit: DisplayUnit,
-) {
-  const { album, document } = projection.state;
-  const width = formatMicrometers(document.sheetWidthUm / 2, presentationUnit);
-  const height = formatMicrometers(document.sheetHeightUm, presentationUnit);
-  const sheetLabel = album.sheets.length === 1 ? "lâmina" : "lâminas";
-  return `${width}×${height} ${displayUnitLabel(presentationUnit)} · ${album.sheets.length} ${sheetLabel}`;
+function projectAlbumMetadata(projection: EditorProjection) {
+  const { sheets } = projection.state.album;
+  const pageCount = sheets.reduce((total, sheet) => total + sheet.pageNumbers.length, 0);
+  const sheetLabel = sheets.length === 1 ? "lâmina" : "lâminas";
+  const pageLabel = pageCount === 1 ? "página" : "páginas";
+  return `${sheets.length} ${sheetLabel} · ${pageCount} ${pageLabel}`;
 }

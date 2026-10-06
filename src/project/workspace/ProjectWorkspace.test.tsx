@@ -2831,6 +2831,33 @@ test("shows the physical configuration projected from the opened Project", () =>
   ).toHaveValue("0.5");
 });
 
+test("the Project header counts Sheets and Pages without the Album size", () => {
+  const twoSheets: EditorProjection = {
+    ...projection,
+    state: {
+      ...projection.state,
+      album: {
+        ...projection.state.album,
+        sheets: [
+          { ...projection.state.album.sheets[0]!, pageNumbers: [1] },
+          { ...projection.state.album.sheets[0]!, id: "sheet-002", number: 2, pageNumbers: [2, 3] },
+        ],
+      },
+    },
+  };
+  render(
+    <ProjectWorkspace
+      exportPort={exportPort}
+      projection={twoSheets}
+      projectSessionPort={projectSessionPortWithApply(async () => twoSheets)}
+      onProjectionChange={() => undefined}
+    />,
+  );
+
+  expect(screen.getByText("2 lâminas · 3 páginas")).toBeVisible();
+  expect(screen.queryByText(/×.*mm/)).not.toBeInTheDocument();
+});
+
 test("projects the pending Unidade across the Project Window without changing Album Design", async () => {
   const projectionWithBorder: EditorProjection = {
     ...projection,
@@ -2873,9 +2900,8 @@ test("projects the pending Unidade across the Project Window without changing Al
     target: { value: "in" },
   });
 
-  expect(await screen.findByText("11.811×11.811 pol · 1 lâmina")).toBeVisible();
   expect(
-    design.getByRole("spinbutton", { name: "Espessura da borda em pol" }),
+    await design.findByRole("spinbutton", { name: "Espessura da borda em pol" }),
   ).toHaveValue("0.1");
   expect(
     design.getByRole("spinbutton", { name: "Espaço entre quadros em pol" }),
@@ -2887,9 +2913,8 @@ test("projects the pending Unidade across the Project Window without changing Al
   fireEvent.click(
     screen.getByRole("button", { name: "Informações do álbum" }),
   );
-  expect(await screen.findByText("300×300 mm · 1 lâmina")).toBeVisible();
   expect(
-    design.getByRole("spinbutton", { name: "Espaço entre quadros em mm" }),
+    await design.findByRole("spinbutton", { name: "Espaço entre quadros em mm" }),
   ).toHaveValue("5");
   expect(designApply).toBeDisabled();
 
@@ -2904,7 +2929,9 @@ test("projects the pending Unidade across the Project Window without changing Al
     ).getByLabelText("Unidade"),
     { target: { value: "in" } },
   );
-  expect(await screen.findByText("11.811×11.811 pol · 1 lâmina")).toBeVisible();
+  expect(
+    await screen.findByRole("spinbutton", { name: "Espaço entre quadros em pol" }),
+  ).toBeVisible();
 
   const otherProject: EditorProjection = {
     ...projectionWithBorder,
@@ -2925,7 +2952,7 @@ test("projects the pending Unidade across the Project Window without changing Al
       onProjectionChange={() => undefined}
     />,
   );
-  expect(screen.getByText("30×30 cm · 1 lâmina")).toBeVisible();
+  expect(screen.getByRole("spinbutton", { name: "Espaço entre quadros em cm" })).toBeVisible();
   expect(apply).not.toHaveBeenCalled();
 });
 
