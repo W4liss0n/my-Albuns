@@ -72,6 +72,7 @@ mod project_recovery;
 mod project_ui_operations;
 mod project_webview_authority;
 mod project_window_lifecycle;
+mod project_window_placement;
 mod provisional_decoratives;
 mod recent_projects;
 mod runtime_role;

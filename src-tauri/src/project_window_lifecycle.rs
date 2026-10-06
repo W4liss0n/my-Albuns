@@ -6,6 +6,7 @@ use std::{
 };
 
 use myalbuns_logging::ProcessRole;
+use myalbuns_paths::AppPaths;
 use tauri::{Manager, Window};
 
 use crate::export_attempts::ExportAttempts;
@@ -101,6 +102,7 @@ pub(crate) fn complete_project_close(window: &Window) {
     if CLOSE_COMPLETION_STARTED.swap(true, Ordering::AcqRel) {
         return;
     }
+    remember_project_window_placement(window);
 
     let attempts = request_window_export_cancellation(window);
     let window = window.clone();
@@ -128,6 +130,34 @@ pub(crate) fn complete_project_close(window: &Window) {
         }
         window.app_handle().exit(0);
     });
+}
+
+/// Records how the Project window is being left so the next Project opens the
+/// same way. A failure only costs the default window size.
+fn remember_project_window_placement(window: &Window) {
+    if crate::desktop_webview_policy::automation_enabled() {
+        return;
+    }
+    let Some(app_paths) = window.try_state::<AppPaths>() else {
+        return;
+    };
+    #[cfg(windows)]
+    let remembered = crate::project_window_placement::capture(window)
+        .and_then(|placement| crate::project_window_placement::save(&app_paths, placement));
+    #[cfg(not(windows))]
+    let remembered: io::Result<()> = {
+        let _ = app_paths;
+        Ok(())
+    };
+    if let Err(error) = remembered {
+        tracing::warn!(
+            target: "myalbuns.desktop",
+            process_role = ProcessRole::DesktopHost.as_str(),
+            window_label = window.label(),
+            error = %error,
+            event = "project_window_placement_save_failed",
+        );
+    }
 }
 
 #[cfg(test)]

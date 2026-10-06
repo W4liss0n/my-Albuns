@@ -497,6 +497,10 @@ fn setup_host(
             .build()?;
         (window, Some(policy_readiness))
     };
+    if let Some(placement) = restore_project_window_placement(&project_window, &app_paths) {
+        app.state::<ProjectStartupHandshake>()
+            .show_maximized(placement);
+    }
     #[cfg(debug_assertions)]
     desktop_webview_policy::retire_inherited_debug_arguments_before_replacement()?;
     project_window.set_title(&initial_window_title)?;
@@ -551,6 +555,31 @@ fn setup_host(
         );
     });
     Ok(())
+}
+
+/// Opens the Project window the way the last one was closed. Returns the
+/// placement when the window must be shown maximized.
+fn restore_project_window_placement(
+    project_window: &tauri::WebviewWindow,
+    app_paths: &AppPaths,
+) -> Option<crate::project_window_placement::ProjectWindowPlacement> {
+    if desktop_webview_policy::automation_enabled() {
+        return None;
+    }
+    let placement = crate::project_window_placement::load(app_paths)?;
+    #[cfg(windows)]
+    if let Err(error) = crate::project_window_placement::prepare_hidden(project_window, placement) {
+        tracing::warn!(
+            target: "myalbuns.desktop",
+            process_role = ProcessRole::DesktopHost.as_str(),
+            window_label = PROJECT_WINDOW_LABEL,
+            error = %error,
+            event = "project_window_placement_restore_failed",
+        );
+    }
+    #[cfg(not(windows))]
+    let _ = project_window;
+    placement.maximized.then_some(placement)
 }
 
 fn projection_identity(project_host: &ProjectHost) -> Result<(String, u64), io::Error> {
@@ -1017,6 +1046,7 @@ struct ProjectStartupState {
     project_id: String,
     revision: u64,
     readiness: StartupReadiness,
+    maximized_placement: Option<crate::project_window_placement::ProjectWindowPlacement>,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -1077,7 +1107,14 @@ impl ProjectStartupHandshake {
                 project_id: identity.0,
                 revision: identity.1,
                 readiness: StartupReadiness::default(),
+                maximized_placement: None,
             })),
+        }
+    }
+
+    fn show_maximized(&self, placement: crate::project_window_placement::ProjectWindowPlacement) {
+        if let Ok(mut state) = self.state.lock() {
+            state.maximized_placement = Some(placement);
         }
     }
 
@@ -1098,6 +1135,20 @@ impl ProjectStartupHandshake {
     }
 
     fn complete_startup(&self, project_window: &tauri::WebviewWindow) -> io::Result<()> {
+        let maximized_placement = self
+            .state
+            .lock()
+            .map_err(|_| io::Error::other("the startup handshake is unavailable"))?
+            .maximized_placement;
+        if let Some(placement) = maximized_placement {
+            #[cfg(windows)]
+            crate::project_window_placement::show_maximized(project_window, placement)?;
+            #[cfg(not(windows))]
+            {
+                let _ = placement;
+                project_window.maximize().map_err(io::Error::other)?;
+            }
+        }
         project_window.show().map_err(io::Error::other)?;
         project_window.set_focus().map_err(io::Error::other)?;
         let mut state = self
