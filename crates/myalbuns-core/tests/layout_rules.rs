@@ -288,10 +288,39 @@ fn favorite_order_is_persistent_with_identity_tiebreak_and_last_keeps_precedence
             .collect::<Vec<_>>(),
         [c.id, b.id, a.id]
     );
+    // Automatic arrangement: custom favorites, custom, automatic favorites, automatic.
     assert_eq!(
         LayoutRules::automatic(&query, sources, &ids)
             .unwrap()
             .last_layout(),
+        Some(&b.layout)
+    );
+    let automatic_favorites = [a.clone(), c.clone()];
+    assert_eq!(
+        LayoutRules::automatic(
+            &query,
+            LayoutSources {
+                favorites: &automatic_favorites,
+                ..sources
+            },
+            &ids
+        )
+        .unwrap()
+        .last_layout(),
+        Some(&layout(40000, LayoutOrigin::Custom))
+    );
+    assert_eq!(
+        LayoutRules::automatic(
+            &query,
+            LayoutSources {
+                favorites: &automatic_favorites,
+                custom: &[],
+                ..sources
+            },
+            &ids
+        )
+        .unwrap()
+        .last_layout(),
         Some(&c.layout)
     );
     let reversed = [c, b, a];

@@ -2,7 +2,7 @@
 status: accepted
 document: design
 date: 2026-09-09
-updated: 2026-10-01
+updated: 2026-10-05
 ticket: 28
 ---
 
@@ -359,8 +359,10 @@ tem uma única preview dentro da mesma origem. Conforme decisão aceita em
 sugestão automática também a apresenta em Personalizados. A deduplicação
 não atravessa as origens, inclusive para cópias favoritas.
 
-A prioridade de aplicação automática é Último Layout, primeiro Favorito,
-primeiro Personalizado e primeira sugestão do Gerador, considerando somente os
+A prioridade de aplicação automática é Último Layout, Personalizados
+favoritos, Personalizados, Automáticos favoritos e sugestões do Gerador
+(atualizada em 05/10/2026 para coincidir com a troca por teclado do design
+0018), considerando somente os
 Layouts que conservam as orientações dos Frames atuais (ADR 0014) e, na versão 3,
 nenhum que leve uma Foto até as bordas de uma Página inteira. Sem opção nessas
 origens, `LayoutRules` produz a reserva derivada da quantidade e superfície

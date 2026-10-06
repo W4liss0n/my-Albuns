@@ -3,7 +3,7 @@ import { useState } from "react";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, expect, test, vi } from "vitest";
 import type { ProjectCorePort } from "../../application/projectPorts";
-import type { EditorProjection, LayoutSelection } from "../../domain/project";
+import type { EditorProjection, LayoutCandidate, LayoutSelection } from "../../domain/project";
 import { useEditorView } from "../../state/editorView";
 import { layoutPanelCorpus } from "../../test/layoutPanelPreview";
 import { useProjectEditorController } from "./useProjectEditorController";
@@ -11,7 +11,8 @@ import { useProjectMutationRunner } from "./useProjectMutationRunner";
 
 afterEach(() => useEditorView.setState(useEditorView.getInitialState(), true));
 
-function harness(pendingKind: "applyLayout" | "lockLayout" | "unlockLayout" | "setDpi", locked = false) {
+function harness(pendingKind: "applyLayout" | "lockLayout" | "unlockLayout" | "setDpi", locked = false,
+  candidates?: LayoutCandidate[]) {
   const sample = layoutPanelCorpus.cases.mixed;
   const initial = structuredClone(sample.before.projection);
   initial.state.album.sheets[0].layoutLocked = locked;
@@ -55,6 +56,10 @@ function harness(pendingKind: "applyLayout" | "lockLayout" | "unlockLayout" | "s
       const query = { ...structuredClone(sample.before.queries[target].query),
         queryId: `prepared-${++querySequence}`, revision: authoritative.state.revision,
         locked: authoritative.state.album.sheets[0].layoutLocked };
+      if (candidates) {
+        query.listing = { ...query.listing, candidates: structuredClone(candidates) };
+        query.candidateRequiresLock = candidates.map(() => false);
+      }
       prepared = query;
       return query;
     },
@@ -74,8 +79,61 @@ function harness(pendingKind: "applyLayout" | "lockLayout" | "unlockLayout" | "s
     return useProjectEditorController({ projectDialogPort: unusedLayoutDialogPort, projection, projectCorePort: port, runProjectMutation: runner,
       onProjectionChange: setProjection });
   });
-  return { view, initial, applied, sheetId, apply, save, undo, resolve, reject };
+  return { view, initial, applied, sheetId, apply, save, undo, resolve, reject, queryCount: () => querySequence };
 }
+
+function cycleCandidate(origin: "automatic" | "custom", options: { favorite?: boolean; last?: boolean } = {}): LayoutCandidate {
+  const sample = layoutPanelCorpus.cases.mixed.before.queries;
+  const definition = Object.values(sample)[0].query.listing.candidates[0].layout.definition;
+  return { isLastApplied: options.last ?? false, customId: origin === "custom" ? "custom-id" : null,
+    favoriteId: options.favorite ? "favorite-id" : null, layout: { origin, definition } };
+}
+
+// Core order: last applied, favorites, custom, automatic. Cycle order: [1, 3, 2, 0, 4].
+const cycleCandidates = [
+  cycleCandidate("automatic", { last: true }),
+  cycleCandidate("custom", { favorite: true }),
+  cycleCandidate("automatic", { favorite: true }),
+  cycleCandidate("custom"),
+  cycleCandidate("automatic"),
+];
+
+test.each([{ direction: "next", candidateIndex: 4 }, { direction: "previous", candidateIndex: 2 }] as const)(
+  "$direction Layout with the panel closed queries the centered Sheet and applies in cycle order", async ({ direction, candidateIndex }) => {
+    const { view, sheetId, apply, queryCount } = harness("setDpi", false, cycleCandidates);
+    act(() => useEditorView.getState().centerSheet(sheetId));
+    let applied!: Promise<boolean>;
+    act(() => { applied = view.result.current.cycleLayout(direction); });
+    expect(await applied).toBe(true);
+    expect(queryCount()).toBe(1);
+    expect(apply).toHaveBeenCalledExactlyOnceWith({ kind: "applyLayout", selection: { queryId: "prepared-1", candidateIndex } }, expect.anything());
+  });
+
+test("with the panel open, the Layout cycle reuses the prepared panel query", async () => {
+  const { view, sheetId, apply, queryCount } = harness("setDpi", false, cycleCandidates);
+  act(() => view.result.current.canvasProps.sheetLayouts!.onToggle(sheetId));
+  await waitFor(() => expect(view.result.current.layoutPanel.query).not.toBeNull());
+  const queryId = view.result.current.layoutPanel.query!.queryId;
+  const queriesBefore = queryCount();
+  let applied!: Promise<boolean>;
+  act(() => { applied = view.result.current.cycleLayout("next"); });
+  expect(await applied).toBe(true);
+  expect(apply).toHaveBeenCalledExactlyOnceWith({ kind: "applyLayout", selection: { queryId, candidateIndex: 4 } }, expect.anything());
+  await waitFor(() => expect(queryCount()).toBeGreaterThan(queriesBefore));
+});
+
+test("a locked Sheet or Sheet Edit Mode ignores the Layout cycle without an error", async () => {
+  const locked = harness("setDpi", true, cycleCandidates);
+  act(() => useEditorView.getState().centerSheet(locked.sheetId));
+  expect(await locked.view.result.current.cycleLayout("next")).toBe(false);
+  expect(locked.apply).not.toHaveBeenCalled();
+  expect(locked.view.result.current.message).toBeNull();
+
+  const editing = harness("setDpi", false, cycleCandidates);
+  act(() => useEditorView.getState().enterSheetEdit(editing.sheetId));
+  expect(await editing.view.result.current.cycleLayout("next")).toBe(false);
+  expect(editing.apply).not.toHaveBeenCalled();
+});
 
 test("locked Sheet metadata reaches the Canvas and disables structural commands without disabling content or order", async () => {
   const { view, sheetId, initial } = harness("setDpi", true);

@@ -7,7 +7,7 @@ import { ownsEditingKeys } from "./keyboardEventOwnership";
 
 const PROJECT_COMMAND_CONTEXT_ATTRIBUTE = "data-project-command-context";
 
-function targetAllowsCommandShortcut(target: EventTarget | null, context: "sheet" | "frame") {
+function targetAllowsCommandShortcut(target: EventTarget | null, context: "sheet" | "frame" | "media-panel") {
   if (!(target instanceof Element)) return true;
   const owner = target.closest<HTMLElement>(
     `[${PROJECT_COMMAND_CONTEXT_ATTRIBUTE}]`,
@@ -16,6 +16,18 @@ function targetAllowsCommandShortcut(target: EventTarget | null, context: "sheet
     owner === null ||
     owner.dataset.projectCommandContext === context
   );
+}
+
+// Clicking a thumbnail leaves the focus in the media panel; the physical
+// arrows still navigate and rearrange the centered Sheet from there. The
+// panel's own keys (Delete, Ctrl+A) keep their owner.
+const SHEET_ARROW_COMMANDS = new Set(["previous-sheet", "next-sheet", "next-layout", "previous-layout"]);
+
+function sheetCommandFor(event: KeyboardEvent) {
+  const command = matchProjectCommandShortcut(event, "sheet");
+  if (command === null || targetAllowsCommandShortcut(event.target, "sheet")) return command;
+  return SHEET_ARROW_COMMANDS.has(command) && targetAllowsCommandShortcut(event.target, "media-panel")
+    ? command : null;
 }
 
 interface ProjectCommandShortcutHandlers {
@@ -35,8 +47,11 @@ interface ProjectCommandShortcutHandlers {
   canRedo: boolean;
   canUndo: boolean;
   closeProject(): void;
+  cycleToNextLayout(): void;
+  cycleToPreviousLayout(): void;
   deleteSheet(): void;
   disabled: boolean;
+  layoutCycleActive: boolean;
   navigateToNextSheet(): void;
   navigateToPreviousSheet(): void;
   redo(): void;
@@ -65,8 +80,11 @@ export function useProjectCommandShortcuts({
   canRedo,
   canUndo,
   closeProject,
+  cycleToNextLayout,
+  cycleToPreviousLayout,
   deleteSheet,
   disabled,
+  layoutCycleActive,
   navigateToNextSheet,
   navigateToPreviousSheet,
   redo,
@@ -120,15 +138,19 @@ export function useProjectCommandShortcuts({
       }
       const command =
         matchProjectCommandShortcut(event, "project-window") ??
-        (sheetShortcutActive && targetAllowsCommandShortcut(event.target, "sheet")
-          ? matchProjectCommandShortcut(event, "sheet")
-          : null);
+        (sheetShortcutActive ? sheetCommandFor(event) : null);
       if (command === null) return;
       if ((command === "new-project" || command === "open-project") && ownsEditingKeys(event.target)) return;
       if (command === "delete-sheet" && ownsEditingKeys(event.target)) return;
       if (
         (command === "previous-sheet" || command === "next-sheet") &&
         (!sheetNavigationActive || ownsEditingKeys(event.target))
+      ) {
+        return;
+      }
+      if (
+        (command === "next-layout" || command === "previous-layout") &&
+        (!layoutCycleActive || ownsEditingKeys(event.target))
       ) {
         return;
       }
@@ -151,7 +173,9 @@ export function useProjectCommandShortcuts({
         command === "redo" ||
         command === "delete-sheet" ||
         command === "previous-sheet" ||
-        command === "next-sheet";
+        command === "next-sheet" ||
+        command === "next-layout" ||
+        command === "previous-layout";
       if (!handledCommand) return;
 
       event.preventDefault();
@@ -188,6 +212,12 @@ export function useProjectCommandShortcuts({
         case "next-sheet":
           navigateToNextSheet();
           break;
+        case "next-layout":
+          cycleToNextLayout();
+          break;
+        case "previous-layout":
+          cycleToPreviousLayout();
+          break;
       }
     };
     window.addEventListener("keydown", handleProjectCommand);
@@ -209,8 +239,11 @@ export function useProjectCommandShortcuts({
     canRedo,
     canUndo,
     closeProject,
+    cycleToNextLayout,
+    cycleToPreviousLayout,
     deleteSheet,
     disabled,
+    layoutCycleActive,
     navigateToNextSheet,
     navigateToPreviousSheet,
     redo,

@@ -15,7 +15,10 @@ function handlers() {
     frameCommandsActive: false,
     canDeleteSheet: true,
     closeProject: vi.fn(),
+    cycleToNextLayout: vi.fn(),
+    cycleToPreviousLayout: vi.fn(),
     deleteSheet: vi.fn(),
+    layoutCycleActive: true,
     navigateToNextSheet: vi.fn(),
     navigateToPreviousSheet: vi.fn(),
     redo: vi.fn(),
@@ -203,6 +206,62 @@ test("routes physical horizontal arrows through the Sheet command seam", () => {
   ).toBe(true);
   expect(actions.navigateToPreviousSheet).toHaveBeenCalledOnce();
   expect(actions.navigateToNextSheet).toHaveBeenCalledOnce();
+});
+
+test("routes physical vertical arrows to the Layout cycle of the centered Sheet", () => {
+  const actions = handlers();
+  const view = renderHook(
+    ({ layoutCycleActive }) =>
+      useProjectCommandShortcuts({ ...actions, canRedo: true, canUndo: true, disabled: false, layoutCycleActive }),
+    { initialProps: { layoutCycleActive: true } },
+  );
+
+  expect(dispatchShortcut("ArrowUp", { ctrlKey: false }).defaultPrevented).toBe(true);
+  expect(dispatchShortcut("ArrowDown", { ctrlKey: false }).defaultPrevented).toBe(true);
+  dispatchShortcut("ArrowUp", { ctrlKey: false, repeat: true });
+  expect(actions.cycleToNextLayout).toHaveBeenCalledOnce();
+  expect(actions.cycleToPreviousLayout).toHaveBeenCalledOnce();
+
+  const owners = [document.createElement("input"), document.createElement("div"), document.createElement("div")];
+  owners[1].setAttribute("role", "listbox");
+  owners[2].setAttribute("role", "menu");
+  for (const owner of owners) {
+    document.body.append(owner);
+    expect(dispatchShortcut("ArrowUp", { ctrlKey: false }, owner).defaultPrevented, owner.outerHTML).toBe(false);
+    expect(dispatchShortcut("ArrowDown", { ctrlKey: false }, owner).defaultPrevented, owner.outerHTML).toBe(false);
+    owner.remove();
+  }
+
+  view.rerender({ layoutCycleActive: false });
+  expect(dispatchShortcut("ArrowUp", { ctrlKey: false }).defaultPrevented).toBe(false);
+  expect(dispatchShortcut("ArrowDown", { ctrlKey: false }).defaultPrevented).toBe(false);
+  expect(actions.cycleToNextLayout).toHaveBeenCalledOnce();
+  expect(actions.cycleToPreviousLayout).toHaveBeenCalledOnce();
+});
+
+test("the arrows still reach the centered Sheet while the media panel holds the focus", () => {
+  const actions = handlers();
+  renderHook(() => useProjectCommandShortcuts({ ...actions, canRedo: true, canUndo: true, disabled: false }));
+  const panel = document.createElement("section");
+  panel.dataset.projectCommandContext = "media-panel";
+  const thumbnail = document.createElement("button");
+  const search = document.createElement("input");
+  panel.append(thumbnail, search);
+  document.body.append(panel);
+  try {
+    for (const key of ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"]) {
+      expect(dispatchShortcut(key, { ctrlKey: false }, thumbnail).defaultPrevented, key).toBe(true);
+      expect(dispatchShortcut(key, { ctrlKey: false }, search).defaultPrevented, key).toBe(false);
+    }
+    expect(actions.cycleToNextLayout).toHaveBeenCalledOnce();
+    expect(actions.cycleToPreviousLayout).toHaveBeenCalledOnce();
+    expect(actions.navigateToPreviousSheet).toHaveBeenCalledOnce();
+    expect(actions.navigateToNextSheet).toHaveBeenCalledOnce();
+    expect(dispatchShortcut("Delete", { ctrlKey: false }, thumbnail).defaultPrevented).toBe(false);
+    expect(actions.deleteSheet).not.toHaveBeenCalled();
+  } finally {
+    panel.remove();
+  }
 });
 
 test("leaves horizontal arrows to editable and keyboard-owning surfaces", () => {
