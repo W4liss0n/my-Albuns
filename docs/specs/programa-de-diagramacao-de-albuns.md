@@ -302,7 +302,7 @@ A saída final será uma Exportação JPEG, PNG ou PDF, `Por lâmina` ou `Por p�
 1. Como pessoa diagramadora, quero selecionar mídias individualmente ou por intervalo no Painel, para preparar ações em lote sem marcar uma a uma.
 1. Como pessoa diagramadora, quero usar `Ctrl + A` para selecionar somente os resultados visíveis, para executar ações em lote respeitando minha busca e meus filtros.
 1. Como pessoa diagramadora, quero que mídias ocultadas por uma busca ou filtro saiam da seleção, para nunca executar uma ação em lote sobre itens invisíveis.
-1. Como pessoa diagramadora, quero remover a seleção do Painel por `Delete` ou pelo menu de contexto, para usar o comando mais conveniente.
+1. Como pessoa diagramadora, quero remover a seleção do Painel somente pelo menu de contexto, para que `Delete` com o foco numa miniatura nunca tire imagens do Projeto por engano.
 1. Como pessoa diagramadora, quero evitar uma Caixa de seleção no Painel, para manter a interação simples na grade de imagens.
 1. Como pessoa diagramadora, quero ordenar por Nome, Data de criação ou Data de alteração, para encontrar imagens por critérios diferentes.
 1. Como pessoa diagramadora, quero escolher direção crescente ou decrescente, para adaptar a visualização ao meu fluxo.
@@ -974,7 +974,7 @@ validação das superfícies descritas nesta seção.
 - Quando uma mudança de Busca ou filtro oculta uma mídia já selecionada, ela e sua eventual âncora são retiradas imediatamente da seleção. Mídias que permanecem visíveis continuam selecionadas.
 - Alterar apenas a Ordenação preserva os mesmos itens selecionados e a mesma âncora em suas novas posições visuais.
 - Clicar com o botão direito sobre uma mídia já selecionada preserva todo o grupo; clicar sobre uma mídia fora da seleção substitui o grupo somente por ela antes de abrir o menu.
-- Com foco no Painel, `Delete` e `Remover` no menu de contexto executam a remoção sobre a seleção resultante. Fora dele, `Delete` continua obedecendo ao contexto ativo do Canvas.
+- `Remover` no menu de contexto executa a remoção sobre a seleção resultante; o Painel não tem atalho de remoção. Com foco numa miniatura, `Delete` age sobre a Seleção de Frames, como depois de preencher um Frame com dois cliques, e não faz nada quando nenhum Frame está selecionado.
 - O Painel não oferece Caixa de seleção. Arrastar ou dar dois cliques atua somente sobre a mídia diretamente acionada, nunca sobre toda a seleção múltipla.
 - A seleção do Painel é transitória, não integra o Projeto e não participa de Undo/Redo.
 - Um item Decorativo pode ser usado como Background ou Overlay; o papel pertence ao uso, não ao arquivo.

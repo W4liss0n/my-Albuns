@@ -306,8 +306,8 @@ test("folder change discards hidden selection and catalog planning uses new memb
   const h = harness(); const user = userEvent.setup();
   await user.click(screen.getByRole("button", { name: "002.jpg" }));
   await user.click(screen.getByRole("button", { name: /Pasta Turma A/ }));
-  fireEvent.keyDown(screen.getByRole("region", { name: "Painel de imagens" }), { key: "Delete" });
-  expect(h.remove).toHaveBeenLastCalledWith([]);
+  await user.click(screen.getByRole("button", { name: /^Todas/ }));
+  expect(screen.getByRole("button", { name: "002.jpg" })).toHaveAttribute("aria-pressed", "false");
   const plan = h.ref.current!.planCatalog(items, [], [{ ...folders[0], mediaIds: ["p2"] }]);
   expect(plan.demand.visibleMediaIds).not.toContain("p1");
 });

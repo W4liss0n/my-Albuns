@@ -95,7 +95,33 @@ test("reserves Escape for the local owner and keeps keyboard commands in their d
   expect(projectCommandShortcutLabel("previous-layout")).toBe("↓");
   expect(matchProjectCommandShortcut(keyboardShortcut("Delete"), "sheet")).toBe("delete-sheet");
   expect(matchProjectCommandShortcut(keyboardShortcut("Delete"), "frame")).toBe("delete-frames");
-  expect(matchProjectCommandShortcut(keyboardShortcut("Delete"), "media-panel")).toBe("remove-media");
+  expect(matchProjectCommandShortcut(keyboardShortcut("Delete"), "media-panel")).toBeNull();
+  expect(matchProjectCommandShortcut(keyboardShortcut("r"), "frame-photo")).toBe("rotate-photo-counterclockwise");
+  expect(matchProjectCommandShortcut(keyboardShortcut("v"), "frame-photo")).toBe("toggle-photo-black-and-white");
+  expect(matchProjectCommandShortcut(keyboardShortcut("r"), "media-panel")).toBeNull();
+  expect(matchProjectCommandShortcut(keyboardShortcut("v"), "sheet")).toBeNull();
+  expect(projectCommandShortcutLabel("rotate-photo-counterclockwise")).toBe("R");
+  expect(projectCommandShortcutLabel("toggle-photo-black-and-white")).toBe("V");
+  expect(matchProjectCommandShortcut(keyboardShortcut("h"), "frame-photo")).toBe("mirror-photo-horizontal");
+  expect(matchProjectCommandShortcut(keyboardShortcut("x"), "frame")).toBe("swap-frame-contents");
+  expect(matchProjectCommandShortcut(keyboardShortcut("Enter", { ctrlKey: true }), "sheet")).toBe("add-after");
+  expect(matchProjectCommandShortcut(keyboardShortcut("Enter"), "sheet")).toBe("enter-sheet-editing");
+  expect(matchProjectCommandShortcut(keyboardShortcut("d", { ctrlKey: true }), "sheet")).toBe("duplicate-sheet");
+  expect(matchProjectCommandShortcut(keyboardShortcut("i", { ctrlKey: true }), "media-panel")).toBe("import-media-files");
+  expect(matchProjectCommandShortcut(keyboardShortcut("E", { ctrlKey: true, shiftKey: true }), "project-window")).toBe("export");
+  expect(matchProjectCommandShortcut(keyboardShortcut("e", { ctrlKey: true }), "frame-photo")).toBe("open-in-photoshop");
+  expect(matchProjectCommandShortcut(keyboardShortcut(",", { ctrlKey: true }), "project-window")).toBe("settings");
+  expect(matchProjectCommandShortcut(keyboardShortcut("1", { ctrlKey: true }), "project-window")).toBe("media-panel");
+  expect(matchProjectCommandShortcut(keyboardShortcut("2", { ctrlKey: true }), "project-window")).toBe("contextual-panel");
+  for (const key of ["}", "]"]) {
+    expect(matchProjectCommandShortcut(keyboardShortcut(key, { ctrlKey: true, shiftKey: true }), "frame")).toBe("bring-frames-to-front");
+  }
+  for (const key of ["{", "["]) {
+    expect(matchProjectCommandShortcut(keyboardShortcut(key, { ctrlKey: true, shiftKey: true }), "frame")).toBe("send-frames-to-back");
+  }
+  expect(matchProjectCommandShortcut(keyboardShortcut("]", { ctrlKey: true }), "frame")).toBe("advance-frames");
+  expect(projectCommandShortcutLabel("bring-frames-to-front")).toBe("Ctrl+Shift+]");
+  expect(projectCommandShortcutLabel("send-frames-to-back")).toBe("Ctrl+Shift+[");
   expect(matchProjectCommandShortcut(keyboardShortcut("Delete"), "media-folder")).toBeNull();
 });
 

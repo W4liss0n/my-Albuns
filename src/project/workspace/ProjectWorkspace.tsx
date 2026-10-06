@@ -7,6 +7,7 @@ import type {
   ImageProcessingProgress,
   ImageProcessingProblem,
   MediaImportCompletion,
+  MediaImportSelection,
   MediaPreviewDemand,
   ProjectCorePort,
   ProjectWindowPort,
@@ -662,43 +663,14 @@ export function ProjectWorkspace({
     if (!controller.canAddFrame || commandsBlocked || canvasMode.kind !== "sheet-editing" || canvasMode.sheetId !== sheetId) return;
     setFrameContextMenu({ kind: "empty", position });
   };
+  const importMedia = (selection: MediaImportSelection) => {
+    void controller.importMedia(selection).then((mediaId) => {
+      if (mediaId) setMediaSelectionRequest({ mediaId });
+    });
+  };
   const launchProject = useProjectLauncher(projectLauncher, commandsBlocked || mediaDrag !== null, reportCloseError);
   const [fitSheetRequest, setFitSheetRequest] = useState(0);
   const canvasNavigationBlocked = commandsBlocked || mediaDrag !== null || sheetContextMenu !== null || frameContextMenu !== null;
-  useProjectCommandShortcuts({
-    ...launchProject,
-    selectAllFrames: controller.selectAllFrames,
-    frameSelectionActive: sheetEditing && mediaDrag === null && sheetContextMenu === null && frameContextMenu === null,
-    openPhotoInPhotoshop: openFrameInPhotoshop,
-    photoCommandActive: selectedPhotoFrameIds.length > 0 && mediaDrag === null && sheetContextMenu === null && frameContextMenu === null,
-    copyFrames: () => { void controller.copyFrames(); },
-    pasteFrames: () => { void controller.pasteFrames(); },
-    frameClipboardActive: mediaDrag === null && sheetContextMenu === null && frameContextMenu === null,
-    deleteFrames: () => { void controller.deleteFrames(); },
-    arrangeFrames: (action) => { void controller.arrangeFrames(action); },
-    frameCommandsActive: controller.canDeleteFrames && mediaDrag === null && sheetContextMenu === null && frameContextMenu === null,
-    canDeleteSheet: implicitSheetAvailability.canDelete,
-    canRedo: projection.state.canRedo,
-    canUndo: projection.state.canUndo,
-    closeProject: projectClose.requestClose,
-    deleteSheet: () => {
-      void controller.deleteSheet();
-    },
-    disabled: commandsBlocked || mediaDrag !== null,
-    navigateToNextSheet: () => controller.navigateToAdjacentSheet("next"),
-    navigateToPreviousSheet: () =>
-      controller.navigateToAdjacentSheet("previous"),
-    cycleToNextLayout: () => { void controller.cycleLayout("next"); },
-    cycleToPreviousLayout: () => { void controller.cycleLayout("previous"); },
-    layoutCycleActive: sheetNavigationActive,
-    redo: controller.redo,
-    save: controller.save,
-    saveAs: controller.saveAs,
-    sheetShortcutActive: controller.selectedFrames.length === 0,
-    sheetCommandsDisabled: structuralCommandsBlocked,
-    sheetNavigationActive,
-    undo: controller.undo,
-  });
   const applicationMenus = createProjectApplicationMenus({
     fitSheet: sheetEditing && !canvasNavigationBlocked ? () => setFitSheetRequest((request) => request + 1) : undefined,
     ...launchProject,
@@ -759,6 +731,49 @@ export function ProjectWorkspace({
         "media",
         !workspacePanels.panels.media.visible,
       ),
+  });
+  useProjectCommandShortcuts({
+    ...launchProject,
+    selectAllFrames: controller.selectAllFrames,
+    frameSelectionActive: sheetEditing && mediaDrag === null && sheetContextMenu === null && frameContextMenu === null,
+    openPhotoInPhotoshop: openFrameInPhotoshop,
+    rotatePhotos: () => { void controller.orientPhotos("rotateCounterClockwise"); },
+    mirrorPhotos: () => { void controller.orientPhotos("toggleHorizontalMirror"); },
+    togglePhotoBlackAndWhite: () => { void controller.togglePhotoBlackAndWhite(); },
+    photoCommandActive: selectedPhotoFrameIds.length > 0 && mediaDrag === null && sheetContextMenu === null && frameContextMenu === null,
+    importMediaFiles: () => {
+      if (!controller.importPending) {
+        importMedia({ mediaKind: workspacePreferences.preferences.mediaPanelActiveKind, source: { kind: "files" } });
+      }
+    },
+    menuGroups: sheetContextMenu === null && frameContextMenu === null ? applicationMenus : undefined,
+    copyFrames: () => { void controller.copyFrames(); },
+    pasteFrames: () => { void controller.pasteFrames(); },
+    frameClipboardActive: mediaDrag === null && sheetContextMenu === null && frameContextMenu === null,
+    deleteFrames: () => { void controller.deleteFrames(); },
+    arrangeFrames: (action) => { void controller.arrangeFrames(action); },
+    frameCommandsActive: controller.canDeleteFrames && mediaDrag === null && sheetContextMenu === null && frameContextMenu === null,
+    canDeleteSheet: implicitSheetAvailability.canDelete,
+    canRedo: projection.state.canRedo,
+    canUndo: projection.state.canUndo,
+    closeProject: projectClose.requestClose,
+    deleteSheet: () => {
+      void controller.deleteSheet();
+    },
+    disabled: commandsBlocked || mediaDrag !== null,
+    navigateToNextSheet: () => controller.navigateToAdjacentSheet("next"),
+    navigateToPreviousSheet: () =>
+      controller.navigateToAdjacentSheet("previous"),
+    cycleToNextLayout: () => { void controller.cycleLayout("next"); },
+    cycleToPreviousLayout: () => { void controller.cycleLayout("previous"); },
+    layoutCycleActive: sheetNavigationActive,
+    redo: controller.redo,
+    save: controller.save,
+    saveAs: controller.saveAs,
+    sheetShortcutActive: controller.selectedFrames.length === 0,
+    sheetCommandsDisabled: structuralCommandsBlocked,
+    sheetNavigationActive,
+    undo: controller.undo,
   });
 
   const noticeInInspector = inspectorContext.kind === "sheet" &&
@@ -953,11 +968,7 @@ export function ProjectWorkspace({
           onRemoveMedia={(ids) => { if (!commandsBlocked) void mediaRemoval.request(ids); }}
           selectionRequest={mediaSelectionRequest}
           importPending={controller.importPending}
-          onImportMedia={(selection) => {
-            void controller.importMedia(selection).then((mediaId) => {
-              if (mediaId) setMediaSelectionRequest({ mediaId });
-            });
-          }}
+          onImportMedia={importMedia}
           onMediaDragChange={setMediaDrag}
           dragThreshold={controller.frameStyle.dragThreshold}
           onRelinkMedia={controller.relinkMedia}

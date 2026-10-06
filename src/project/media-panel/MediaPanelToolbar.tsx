@@ -18,7 +18,7 @@ import {
   type MediaUsageFilter,
 } from "../../state/mediaPanelPreferences";
 import { AppIcon, TextInput } from "../../ui";
-import { matchProjectCommandShortcut, projectCommandDescriptor } from "../../application/projectCommandCatalog";
+import { matchProjectCommandShortcut, projectCommandDescriptor, projectCommandShortcutLabel } from "../../application/projectCommandCatalog";
 import { isTextEntryTarget } from "../workspace/isTextEntryTarget";
 import { useDismissableSurface } from "../../ui/useDismissableSurface";
 
@@ -150,6 +150,7 @@ export function MediaPanelToolbar({
             role="menu"
           >
             <MenuItem compact label={projectCommandDescriptor("import-media-files").label}
+          shortcut={projectCommandShortcutLabel("import-media-files")}
           disabled={importDisabled}
           onClick={() => {
                 setOpenPopup(null);

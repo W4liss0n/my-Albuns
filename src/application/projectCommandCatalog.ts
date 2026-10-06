@@ -85,19 +85,19 @@ const DEFINITIONS = [
     id: "toggle-photo-black-and-white",
     label: "Preto e branco",
     description: "Alterna o efeito Preto e branco das fotos selecionadas.",
-    kind: "domain", contexts: ["frame", "frame-photo"], availability: "implemented", shortcuts: [],
+    kind: "domain", contexts: ["frame", "frame-photo"], availability: "implemented", shortcuts: [shortcut("v", "V")],
   }),
   command({
     id: "rotate-photo-counterclockwise",
     label: "Girar 90° à esquerda",
     description: "Gira as fotos selecionadas 90° no sentido anti-horário.",
-    kind: "domain", contexts: ["frame", "frame-photo"], availability: "implemented", shortcuts: [],
+    kind: "domain", contexts: ["frame", "frame-photo"], availability: "implemented", shortcuts: [shortcut("r", "R")],
   }),
   command({
     id: "mirror-photo-horizontal",
     label: "Espelhar horizontalmente",
     description: "Alterna o espelhamento horizontal das fotos selecionadas.",
-    kind: "domain", contexts: ["frame", "frame-photo"], availability: "implemented", shortcuts: [],
+    kind: "domain", contexts: ["frame", "frame-photo"], availability: "implemented", shortcuts: [shortcut("h", "H")],
   }),
   command({
     id: "new-project",
@@ -157,7 +157,7 @@ const DEFINITIONS = [
     kind: "application",
     contexts: ["project-window"],
     availability: "implemented",
-    shortcuts: [],
+    shortcuts: [shortcut("e", "Ctrl+Shift+E", { ctrlKey: true, shiftKey: true })],
   }),
   command({
     id: "close",
@@ -214,7 +214,7 @@ const DEFINITIONS = [
     kind: "domain",
     contexts: ["frame"],
     availability: "implemented",
-    shortcuts: [],
+    shortcuts: [shortcut("x", "X")],
   }),
   command({
     id: "swap-sheet-sides",
@@ -253,7 +253,7 @@ const DEFINITIONS = [
     id: "import-media-files",
     label: "Arquivos…",
     description: "Importa os arquivos de imagem escolhidos para a aba ativa do painel.",
-    kind: "application", contexts: ["media-panel"], availability: "implemented", shortcuts: [],
+    kind: "application", contexts: ["media-panel"], availability: "implemented", shortcuts: [shortcut("i", "Ctrl+I", { ctrlKey: true })],
   }),
   command({
     id: "import-media-folder",
@@ -305,7 +305,7 @@ const DEFINITIONS = [
     kind: "domain",
     contexts: ["media-panel"],
     availability: "implemented",
-    shortcuts: [shortcut("delete", "Delete")],
+    shortcuts: [],
   }),
   command({
     id: "bring-frames-to-front",
@@ -314,7 +314,8 @@ const DEFINITIONS = [
     kind: "domain",
     contexts: ["frame"],
     availability: "implemented",
-    shortcuts: [],
+    shortcuts: [shortcut("}", "Ctrl+Shift+]", { ctrlKey: true, shiftKey: true }),
+      shortcut("]", undefined, { ctrlKey: true, shiftKey: true })],
   }),
   command({
     id: "advance-frames",
@@ -341,7 +342,8 @@ const DEFINITIONS = [
     kind: "domain",
     contexts: ["frame"],
     availability: "implemented",
-    shortcuts: [],
+    shortcuts: [shortcut("{", "Ctrl+Shift+[", { ctrlKey: true, shiftKey: true }),
+      shortcut("[", undefined, { ctrlKey: true, shiftKey: true })],
   }),
   command({
     id: "save-frame-arrangement-as-layout",
@@ -424,7 +426,7 @@ const DEFINITIONS = [
     kind: "domain",
     contexts: ["sheet"],
     availability: "implemented",
-    shortcuts: [],
+    shortcuts: [shortcut("enter", "Ctrl+Enter", { ctrlKey: true })],
   }),
   command({
     id: "duplicate-sheet",
@@ -433,7 +435,7 @@ const DEFINITIONS = [
     kind: "domain",
     contexts: ["sheet"],
     availability: "implemented",
-    shortcuts: [],
+    shortcuts: [shortcut("d", "Ctrl+D", { ctrlKey: true })],
   }),
   command({
     id: "delete-sheet",
@@ -460,7 +462,7 @@ const DEFINITIONS = [
     kind: "interface",
     contexts: ["project-window"],
     availability: "implemented",
-    shortcuts: [],
+    shortcuts: [shortcut("1", "Ctrl+1", { ctrlKey: true })],
   }),
   command({
     id: "contextual-panel",
@@ -469,7 +471,7 @@ const DEFINITIONS = [
     kind: "interface",
     contexts: ["project-window"],
     availability: "implemented",
-    shortcuts: [],
+    shortcuts: [shortcut("2", "Ctrl+2", { ctrlKey: true })],
   }),
   command({
     id: "fit-sheet",
@@ -507,7 +509,7 @@ const DEFINITIONS = [
     kind: "application",
     contexts: ["project-window"],
     availability: "implemented",
-    shortcuts: [],
+    shortcuts: [shortcut(",", "Ctrl+,", { ctrlKey: true })],
   }),
   command({
     id: "manual",

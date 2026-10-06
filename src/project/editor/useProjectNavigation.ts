@@ -27,7 +27,8 @@ export function useProjectNavigation(projection: EditorProjection) {
   const viewport = useEditorView((state) => state.viewport);
   const selectFrame = useEditorView((state) => state.selectFrame);
   const focusSheet = useEditorView((state) => state.focusSheet);
-  const centerSheet = useEditorView((state) => state.centerSheet);
+  const centerSheetInView = useEditorView((state) => state.centerSheet);
+  const selectFrames = useEditorView((state) => state.selectFrames);
   const setViewport = useEditorView((state) => state.setViewport);
   const enterSheetEdit = useEditorView((state) => state.enterSheetEdit);
   const exitSheetEdit = useEditorView((state) => state.exitSheetEdit);
@@ -36,6 +37,18 @@ export function useProjectNavigation(projection: EditorProjection) {
   );
   const [canvasMetrics, setCanvasMetrics] =
     useState<CanvasMetrics | null>(null);
+  // Arrows, scrolling and the new Sheet after Add or Duplicate all recenter
+  // here. A Frame left on another Sheet would stay selected off screen, where
+  // Delete, R, H and V could still change it.
+  const centerSheet = useCallback((sheetId: string) => {
+    const sheetFrameIds = new Set(projection.state.album.sheets
+      .find((sheet) => sheet.id === sheetId)?.frames.map((frame) => frame.id) ?? []);
+    const selected = useEditorView.getState().selectedFrameIds;
+    if (selected.some((frameId) => !sheetFrameIds.has(frameId))) {
+      selectFrames(selected.filter((frameId) => sheetFrameIds.has(frameId)));
+    }
+    centerSheetInView(sheetId);
+  }, [centerSheetInView, projection.state.album.sheets, selectFrames]);
   const pendingSheetNavigationRef = useRef<string | null>(null);
 
   const synchronizeProjection = useCallback((current: EditorProjection) => {

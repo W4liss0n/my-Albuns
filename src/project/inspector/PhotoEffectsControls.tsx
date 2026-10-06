@@ -1,6 +1,10 @@
 import { Contrast } from "lucide-react";
 import type { FrameSnapshot } from "../../domain/project";
-import { projectCommandDescriptor } from "../../application/projectCommandCatalog";
+import {
+  projectCommandDescriptor,
+  projectCommandShortcutAria,
+  projectCommandShortcutLabel,
+} from "../../application/projectCommandCatalog";
 import { PropertyToggle } from "../../ui";
 
 export interface PhotoEffectsControlActions {
@@ -23,6 +27,8 @@ export function PhotoEffectsControls({ frames, disabled, onToggleBlackAndWhite }
       )}
       <PropertyToggle className="photo-effect-control"
         label={projectCommandDescriptor("toggle-photo-black-and-white").label}
+        shortcut={projectCommandShortcutLabel("toggle-photo-black-and-white")}
+        keyShortcuts={projectCommandShortcutAria("toggle-photo-black-and-white")}
         icon={Contrast}
         pressed={enabled} disabled={disabled} onToggle={onToggleBlackAndWhite} />
     </div>
