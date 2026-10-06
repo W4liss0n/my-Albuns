@@ -28,6 +28,9 @@ mantém as famílias, a busca determinística e a seleção da versão 2, e acre
   Página até a borda externa já inclui a Sangria. Essas sugestões têm sua própria
   janela de nota e não alinham horizonte com a outra Página. A escolha automática
   nunca aplica uma Página inteira; ela continua disponível no Painel.
+  Atualização de 06/10/2026: um Layout personalizado salvo pela pessoa com uma
+  Página inteira aplica-se automaticamente como foi salvo; a restrição vale
+  para as sugestões do Gerador e para Favoritos automáticos (design 0026).
 - **Frames vazios livres no Painel.** Nas consultas do Painel, um Frame vazio não
   tem orientação fixa: em cada sugestão, o Gerador o faz vertical ou horizontal.
   Isso vale para os placeholders existentes e para os criados pelo seletor de

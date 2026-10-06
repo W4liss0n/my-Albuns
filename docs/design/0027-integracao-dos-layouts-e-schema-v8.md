@@ -2,7 +2,7 @@
 status: accepted
 document: design
 date: 2026-09-09
-updated: 2026-10-01
+updated: 2026-10-06
 ticket: 28
 ---
 
@@ -53,8 +53,10 @@ geometria. Na edição da Lâmina, adicionar ou excluir Frames conserva a
 disposição manual dos demais.
 
 O Último Layout compatível tem prioridade na escolha automática somente se
-conservar as orientações atuais; a mesma condição vale para Favoritos e
-Personalizados. Sem candidato adequado, vale a primeira sugestão do Gerador
+conservar as orientações atuais; a mesma condição vale para Favoritos
+automáticos. Desde 06/10/2026, um Layout personalizado, favorito ou não,
+aplica-se como foi salvo, sem a condição de orientação nem a de Página inteira
+(design 0026). Sem candidato adequado, vale a primeira sugestão do Gerador
 que não leve uma Foto até as bordas de uma Página inteira
 ([ADR 0015](../adr/0015-ampliar-as-sugestoes-com-pagina-inteira-e-proporcoes-reais.md));
 sem sugestão, a reserva do ADR 0008 reorganiza os Frames.

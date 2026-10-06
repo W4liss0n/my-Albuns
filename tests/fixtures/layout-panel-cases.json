@@ -6288,6 +6288,30 @@
                     }
                   }
                 ],
+                "cycleOrder": [
+                  0,
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6,
+                  7,
+                  8,
+                  9,
+                  10,
+                  11,
+                  12,
+                  13,
+                  14,
+                  15,
+                  16,
+                  17,
+                  18,
+                  19,
+                  20,
+                  21
+                ],
                 "generationStatus": "candidates"
               },
               "locked": false,
@@ -6532,6 +6556,10 @@
                       "origin": "custom"
                     }
                   }
+                ],
+                "cycleOrder": [
+                  0,
+                  1
                 ],
                 "generationStatus": "empty"
               },
@@ -12837,6 +12865,30 @@
                     }
                   }
                 ],
+                "cycleOrder": [
+                  0,
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6,
+                  7,
+                  8,
+                  9,
+                  10,
+                  11,
+                  12,
+                  13,
+                  14,
+                  15,
+                  16,
+                  17,
+                  18,
+                  19,
+                  20,
+                  21
+                ],
                 "generationStatus": "candidates"
               },
               "locked": false,
@@ -13081,6 +13133,10 @@
                       "origin": "custom"
                     }
                   }
+                ],
+                "cycleOrder": [
+                  0,
+                  1
                 ],
                 "generationStatus": "empty"
               },
@@ -19124,6 +19180,29 @@
                     }
                   }
                 ],
+                "cycleOrder": [
+                  0,
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6,
+                  7,
+                  8,
+                  9,
+                  10,
+                  11,
+                  12,
+                  13,
+                  14,
+                  15,
+                  16,
+                  17,
+                  18,
+                  19,
+                  20
+                ],
                 "generationStatus": "candidates"
               },
               "locked": false,
@@ -19259,6 +19338,9 @@
                       "origin": "custom"
                     }
                   }
+                ],
+                "cycleOrder": [
+                  0
                 ],
                 "generationStatus": "empty"
               },
@@ -25564,6 +25646,30 @@
                     }
                   }
                 ],
+                "cycleOrder": [
+                  0,
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6,
+                  7,
+                  8,
+                  9,
+                  10,
+                  11,
+                  12,
+                  13,
+                  14,
+                  15,
+                  16,
+                  17,
+                  18,
+                  19,
+                  20,
+                  21
+                ],
                 "generationStatus": "candidates"
               },
               "locked": false,
@@ -25808,6 +25914,10 @@
                       "origin": "custom"
                     }
                   }
+                ],
+                "cycleOrder": [
+                  0,
+                  1
                 ],
                 "generationStatus": "empty"
               },
@@ -31597,6 +31707,28 @@
                     }
                   }
                 ],
+                "cycleOrder": [
+                  0,
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6,
+                  7,
+                  8,
+                  9,
+                  10,
+                  11,
+                  12,
+                  13,
+                  14,
+                  15,
+                  16,
+                  17,
+                  18,
+                  19
+                ],
                 "generationStatus": "candidates"
               },
               "locked": false,
@@ -31621,6 +31753,7 @@
               "listing": {
                 "algorithmVersion": 3,
                 "candidates": [],
+                "cycleOrder": [],
                 "generationStatus": "empty"
               },
               "locked": false,
@@ -37663,6 +37796,29 @@
                     }
                   }
                 ],
+                "cycleOrder": [
+                  0,
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6,
+                  7,
+                  8,
+                  9,
+                  10,
+                  11,
+                  12,
+                  13,
+                  14,
+                  15,
+                  16,
+                  17,
+                  18,
+                  19,
+                  20
+                ],
                 "generationStatus": "candidates"
               },
               "locked": false,
@@ -37798,6 +37954,9 @@
                       "origin": "custom"
                     }
                   }
+                ],
+                "cycleOrder": [
+                  0
                 ],
                 "generationStatus": "empty"
               },
@@ -44103,6 +44262,30 @@
                     }
                   }
                 ],
+                "cycleOrder": [
+                  0,
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6,
+                  7,
+                  8,
+                  9,
+                  10,
+                  11,
+                  12,
+                  13,
+                  14,
+                  15,
+                  16,
+                  17,
+                  18,
+                  19,
+                  20,
+                  21
+                ],
                 "generationStatus": "candidates"
               },
               "locked": false,
@@ -44348,6 +44531,10 @@
                     }
                   }
                 ],
+                "cycleOrder": [
+                  0,
+                  1
+                ],
                 "generationStatus": "empty"
               },
               "locked": false,
@@ -44584,6 +44771,7 @@
               "listing": {
                 "algorithmVersion": 3,
                 "candidates": [],
+                "cycleOrder": [],
                 "generationStatus": "empty"
               },
               "locked": false,
@@ -44608,6 +44796,7 @@
               "listing": {
                 "algorithmVersion": 3,
                 "candidates": [],
+                "cycleOrder": [],
                 "generationStatus": "empty"
               },
               "locked": false,
@@ -44839,6 +45028,7 @@
               "listing": {
                 "algorithmVersion": 3,
                 "candidates": [],
+                "cycleOrder": [],
                 "generationStatus": "empty"
               },
               "locked": false,
@@ -44863,6 +45053,7 @@
               "listing": {
                 "algorithmVersion": 3,
                 "candidates": [],
+                "cycleOrder": [],
                 "generationStatus": "empty"
               },
               "locked": false,
@@ -46129,6 +46320,15 @@
                     }
                   }
                 ],
+                "cycleOrder": [
+                  0,
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6
+                ],
                 "generationStatus": "candidates"
               },
               "locked": true,
@@ -46153,6 +46353,7 @@
               "listing": {
                 "algorithmVersion": 3,
                 "candidates": [],
+                "cycleOrder": [],
                 "generationStatus": "empty"
               },
               "locked": false,
@@ -47375,6 +47576,12 @@
                     }
                   }
                 ],
+                "cycleOrder": [
+                  0,
+                  1,
+                  2,
+                  3
+                ],
                 "generationStatus": "candidates"
               },
               "locked": true,
@@ -47399,6 +47606,7 @@
               "listing": {
                 "algorithmVersion": 3,
                 "candidates": [],
+                "cycleOrder": [],
                 "generationStatus": "empty"
               },
               "locked": false,
@@ -48150,6 +48358,16 @@
                     }
                   }
                 ],
+                "cycleOrder": [
+                  0,
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6,
+                  7
+                ],
                 "generationStatus": "candidates"
               },
               "locked": false,
@@ -48174,6 +48392,7 @@
               "listing": {
                 "algorithmVersion": 3,
                 "candidates": [],
+                "cycleOrder": [],
                 "generationStatus": "empty"
               },
               "locked": false,
@@ -48990,6 +49209,16 @@
                     }
                   }
                 ],
+                "cycleOrder": [
+                  0,
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6,
+                  7
+                ],
                 "generationStatus": "candidates"
               },
               "locked": true,
@@ -49014,6 +49243,7 @@
               "listing": {
                 "algorithmVersion": 3,
                 "candidates": [],
+                "cycleOrder": [],
                 "generationStatus": "empty"
               },
               "locked": false,
@@ -49833,6 +50063,16 @@
                     }
                   }
                 ],
+                "cycleOrder": [
+                  0,
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6,
+                  7
+                ],
                 "generationStatus": "candidates"
               },
               "locked": false,
@@ -49857,6 +50097,7 @@
               "listing": {
                 "algorithmVersion": 3,
                 "candidates": [],
+                "cycleOrder": [],
                 "generationStatus": "empty"
               },
               "locked": false,
@@ -55640,6 +55881,28 @@
                     }
                   }
                 ],
+                "cycleOrder": [
+                  0,
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6,
+                  7,
+                  8,
+                  9,
+                  10,
+                  11,
+                  12,
+                  13,
+                  14,
+                  15,
+                  16,
+                  17,
+                  18,
+                  19
+                ],
                 "generationStatus": "candidates"
               },
               "locked": false,
@@ -55664,6 +55927,7 @@
               "listing": {
                 "algorithmVersion": 3,
                 "candidates": [],
+                "cycleOrder": [],
                 "generationStatus": "empty"
               },
               "locked": false,
@@ -66389,6 +66653,28 @@
                     }
                   }
                 ],
+                "cycleOrder": [
+                  0,
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6,
+                  7,
+                  8,
+                  9,
+                  10,
+                  11,
+                  12,
+                  13,
+                  14,
+                  15,
+                  16,
+                  17,
+                  18,
+                  19
+                ],
                 "generationStatus": "candidates"
               },
               "locked": true,
@@ -66413,6 +66699,7 @@
               "listing": {
                 "algorithmVersion": 3,
                 "candidates": [],
+                "cycleOrder": [],
                 "generationStatus": "empty"
               },
               "locked": false,
@@ -78498,6 +78785,28 @@
                     }
                   }
                 ],
+                "cycleOrder": [
+                  0,
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6,
+                  7,
+                  8,
+                  9,
+                  10,
+                  11,
+                  12,
+                  13,
+                  14,
+                  15,
+                  16,
+                  17,
+                  18,
+                  19
+                ],
                 "generationStatus": "candidates"
               },
               "locked": true,
@@ -78522,6 +78831,7 @@
               "listing": {
                 "algorithmVersion": 3,
                 "candidates": [],
+                "cycleOrder": [],
                 "generationStatus": "empty"
               },
               "locked": false,
@@ -85182,6 +85492,28 @@
                     }
                   }
                 ],
+                "cycleOrder": [
+                  0,
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6,
+                  7,
+                  8,
+                  9,
+                  10,
+                  11,
+                  12,
+                  13,
+                  14,
+                  15,
+                  16,
+                  17,
+                  18,
+                  19
+                ],
                 "generationStatus": "candidates"
               },
               "locked": false,
@@ -85206,6 +85538,7 @@
               "listing": {
                 "algorithmVersion": 3,
                 "candidates": [],
+                "cycleOrder": [],
                 "generationStatus": "empty"
               },
               "locked": false,
@@ -91929,6 +92262,28 @@
                     }
                   }
                 ],
+                "cycleOrder": [
+                  0,
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6,
+                  7,
+                  8,
+                  9,
+                  10,
+                  11,
+                  12,
+                  13,
+                  14,
+                  15,
+                  16,
+                  17,
+                  18,
+                  19
+                ],
                 "generationStatus": "candidates"
               },
               "locked": true,
@@ -91953,6 +92308,7 @@
               "listing": {
                 "algorithmVersion": 3,
                 "candidates": [],
+                "cycleOrder": [],
                 "generationStatus": "empty"
               },
               "locked": false,
@@ -93735,6 +94091,14 @@
                     }
                   }
                 ],
+                "cycleOrder": [
+                  0,
+                  1,
+                  2,
+                  3,
+                  4,
+                  5
+                ],
                 "generationStatus": "candidates"
               },
               "locked": false,
@@ -93759,6 +94123,7 @@
               "listing": {
                 "algorithmVersion": 3,
                 "candidates": [],
+                "cycleOrder": [],
                 "generationStatus": "empty"
               },
               "locked": false,
@@ -95538,6 +95903,14 @@
                     }
                   }
                 ],
+                "cycleOrder": [
+                  0,
+                  1,
+                  2,
+                  3,
+                  4,
+                  5
+                ],
                 "generationStatus": "candidates"
               },
               "locked": true,
@@ -95562,6 +95935,7 @@
               "listing": {
                 "algorithmVersion": 3,
                 "candidates": [],
+                "cycleOrder": [],
                 "generationStatus": "empty"
               },
               "locked": false,
@@ -97476,6 +97850,14 @@
                     }
                   }
                 ],
+                "cycleOrder": [
+                  0,
+                  1,
+                  2,
+                  3,
+                  4,
+                  5
+                ],
                 "generationStatus": "candidates"
               },
               "locked": false,
@@ -97500,6 +97882,7 @@
               "listing": {
                 "algorithmVersion": 3,
                 "candidates": [],
+                "cycleOrder": [],
                 "generationStatus": "empty"
               },
               "locked": false,
@@ -104226,6 +104609,28 @@
                     }
                   }
                 ],
+                "cycleOrder": [
+                  0,
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6,
+                  7,
+                  8,
+                  9,
+                  10,
+                  11,
+                  12,
+                  13,
+                  14,
+                  15,
+                  16,
+                  17,
+                  18,
+                  19
+                ],
                 "generationStatus": "candidates"
               },
               "locked": false,
@@ -104250,6 +104655,7 @@
               "listing": {
                 "algorithmVersion": 3,
                 "candidates": [],
+                "cycleOrder": [],
                 "generationStatus": "empty"
               },
               "locked": false,
@@ -110295,6 +110701,29 @@
                     }
                   }
                 ],
+                "cycleOrder": [
+                  0,
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6,
+                  7,
+                  8,
+                  9,
+                  10,
+                  11,
+                  12,
+                  13,
+                  14,
+                  15,
+                  16,
+                  17,
+                  18,
+                  19,
+                  20
+                ],
                 "generationStatus": "candidates"
               },
               "locked": false,
@@ -110430,6 +110859,9 @@
                       "origin": "custom"
                     }
                   }
+                ],
+                "cycleOrder": [
+                  0
                 ],
                 "generationStatus": "empty"
               },
@@ -116474,6 +116906,29 @@
                       }
                     }
                   ],
+                  "cycleOrder": [
+                    1,
+                    0,
+                    2,
+                    3,
+                    4,
+                    5,
+                    6,
+                    7,
+                    8,
+                    9,
+                    10,
+                    11,
+                    12,
+                    13,
+                    14,
+                    15,
+                    16,
+                    17,
+                    18,
+                    19,
+                    20
+                  ],
                   "generationStatus": "candidates"
                 },
                 "locked": false,
@@ -116718,6 +117173,10 @@
                         "origin": "custom"
                       }
                     }
+                  ],
+                  "cycleOrder": [
+                    1,
+                    0
                   ],
                   "generationStatus": "empty"
                 },
@@ -122761,6 +123220,29 @@
                       }
                     }
                   ],
+                  "cycleOrder": [
+                    0,
+                    1,
+                    2,
+                    3,
+                    4,
+                    5,
+                    6,
+                    7,
+                    8,
+                    9,
+                    10,
+                    11,
+                    12,
+                    13,
+                    14,
+                    15,
+                    16,
+                    17,
+                    18,
+                    19,
+                    20
+                  ],
                   "generationStatus": "candidates"
                 },
                 "locked": false,
@@ -122896,6 +123378,9 @@
                         "origin": "custom"
                       }
                     }
+                  ],
+                  "cycleOrder": [
+                    0
                   ],
                   "generationStatus": "empty"
                 },
@@ -128939,6 +129424,29 @@
                       }
                     }
                   ],
+                  "cycleOrder": [
+                    1,
+                    0,
+                    2,
+                    3,
+                    4,
+                    5,
+                    6,
+                    7,
+                    8,
+                    9,
+                    10,
+                    11,
+                    12,
+                    13,
+                    14,
+                    15,
+                    16,
+                    17,
+                    18,
+                    19,
+                    20
+                  ],
                   "generationStatus": "candidates"
                 },
                 "locked": false,
@@ -129183,6 +129691,10 @@
                         "origin": "custom"
                       }
                     }
+                  ],
+                  "cycleOrder": [
+                    1,
+                    0
                   ],
                   "generationStatus": "empty"
                 },
@@ -135226,6 +135738,29 @@
                       }
                     }
                   ],
+                  "cycleOrder": [
+                    1,
+                    0,
+                    2,
+                    3,
+                    4,
+                    5,
+                    6,
+                    7,
+                    8,
+                    9,
+                    10,
+                    11,
+                    12,
+                    13,
+                    14,
+                    15,
+                    16,
+                    17,
+                    18,
+                    19,
+                    20
+                  ],
                   "generationStatus": "candidates"
                 },
                 "locked": false,
@@ -135470,6 +136005,10 @@
                         "origin": "custom"
                       }
                     }
+                  ],
+                  "cycleOrder": [
+                    1,
+                    0
                   ],
                   "generationStatus": "empty"
                 },
@@ -141251,6 +141790,28 @@
                       }
                     }
                   ],
+                  "cycleOrder": [
+                    0,
+                    1,
+                    2,
+                    3,
+                    4,
+                    5,
+                    6,
+                    7,
+                    8,
+                    9,
+                    10,
+                    11,
+                    12,
+                    13,
+                    14,
+                    15,
+                    16,
+                    17,
+                    18,
+                    19
+                  ],
                   "generationStatus": "candidates"
                 },
                 "locked": false,
@@ -141386,6 +141947,9 @@
                         "origin": "automatic"
                       }
                     }
+                  ],
+                  "cycleOrder": [
+                    0
                   ],
                   "generationStatus": "empty"
                 },
@@ -147187,6 +147751,28 @@
                     }
                   }
                 ],
+                "cycleOrder": [
+                  0,
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6,
+                  7,
+                  8,
+                  9,
+                  10,
+                  11,
+                  12,
+                  13,
+                  14,
+                  15,
+                  16,
+                  17,
+                  18,
+                  19
+                ],
                 "generationStatus": "candidates"
               },
               "locked": false,
@@ -147211,6 +147797,7 @@
               "listing": {
                 "algorithmVersion": 3,
                 "candidates": [],
+                "cycleOrder": [],
                 "generationStatus": "empty"
               },
               "locked": false,
@@ -152991,6 +153578,28 @@
                     }
                   }
                 ],
+                "cycleOrder": [
+                  0,
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6,
+                  7,
+                  8,
+                  9,
+                  10,
+                  11,
+                  12,
+                  13,
+                  14,
+                  15,
+                  16,
+                  17,
+                  18,
+                  19
+                ],
                 "generationStatus": "candidates"
               },
               "locked": false,
@@ -153015,6 +153624,7 @@
               "listing": {
                 "algorithmVersion": 3,
                 "candidates": [],
+                "cycleOrder": [],
                 "generationStatus": "empty"
               },
               "locked": false,
@@ -160126,6 +160736,28 @@
                     }
                   }
                 ],
+                "cycleOrder": [
+                  0,
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6,
+                  7,
+                  8,
+                  9,
+                  10,
+                  11,
+                  12,
+                  13,
+                  14,
+                  15,
+                  16,
+                  17,
+                  18,
+                  19
+                ],
                 "generationStatus": "candidates"
               },
               "locked": true,
@@ -160150,6 +160782,7 @@
               "listing": {
                 "algorithmVersion": 3,
                 "candidates": [],
+                "cycleOrder": [],
                 "generationStatus": "empty"
               },
               "locked": false,
@@ -165505,6 +166138,20 @@
                     }
                   }
                 ],
+                "cycleOrder": [
+                  0,
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6,
+                  7,
+                  8,
+                  9,
+                  10,
+                  11
+                ],
                 "generationStatus": "candidates"
               },
               "locked": true,
@@ -165529,6 +166176,7 @@
               "listing": {
                 "algorithmVersion": 3,
                 "candidates": [],
+                "cycleOrder": [],
                 "generationStatus": "empty"
               },
               "locked": false,
@@ -171309,6 +171957,28 @@
                     }
                   }
                 ],
+                "cycleOrder": [
+                  0,
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6,
+                  7,
+                  8,
+                  9,
+                  10,
+                  11,
+                  12,
+                  13,
+                  14,
+                  15,
+                  16,
+                  17,
+                  18,
+                  19
+                ],
                 "generationStatus": "candidates"
               },
               "locked": false,
@@ -171333,6 +172003,7 @@
               "listing": {
                 "algorithmVersion": 3,
                 "candidates": [],
+                "cycleOrder": [],
                 "generationStatus": "empty"
               },
               "locked": false,
@@ -177110,6 +177781,28 @@
                     }
                   }
                 ],
+                "cycleOrder": [
+                  0,
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6,
+                  7,
+                  8,
+                  9,
+                  10,
+                  11,
+                  12,
+                  13,
+                  14,
+                  15,
+                  16,
+                  17,
+                  18,
+                  19
+                ],
                 "generationStatus": "candidates"
               },
               "locked": true,
@@ -177134,6 +177827,7 @@
               "listing": {
                 "algorithmVersion": 3,
                 "candidates": [],
+                "cycleOrder": [],
                 "generationStatus": "empty"
               },
               "locked": false,
@@ -182914,6 +183608,28 @@
                     }
                   }
                 ],
+                "cycleOrder": [
+                  0,
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6,
+                  7,
+                  8,
+                  9,
+                  10,
+                  11,
+                  12,
+                  13,
+                  14,
+                  15,
+                  16,
+                  17,
+                  18,
+                  19
+                ],
                 "generationStatus": "candidates"
               },
               "locked": false,
@@ -182938,6 +183654,7 @@
               "listing": {
                 "algorithmVersion": 3,
                 "candidates": [],
+                "cycleOrder": [],
                 "generationStatus": "empty"
               },
               "locked": false,
@@ -185405,6 +186122,7 @@
               "listing": {
                 "algorithmVersion": 3,
                 "candidates": [],
+                "cycleOrder": [],
                 "generationStatus": "outsideCoverage"
               },
               "locked": false,
@@ -185429,6 +186147,7 @@
               "listing": {
                 "algorithmVersion": 3,
                 "candidates": [],
+                "cycleOrder": [],
                 "generationStatus": "empty"
               },
               "locked": false,
@@ -188590,6 +189309,18 @@
                     }
                   }
                 ],
+                "cycleOrder": [
+                  0,
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6,
+                  7,
+                  8,
+                  9
+                ],
                 "generationStatus": "candidates"
               },
               "locked": false,
@@ -188614,6 +189345,7 @@
               "listing": {
                 "algorithmVersion": 3,
                 "candidates": [],
+                "cycleOrder": [],
                 "generationStatus": "empty"
               },
               "locked": false,
@@ -191773,6 +192505,18 @@
                     }
                   }
                 ],
+                "cycleOrder": [
+                  0,
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6,
+                  7,
+                  8,
+                  9
+                ],
                 "generationStatus": "candidates"
               },
               "locked": false,
@@ -191797,6 +192541,7 @@
               "listing": {
                 "algorithmVersion": 3,
                 "candidates": [],
+                "cycleOrder": [],
                 "generationStatus": "empty"
               },
               "locked": false,

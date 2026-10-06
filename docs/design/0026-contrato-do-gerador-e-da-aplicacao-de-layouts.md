@@ -2,7 +2,7 @@
 status: accepted
 document: design
 date: 2026-09-09
-updated: 2026-10-05
+updated: 2026-10-06
 ticket: 28
 ---
 
@@ -362,9 +362,11 @@ não atravessa as origens, inclusive para cópias favoritas.
 A prioridade de aplicação automática é Último Layout, Personalizados
 favoritos, Personalizados, Automáticos favoritos e sugestões do Gerador
 (atualizada em 05/10/2026 para coincidir com a troca por teclado do design
-0018), considerando somente os
-Layouts que conservam as orientações dos Frames atuais (ADR 0014) e, na versão 3,
-nenhum que leve uma Foto até as bordas de uma Página inteira. Sem opção nessas
+0018). Um Layout personalizado é geometria salva pela pessoa e se aplica como
+foi salvo. Os demais candidatos (Último Layout automático, Automáticos favoritos
+e sugestões) entram somente quando conservam as orientações dos Frames atuais
+(ADR 0014) e, na versão 3, não levam uma Foto até as bordas de uma Página
+inteira (regra atualizada em 06/10/2026). Sem opção nessas
 origens, `LayoutRules` produz a reserva derivada da quantidade e superfície
 ativa. Ela pode sempre respeitar o escopo mais restritivo, sem consultar
 Foto, orientação, prévia ou escolhas anteriores. Não aparece no painel,

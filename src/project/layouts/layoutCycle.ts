@@ -1,21 +1,14 @@
-import type { LayoutCandidate, LayoutQueryResult } from "../../domain/project";
+import type { LayoutQueryResult } from "../../domain/project";
 
 export type LayoutCycleDirection = "next" | "previous";
 
 /**
- * Cycle order for the keyboard: custom favorites, custom, automatic favorites,
- * automatic. The sort is stable, so inside each group the Core listing order
- * stands (last applied first, then favorite order, then catalog or generator
- * order), which is the same order the Layout panel shows.
+ * The Core lists the cycle order (custom favorites, custom, automatic
+ * favorites, automatic) with the last applied Layout in its natural place.
+ * Candidates that need the lock stay out of the keyboard cycle.
  */
 export function layoutCycleOrder(query: LayoutQueryResult): number[] {
-  const rank = (candidate: LayoutCandidate) =>
-    (candidate.layout.origin === "custom" ? 0 : 2) + (candidate.favoriteId ? 0 : 1);
-  return query.listing.candidates
-    .map((candidate, index) => ({ candidate, index }))
-    .filter(({ index }) => !query.candidateRequiresLock[index])
-    .sort((first, second) => rank(first.candidate) - rank(second.candidate))
-    .map(({ index }) => index);
+  return query.listing.cycleOrder.filter((index) => !query.candidateRequiresLock[index]);
 }
 
 /** Candidate index to apply, or null when there is nothing to change. */

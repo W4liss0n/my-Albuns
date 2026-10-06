@@ -1,7 +1,7 @@
 ---
 status: accepted
 date: 2026-09-17
-updated: 2026-10-01
+updated: 2026-10-06
 ---
 
 # Orientar novos Frames pela Foto inserida
@@ -28,7 +28,11 @@ de 1 × 1 pixel. Observar metadados posteriormente não altera Frames existentes
 Na escolha automática, Último Layout, Favoritos e Personalizados só têm
 prioridade quando conservam as orientações dos Frames atuais, inclusive o
 recém-criado. Continuam disponíveis no Painel para aplicação explícita,
-recuperando sua geometria original. A reserva para consultas sem composição
+recuperando sua geometria original. Atualização de 06/10/2026: a condição
+deixa de valer para Layouts personalizados, favoritos ou não, que são geometria
+escolhida pela pessoa e se aplicam como foram salvos; ela continua valendo
+para o Último Layout automático, para Favoritos automáticos e para o Gerador
+(design 0026). A reserva para consultas sem composição
 adequada mantém o contrato do [ADR 0008](0008-garantir-layout-compativel-por-arranjo-de-reserva.md).
 
 A correção reutiliza as dimensões já observadas pelo Core; não adiciona

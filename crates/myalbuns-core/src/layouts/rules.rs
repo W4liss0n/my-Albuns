@@ -100,10 +100,19 @@ impl LayoutRules {
             algorithm_version: generation.algorithm_version,
             generation_status: generation.status,
             candidates: Vec::new(),
+            cycle_order: Vec::new(),
         };
         if generation.status == LayoutGenerationStatus::InvalidQuery {
             return listing;
         }
+        // Cycle key of each candidate: group rank, then natural position. The
+        // last applied Layout takes the key of the entry it replaced; when it
+        // matches nothing, it opens its group.
+        let rank = |origin: LayoutOrigin, favorite: bool| {
+            u8::from(origin != LayoutOrigin::Custom) * 2 + u8::from(!favorite)
+        };
+        let mut keys: Vec<Option<(u8, usize)>> = Vec::new();
+        let mut natural = 1usize;
         let accepts = |definition: &LayoutDefinition| {
             compatible(definition, query)
                 || allow_larger
@@ -119,6 +128,7 @@ impl LayoutRules {
                 custom_id: sources.custom_id(last),
                 favorite_id: sources.favorite_id(last),
             });
+            keys.push(None);
         }
         let mut favorites: Vec<_> = sources.favorites.iter().collect();
         favorites.sort_by_key(|item| (item.order, item.id));
@@ -126,10 +136,13 @@ impl LayoutRules {
             .into_iter()
             .filter(|item| accepts(&item.layout.definition))
         {
-            if listing.candidates.iter().any(|item| {
+            let key = (rank(favorite.layout.origin, true), natural);
+            natural += 1;
+            if let Some(existing) = listing.candidates.iter().position(|item| {
                 item.layout.origin == favorite.layout.origin
                     && Self::same_definition(&item.layout.definition, &favorite.layout.definition)
             }) {
+                keys[existing].get_or_insert(key);
                 continue;
             }
             listing.candidates.push(LayoutCandidate {
@@ -138,16 +151,20 @@ impl LayoutRules {
                 custom_id: sources.custom_id(&favorite.layout),
                 favorite_id: Some(favorite.id),
             });
+            keys.push(Some(key));
         }
         for custom in sources
             .custom
             .iter()
             .filter(|item| accepts(&item.definition))
         {
-            if listing.candidates.iter().any(|item| {
+            let key = (rank(LayoutOrigin::Custom, false), natural);
+            natural += 1;
+            if let Some(existing) = listing.candidates.iter().position(|item| {
                 item.layout.origin == LayoutOrigin::Custom
                     && Self::same_definition(&item.layout.definition, &custom.definition)
             }) {
+                keys[existing].get_or_insert(key);
                 continue;
             }
             listing.candidates.push(LayoutCandidate {
@@ -159,12 +176,16 @@ impl LayoutRules {
                 custom_id: Some(custom.id),
                 favorite_id: None,
             });
+            keys.push(Some(key));
         }
         for candidate in &generation.candidates {
-            if listing.candidates.iter().any(|item| {
+            let key = (rank(LayoutOrigin::Automatic, false), natural);
+            natural += 1;
+            if let Some(existing) = listing.candidates.iter().position(|item| {
                 item.layout.origin == LayoutOrigin::Automatic
                     && Self::same_definition(&item.layout.definition, &candidate.definition)
             }) {
+                keys[existing].get_or_insert(key);
                 continue;
             }
             listing.candidates.push(LayoutCandidate {
@@ -176,7 +197,19 @@ impl LayoutRules {
                 custom_id: None,
                 favorite_id: None,
             });
+            keys.push(Some(key));
         }
+        let mut order: Vec<usize> = (0..listing.candidates.len()).collect();
+        order.sort_by_key(|&index| {
+            keys[index].unwrap_or_else(|| {
+                let candidate = &listing.candidates[index];
+                (
+                    rank(candidate.layout.origin, candidate.favorite_id.is_some()),
+                    0,
+                )
+            })
+        });
+        listing.cycle_order = order;
         listing
     }
 
@@ -225,35 +258,41 @@ impl LayoutRules {
         if listing.generation_status == LayoutGenerationStatus::InvalidQuery {
             return Err(CoreError::InvalidLayoutQuery);
         }
-        // Saved layouts remain available for explicit selection. Automatic
-        // arrangement must preserve the orientation of each current Frame and
-        // never prints a Photo to the edges of a whole Page on its own.
-        // Priority: the last applied Layout, then custom favorites, custom,
-        // automatic favorites and automatic. The sort is stable, so each group
-        // keeps the listing order. The keyboard Layout cycle uses the same groups.
-        let mut prioritized: Vec<&LayoutCandidate> = listing.candidates.iter().collect();
-        prioritized.sort_by_key(|candidate| {
-            if candidate.is_last_applied {
-                0
-            } else {
-                1 + u8::from(candidate.layout.origin != LayoutOrigin::Custom) * 2
-                    + u8::from(candidate.favorite_id.is_none())
-            }
-        });
+        // Priority: the last applied Layout, then the cycle order (custom
+        // favorites, custom, automatic favorites, automatic). A custom Layout is
+        // the user's own geometry and applies as saved. An automatic one must
+        // preserve the orientation of each current Frame and never prints a
+        // Photo to the edges of a whole Page on its own.
+        let last = listing
+            .candidates
+            .first()
+            .filter(|item| item.is_last_applied)
+            .map(|_| 0);
+        let prioritized = last
+            .into_iter()
+            .chain(
+                listing
+                    .cycle_order
+                    .iter()
+                    .copied()
+                    .filter(|&index| Some(index) != last),
+            )
+            .map(|index| &listing.candidates[index]);
         if let Some(candidate) = prioritized.into_iter().find(|candidate| {
             let positions = &candidate.layout.definition.positions;
-            positions
-                .iter()
-                .zip(&query.frame_orientations)
-                .all(|(rect, orientation)| match orientation {
-                    Some(FrameOrientation::Vertical) => rect.width < rect.height,
-                    Some(FrameOrientation::Horizontal) => rect.width > rect.height,
-                    Some(FrameOrientation::Square) => rect.width == rect.height,
-                    None => true,
-                })
-                && !positions
+            candidate.layout.origin == LayoutOrigin::Custom
+                || positions
                     .iter()
-                    .any(|rect| fills_a_page(rect, &candidate.layout.definition.surface))
+                    .zip(&query.frame_orientations)
+                    .all(|(rect, orientation)| match orientation {
+                        Some(FrameOrientation::Vertical) => rect.width < rect.height,
+                        Some(FrameOrientation::Horizontal) => rect.width > rect.height,
+                        Some(FrameOrientation::Square) => rect.width == rect.height,
+                        None => true,
+                    })
+                    && !positions
+                        .iter()
+                        .any(|rect| fills_a_page(rect, &candidate.layout.definition.surface))
         }) {
             Self::resolve(
                 &candidate.layout,

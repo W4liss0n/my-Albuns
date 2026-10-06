@@ -2,7 +2,7 @@
 status: accepted
 document: design
 date: 2026-09-09
-updated: 2026-10-05
+updated: 2026-10-06
 ticket: 29
 implementation-readiness: ready-for-agent
 ---
@@ -44,11 +44,15 @@ Automáticos favoritos, Gerador e reserva. Dentro de cada grupo vale a ordem
 da listagem (`order` dos Favoritos, criação dos Personalizados, nota do
 Gerador). Antes, todo Favorito precedia os Personalizados sem estrela.
 
-A troca por teclado (`↑` e `↓`, design 0018) usa os mesmos grupos:
-a interface reordena a listagem recebida de forma estável por origem e por
-estrela, o que resulta em Personalizados favoritos, Personalizados, Automáticos
-favoritos e Automáticos. Dentro de cada grupo vale a ordem da listagem, e o
-Último Layout conserva a primeira posição do seu grupo, como o painel mostra.
+A troca por teclado (`↑` e `↓`, design 0018) usa os mesmos grupos. Desde
+06/10/2026 o Core devolve em `LayoutListing.cycleOrder` os índices dos
+candidatos nessa ordem: Personalizados favoritos, Personalizados, Automáticos
+favoritos e Automáticos, cada grupo na ordem da listagem. O Último Layout
+conserva no ciclo a posição natural da entrada que ele substituiu (o painel
+continua mostrando-o primeiro na sua seção); assim avançar a partir dele chega
+ao candidato seguinte, e não ao primeiro do grupo, o que fazia o ciclo alternar
+entre dois Layouts. A escolha automática percorre a mesma ordem depois do
+Último Layout.
 
 A cópia favorita continua disponível quando a origem global muda ou desaparece.
 A lixeira só aparece quando existe uma entrada global da mesma geometria.

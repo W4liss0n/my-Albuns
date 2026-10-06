@@ -2,4 +2,10 @@
 import type { LayoutCandidate } from "./LayoutCandidate";
 import type { LayoutGenerationStatus } from "./LayoutGenerationStatus";
 
-export type LayoutListing = { algorithmVersion: number, generationStatus: LayoutGenerationStatus, candidates: Array<LayoutCandidate>, };
+export type LayoutListing = { algorithmVersion: number, generationStatus: LayoutGenerationStatus, candidates: Array<LayoutCandidate>, 
+/**
+ * Candidate indices in cycle order: custom favorites, custom, automatic
+ * favorites, automatic. The last applied Layout keeps the position of the
+ * entry it replaced, so stepping through the cycle never loops back.
+ */
+cycleOrder: Array<number>, };

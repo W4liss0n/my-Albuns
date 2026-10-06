@@ -336,3 +336,133 @@ fn favorite_order_is_persistent_with_identity_tiebreak_and_last_keeps_precedence
         candidates
     );
 }
+
+#[test]
+fn the_cycle_order_keeps_the_last_applied_layout_in_its_natural_position() {
+    use myalbuns_core::*;
+    let query: LayoutQuery = serde_json::from_value(serde_json::json!({
+        "surface":{"type":"doubleSheet","widthUm":600000,"heightUm":300000},
+        "frameOrientations":["vertical","vertical","horizontal"],"permission":"pagesAndSheet", "marginUm":15000,
+        "gapUm":5000,"minimumSideUm":20000
+    }))
+    .unwrap();
+    let generated = LayoutRules::list(&query, Default::default());
+    assert!(generated.candidates.len() >= 3);
+    assert_eq!(
+        generated.cycle_order,
+        (0..generated.candidates.len()).collect::<Vec<_>>()
+    );
+    // Apply the second suggestion: it moves to the front of the listing but
+    // keeps its second place in the cycle, so next goes to the third one.
+    let last = generated.candidates[1].layout.clone();
+    let listing = LayoutRules::list(
+        &query,
+        LayoutSources {
+            last: Some(&last),
+            ..Default::default()
+        },
+    );
+    assert!(listing.candidates[0].is_last_applied);
+    assert_eq!(listing.candidates[1].layout, generated.candidates[0].layout);
+    assert_eq!(listing.cycle_order[0], 1);
+    assert_eq!(listing.cycle_order[1], 0);
+    assert_eq!(
+        listing.candidates[listing.cycle_order[2]].layout,
+        generated.candidates[2].layout
+    );
+    // A last Layout outside the catalog opens its group.
+    let foreign = StoredLayout {
+        origin: LayoutOrigin::Custom,
+        definition: LayoutDefinition {
+            surface: query.surface.clone(),
+            scope: LayoutScope::Page,
+            positions: vec![
+                RectUm {
+                    x: 20000,
+                    y: 20000,
+                    width: 60000,
+                    height: 120000,
+                },
+                RectUm {
+                    x: 110000,
+                    y: 20000,
+                    width: 60000,
+                    height: 120000,
+                },
+                RectUm {
+                    x: 320000,
+                    y: 20000,
+                    width: 240000,
+                    height: 120000,
+                },
+            ],
+        },
+    };
+    let listing = LayoutRules::list(
+        &query,
+        LayoutSources {
+            last: Some(&foreign),
+            ..Default::default()
+        },
+    );
+    assert_eq!(listing.cycle_order[0], 0);
+}
+
+#[test]
+fn automatic_arrangement_applies_a_custom_layout_as_saved_but_filters_automatic_ones() {
+    use myalbuns_core::*;
+    let query: LayoutQuery = serde_json::from_value(serde_json::json!({
+        "surface":{"type":"singlePage","widthUm":210000,"heightUm":300000},
+        "frameOrientations":["vertical"],"permission":"pagesOnly", "marginUm":15000,
+        "gapUm":5000,"minimumSideUm":20000
+    }))
+    .unwrap();
+    let horizontal = |origin| StoredLayout {
+        origin,
+        definition: LayoutDefinition {
+            surface: query.surface.clone(),
+            scope: LayoutScope::Page,
+            positions: vec![RectUm {
+                x: 20000,
+                y: 40000,
+                width: 150000,
+                height: 90000,
+            }],
+        },
+    };
+    let ids = [Uuid::new_v4()];
+    // A favorited automatic Layout that changes the Frame orientation is skipped.
+    let favorites = [FavoriteLayout {
+        id: LayoutFavoriteId::generate(),
+        order: 1,
+        layout: horizontal(LayoutOrigin::Automatic),
+    }];
+    let chosen = LayoutRules::automatic(
+        &query,
+        LayoutSources {
+            favorites: &favorites,
+            ..Default::default()
+        },
+        &ids,
+    )
+    .unwrap();
+    assert_ne!(chosen.last_layout(), Some(&favorites[0].layout));
+    // The same geometry saved as a custom Layout applies as the user saved it.
+    let custom = [CustomLayout {
+        id: CustomLayoutId::generate(),
+        definition: horizontal(LayoutOrigin::Custom).definition,
+    }];
+    let chosen = LayoutRules::automatic(
+        &query,
+        LayoutSources {
+            custom: &custom,
+            ..Default::default()
+        },
+        &ids,
+    )
+    .unwrap();
+    assert_eq!(
+        chosen.last_layout(),
+        Some(&horizontal(LayoutOrigin::Custom))
+    );
+}

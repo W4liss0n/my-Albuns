@@ -13,7 +13,7 @@ const frames = initial.composition.sheets[0].frames;
 function query(id: string, target = sheetId, revision = initial.state.revision): LayoutQueryResult {
   return { queryId: id, projectId: initial.state.projectId, revision, catalogRevision: 0, sheetId: target,
     frameCount: frames.length, locked: false, candidateRequiresLock: [false], settings: { permission: "pagesAndSheet", marginUm: 15000, gapUm: 5000, minimumSideUm: 20000 },
-    listing: { algorithmVersion: 1, generationStatus: "candidates", candidates: [
+    listing: { algorithmVersion: 1, generationStatus: "candidates", cycleOrder: [0], candidates: [
       { isLastApplied: false, customId: null, favoriteId: null, layout: { origin: "automatic", definition: {
         surface: { type: "doubleSheet", widthUm: 600000, heightUm: 300000 }, scope: "page",
         positions: frames.map((frame) => frame.clipRect),

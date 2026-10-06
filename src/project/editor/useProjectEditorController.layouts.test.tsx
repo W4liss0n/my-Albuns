@@ -57,7 +57,7 @@ function harness(pendingKind: "applyLayout" | "lockLayout" | "unlockLayout" | "s
         queryId: `prepared-${++querySequence}`, revision: authoritative.state.revision,
         locked: authoritative.state.album.sheets[0].layoutLocked };
       if (candidates) {
-        query.listing = { ...query.listing, candidates: structuredClone(candidates) };
+        query.listing = { ...query.listing, candidates: structuredClone(candidates), cycleOrder: [1, 3, 2, 0, 4] };
         query.candidateRequiresLock = candidates.map(() => false);
       }
       prepared = query;

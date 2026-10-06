@@ -221,6 +221,11 @@ pub struct LayoutListing {
     pub algorithm_version: u32,
     pub generation_status: LayoutGenerationStatus,
     pub candidates: Vec<LayoutCandidate>,
+    /// Candidate indices in cycle order: custom favorites, custom, automatic
+    /// favorites, automatic. The last applied Layout keeps the position of the
+    /// entry it replaced, so stepping through the cycle never loops back.
+    #[serde(default)]
+    pub cycle_order: Vec<usize>,
 }
 
 impl LayoutSurface {
