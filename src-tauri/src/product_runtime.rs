@@ -504,6 +504,7 @@ fn setup_host(
     #[cfg(debug_assertions)]
     desktop_webview_policy::retire_inherited_debug_arguments_before_replacement()?;
     project_window.set_title(&initial_window_title)?;
+    app.manage(register_open_project(&app_paths));
     app.manage(app_paths);
     let app_handle = app.handle().clone();
     let startup_handshake = app.state::<ProjectStartupHandshake>().inner().clone();
@@ -555,6 +556,18 @@ fn setup_host(
         );
     });
     Ok(())
+}
+
+fn register_open_project(app_paths: &AppPaths) -> crate::open_projects::OpenProjectPresence {
+    crate::open_projects::OpenProjectPresence::register(app_paths).unwrap_or_else(|error| {
+        tracing::warn!(
+            target: "myalbuns.desktop",
+            process_role = ProcessRole::DesktopHost.as_str(),
+            error = %error,
+            event = "open_project_registration_failed",
+        );
+        crate::open_projects::OpenProjectPresence::unregistered()
+    })
 }
 
 /// Opens the Project window the way the last one was closed. Returns the

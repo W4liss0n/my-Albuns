@@ -9,7 +9,7 @@ use myalbuns_logging::ProcessRole;
 use myalbuns_paths::AppPaths;
 use tauri::{Manager, Window};
 
-use crate::export_attempts::ExportAttempts;
+use crate::{export_attempts::ExportAttempts, open_projects::OpenProjectPresence};
 
 pub(crate) const PROJECT_CLOSE_CONFIRMATION_EVENT: &str =
     "myalbuns://project-close-confirmation-requested";
@@ -94,7 +94,8 @@ pub(crate) fn request_window_export_cancellation(window: &Window) -> ExportAttem
     attempts
 }
 
-/// Ends a consumed Project Host and starts a fresh global entry point.
+/// Ends a consumed Project Host and, when no other Project remains open,
+/// starts a fresh global entry point.
 ///
 /// No Project path or creative state crosses this process boundary. The
 /// caller must consume the EditableProject before reaching this function.
@@ -109,7 +110,9 @@ pub(crate) fn complete_project_close(window: &Window) {
     tauri::async_runtime::spawn(async move {
         attempts.wait_for_window_to_finish(window.label()).await;
 
-        if let Err(error) = launch_clean_global_entry() {
+        if !other_projects_remain_open(&window)
+            && let Err(error) = launch_clean_global_entry()
+        {
             tracing::error!(
                 target: "myalbuns.desktop",
                 process_role = ProcessRole::DesktopHost.as_str(),
@@ -130,6 +133,41 @@ pub(crate) fn complete_project_close(window: &Window) {
         }
         window.app_handle().exit(0);
     });
+}
+
+/// Reports whether closing this Project leaves other Projects open, in which
+/// case the Welcome screen stays closed. When that cannot be known, the
+/// Welcome screen returns so the application never disappears.
+fn other_projects_remain_open(window: &Window) -> bool {
+    let (Some(presence), Some(app_paths)) = (
+        window.try_state::<OpenProjectPresence>(),
+        window.try_state::<AppPaths>(),
+    ) else {
+        return false;
+    };
+    match presence.release_and_check_last(&app_paths) {
+        Ok(last) => {
+            if !last {
+                tracing::info!(
+                    target: "myalbuns.desktop",
+                    process_role = ProcessRole::DesktopHost.as_str(),
+                    window_label = window.label(),
+                    event = "welcome_kept_closed_for_open_projects",
+                );
+            }
+            !last
+        }
+        Err(error) => {
+            tracing::warn!(
+                target: "myalbuns.desktop",
+                process_role = ProcessRole::DesktopHost.as_str(),
+                window_label = window.label(),
+                error = %error,
+                event = "open_projects_check_failed",
+            );
+            false
+        }
+    }
 }
 
 /// Records how the Project window is being left so the next Project opens the

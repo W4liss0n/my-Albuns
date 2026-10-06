@@ -52,6 +52,7 @@ mod native_dialog_taskbar;
 mod native_dialog_window;
 mod native_project_dialog;
 mod opaque_image_protocol;
+mod open_projects;
 mod operation_gate;
 mod operation_lease;
 mod path_io;
