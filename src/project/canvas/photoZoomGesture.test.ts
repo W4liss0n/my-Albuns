@@ -17,7 +17,7 @@ test("groups consecutive wheel events into one Photo Zoom commit", () => {
   });
 
   expect(transition.interruptedCommit).toBeNull();
-  expect(transition.previewZoom).toBeCloseTo(1.12, 6);
+  expect(transition.previewZoom).toBeCloseTo(1.06, 6);
 
   transition = advancePhotoZoomGesture(transition.gesture, {
     frameId: "frame-a",
@@ -32,10 +32,10 @@ test("groups consecutive wheel events into one Photo Zoom commit", () => {
     wheelDeltaY: -100,
   });
 
-  expect(transition.previewZoom).toBeCloseTo(1.36, 6);
+  expect(transition.previewZoom).toBeCloseTo(1.18, 6);
   const commit = finishPhotoZoomGesture(transition.gesture);
   expect(commit?.frameId).toBe("frame-a");
-  expect(commit?.delta).toBeCloseTo(0.36, 6);
+  expect(commit?.delta).toBeCloseTo(0.18, 6);
 });
 
 test("finishes the previous Frame before starting another gesture", () => {
@@ -53,9 +53,9 @@ test("finishes the previous Frame before starting another gesture", () => {
   });
 
   expect(second.interruptedCommit?.frameId).toBe("frame-a");
-  expect(second.interruptedCommit?.delta).toBeCloseTo(0.12, 6);
+  expect(second.interruptedCommit?.delta).toBeCloseTo(0.06, 6);
   expect(second.gesture.frameId).toBe("frame-b");
-  expect(second.previewZoom).toBeCloseTo(1.88, 6);
+  expect(second.previewZoom).toBeCloseTo(1.94, 6);
 });
 
 test("keeps Photo Zoom within the domain range", () => {

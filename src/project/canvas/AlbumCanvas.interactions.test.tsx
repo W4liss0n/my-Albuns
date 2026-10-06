@@ -351,7 +351,7 @@ test("does not reset an active Pan preview when wheel Zoom starts", async () => 
   expect(onTransformCommit.mock.calls[0][0]).toMatchObject({
     frameId: "frame-001",
     deltaPanY: 0,
-    deltaZoom: expect.closeTo(0.12, 6),
+    deltaZoom: expect.closeTo(0.06, 6),
   });
   expect(
     onTransformCommit.mock.calls[0][0].deltaPanX,
@@ -397,7 +397,7 @@ test("previews a smooth wheel zoom and commits the sequence once", async () => {
 
   wheel();
   expect(photoLayer.scale.y).toBeGreaterThan(1);
-  expect(photoLayer.position.x).toBeCloseTo(83.4, 1);
+  expect(photoLayer.position.x).toBeCloseTo(94.2, 1);
   expect(onTransformPreview).toHaveBeenLastCalledWith({
     frameId: "frame-001",
     panX: -0.9,
