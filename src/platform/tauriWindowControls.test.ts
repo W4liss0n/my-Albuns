@@ -24,6 +24,7 @@ vi.mock("@tauri-apps/api/window", () => ({
 }));
 
 let tauriWindowControls: typeof import("./tauriWindowControls").tauriWindowControls;
+let withLoggedProjectClose: typeof import("./tauriWindowControls").withLoggedProjectClose;
 
 beforeEach(async () => {
   vi.resetModules();
@@ -40,7 +41,7 @@ beforeEach(async () => {
     520,
   );
   vi.spyOn(window.screen, "availHeight", "get").mockReturnValue(900);
-  ({ tauriWindowControls } = await import("./tauriWindowControls"));
+  ({ tauriWindowControls, withLoggedProjectClose } = await import("./tauriWindowControls"));
 });
 
 afterEach(() => {
@@ -203,4 +204,30 @@ test("retries the readiness handshake without resizing again", async () => {
   expect(coreApi.fitBounds).toHaveBeenCalledOnce();
   expect(windowApi.center).not.toHaveBeenCalled();
   expect(coreApi.ready).toHaveBeenCalledTimes(2);
+});
+
+test("a Project window close records the click before asking the window to close", async () => {
+  const write = vi.fn();
+  const controls = withLoggedProjectClose(tauriWindowControls, { write });
+
+  await controls.close();
+
+  expect(write).toHaveBeenCalledExactlyOnceWith({
+    level: "info", component: "project-close", event: "window_close_clicked",
+  });
+  expect(windowApi.close).toHaveBeenCalledOnce();
+});
+
+test("a Project window close that the window rejects is recorded and still fails", async () => {
+  const write = vi.fn();
+  const failure = Object.assign(new Error("denied"), { code: "PermissionDenied" });
+  windowApi.close.mockRejectedValueOnce(failure);
+  const controls = withLoggedProjectClose(tauriWindowControls, { write });
+
+  await expect(controls.close()).rejects.toBe(failure);
+
+  expect(write).toHaveBeenLastCalledWith({
+    level: "warn", component: "project-close", event: "window_close_failed",
+    reason: "permission_denied",
+  });
 });

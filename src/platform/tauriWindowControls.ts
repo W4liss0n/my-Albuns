@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 
+import { logReasonFromError, type Logger } from "../application/logging";
 import type { WindowControls } from "../ui/WindowControlsContext";
 
 const MIN_OWNED_WINDOW_HEIGHT = 120;
@@ -114,3 +115,30 @@ export const tauriWindowControls: WindowControls = {
   minimize: () => getCurrentWindow().minimize(),
   toggleMaximize: () => getCurrentWindow().toggleMaximize(),
 };
+
+/**
+ * Records each close the Project window asks for. A click that never becomes a
+ * native close request leaves this trace and nothing in the Host log.
+ */
+export function withLoggedProjectClose(
+  controls: WindowControls,
+  logger: Logger,
+): WindowControls {
+  return {
+    ...controls,
+    close: async () => {
+      logger.write({
+        level: "info", component: "project-close", event: "window_close_clicked",
+      });
+      try {
+        await controls.close();
+      } catch (error: unknown) {
+        logger.write({
+          level: "warn", component: "project-close", event: "window_close_failed",
+          reason: logReasonFromError(error),
+        });
+        throw error;
+      }
+    },
+  };
+}

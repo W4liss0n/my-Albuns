@@ -12,14 +12,21 @@ use crate::{
     settings_window::SETTINGS_WINDOW_LABEL,
 };
 
+const BLOCK_CONFIRMATIONS: usize = 2;
+
 pub(crate) struct ApplicationModality {
-    gate: NamedMutex,
-    batch: NamedMutex,
+    owners: ModalityOwners,
     blocked: Mutex<HashMap<isize, (WebviewWindow, bool)>>,
 }
 
-impl ApplicationModality {
-    pub(crate) fn new(paths: &AppPaths) -> Self {
+/// The kernel mutexes that say whether Settings or batch export owns input.
+struct ModalityOwners {
+    gate: NamedMutex,
+    batch: NamedMutex,
+}
+
+impl ModalityOwners {
+    fn new(paths: &AppPaths) -> Self {
         Self {
             batch: crate::batch_exclusivity::gate(paths),
             gate: NamedMutex::scoped(
@@ -28,6 +35,44 @@ impl ApplicationModality {
                 "application",
                 "settings-modal-owner",
             ),
+        }
+    }
+
+    fn is_active(&self) -> bool {
+        // A failed observation must not permit a project to close under Settings.
+        self.gate.is_owned().unwrap_or(true)
+    }
+
+    fn batch_active(&self) -> bool {
+        self.batch.is_owned().unwrap_or(true)
+    }
+
+    /// Names what currently owns the application, when this window may not act.
+    fn block_reason(&self, label: &str) -> Option<&'static str> {
+        if self.batch_active() {
+            (label != "batch-progress").then_some("batch_export_active")
+        } else {
+            (self.is_active() && label != SETTINGS_WINDOW_LABEL).then_some("settings_open")
+        }
+    }
+
+    /// Every ownership probe holds the free mutex for an instant, so a probe
+    /// from another thread or process can look like Settings or batch export.
+    /// Refusing a person's request needs the block to persist.
+    fn confirmed_block_reason(&self, label: &str) -> Option<&'static str> {
+        let mut reason = self.block_reason(label)?;
+        for _ in 0..BLOCK_CONFIRMATIONS {
+            std::thread::sleep(Duration::from_millis(1));
+            reason = self.block_reason(label)?;
+        }
+        Some(reason)
+    }
+}
+
+impl ApplicationModality {
+    pub(crate) fn new(paths: &AppPaths) -> Self {
+        Self {
+            owners: ModalityOwners::new(paths),
             blocked: Mutex::new(HashMap::new()),
         }
     }
@@ -40,7 +85,7 @@ impl ApplicationModality {
         // Settings requests themselves are serialized by SettingsWindowState.
         let deadline = std::time::Instant::now() + Duration::from_secs(2);
         loop {
-            match self.gate.try_acquire() {
+            match self.owners.gate.try_acquire() {
                 Ok(grant) => return Ok(grant),
                 Err(NamedMutexError::Conflict) if std::time::Instant::now() < deadline => {
                     tokio::time::sleep(Duration::from_millis(10)).await;
@@ -53,20 +98,15 @@ impl ApplicationModality {
     }
 
     pub(crate) fn is_active(&self) -> bool {
-        // A failed observation must not permit a project to close under Settings.
-        self.gate.is_owned().unwrap_or(true)
+        self.owners.is_active()
     }
 
     pub(crate) fn batch_active(&self) -> bool {
-        self.batch.is_owned().unwrap_or(true)
+        self.owners.batch_active()
     }
 
     fn allows(&self, label: &str) -> bool {
-        if self.batch_active() {
-            label == "batch-progress"
-        } else {
-            !self.is_active() || label == SETTINGS_WINDOW_LABEL
-        }
+        self.owners.block_reason(label).is_none()
     }
 
     /// Called only on the window thread, including restoration after close.
@@ -148,10 +188,21 @@ pub(crate) async fn synchronize(app: &AppHandle) -> Result<(), String> {
         .map_err(|_| "Não foi possível bloquear as janelas do Álbum.".into())
 }
 
+/// Decides a close request or close command from this window.
 pub(crate) fn blocks(window: &Window) -> bool {
-    window
+    let Some(reason) = window
         .try_state::<ApplicationModality>()
-        .is_some_and(|state| !state.allows(window.label()))
+        .and_then(|state| state.owners.confirmed_block_reason(window.label()))
+    else {
+        return false;
+    };
+    tracing::info!(
+        target: "myalbuns.desktop",
+        window_label = window.label(),
+        reason,
+        event = "window_close_blocked_by_modality",
+    );
+    true
 }
 
 pub(crate) fn on_window_event(window: &Window, event: &WindowEvent) -> bool {
@@ -197,6 +248,33 @@ mod tests {
             assert!(!host.is_owned().unwrap());
             assert!(!settings.is_owned().unwrap());
         });
+    }
+
+    #[test]
+    fn close_requests_name_the_owner_that_blocks_them() {
+        let root = tempfile::tempdir().unwrap();
+        let paths = AppPaths::from_roots(root.path(), root.path());
+        let owners = ModalityOwners::new(&paths);
+        assert_eq!(owners.confirmed_block_reason("project"), None);
+
+        let settings = owners.gate.try_acquire().unwrap();
+        assert_eq!(
+            owners.confirmed_block_reason("project"),
+            Some("settings_open")
+        );
+        assert_eq!(owners.confirmed_block_reason(SETTINGS_WINDOW_LABEL), None);
+        drop(settings);
+
+        let batch = crate::batch_exclusivity::gate(&paths)
+            .try_acquire()
+            .unwrap();
+        assert_eq!(
+            owners.confirmed_block_reason("project"),
+            Some("batch_export_active")
+        );
+        assert_eq!(owners.confirmed_block_reason("batch-progress"), None);
+        drop(batch);
+        assert_eq!(owners.confirmed_block_reason("project"), None);
     }
 
     #[test]

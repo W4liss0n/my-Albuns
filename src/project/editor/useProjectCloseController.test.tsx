@@ -1,5 +1,8 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
+import type { ReactNode } from "react";
 import { expect, test, vi } from "vitest";
+
+import type { Logger } from "../../application/logging";
 
 import type {
   ProjectDialogAction,
@@ -13,6 +16,7 @@ import {
 } from "../../application/projectPorts";
 import type { ProjectMutationOutcome } from "../../application/projectMutation";
 import { representativeProjection } from "../../test/projectFixtures";
+import { LoggingProvider } from "../loggingContext";
 import { useProjectCloseController } from "./useProjectCloseController";
 
 const confirmation = { busy: false, kind: "projectCloseConfirmation" as const };
@@ -68,6 +72,7 @@ function closeHarness(
   );
   const onProjectionChange = vi.fn();
   const onError = vi.fn();
+  const write = vi.fn<Logger["write"]>();
   const projectDialogPort: ProjectDialogPort = { acquire };
   const view = renderHook(
     (props: { formatConversionPending?: boolean; requestBlocked?: boolean }) =>
@@ -79,7 +84,12 @@ function closeHarness(
         projectWindowPort: windowPort,
         waitForPendingMutations,
       }),
-    { initialProps },
+    {
+      initialProps,
+      wrapper: ({ children }: { children: ReactNode }) => (
+        <LoggingProvider logger={{ write }}>{children}</LoggingProvider>
+      ),
+    },
   );
   return {
     ...view,
@@ -87,6 +97,8 @@ function closeHarness(
     dismiss,
     emit: (action: ProjectDialogAction) => sessions[sessions.length - 1]?.emit(action),
     emitCloseRequested: () => closeRequested?.(),
+    /** The close diagnostics written so far, as `[event, reason]`. */
+    loggedClose: () => write.mock.calls.map(([event]) => [event.event, event.reason]),
     onError,
     onProjectionChange,
     present,
@@ -261,6 +273,7 @@ test.each([
   expect(harness.acquire).not.toHaveBeenCalled();
   expect(harness.onError).not.toHaveBeenCalled();
   expect(harness.result.current.interactionBlocked).toBe(false);
+  expect(harness.loggedClose()).toContainEqual(["project_close_request_dropped", pending.status]);
 });
 
 test.each([
@@ -279,6 +292,10 @@ test.each([
   expect(harness.onProjectionChange).toHaveBeenCalledExactlyOnceWith(representativeProjection);
   expect(harness.onError).not.toHaveBeenCalled();
   expect(harness.result.current.interactionBlocked).toBe(false);
+  expect(harness.loggedClose()).toEqual([
+    ["project_close_native_received", undefined],
+    ["project_close_native_released", pending.status],
+  ]);
 });
 
 test("a native close that cannot be released reports the failure and returns to idle", async () => {
@@ -311,6 +328,11 @@ test("a blocked workspace releases a native close and ignores the application co
   expect(harness.waitForPendingMutations).not.toHaveBeenCalled();
   expect(harness.acquire).not.toHaveBeenCalled();
   expect(harness.result.current.interactionBlocked).toBe(false);
+  expect(harness.loggedClose()).toEqual([
+    ["project_close_request_ignored", "workspace_blocked"],
+    ["project_close_native_received", undefined],
+    ["project_close_native_released", "workspace_blocked"],
+  ]);
 });
 
 test("a confirmation that cannot be presented cancels the close and reports why", async () => {
@@ -457,6 +479,11 @@ test("a second close request while a decision is pending is ignored", async () =
   expect(harness.present).toHaveBeenCalledExactlyOnceWith(confirmation);
   expect(harness.windowPort.requestClose).not.toHaveBeenCalled();
   expect(harness.windowPort.resolveClose).not.toHaveBeenCalled();
+  expect(harness.loggedClose()).toEqual([
+    ["project_close_native_received", undefined],
+    ["project_close_native_ignored", "deciding"],
+    ["project_close_request_ignored", "deciding"],
+  ]);
 });
 
 test("a native close repeated while pending mutations settle opens one confirmation", async () => {
