@@ -503,7 +503,7 @@ async function openPhotoImportDialog(driver, label) {
   await clickWhenEnabled(
     driver,
     "xpath",
-    "//*[@role='menu' and @aria-label='Importar']//button[normalize-space()='Arquivos…']",
+    "//*[@role='menu' and @aria-label='Importar']//button[@aria-label='Arquivos…']",
     label,
   );
 }
@@ -572,7 +572,7 @@ async function ensureInspectorSectionExpanded(driver, title, label) {
 async function findAlbumInformationDpi(driver, label) {
   await ensureInspectorSectionExpanded(
     driver,
-    "Informações do Álbum",
+    "Informações do álbum",
     `${label} section`,
   );
   return findElement(driver, "css selector", "input[aria-label='DPI']", label);
@@ -581,7 +581,7 @@ async function findAlbumInformationDpi(driver, label) {
 async function replaceAlbumInformationDpi(driver, value, label) {
   await ensureInspectorSectionExpanded(
     driver,
-    "Informações do Álbum",
+    "Informações do álbum",
     `${label} section`,
   );
   return replaceInput(
@@ -603,7 +603,7 @@ async function applyAlbumInformation(driver, label) {
 
   await clickProjectDialogAction(
     driver,
-    "Aplicar alterações no Álbum?",
+    "Aplicar alterações no álbum?",
     "Aplicar",
     `${label} confirmation`,
   );
@@ -1073,24 +1073,37 @@ try {
     "button[aria-label='Continuar']",
     "creation next action",
   );
+  // The background color is chosen through the shared color popover.
+  await click(
+    globalDriver,
+    "css selector",
+    "button[aria-label='Cor do fundo']",
+    "background color trigger",
+  );
   await changeFormControl(
     globalDriver,
+    "css selector",
+    "input[aria-label='Código da cor do fundo']",
+    personalizedBackgroundRgb,
+    "Background color code",
+  );
+  await clickWhenEnabled(
+    globalDriver,
     "xpath",
-    "//label[.//span[normalize-space()='Cor do Background']]//input[@type='color']",
-    personalizedBackgroundRgb.toLowerCase(),
-    "Background color",
+    "//*[@role='dialog' and @aria-label='Escolher cor do fundo']//button[normalize-space()='Aplicar cor']",
+    "background color apply action",
   );
   await clickWhenEnabled(
     globalDriver,
     "css selector",
-    "button[aria-label='Criar Projeto']",
+    "button[aria-label='Criar projeto']",
     "creation action",
   );
   await delay(250);
   const cancelledCreation = driveNativeDialog(
     firstGlobal,
     "cancel",
-    "Criar Projeto MyAlbuns",
+    "Criar projeto MyAlbuns",
   );
   if (
     cancelledCreation.action !== "cancel" ||
@@ -1103,14 +1116,14 @@ try {
   await clickUntilLogEvent(
     globalDriver,
     "css selector",
-    "button[aria-label='Criar Projeto']",
+    "button[aria-label='Criar projeto']",
     "native_save_dialog_opening",
     "creation retry action",
   );
   const selectedCreation = driveNativeDialog(
     firstGlobal,
     "select",
-    "Criar Projeto MyAlbuns",
+    "Criar projeto MyAlbuns",
     projectPath,
   );
   if (selectedCreation.action !== "select") {
@@ -1256,7 +1269,7 @@ try {
   await findElement(
     hostDriver,
     "xpath",
-    "//*[normalize-space()='Frame selecionado']",
+    "//*[normalize-space()='Quadro selecionado']",
     "affected Frame contextual selection",
   );
   await waitForLogEvent(
@@ -1335,7 +1348,7 @@ try {
   await selectApplicationMenuCommandUntilLogEvent(
     hostDriver,
     "Arquivo",
-    "Fechar Projeto",
+    "Fechar projeto",
     "clean_project_close_requested",
     "saved Project close",
   );
@@ -1460,7 +1473,7 @@ try {
   await findElement(
     hostDriver,
     "xpath",
-    "//button[.//span[normalize-space()='Design do Álbum']]",
+    "//button[.//span[normalize-space()='Design do álbum']]",
     "Album inspector after leaving edit mode",
   );
 
@@ -1713,7 +1726,7 @@ try {
     JSON.stringify([
       "Agora não",
       "Abrir última versão salva",
-      "Reabrir e recuperar",
+      "Recuperar e abrir",
     ])
   ) {
     throw new Error(
@@ -1733,7 +1746,7 @@ try {
     recoveryPresentation.fullPageRecoveryCount !== 0 ||
     recoveryPresentation.ariaModal !== "true" ||
     recoveryPresentation.title !== "Recuperar trabalho não salvo?" ||
-    recoveryPresentation.initialFocus !== "Reabrir e recuperar" ||
+    recoveryPresentation.initialFocus !== "Recuperar e abrir" ||
     !recoveryActionsAreSingleLine ||
     !recoveryPresentation.contentFitted ||
     recoveryPresentation.viewportWidth !== 492 ||
@@ -1808,7 +1821,7 @@ try {
   await click(
     recoveryDialogDriver,
     "xpath",
-    "//button[normalize-space()='Reabrir e recuperar']",
+    "//button[normalize-space()='Recuperar e abrir']",
     "Reopen and recover choice",
   );
   await waitForExit(recoveryGlobal, "recovery Global handoff");
@@ -1960,7 +1973,7 @@ try {
   const cancelledSaveAs = driveNativeDialog(
     secondHost,
     "cancel",
-    "Salvar Projeto como",
+    "Salvar projeto como",
   );
   await waitFor(
     "cancelled Save As frontend settlement",
@@ -2004,7 +2017,7 @@ try {
   const selectedSaveAs = driveNativeDialog(
     secondHost,
     "select",
-    "Salvar Projeto como",
+    "Salvar projeto como",
     saveAsPath,
   );
   if (selectedSaveAs.action !== "select") {
@@ -2128,7 +2141,7 @@ try {
   const copiedAlbumDesign = await findElement(
     hostDriver,
     "xpath",
-    "//button[.//span[normalize-space()='Design do Álbum']]",
+    "//button[.//span[normalize-space()='Design do álbum']]",
     "fresh Save As Album Design section",
   );
   const copiedAlbumDesignExpanded = await elementAttribute(
@@ -2438,7 +2451,7 @@ try {
   await selectApplicationMenuCommandUntilLogEvent(
     originalDriver,
     "Arquivo",
-    "Fechar Projeto",
+    "Fechar projeto",
     "clean_project_close_requested",
     "simultaneous original close",
   );
@@ -2480,7 +2493,7 @@ try {
   await selectApplicationMenuCommand(
     hostDriver,
     "Arquivo",
-    "Exportar Lâmina…",
+    "Exportar lâmina…",
     "Export action",
   );
   await withProjectDialog(
@@ -2497,7 +2510,7 @@ try {
         "choose Export folder",
       );
       const cancelledFolder = driveNativeDialog(
-        secondHost, "cancel", "Escolher pasta de destino da Exportação",
+        secondHost, "cancel", "Escolher pasta de destino da exportação",
       );
       await waitFor(
         "cancelled folder preserves destination",
@@ -2535,7 +2548,7 @@ try {
   await selectApplicationMenuCommand(
     hostDriver,
     "Arquivo",
-    "Exportar Lâmina…",
+    "Exportar lâmina…",
     "Export retry action",
   );
   mkdirSync(exportDirectory);
@@ -2716,7 +2729,7 @@ try {
     await selectApplicationMenuCommand(
       hostDriver,
       "Arquivo",
-      "Exportar Lâmina…",
+      "Exportar lâmina…",
       "missing-Original Export action",
     );
     const startedBeforeMissingOriginal = recordsFor("export_started").length;
@@ -2744,14 +2757,14 @@ try {
         const failureDialog = await findElement(
           dialogDriver,
           "xpath",
-          accessibleProjectDialogXpath("Problemas na Exportação"),
+          accessibleProjectDialogXpath("Problemas na exportação"),
           "actionable missing-Original message",
         );
         const text = await elementText(dialogDriver, failureDialog);
         await clickWhenEnabled(
           dialogDriver,
           "xpath",
-          `${accessibleProjectDialogXpath("Problemas na Exportação")}//button[normalize-space()=${xpathLiteral("Fechar")}]`,
+          `${accessibleProjectDialogXpath("Problemas na exportação")}//button[normalize-space()=${xpathLiteral("Fechar")}]`,
           "close missing-Original feedback",
         );
         return text;
@@ -2760,7 +2773,7 @@ try {
     missingOriginalBlocked = !existsSync(missingOriginalExportPath);
     missingOriginalActionable =
       failureText.includes(path.basename(photoPath)) &&
-      failureText.includes("ausente") && failureText.includes("Relinkar");
+      failureText.includes("ausente") && failureText.includes("Localizar imagens…");
     missingOriginalBlockedBeforePipeline =
       recordsFor("export_started").length === startedBeforeMissingOriginal &&
       exportProcessorAttempts().length === missingOriginalProcessorCount;
@@ -2788,7 +2801,7 @@ try {
 
   await ensureInspectorSectionExpanded(
     hostDriver,
-    "Grade de Lâminas",
+    "Grade de lâminas",
     "physical Album structure Grade",
   );
   const physicalAlbumBefore = await waitForSheetGrid(
@@ -2916,7 +2929,7 @@ try {
   await selectApplicationMenuCommandUntilLogEvent(
     hostDriver,
     "Arquivo",
-    "Fechar Projeto",
+    "Fechar projeto",
     "dirty_project_close_confirmation_required",
     "Close Project action",
   );
@@ -3412,7 +3425,7 @@ try {
   const cancelledExternalCopyPicker = driveNativeDialog(
     externalCopyGlobal,
     "cancel",
-    "Criar Projeto MyAlbuns",
+    "Criar projeto MyAlbuns",
   );
   await findElement(
     externalCopyDialogDriver,
@@ -3491,7 +3504,7 @@ try {
   const selectedExternalCopy = driveNativeDialog(
     externalCopyGlobal,
     "select",
-    "Criar Projeto MyAlbuns",
+    "Criar projeto MyAlbuns",
     externalSavedCopyPath,
   );
   if (selectedExternalCopy.action !== "select") {
@@ -3670,7 +3683,7 @@ try {
     graphicsPresentation.dialogCount === 1 &&
     graphicsPresentation.ariaModal === "true" &&
     graphicsPresentation.externalProjectDialog &&
-    graphicsPresentation.title === "O Canvas não pôde ser iniciado" &&
+    graphicsPresentation.title === "Não foi possível iniciar o editor" &&
     graphicsNativeOwner.dialogCount === 1 &&
     graphicsNativeOwner.dialog?.visible === true &&
     graphicsNativeOwner.dialog?.enabled === true &&
@@ -3696,8 +3709,8 @@ try {
   ).length;
   await clickProjectDialogAction(
     externalCopyHostDriver,
-    "O Canvas não pôde ser iniciado",
-    "Fechar Projeto",
+    "Não foi possível iniciar o editor",
+    "Fechar projeto",
     "graphics-failure close request",
   );
   await waitForLogEvent(
@@ -3738,7 +3751,7 @@ try {
       await findElement(
         dialogDriver,
         "xpath",
-        accessibleProjectDialogXpath("O Canvas não pôde ser iniciado"),
+        accessibleProjectDialogXpath("Não foi possível iniciar o editor"),
         "rearmed graphics-failure dialog",
       );
       return dialogDriver.request(
@@ -3771,8 +3784,8 @@ try {
   ).length;
   await clickProjectDialogAction(
     externalCopyHostDriver,
-    "O Canvas não pôde ser iniciado",
-    "Fechar Projeto",
+    "Não foi possível iniciar o editor",
+    "Fechar projeto",
     "second graphics-failure close request",
   );
   await waitForLogEvent(

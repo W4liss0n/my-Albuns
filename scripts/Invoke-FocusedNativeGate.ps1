@@ -165,7 +165,7 @@ try {
         -not $gate.graphicsFailure.oneVisibleDialog -or
         -not $gate.graphicsFailure.ownerDisabled -or
         -not $gate.graphicsFailure.workspaceInert -or
-        $gate.graphicsFailure.exactAction -cne 'Fechar Projeto' -or
+        $gate.graphicsFailure.exactAction -cne 'Fechar projeto' -or
         -not $gate.graphicsFailure.terminalCleaned
     )
     $projectCloseInvalid = $isProjectClose -and (

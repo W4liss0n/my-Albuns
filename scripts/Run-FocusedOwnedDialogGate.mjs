@@ -326,7 +326,7 @@ async function observeExternalCopyScenario() {
     const cancelledPicker = driveNativeDialog(
       globalInstance,
       "cancel",
-      "Criar Projeto MyAlbuns",
+      "Criar projeto MyAlbuns",
     );
     await findElement(
       driver,
@@ -608,10 +608,10 @@ async function observeGraphicsScenario() {
       currentProject === undefined ||
       presentation.dialogCount !== 1 ||
       presentation.ariaModal !== "true" ||
-      presentation.title !== "O Canvas não pôde ser iniciado" ||
-      presentation.initialFocus !== "Fechar Projeto" ||
+      presentation.title !== "Não foi possível iniciar o editor" ||
+      presentation.initialFocus !== "Fechar projeto" ||
       JSON.stringify(presentation.actions) !==
-        JSON.stringify(["Fechar Projeto"]) ||
+        JSON.stringify(["Fechar projeto"]) ||
       !blockedProject.canvasMounted ||
       blockedProject.inlineAlertCount !== 0
     ) {
@@ -627,7 +627,7 @@ async function observeGraphicsScenario() {
     await click(
       dialogDriver,
       "xpath",
-      "//button[normalize-space()='Fechar Projeto']",
+      "//button[normalize-space()='Fechar projeto']",
       "graphics failure terminal",
     );
     dialogDriver = await disposeConfirmedWebDriver(dialogDriver);
