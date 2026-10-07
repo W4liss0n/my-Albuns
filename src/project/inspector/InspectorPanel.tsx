@@ -4,10 +4,11 @@ import {
   useRef,
   useState,
   type CSSProperties,
+  type KeyboardEvent as ReactKeyboardEvent,
   type MouseEvent as ReactMouseEvent,
+  type PointerEvent as ReactPointerEvent,
   type ReactNode,
 } from "react";
-import { Button } from "react-aria-components";
 import { ChevronDown, ChevronRight, PanelsTopLeft } from "lucide-react";
 
 import type {
@@ -29,6 +30,10 @@ import type {
 } from "../../application/projectSettingsDraft";
 import type { MediaPreview } from "../../application/projectPorts";
 import { renderableMediaPreviewUrls } from "../../application/mediaPreviews";
+import {
+  sheetSelectionModifiers,
+  type SheetSelectionModifiers,
+} from "../../application/sheetSelection";
 import { ActionButton, AppIcon, EmptyState } from "../../ui";
 import { AlbumDesignForm } from "./AlbumDesignForm";
 import { AlbumInformationForm } from "./AlbumInformationForm";
@@ -93,6 +98,8 @@ export interface InspectorPanelProps {
   visualDefaults: ProjectedVisualDefaults;
   frameGapUm: number;
   focusedSheetId: string | null;
+  /** Defaults to the focused Sheet alone. */
+  selectedSheetIds?: readonly string[];
   mediaPreviews: Readonly<Record<string, MediaPreview>>;
   revision: number;
   onApplyAlbumInformation(
@@ -107,6 +114,7 @@ export interface InspectorPanelProps {
   ): Promise<AlbumInformationValidation>;
   onPresentationUnitChange(unit: DisplayUnit | null): void;
   onNavigateToSheet(sheetId: string): void;
+  onSelectSheet(sheetId: string, modifiers: SheetSelectionModifiers): void;
   onOpenSheetContextMenu?(
     sheetId: string,
     position: { x: number; y: number },
@@ -139,6 +147,7 @@ export function InspectorPanel({
   visualDefaults,
   frameGapUm,
   focusedSheetId,
+  selectedSheetIds,
   mediaPreviews,
   revision,
   onApplyAlbumInformation,
@@ -146,6 +155,7 @@ export function InspectorPanel({
   onPresentationUnitChange,
   onValidateAlbumInformation,
   onNavigateToSheet,
+  onSelectSheet,
   onOpenSheetContextMenu,
   sheetReorder,
   sectionState,
@@ -162,6 +172,8 @@ export function InspectorPanel({
   } | null>(null);
   const gridRef = useRef<HTMLDivElement | null>(null);
   const gridGhostAnchorRef = useRef<GridGhostAnchor | null>(null);
+  // A press that turned into a drag still ends in click and dblclick events.
+  const gridDragEndedRef = useRef(false);
   const gridAutoScrollRef = useRef<{
     frameId: number | null;
     lastTimestamp: number | null;
@@ -179,6 +191,10 @@ export function InspectorPanel({
   const composedSheetById = new Map(
     sheets.map((sheet) => [sheet.sheetId, sheet] as const),
   );
+  const selectedSheetIdSet = new Set(
+    selectedSheetIds ?? (focusedSheetId === null ? [] : [focusedSheetId]),
+  );
+  if (focusedSheetId !== null) selectedSheetIdSet.add(focusedSheetId);
   const sheetReorderEnabled =
     sheetReorder !== undefined &&
     !sheetReorder.disabled &&
@@ -259,7 +275,7 @@ export function InspectorPanel({
 
   const pointerReorder = useSheetPointerReorder({
     enabled: sheetReorderEnabled,
-    onActivate: onNavigateToSheet,
+    onActivate: onSelectSheet,
     onCancel: () => sheetReorder?.onCancel(),
     onDrop: () => sheetReorder?.onDrop(),
     onFinish: stopGridAutoScroll,
@@ -284,6 +300,37 @@ export function InspectorPanel({
   const reorderGhostPageMetadata = formatSheetPageMetadata(
     reorderGhostSheetState,
   );
+
+  function endGridPointer(event: ReactPointerEvent<HTMLDivElement>) {
+    gridDragEndedRef.current = pointerReorder.end(event) === "drag";
+  }
+
+  function navigateToSheetAtPointer(event: ReactMouseEvent<HTMLDivElement>) {
+    if (gridDragEndedRef.current) {
+      gridDragEndedRef.current = false;
+      return;
+    }
+    const sheetId = gridSheetIdAtPoint(gridRef.current, event);
+    if (!sheetId) return;
+    event.preventDefault();
+    onNavigateToSheet(sheetId);
+  }
+
+  function handleTileKeyDown(
+    event: ReactKeyboardEvent<HTMLButtonElement>,
+    sheetId: string,
+  ) {
+    if (event.altKey) return;
+    // Handled on keydown, repeats included, so the button never turns the key
+    // into its own click; Ctrl and Shift extend the selection as with the pointer.
+    if (event.key === " ") {
+      event.preventDefault();
+      if (!event.repeat) onSelectSheet(sheetId, sheetSelectionModifiers(event));
+    } else if (event.key === "Enter" && !event.ctrlKey && !event.metaKey) {
+      event.preventDefault();
+      if (!event.repeat) onNavigateToSheet(sheetId);
+    }
+  }
 
   function openGridContextMenu(
     event: ReactMouseEvent<HTMLDivElement>,
@@ -509,10 +556,11 @@ export function InspectorPanel({
                   data-reorder-surface="grid"
                   data-sheet-order={sheets.map((sheet) => sheet.sheetId).join(",")}
                   data-testid="sheet-reorder-grid"
+                  onDoubleClick={navigateToSheetAtPointer}
                   onLostPointerCapture={pointerReorder.lostCapture}
                   onPointerCancel={pointerReorder.cancel}
                   onPointerMove={pointerReorder.move}
-                  onPointerUp={pointerReorder.end}
+                  onPointerUp={endGridPointer}
                   ref={gridRef}
                 >
                   {orderedSheets.map((sheet, index) => {
@@ -524,7 +572,7 @@ export function InspectorPanel({
                       pageMetadata?.visualLabel ?? `Lâmina ${number}`;
                     const accessiblePageLabel =
                       pageMetadata?.accessibleLabel ?? `Lâmina ${number}`;
-                    const active = sheet.sheetId === focusedSheetId;
+                    const selected = selectedSheetIdSet.has(sheet.sheetId);
                     const tileStyle = {
                       aspectRatio: `${document.sheetWidthUm} / ${document.sheetHeightUm}`,
                     } as CSSProperties;
@@ -555,6 +603,7 @@ export function InspectorPanel({
                           event.stopPropagation();
                         }}
                         onPointerDownCapture={(event) => {
+                          gridDragEndedRef.current = false;
                           const bounds =
                             event.currentTarget.getBoundingClientRect();
                           gridGhostAnchorRef.current = {
@@ -578,13 +627,26 @@ export function InspectorPanel({
                             data-testid="reorder-placeholder"
                           />
                         ) : null}
-                      <Button
-                        aria-current={active ? "true" : undefined}
-                        aria-label={`Ir para lâmina ${number}, ${accessiblePageLabel.toLocaleLowerCase("pt-BR")}`}
-                        className={active ? "sheet-tile active" : "sheet-tile"}
+                      <button
+                        aria-current={
+                          sheet.sheetId === focusedSheetId ? "true" : undefined
+                        }
+                        aria-label={`Lâmina ${number}, ${accessiblePageLabel.toLocaleLowerCase("pt-BR")}`}
+                        aria-pressed={selected}
+                        className={selected ? "sheet-tile active" : "sheet-tile"}
                         data-active-sides={sheet.activeSides}
                         style={tileStyle}
-                        onPress={() => onNavigateToSheet(sheet.sheetId)}
+                        title="Duplo clique para ir até a lâmina"
+                        type="button"
+                        onClick={(event) =>
+                          onSelectSheet(
+                            sheet.sheetId,
+                            sheetSelectionModifiers(event),
+                          )
+                        }
+                        onKeyDown={(event) =>
+                          handleTileKeyDown(event, sheet.sheetId)
+                        }
                       >
                         <SheetPreviewShell
                           sheet={sheet}
@@ -597,7 +659,7 @@ export function InspectorPanel({
                             {visualPageLabel}
                           </span>
                         </SheetPreviewShell>
-                      </Button>
+                      </button>
                       </div>
                     );
                   })}
@@ -607,7 +669,8 @@ export function InspectorPanel({
                       className="sheet-reorder-ghost"
                       data-active-sides={reorderGhostSheet.activeSides}
                       data-origin-selected={
-                        reorderGhostSheetId === focusedSheetId || undefined
+                        selectedSheetIdSet.has(reorderGhostSheetId) ||
+                        undefined
                       }
                       data-pointer-x={pointerReorder.pointer?.clientX}
                       data-pointer-y={pointerReorder.pointer?.clientY}
@@ -677,6 +740,22 @@ function gridGhostStyle(
   };
 }
 
+function gridSheetIdAtPoint(
+  grid: HTMLElement | null,
+  event: ReactMouseEvent<HTMLElement>,
+): string | null {
+  if (!grid) return null;
+  // Under the Grade's pointer capture the event may target the Grade itself.
+  const target = event.target instanceof Element ? event.target : null;
+  const slot =
+    target?.closest<HTMLElement>(".sheet-grid-slot") ??
+    Array.from(grid.querySelectorAll<HTMLElement>(".sheet-grid-slot")).find(
+      (candidate) =>
+        pointInsideRenderedBounds(candidate, event, { emptyContains: false }),
+    );
+  return slot && grid.contains(slot) ? slot.dataset.sheetId ?? null : null;
+}
+
 function resolveGridTarget(
   grid: HTMLElement | null,
   position: SheetReorderPointerPosition,
@@ -721,9 +800,10 @@ function pointInsideGridViewport(
 function pointInsideRenderedBounds(
   element: HTMLElement,
   position: SheetReorderPointerPosition,
+  { emptyContains = true }: { emptyContains?: boolean } = {},
 ): boolean {
   const bounds = element.getBoundingClientRect();
-  if (bounds.width === 0 && bounds.height === 0) return true;
+  if (bounds.width === 0 && bounds.height === 0) return emptyContains;
   return (
     position.clientX >= bounds.left &&
     position.clientX <= bounds.right &&

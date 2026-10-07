@@ -16,7 +16,14 @@ import {
   createFallbackWorkspacePreferencesPort,
   type WorkspacePreferencesPort,
 } from "../../application/workspacePreferences";
-import { sheetStructureAvailability } from "../../application/sheetStructure";
+import {
+  sheetSelectionAvailability,
+  sheetStructureAvailability,
+} from "../../application/sheetStructure";
+import {
+  sheetCommandTargetIds as resolveSheetCommandTargetIds,
+  sheetContextMenuTargetIds,
+} from "../../application/sheetSelection";
 import type { ProjectDialogPort } from "../../application/projectDialogPort";
 import type { ImageViewerWindowPort } from "../../application/imageViewerWindow";
 import { useImageViewerSession } from "../../application/useImageViewerSession";
@@ -161,6 +168,8 @@ export function ProjectWorkspace({
   const [sheetContextMenu, setSheetContextMenu] = useState<{
     position: { x: number; y: number };
     sheetId: string;
+    /** The clicked Sheet, or the whole selection when the click was on it. */
+    sheetIds: readonly string[];
   } | null>(null);
   const [closeMessage, setCloseMessage] = useState<string | null>(null);
   const [frameContextMenu, setFrameContextMenu] = useState<{
@@ -612,6 +621,25 @@ export function ProjectWorkspace({
     projection.state.album.sheets,
     implicitSheetId ?? "",
   );
+  const sheetGridVisible =
+    workspacePanels.panels.inspector.visible &&
+    inspectorContext.kind === "album" &&
+    (workspacePreferences.preferences.inspectorSections["album.sheet-grid"] ?? true);
+  const selectedSheetIds = controller.canvasProps.selectedSheetIds;
+  const sheetSelectionSource = controller.sheetSelectionSource;
+  const sheetCommandTargetIds = useMemo(
+    () => resolveSheetCommandTargetIds({
+      gridShowsSelection: sheetGridVisible,
+      selectedSheetIds: selectedSheetIds ?? [],
+      source: sheetSelectionSource,
+      implicitSheetId,
+    }),
+    [implicitSheetId, selectedSheetIds, sheetGridVisible, sheetSelectionSource],
+  );
+  const sheetCommandTargetAvailability = sheetSelectionAvailability(
+    projection.state.album.sheets,
+    sheetCommandTargetIds,
+  );
   const sheetReorderGestureActive =
     sheetReorderSession.status === "preview" ||
     sheetReorderSession.status === "invalid";
@@ -627,9 +655,13 @@ export function ProjectWorkspace({
   const openSheetContextMenu = useCallback(
     (sheetId: string, position: { x: number; y: number }) => {
       if (structuralCommandsBlocked) return;
-      setSheetContextMenu({ position, sheetId });
+      setSheetContextMenu({
+        position,
+        sheetId,
+        sheetIds: sheetContextMenuTargetIds(sheetId, sheetCommandTargetIds),
+      });
     },
-    [structuralCommandsBlocked],
+    [sheetCommandTargetIds, structuralCommandsBlocked],
   );
   useEffect(() => {
     if (commandsBlocked || (frameContextMenu?.kind !== "photo" && !controller.canAddFrame) ||
@@ -693,11 +725,12 @@ export function ProjectWorkspace({
       void controller.addSheetBefore();
     },
     canAddAfter: implicitSheetAvailability.canAddAfter,
-    canDuplicate: implicitSheetAvailability.canDuplicate,
-    duplicateSheet: () => { void controller.duplicateSheet(); },
+    canDuplicate: sheetCommandTargetAvailability.canDuplicate,
+    duplicateSheet: () => { void controller.duplicateSheets(sheetCommandTargetIds); },
+    sheetCommandTargetCount: sheetCommandTargetIds.length,
     canAddBefore: implicitSheetAvailability.canAddBefore,
     canConvertEdge: implicitSheetAvailability.canConvertEdge,
-    canDelete: implicitSheetAvailability.canDelete,
+    canDelete: sheetCommandTargetAvailability.canDelete,
     canExport: controller.canvasProps.centeredSheetId !== null,
     canRedo: projection.state.canRedo,
     canUndo: projection.state.canUndo,
@@ -707,7 +740,7 @@ export function ProjectWorkspace({
       void controller.convertEdge();
     },
     deleteSheet: () => {
-      void controller.deleteSheet();
+      void controller.deleteSheets(sheetCommandTargetIds);
     },
     exportSheet: () => exportControlRef.current?.start(),
     exportAlbum: () => exportControlRef.current?.start("album"),
@@ -749,12 +782,12 @@ export function ProjectWorkspace({
     deleteFrames: () => { void controller.deleteFrames(); },
     arrangeFrames: (action) => { void controller.arrangeFrames(action); },
     frameCommandsActive: controller.canDeleteFrames && mediaDrag === null && sheetContextMenu === null && frameContextMenu === null,
-    canDeleteSheet: implicitSheetAvailability.canDelete,
+    canDeleteSheet: sheetCommandTargetAvailability.canDelete,
     canRedo: projection.state.canRedo,
     canUndo: projection.state.canUndo,
     closeProject: projectClose.requestClose,
     deleteSheet: () => {
-      void controller.deleteSheet();
+      void controller.deleteSheets(sheetCommandTargetIds);
     },
     disabled: commandsBlocked || mediaDrag !== null,
     navigateToNextSheet: () => controller.navigateToAdjacentSheet("next"),
@@ -912,6 +945,7 @@ export function ProjectWorkspace({
           visualDefaults={projection.state.album.visualDefaults}
           frameGapUm={projection.state.layoutSettings.gapUm}
           focusedSheetId={controller.canvasProps.focusedSheetId}
+          selectedSheetIds={controller.canvasProps.selectedSheetIds}
           mediaPreviews={mediaPreviews}
           revision={projection.state.revision}
           onApplyAlbumInformation={albumInformationApply.requestApply}
@@ -919,6 +953,7 @@ export function ProjectWorkspace({
           onPresentationUnitChange={changePresentationUnit}
           onValidateAlbumInformation={projectCorePort.validateAlbumInformation}
           onNavigateToSheet={controller.navigateToSheet}
+          onSelectSheet={controller.selectSheet}
           onOpenSheetContextMenu={openSheetContextMenu}
           sheetReorder={{
             disabled: structuralCommandsBlocked,
@@ -1037,11 +1072,22 @@ export function ProjectWorkspace({
       ) : null}
       {sheetContextMenu ? (
         <SheetContextMenu
-          availability={sheetStructureAvailability(
-            projection.state.album.sheets,
-            sheetContextMenu.sheetId,
-          )}
+          availability={sheetContextMenu.sheetIds.length > 1
+            ? {
+                ...sheetSelectionAvailability(
+                  projection.state.album.sheets,
+                  sheetContextMenu.sheetIds,
+                ),
+                canAddAfter: false,
+                canAddBefore: false,
+                canConvertEdge: false,
+              }
+            : sheetStructureAvailability(
+                projection.state.album.sheets,
+                sheetContextMenu.sheetId,
+              )}
           position={sheetContextMenu.position}
+          sheetCount={sheetContextMenu.sheetIds.length}
           sheetNumber={
             projection.state.album.sheets.find(
               (sheet) => sheet.id === sheetContextMenu.sheetId,
@@ -1051,7 +1097,7 @@ export function ProjectWorkspace({
             void controller.addSheetAfter(sheetContextMenu.sheetId);
           }}
           onDuplicate={() => {
-            void controller.duplicateSheet(sheetContextMenu.sheetId);
+            void controller.duplicateSheets(sheetContextMenu.sheetIds);
           }}
           onAddBefore={() => {
             void controller.addSheetBefore(sheetContextMenu.sheetId);
@@ -1060,7 +1106,7 @@ export function ProjectWorkspace({
             void controller.convertEdge(sheetContextMenu.sheetId);
           }}
           onDelete={() => {
-            void controller.deleteSheet(sheetContextMenu.sheetId);
+            void controller.deleteSheets(sheetContextMenu.sheetIds);
           }}
           onDismiss={() => setSheetContextMenu(null)}
         />

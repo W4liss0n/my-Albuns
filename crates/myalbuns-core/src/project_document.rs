@@ -814,42 +814,87 @@ impl ProjectDocument {
     }
 
     pub(crate) fn with_duplicated_sheet(&self, sheet_id: Uuid) -> Result<(Self, Uuid), ()> {
-        let index = self
-            .sheets
+        self.with_duplicated_sheets(&[sheet_id])
+    }
+
+    /// Repeats each run of consecutive listed Sheets as a block right after
+    /// the run, with new Sheet and Frame identities. Only double Sheets can be
+    /// duplicated. Returns the first copy.
+    pub(crate) fn with_duplicated_sheets(&self, sheet_ids: &[Uuid]) -> Result<(Self, Uuid), ()> {
+        let listed = self.listed_sheet_indexes(sheet_ids)?;
+        if listed
             .iter()
-            .position(|sheet| sheet.id == sheet_id)
-            .ok_or(())?;
-        let source = &self.sheets[index];
-        if !self.sheet_structure(index).availability.can_duplicate {
+            .any(|&index| !self.sheet_structure(index).availability.can_duplicate)
+        {
             return Err(());
         }
-        let mut copy = source.clone();
-        copy.id = Uuid::new_v4();
-        for frame in &mut copy.frames {
-            frame.id = Uuid::new_v4();
-        }
-        let copy_id = copy.id;
         let mut candidate = self.clone();
-        candidate.sheets.insert(index + 1, copy);
+        let original = std::mem::take(&mut candidate.sheets);
+        let mut pending_copies = Vec::new();
+        let mut first_copy_id = None;
+        for (index, sheet) in original.into_iter().enumerate() {
+            let is_listed = listed.binary_search(&index).is_ok();
+            if !is_listed {
+                candidate.sheets.append(&mut pending_copies);
+            }
+            if is_listed {
+                let mut copy = sheet.clone();
+                copy.id = Uuid::new_v4();
+                for frame in &mut copy.frames {
+                    frame.id = Uuid::new_v4();
+                }
+                first_copy_id.get_or_insert(copy.id);
+                pending_copies.push(copy);
+            }
+            candidate.sheets.push(sheet);
+        }
+        candidate.sheets.append(&mut pending_copies);
         validate_project_state(&candidate)?;
-        Ok((candidate, copy_id))
+        Ok((candidate, first_copy_id.ok_or(())?))
     }
 
     pub(crate) fn with_deleted_sheet(&self, sheet_id: Uuid) -> Result<(Self, Uuid), ()> {
-        let mut candidate = self.clone();
-        let deleted_index = candidate
-            .sheets
-            .iter()
-            .position(|sheet| sheet.id == sheet_id)
-            .ok_or(())?;
-        if !self.sheet_structure(deleted_index).availability.can_delete {
+        self.with_deleted_sheets(&[sheet_id])
+    }
+
+    /// Deletes the listed Sheets, keeping at least two. The neighbor is the
+    /// Sheet that takes the place of the first deleted one, or the new last.
+    pub(crate) fn with_deleted_sheets(&self, sheet_ids: &[Uuid]) -> Result<(Self, Uuid), ()> {
+        let listed = self.listed_sheet_indexes(sheet_ids)?;
+        if self.sheets.len() < listed.len() + 2 {
             return Err(());
         }
-        candidate.sheets.remove(deleted_index);
-        let neighbor_index = deleted_index.min(candidate.sheets.len() - 1);
+        let mut candidate = self.clone();
+        let mut index = 0;
+        candidate.sheets.retain(|_| {
+            let keep = listed.binary_search(&index).is_err();
+            index += 1;
+            keep
+        });
+        let neighbor_index = listed[0].min(candidate.sheets.len() - 1);
         let neighbor_id = candidate.sheets[neighbor_index].id;
         validate_project_state(&candidate)?;
         Ok((candidate, neighbor_id))
+    }
+
+    /// Album-order indexes of the listed Sheets. Fails when the list is empty
+    /// or names a Sheet outside the Album; repeated ids collapse.
+    fn listed_sheet_indexes(&self, sheet_ids: &[Uuid]) -> Result<Vec<usize>, ()> {
+        let mut indexes = sheet_ids
+            .iter()
+            .map(|id| {
+                self.sheets
+                    .iter()
+                    .position(|sheet| sheet.id == *id)
+                    .ok_or(())
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        indexes.sort_unstable();
+        indexes.dedup();
+        if indexes.is_empty() {
+            return Err(());
+        }
+        Ok(indexes)
     }
 
     pub(crate) fn with_converted_edge_sheet(

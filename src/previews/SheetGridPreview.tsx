@@ -1,6 +1,10 @@
 import { rasterLimitsAt300Dpi } from "../test/projectConfigurationFixtures";
 import { useCallback, useMemo, useState } from "react";
 
+import {
+  nextSheetSelection,
+  type SheetSelection,
+} from "../application/sheetSelection";
 import { InspectorPanel } from "../project/inspector/InspectorPanel";
 import type {
   AlbumInformation,
@@ -53,7 +57,11 @@ const decorativePreview: MediaCatalogItem = {
 };
 
 export function SheetGridPreview() {
-  const [focusedSheetId, setFocusedSheetId] = useState("sheet-002");
+  const [selection, setSelection] = useState<SheetSelection>({
+    selectedSheetIds: ["sheet-002"],
+    focusedSheetId: "sheet-002",
+    anchorSheetId: "sheet-002",
+  });
   const [document, setDocument] = useState<DocumentSnapshot>(
     representativeProjection.state.document,
   );
@@ -120,7 +128,8 @@ export function SheetGridPreview() {
         displayedPhotoZoom={1}
         document={document}
         presentationUnit={presentationUnit}
-        focusedSheetId={focusedSheetId}
+        focusedSheetId={selection.focusedSheetId}
+        selectedSheetIds={selection.selectedSheetIds}
         mediaItems={mediaItems}
         mediaPreviews={
           previewUrl
@@ -148,7 +157,23 @@ export function SheetGridPreview() {
           setVisualDefaults(draft.value);
           return true;
         }}
-        onNavigateToSheet={setFocusedSheetId}
+        onNavigateToSheet={(sheetId) =>
+          setSelection({
+            selectedSheetIds: [sheetId],
+            focusedSheetId: sheetId,
+            anchorSheetId: sheetId,
+          })
+        }
+        onSelectSheet={(sheetId, modifiers) =>
+          setSelection((current) =>
+            nextSheetSelection(
+              current,
+              sheetId,
+              modifiers,
+              sheetStates.map((sheet) => sheet.id),
+            ),
+          )
+        }
         onPresentationUnitChange={changePresentationUnit}
         onValidateAlbumInformation={async () => ({ rasterLimits: rasterLimitsAt300Dpi,
           errors: [],

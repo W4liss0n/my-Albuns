@@ -248,6 +248,9 @@ Condição de um Frame que ocupa áreas dos dois lados da divisão central de um
 **Seleção de Frames**:
 Conjunto transitório de Frames que recebe uma ação de edição em comum.
 
+**Seleção de Lâminas**:
+Conjunto transitório de Lâminas escolhidas na Grade de Lâminas, com `Ctrl` e `Shift`, ou uma única Lâmina escolhida pela Barra da Lâmina ou no Canvas. Não muda a Lâmina centralizada no Canvas. Quando feita na Grade, e enquanto a Grade a mostra, é o alvo de `Duplicar Lâmina` e `Excluir`.
+
 **Caixa delimitadora**:
 Retângulo único que envolve uma Seleção de Frames e oferece as alças de redimensionamento do conjunto.
 

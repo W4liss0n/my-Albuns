@@ -1,5 +1,5 @@
 import { rasterLimitsAt300Dpi } from "../../test/projectConfigurationFixtures";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import type { ComponentProps } from "react";
 import { expect, test, vi } from "vitest";
 
@@ -33,8 +33,9 @@ test("captures pointer reorder in the Grade and follows it in both directions", 
   const onDrop = vi.fn();
   const onNavigateToSheet = vi.fn();
   const onPreview = vi.fn();
+  const onSelectSheet = vi.fn();
   const ids = sheetIds();
-  renderInspector({ onDrop, onNavigateToSheet, onPreview });
+  renderInspector({ onDrop, onNavigateToSheet, onPreview, onSelectSheet });
   const { first, grid, second } = arrangeGridBounds();
   const gridCapture = pointerCapture(grid);
 
@@ -71,7 +72,9 @@ test("captures pointer reorder in the Grade and follows it in both directions", 
   expect(gridCapture.release).toHaveBeenCalledWith(23);
   expect(onDrop).toHaveBeenCalledOnce();
   fireEvent.click(sheetButton(1));
+  fireEvent.doubleClick(sheetButton(1));
   expect(onNavigateToSheet).not.toHaveBeenCalled();
+  expect(onSelectSheet).not.toHaveBeenCalled();
 
   pointerDown(second, 24, 50, 160);
   pointerMove(grid, 24, 50, 50);
@@ -132,23 +135,223 @@ test("keeps the exact single-page source representation in the Grade ghost", () 
   ).toContain("linear-gradient");
 });
 
-test("keeps a below-threshold Grade press as an ordinary navigation click", () => {
+test("selects on a below-threshold Grade press without navigating", () => {
   const onDrop = vi.fn();
   const onNavigateToSheet = vi.fn();
   const onPreview = vi.fn();
-  renderInspector({ onDrop, onNavigateToSheet, onPreview });
+  const onSelectSheet = vi.fn();
+  renderInspector({ onDrop, onNavigateToSheet, onPreview, onSelectSheet });
   const { first, grid } = arrangeGridBounds();
   pointerCapture(grid);
 
   pointerDown(first, 12, 50, 50);
   pointerMove(grid, 12, 52, 52);
   pointerUp(grid, 12, 52, 52);
-  expect(onNavigateToSheet).toHaveBeenCalledWith(sheetIds()[0]);
+  expect(onSelectSheet).toHaveBeenCalledWith(sheetIds()[0], {
+    range: false,
+    toggle: false,
+  });
   fireEvent.click(sheetButton(1));
 
-  expect(onNavigateToSheet).toHaveBeenCalledOnce();
+  expect(onSelectSheet).toHaveBeenCalledOnce();
+  expect(onNavigateToSheet).not.toHaveBeenCalled();
   expect(onPreview).not.toHaveBeenCalled();
   expect(onDrop).not.toHaveBeenCalled();
+});
+
+test("passes Ctrl, Cmd and Shift from a Grade press to the selection", () => {
+  const onSelectSheet = vi.fn();
+  renderInspector({ onSelectSheet });
+  const { first, grid, second } = arrangeGridBounds();
+  pointerCapture(grid);
+
+  pointerDown(second, 31, 50, 160);
+  pointerUp(grid, 31, 50, 160, { ctrlKey: true });
+  pointerDown(first, 32, 50, 50);
+  pointerUp(grid, 32, 50, 50, { metaKey: true });
+  pointerDown(second, 33, 50, 160);
+  pointerUp(grid, 33, 50, 160, { shiftKey: true });
+  pointerDown(first, 34, 50, 50);
+  pointerUp(grid, 34, 50, 50, { ctrlKey: true, shiftKey: true });
+
+  const [firstId, secondId] = sheetIds();
+  expect(onSelectSheet.mock.calls).toEqual([
+    [secondId, { range: false, toggle: true }],
+    [firstId, { range: false, toggle: true }],
+    [secondId, { range: true, toggle: false }],
+    [firstId, { range: true, toggle: true }],
+  ]);
+});
+
+test("selects with a click when the Grade cannot reorder", () => {
+  const onNavigateToSheet = vi.fn();
+  const onSelectSheet = vi.fn();
+  render(
+    <InspectorPanel
+      {...props()}
+      onNavigateToSheet={onNavigateToSheet}
+      onSelectSheet={onSelectSheet}
+    />,
+  );
+
+  fireEvent.click(sheetButton(2), { ctrlKey: true });
+  fireEvent.click(sheetButton(1), { shiftKey: true });
+
+  expect(onSelectSheet.mock.calls).toEqual([
+    [sheetIds()[1], { range: false, toggle: true }],
+    [sheetIds()[0], { range: true, toggle: false }],
+  ]);
+  expect(onNavigateToSheet).not.toHaveBeenCalled();
+});
+
+test("goes to a Sheet only on a double click in the Grade", () => {
+  const onNavigateToSheet = vi.fn();
+  renderInspector({ onNavigateToSheet });
+  const { grid } = arrangeGridBounds();
+
+  fireEvent.doubleClick(sheetButton(2));
+  expect(onNavigateToSheet).toHaveBeenLastCalledWith(sheetIds()[1]);
+
+  // Under pointer capture the double click reaches the Grade itself.
+  fireEvent.doubleClick(grid, { clientX: 50, clientY: 50 });
+  expect(onNavigateToSheet).toHaveBeenLastCalledWith(sheetIds()[0]);
+
+  fireEvent.doubleClick(grid, { clientX: 50, clientY: 105 });
+  expect(onNavigateToSheet).toHaveBeenCalledTimes(2);
+});
+
+test("does not go to a Sheet when the second press of a double click was a drag", () => {
+  const onNavigateToSheet = vi.fn();
+  renderInspector({ onNavigateToSheet });
+  const { first, grid } = arrangeGridBounds();
+  pointerCapture(grid);
+
+  pointerDown(first, 41, 50, 50);
+  pointerMove(grid, 41, 50, 160);
+  pointerUp(grid, 41, 50, 160);
+  fireEvent.doubleClick(grid, { clientX: 50, clientY: 160 });
+  expect(onNavigateToSheet).not.toHaveBeenCalled();
+
+  pointerDown(first, 42, 50, 50);
+  pointerUp(grid, 42, 50, 50);
+  fireEvent.doubleClick(sheetButton(1));
+  expect(onNavigateToSheet).toHaveBeenCalledWith(sheetIds()[0]);
+});
+
+test("does not go to a Sheet when a fast drag and its release share one frame", () => {
+  const onDrop = vi.fn();
+  const onNavigateToSheet = vi.fn();
+  renderInspector({ onDrop, onNavigateToSheet });
+  const { first, grid } = arrangeGridBounds();
+  pointerCapture(grid);
+
+  pointerDown(first, 51, 50, 50);
+  act(() => {
+    pointerMove(grid, 51, 50, 160);
+    pointerUp(grid, 51, 50, 160);
+  });
+  fireEvent.doubleClick(grid, { clientX: 50, clientY: 160 });
+
+  expect(onDrop).toHaveBeenCalledOnce();
+  expect(onNavigateToSheet).not.toHaveBeenCalled();
+});
+
+test("a drag cancelled with Escape keeps the selection when the button is released", async () => {
+  const onCancel = vi.fn();
+  const onNavigateToSheet = vi.fn();
+  const onSelectSheet = vi.fn();
+  renderInspector({ onCancel, onNavigateToSheet, onSelectSheet });
+  const { first, grid } = arrangeGridBounds();
+  pointerCapture(grid);
+
+  pointerDown(first, 61, 50, 50);
+  pointerMove(grid, 61, 50, 160);
+  fireEvent.keyDown(window, { key: "Escape" });
+  expect(onCancel).toHaveBeenCalledOnce();
+  // The user takes a while to let go of the button.
+  await act(() => new Promise((resolve) => setTimeout(resolve, 0)));
+
+  pointerUp(sheetButton(1), 61, 50, 50);
+  fireEvent.click(sheetButton(1));
+  fireEvent.doubleClick(sheetButton(1));
+  expect(onSelectSheet).not.toHaveBeenCalled();
+  expect(onNavigateToSheet).not.toHaveBeenCalled();
+
+  await act(() => new Promise((resolve) => setTimeout(resolve, 0)));
+  fireEvent.click(sheetButton(1));
+  expect(onSelectSheet).toHaveBeenCalledWith(sheetIds()[0], {
+    range: false,
+    toggle: false,
+  });
+});
+
+test("Enter goes to the Sheet and Space selects it from the keyboard", () => {
+  const onNavigateToSheet = vi.fn();
+  const onSelectSheet = vi.fn();
+  renderInspector({ onNavigateToSheet, onSelectSheet });
+
+  fireEvent.keyDown(sheetButton(2), { key: "Enter" });
+  expect(onNavigateToSheet).toHaveBeenCalledWith(sheetIds()[1]);
+  expect(onSelectSheet).not.toHaveBeenCalled();
+
+  fireEvent.keyDown(sheetButton(1), { key: " " });
+  fireEvent.keyDown(sheetButton(2), { ctrlKey: true, key: " " });
+  // A held key is swallowed: the button must not replay it as its own click.
+  expect(
+    fireEvent.keyDown(sheetButton(2), { ctrlKey: true, key: " ", repeat: true }),
+  ).toBe(false);
+  expect(
+    fireEvent.keyDown(sheetButton(2), { key: "Enter", repeat: true }),
+  ).toBe(false);
+  expect(onSelectSheet.mock.calls).toEqual([
+    [sheetIds()[0], { range: false, toggle: false }],
+    [sheetIds()[1], { range: false, toggle: true }],
+  ]);
+
+  // Ctrl+Enter stays with the application shortcut (Adicionar depois).
+  const notPrevented = fireEvent.keyDown(sheetButton(1), {
+    ctrlKey: true,
+    key: "Enter",
+  });
+  expect(notPrevented).toBe(true);
+  expect(onNavigateToSheet).toHaveBeenCalledOnce();
+});
+
+test("shows every selected Sheet and keeps the focused one current", () => {
+  const [firstId, secondId] = sheetIds();
+  render(
+    <InspectorPanel
+      {...props()}
+      focusedSheetId={secondId}
+      selectedSheetIds={[firstId, secondId]}
+      sheetReorder={{
+        disabled: false,
+        onCancel: vi.fn(),
+        onDrop: vi.fn(),
+        onPreview: vi.fn(),
+        representation: {
+          ghost: { sheetId: firstId },
+          order: sheetIds(),
+          placeholderIndex: 0,
+        },
+        status: "preview",
+      }}
+    />,
+  );
+
+  expect(sheetButton(1)).toHaveAttribute("aria-pressed", "true");
+  expect(sheetButton(2)).toHaveAttribute("aria-pressed", "true");
+  expect(sheetButton(1)).toHaveClass("active");
+  expect(sheetButton(2)).toHaveClass("active");
+  expect(sheetButton(1)).not.toHaveAttribute("aria-current");
+  expect(sheetButton(2)).toHaveAttribute("aria-current", "true");
+  expect(sheetButton(1)).toHaveAccessibleDescription(
+    "Duplo clique para ir até a lâmina",
+  );
+  expect(screen.getByTestId("reorder-ghost")).toHaveAttribute(
+    "data-origin-selected",
+    "true",
+  );
 });
 
 test("keeps Grade structural pointer gestures disabled during Sheet Edit Mode", () => {
@@ -359,6 +562,7 @@ function renderInspector({
   onDrop = vi.fn(),
   onNavigateToSheet = vi.fn(),
   onPreview = vi.fn(),
+  onSelectSheet = vi.fn(),
 }: {
   disabled?: boolean;
   onCancel?: NonNullable<
@@ -373,11 +577,13 @@ function renderInspector({
   onPreview?: NonNullable<
     ComponentProps<typeof InspectorPanel>["sheetReorder"]
   >["onPreview"];
+  onSelectSheet?: ComponentProps<typeof InspectorPanel>["onSelectSheet"];
 } = {}) {
   return render(
     <InspectorPanel
       {...props()}
       onNavigateToSheet={onNavigateToSheet}
+      onSelectSheet={onSelectSheet}
       sheetReorder={{
         disabled,
         onCancel,
@@ -446,7 +652,7 @@ function sheetSlot(sheetId: string): HTMLElement {
 
 function sheetButton(number: number): HTMLElement {
   return screen.getByRole("button", {
-    name: new RegExp(`^Ir para lâmina ${String(number).padStart(2, "0")},`),
+    name: new RegExp(`^Lâmina ${String(number).padStart(2, "0")},`),
   });
 }
 
@@ -496,6 +702,7 @@ function pointerUp(
   pointerId: number,
   clientX: number,
   clientY: number,
+  modifiers: { ctrlKey?: boolean; metaKey?: boolean; shiftKey?: boolean } = {},
 ) {
   fireEvent.pointerUp(target, {
     button: 0,
@@ -504,6 +711,7 @@ function pointerUp(
     clientY,
     pointerId,
     pointerType: "mouse",
+    ...modifiers,
   });
 }
 
@@ -542,6 +750,7 @@ function props(): ComponentProps<typeof InspectorPanel> {
     mediaPreviews: {},
     onApplyAlbumDesign: vi.fn(),
     onApplyAlbumInformation: vi.fn(),    onNavigateToSheet: vi.fn(),
+    onSelectSheet: vi.fn(),
     onPresentationUnitChange: vi.fn(),    onValidateAlbumInformation: vi.fn(async () => ({ rasterLimits: rasterLimitsAt300Dpi,
       errors: [],
       impact: { conversionLosses: [], heightPx: 1, pageWidthPx: 1, sheetWidthPx: 2 },

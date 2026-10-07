@@ -7,6 +7,9 @@ beforeEach(() => {
   useEditorView.setState({
     projectId: null,
     selectedFrameIds: [],
+    selectedSheetIds: [],
+    sheetSelectionAnchorId: null,
+    sheetSelectionSource: "focus",
     focusedSheetId: null,
     centeredSheetId: null,
     editingSheetId: null,
@@ -118,8 +121,117 @@ test("resets transient state when another Project is opened", () => {
   expect(useEditorView.getState()).toMatchObject({
     projectId: "project-002",
     selectedFrameIds: [],
+    selectedSheetIds: ["sheet-101"],
+    sheetSelectionAnchorId: "sheet-101",
     focusedSheetId: "sheet-101",
     centeredSheetId: "sheet-101",
     viewport: { offsetX: 0 },
   });
+});
+
+test("a Grade selection of several Sheets collapses when one Sheet is focused", () => {
+  const view = useEditorView.getState();
+  view.synchronizeProject("project-001", ["sheet-001", "sheet-002", "sheet-003"], []);
+  view.selectSheets({
+    selectedSheetIds: ["sheet-001", "sheet-003"],
+    focusedSheetId: "sheet-003",
+    anchorSheetId: "sheet-001",
+  });
+  expect(useEditorView.getState()).toMatchObject({
+    selectedSheetIds: ["sheet-001", "sheet-003"],
+    focusedSheetId: "sheet-003",
+    sheetSelectionAnchorId: "sheet-001",
+    centeredSheetId: "sheet-001",
+  });
+
+  view.focusSheet("sheet-002");
+  expect(useEditorView.getState()).toMatchObject({
+    selectedSheetIds: ["sheet-002"],
+    focusedSheetId: "sheet-002",
+    sheetSelectionAnchorId: "sheet-002",
+  });
+
+  view.selectSheets({
+    selectedSheetIds: ["sheet-001", "sheet-002"],
+    focusedSheetId: "sheet-002",
+    anchorSheetId: "sheet-001",
+  });
+  view.enterSheetEdit("sheet-001");
+  expect(useEditorView.getState()).toMatchObject({
+    selectedSheetIds: ["sheet-001"],
+    focusedSheetId: "sheet-001",
+  });
+});
+
+test("only a selection made in the Grade becomes the target of Delete and Duplicate", () => {
+  const view = useEditorView.getState();
+  view.synchronizeProject("project-001", ["sheet-001", "sheet-002", "sheet-003"], []);
+  expect(useEditorView.getState().sheetSelectionSource).toBe("focus");
+
+  view.selectSheets({
+    selectedSheetIds: ["sheet-002", "sheet-003"],
+    focusedSheetId: "sheet-003",
+    anchorSheetId: "sheet-002",
+  });
+  expect(useEditorView.getState().sheetSelectionSource).toBe("grid");
+  view.synchronizeProject("project-001", ["sheet-001", "sheet-003"], []);
+  expect(useEditorView.getState()).toMatchObject({
+    selectedSheetIds: ["sheet-003"],
+    sheetSelectionSource: "grid",
+  });
+  // Undo or Redo removed every selected Sheet: the fallback is not a choice.
+  view.synchronizeProject("project-001", ["sheet-001"], []);
+  expect(useEditorView.getState()).toMatchObject({
+    selectedSheetIds: ["sheet-001"],
+    sheetSelectionSource: "focus",
+  });
+
+  view.synchronizeProject("project-001", ["sheet-001", "sheet-002"], []);
+  view.selectSheets({
+    selectedSheetIds: ["sheet-002"],
+    focusedSheetId: "sheet-002",
+    anchorSheetId: "sheet-002",
+  });
+  view.focusSheet("sheet-001");
+  expect(useEditorView.getState().sheetSelectionSource).toBe("focus");
+  view.selectSheets({
+    selectedSheetIds: ["sheet-002"],
+    focusedSheetId: "sheet-002",
+    anchorSheetId: "sheet-002",
+  });
+  view.enterSheetEdit("sheet-002");
+  expect(useEditorView.getState().sheetSelectionSource).toBe("focus");
+});
+
+test("prunes deleted Sheets from the selection and keeps one focused", () => {
+  const view = useEditorView.getState();
+  view.synchronizeProject("project-001", ["sheet-001", "sheet-002", "sheet-003"], []);
+  view.selectSheets({
+    selectedSheetIds: ["sheet-001", "sheet-002", "sheet-003"],
+    focusedSheetId: "sheet-003",
+    anchorSheetId: "sheet-001",
+  });
+
+  view.synchronizeProject("project-001", ["sheet-002", "sheet-003"], []);
+  expect(useEditorView.getState()).toMatchObject({
+    selectedSheetIds: ["sheet-002", "sheet-003"],
+    focusedSheetId: "sheet-003",
+    sheetSelectionAnchorId: "sheet-003",
+  });
+
+  view.synchronizeProject("project-001", ["sheet-002", "sheet-004"], []);
+  expect(useEditorView.getState()).toMatchObject({
+    selectedSheetIds: ["sheet-002"],
+    focusedSheetId: "sheet-002",
+  });
+
+  view.synchronizeProject("project-001", ["sheet-004", "sheet-005"], []);
+  expect(useEditorView.getState()).toMatchObject({
+    selectedSheetIds: ["sheet-004"],
+    focusedSheetId: "sheet-004",
+  });
+
+  const selectedBefore = useEditorView.getState().selectedSheetIds;
+  view.synchronizeProject("project-001", ["sheet-004", "sheet-005"], []);
+  expect(useEditorView.getState().selectedSheetIds).toBe(selectedBefore);
 });

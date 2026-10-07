@@ -327,6 +327,27 @@ impl PersistentProjectSession {
                 outcome.affected_sheet_id = Some(neighbor_id);
                 Ok(next)
             }
+            ProjectIntent::DuplicateSheets { sheet_ids } => {
+                publication = EditPublication::GuardedAlways;
+                let parsed = parse_listed_sheet_ids(project.sheets(), &sheet_ids)?;
+                let (next, first_copy_id) = project
+                    .with_duplicated_sheets(&parsed)
+                    .map_err(|()| CoreError::InvalidSheetDuplication)?;
+                outcome.affected_sheet_id = Some(first_copy_id);
+                Ok(next)
+            }
+            ProjectIntent::DeleteSheets { sheet_ids } => {
+                publication = EditPublication::GuardedAlways;
+                let parsed = parse_listed_sheet_ids(project.sheets(), &sheet_ids)?;
+                if project.sheets().len() < parsed.len() + 2 {
+                    return Err(CoreError::MinimumSheetCount);
+                }
+                let (next, neighbor_id) = project.with_deleted_sheets(&parsed).map_err(|()| {
+                    CoreError::InvalidProject("as Lâminas não podem ser excluídas".into())
+                })?;
+                outcome.affected_sheet_id = Some(neighbor_id);
+                Ok(next)
+            }
             ProjectIntent::ConvertEdgeSheet { sheet_id } => {
                 publication = EditPublication::GuardedAlways;
                 let parsed = parse_uuid(&sheet_id)
@@ -773,6 +794,29 @@ impl PersistentProjectSession {
         self.recovered_unsaved = false;
         Ok(())
     }
+}
+
+/// Every listed Sheet must exist; repeated ids collapse into one.
+fn parse_listed_sheet_ids(
+    sheets: &[crate::project_document::ProjectSheet],
+    sheet_ids: &[String],
+) -> Result<Vec<Uuid>, CoreError> {
+    let mut parsed = Vec::with_capacity(sheet_ids.len());
+    for sheet_id in sheet_ids {
+        let id = parse_uuid(sheet_id)
+            .ok()
+            .filter(|id| sheets.iter().any(|sheet| sheet.id() == *id))
+            .ok_or_else(|| CoreError::SheetNotFound(sheet_id.clone()))?;
+        if !parsed.contains(&id) {
+            parsed.push(id);
+        }
+    }
+    if parsed.is_empty() {
+        return Err(CoreError::InvalidProject(
+            "nenhuma Lâmina foi indicada".into(),
+        ));
+    }
+    Ok(parsed)
 }
 
 fn parse_uuid(source: &str) -> Result<Uuid, ()> {

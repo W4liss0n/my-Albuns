@@ -745,6 +745,24 @@ async function changeFormControl(driver, using, value, nextValue, label) {
   return elementId;
 }
 
+// A click in the Grade only selects; the journey needs the double click to
+// center the second Sheet, which the Canvas reports as its centered Sheet.
+async function waitForGridNavigation(driver, label) {
+  const slot = await findElement(
+    driver,
+    "css selector",
+    ".sheet-grid > .sheet-grid-slot:nth-child(2)",
+    `${label} slot`,
+  );
+  const sheetId = await elementAttribute(driver, slot, "data-sheet-id");
+  await findElement(
+    driver,
+    "css selector",
+    `.canvas-host[data-centered-sheet-id='${sheetId}']`,
+    `${label} centered on the Canvas`,
+  );
+}
+
 async function elementText(driver, elementId) {
   return driver.request(
     "GET",
@@ -1129,12 +1147,13 @@ try {
   if (sourcePathExposedToWebView) {
     throw new Error("The Project WebView exposed a native operation path");
   }
-  await click(
+  await doubleClick(
     hostDriver,
     "css selector",
     ".sheet-grid > .sheet-grid-slot:nth-child(2) > button",
     "second sheet",
   );
+  await waitForGridNavigation(hostDriver, "second sheet");
   const activeSheetNumber = Number(
     await elementText(
       hostDriver,
@@ -1148,7 +1167,7 @@ try {
   );
   if (activeSheetNumber !== 2) {
     throw new Error(
-      `The productive Grade click did not activate Sheet 2 (observed ${activeSheetNumber})`,
+      `The productive Grade double click did not select Sheet 2 (observed ${activeSheetNumber})`,
     );
   }
   await replaceAlbumInformationDpi(hostDriver, "300", "DPI input");
@@ -1369,12 +1388,13 @@ try {
   if ((await elementAttribute(hostDriver, reopenedDpi, "value")) !== "300") {
     throw new Error("The reopened Project did not restore the saved DPI");
   }
-  await click(
+  await doubleClick(
     hostDriver,
     "css selector",
     ".sheet-grid > .sheet-grid-slot:nth-child(2) > button",
     "reopened second sheet",
   );
+  await waitForGridNavigation(hostDriver, "reopened second sheet");
   const reopenedActiveSheetNumber = Number(
     await elementText(
       hostDriver,
@@ -2140,12 +2160,13 @@ try {
       "The Save As WebView inherited the previous local sheet selection",
     );
   }
-  await click(
+  await doubleClick(
     hostDriver,
     "css selector",
     ".sheet-grid > .sheet-grid-slot:nth-child(2) > button",
     "Save As second sheet",
   );
+  await waitForGridNavigation(hostDriver, "Save As second sheet");
   await waitFor(
     "Save As second sheet selection",
     async () =>

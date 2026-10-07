@@ -8,6 +8,11 @@ import {
 } from "react";
 
 import type { EditorProjection } from "../../domain/project";
+import {
+  effectiveSelectedSheetIds,
+  nextSheetSelection,
+  type SheetSelectionModifiers,
+} from "../../application/sheetSelection";
 import { useEditorView } from "../../state/editorView";
 import type { CanvasMetrics } from "../canvas/albumCanvasContract";
 import { createNormalCanvasLayout } from "../canvas/canvasSheetViewGeometry";
@@ -20,6 +25,16 @@ export function useProjectNavigation(projection: EditorProjection) {
   const focusedSheetId = useEditorView(
     (state) => state.focusedSheetId,
   );
+  const storedSelectedSheetIds = useEditorView(
+    (state) => state.selectedSheetIds,
+  );
+  const sheetSelectionSource = useEditorView(
+    (state) => state.sheetSelectionSource,
+  );
+  const selectedSheetIds = useMemo(
+    () => effectiveSelectedSheetIds(storedSelectedSheetIds, focusedSheetId),
+    [focusedSheetId, storedSelectedSheetIds],
+  );
   const centeredSheetId = useEditorView(
     (state) => state.centeredSheetId,
   );
@@ -27,6 +42,7 @@ export function useProjectNavigation(projection: EditorProjection) {
   const viewport = useEditorView((state) => state.viewport);
   const selectFrame = useEditorView((state) => state.selectFrame);
   const focusSheet = useEditorView((state) => state.focusSheet);
+  const selectSheets = useEditorView((state) => state.selectSheets);
   const centerSheetInView = useEditorView((state) => state.centerSheet);
   const selectFrames = useEditorView((state) => state.selectFrames);
   const setViewport = useEditorView((state) => state.setViewport);
@@ -141,6 +157,25 @@ export function useProjectNavigation(projection: EditorProjection) {
     ],
   );
 
+  // The Grade selects without moving the Canvas; only a double click or Enter
+  // navigates. Shift ranges follow the confirmed order, never a drag preview.
+  const selectSheet = useCallback(
+    (sheetId: string, modifiers: SheetSelectionModifiers) => {
+      const state = useEditorView.getState();
+      selectSheets(nextSheetSelection(
+        {
+          selectedSheetIds: state.selectedSheetIds,
+          focusedSheetId: state.focusedSheetId,
+          anchorSheetId: state.sheetSelectionAnchorId,
+        },
+        sheetId,
+        modifiers,
+        projection.state.album.sheets.map((sheet) => sheet.id),
+      ));
+    },
+    [projection.state.album.sheets, selectSheets],
+  );
+
   const navigateToAdjacentSheet = useCallback(
     (direction: "previous" | "next") => {
       const sheetIds = projection.state.album.sheets.map((sheet) => sheet.id);
@@ -176,6 +211,8 @@ export function useProjectNavigation(projection: EditorProjection) {
     selectedFrameIds,
     selectedFrameId,
     focusedSheetId,
+    selectedSheetIds,
+    sheetSelectionSource,
     centeredSheetId,
     editingSheetId,
     viewport,
@@ -183,6 +220,7 @@ export function useProjectNavigation(projection: EditorProjection) {
     implicitSheetId,
     selectFrame,
     focusSheet,
+    selectSheet,
     centerSheet,
     setViewport,
     enterSheetEdit: beginSheetEdit,

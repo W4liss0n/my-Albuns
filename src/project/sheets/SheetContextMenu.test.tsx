@@ -17,6 +17,27 @@ describe("SheetContextMenu", () => {
     expect(dismiss).toHaveBeenCalledOnce();
   });
 
+  test("acts on every selected Sheet and keeps single-Sheet commands disabled", () => {
+    const duplicate = vi.fn();
+    const deleteSheets = vi.fn();
+    render(<SheetContextMenu availability={{ canAddAfter: false, canAddBefore: false,
+      canConvertEdge: false, canDelete: true, canDuplicate: true }}
+      position={{ x: 20, y: 30 }} sheetNumber={2} sheetCount={3} onAddAfter={vi.fn()}
+      onAddBefore={vi.fn()} onConvertEdge={vi.fn()} onDelete={deleteSheets}
+      onDuplicate={duplicate} onDismiss={vi.fn()} />);
+
+    expect(screen.getByRole("menu", { name: "Ações das 3 lâminas" })).toBeInTheDocument();
+    for (const name of ["Adicionar antes", "Adicionar depois", "Converter extremidade"]) {
+      const item = screen.getByRole("menuitem", { name });
+      expect(item).toBeDisabled();
+      expect(item).toHaveAttribute("title", "Disponível somente para uma lâmina");
+    }
+    fireEvent.click(screen.getByRole("menuitem", { name: "Duplicar 3 lâminas" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Excluir 3 lâminas" }));
+    expect(duplicate).toHaveBeenCalledOnce();
+    expect(deleteSheets).toHaveBeenCalledOnce();
+  });
+
   test("converts an eligible explicit edge target", () => {
     const convertEdge = vi.fn();
     const dismiss = vi.fn();

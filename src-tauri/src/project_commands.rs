@@ -80,6 +80,8 @@ pub(crate) async fn apply_project_intent(
         ProjectIntent::AddSheet { .. } => "add_sheet",
         ProjectIntent::DuplicateSheet { .. } => "duplicate_sheet",
         ProjectIntent::DeleteSheet { .. } => "delete_sheet",
+        ProjectIntent::DuplicateSheets { .. } => "duplicate_sheets",
+        ProjectIntent::DeleteSheets { .. } => "delete_sheets",
         ProjectIntent::ConvertEdgeSheet { .. } => "convert_edge_sheet",
         ProjectIntent::ReorderSheet { .. } => "reorder_sheet",
         ProjectIntent::TransformPhoto { .. } => "transform_photo",

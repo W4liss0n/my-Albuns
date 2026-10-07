@@ -45,6 +45,7 @@ export interface SheetBarOverlayProps {
   readonly offsetY?: number;
   readonly bleedUm?: number;
   readonly focusedSheetId?: string | null;
+  readonly selectedSheetIds?: readonly string[];
   readonly mediaPreviewUrls?: Readonly<Record<string, string>>;
   readonly sheetBarMetadata?: readonly SheetBarMetadata[];
   readonly viewport: ViewportState;
@@ -106,7 +107,8 @@ export function SheetBarOverlay(
   const ghostAnchorRef = useRef<GhostAnchor | null>(null);
   const pointerReorder = useSheetPointerReorder({
     enabled: reorderEnabled,
-    onActivate: props.onSelect,
+    // The Bar selects one Sheet at a time; Ctrl and Shift belong to the Grade.
+    onActivate: (sheetId) => props.onSelect(sheetId),
     onCancel: props.onCancel,
     onDrop: props.onDrop,
     onFinish: () => props.onAutoScrollVelocity(0),
@@ -375,7 +377,9 @@ export function SheetBarOverlay(
           className="sheet-bar-overlay__ghost"
           data-active-sides={ghostSheet.activeSides}
           data-origin-selected={
-            ghostSheet.sheetId === props.focusedSheetId || undefined
+            ghostSheet.sheetId === props.focusedSheetId ||
+            props.selectedSheetIds?.includes(ghostSheet.sheetId) ||
+            undefined
           }
           data-pointer-x={pointerReorder.pointer?.clientX}
           data-pointer-y={pointerReorder.pointer?.clientY}

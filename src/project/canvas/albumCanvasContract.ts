@@ -103,6 +103,8 @@ export interface AlbumCanvasProps {
   continuousCanvasLayout: ContinuousCanvasLayout;
   selectedFrameIds: readonly string[];
   focusedSheetId: string | null;
+  /** Sheets outlined as selected; defaults to the focused Sheet alone. */
+  selectedSheetIds?: readonly string[];
   centeredSheetId: string | null;
   viewport: ViewportState;
   editingNavigation?: { disabled: boolean; fitRequest: number; onPanGesture?: () => void };

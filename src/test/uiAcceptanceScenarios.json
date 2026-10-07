@@ -3427,6 +3427,150 @@
       ]
     },
     {
+      "id": "sheet-grid-multiple-selection",
+      "title": "Grade de Lâminas — seleção múltipla",
+      "implementationPath": "/previews/sheet-grid-preview.html",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "sheet-grid",
+        "implementationCaptureSelector": ".inspector-section:has(.sheet-grid)",
+        "reason": "A referência visual vigente antecede a seleção de várias Lâminas na Grade definida nas decisões aceitas posteriores."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "readySelector": ".sheet-grid:has(> .sheet-grid-slot:nth-child(3) > .sheet-tile[aria-pressed=\"true\"]):has(> .sheet-grid-slot:nth-child(5) > .sheet-tile[aria-pressed=\"true\"]):not(:has(> .sheet-grid-slot:nth-child(2) > .sheet-tile[aria-pressed=\"true\"]))",
+      "actions": [
+        {
+          "type": "click",
+          "selector": ".sheet-grid > .sheet-grid-slot:nth-child(3) > .sheet-tile"
+        },
+        {
+          "type": "click",
+          "selector": ".sheet-grid > .sheet-grid-slot:nth-child(5) > .sheet-tile",
+          "modifiers": [
+            "Control"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "sheet-grid-selection-preserves-navigation",
+      "title": "Grade de Lâminas — clique e Ctrl selecionam sem navegar",
+      "implementationPath": "/previews/workspace-preview.html?structure=physical",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "sheet-grid-selection-ownership",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "A referência visual vigente não representa a seleção de várias Lâminas na Grade nem sua separação da navegação do Canvas, aceitas posteriormente."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "readySelector": ".app-shell:has(.canvas-host[data-centered-sheet-id=\"sheet-001\"]):has([data-reorder-surface=\"grid\"] [data-sheet-id=\"sheet-002\"] .sheet-tile[aria-pressed=\"true\"]):has([data-reorder-surface=\"grid\"] [data-sheet-id=\"sheet-003\"] .sheet-tile[aria-pressed=\"true\"]):has([data-reorder-surface=\"grid\"] [data-sheet-id=\"sheet-001\"] .sheet-tile[aria-pressed=\"false\"])",
+      "actions": [
+        {
+          "type": "wheel",
+          "selector": ".inspector",
+          "deltaY": 1100
+        },
+        {
+          "type": "assert",
+          "selector": ".canvas-host[data-centered-sheet-id=\"sheet-001\"]"
+        },
+        {
+          "type": "pointer-click",
+          "selector": "[data-reorder-surface=\"grid\"] [data-sheet-id=\"sheet-002\"] .sheet-tile"
+        },
+        {
+          "type": "assert",
+          "selector": ".app-shell:has(.canvas-host[data-centered-sheet-id=\"sheet-001\"]):has([data-reorder-surface=\"grid\"] [data-sheet-id=\"sheet-002\"] .sheet-tile[aria-pressed=\"true\"])"
+        },
+        {
+          "type": "click",
+          "selector": "[data-reorder-surface=\"grid\"] [data-sheet-id=\"sheet-003\"] .sheet-tile",
+          "modifiers": [
+            "Control"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "sheet-grid-double-click-navigates",
+      "title": "Grade de Lâminas — duplo clique vai até a Lâmina",
+      "implementationPath": "/previews/workspace-preview.html?structure=physical",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "sheet-grid-selection-ownership",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "A referência visual vigente não representa a navegação da Grade por duplo clique aceita posteriormente."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "readySelector": ".app-shell:has(.canvas-host[data-centered-sheet-id=\"sheet-003\"][data-viewport-offset-x]:not([data-viewport-offset-x=\"0\"])):has([data-reorder-surface=\"grid\"] [data-sheet-id=\"sheet-003\"] .sheet-tile[aria-pressed=\"true\"]):has([data-reorder-surface=\"grid\"] [data-sheet-id=\"sheet-002\"] .sheet-tile[aria-pressed=\"false\"])",
+      "actions": [
+        {
+          "type": "wheel",
+          "selector": ".inspector",
+          "deltaY": 1100
+        },
+        {
+          "type": "pointer-click",
+          "selector": "[data-reorder-surface=\"grid\"] [data-sheet-id=\"sheet-002\"] .sheet-tile"
+        },
+        {
+          "type": "assert",
+          "selector": ".app-shell:has(.canvas-host[data-centered-sheet-id=\"sheet-001\"]):has([data-reorder-surface=\"grid\"] [data-sheet-id=\"sheet-002\"] .sheet-tile[aria-pressed=\"true\"])"
+        },
+        {
+          "type": "double-click",
+          "selector": "[data-reorder-surface=\"grid\"] [data-sheet-id=\"sheet-003\"] .sheet-tile"
+        }
+      ]
+    },
+    {
+      "id": "sheet-grid-selection-context-menu",
+      "title": "Grade de Lâminas — menu contextual da seleção",
+      "implementationPath": "/previews/workspace-preview.html?structure=physical",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "sheet-grid-selection-ownership",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "A referência visual vigente não representa ações sobre várias Lâminas selecionadas na Grade, aceitas posteriormente."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "readySelector": "[role=\"menu\"][aria-label=\"Ações das 2 lâminas\"]:has([role=\"menuitem\"][aria-label=\"Excluir 2 lâminas\"]:not([disabled]))",
+      "actions": [
+        {
+          "type": "wheel",
+          "selector": ".inspector",
+          "deltaY": 1100
+        },
+        {
+          "type": "pointer-click",
+          "selector": "[data-reorder-surface=\"grid\"] [data-sheet-id=\"sheet-002\"] .sheet-tile"
+        },
+        {
+          "type": "click",
+          "selector": "[data-reorder-surface=\"grid\"] [data-sheet-id=\"sheet-003\"] .sheet-tile",
+          "modifiers": [
+            "Control"
+          ]
+        },
+        {
+          "type": "context-click",
+          "selector": "[data-reorder-surface=\"grid\"] [data-sheet-id=\"sheet-003\"]"
+        }
+      ]
+    },
+    {
       "id": "album-information-validation-tooltip",
       "title": "Inspector — validação de medida",
       "implementationPath": "/previews/sheet-grid-preview.html",

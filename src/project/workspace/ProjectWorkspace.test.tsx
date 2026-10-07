@@ -52,6 +52,7 @@ import {
   createEmptyProjection,
   createThreeSheetProjection,
   createTwoSheetProjection,
+  refreshSheetStructureFixture,
   representativeProjection,
 } from "../../test/projectFixtures";
 import type {
@@ -77,6 +78,7 @@ const canvasHarness = vi.hoisted(() => ({
     sheetLayouts?: { onToggle(sheetId: string): void };
     continuousCanvasLayout: ContinuousCanvasLayout;
     focusedSheetId: string | null;
+    selectedSheetIds?: readonly string[];
     centeredSheetId: string | null;
     viewport: { offsetX: number };
     mediaPreviewUrls?: Readonly<Record<string, string>>;
@@ -683,6 +685,9 @@ beforeEach(() => {
   useEditorView.setState({
     projectId: projection.state.projectId,
     selectedFrameIds: [],
+    selectedSheetIds: ["sheet-001"],
+    sheetSelectionAnchorId: "sheet-001",
+    sheetSelectionSource: "focus",
     focusedSheetId: "sheet-001",
     centeredSheetId: "sheet-001",
     editingSheetId: null,
@@ -1234,7 +1239,7 @@ test("Delete in an explicit Sheet menu cannot remove the centered Sheet", async 
   vi.spyOn(core, "applyWithOutcome");
   render(<ProjectWorkspace exportPipelinePort={exportPipelinePort}
     projection={physicalProjection} projectCorePort={core} onProjectionChange={() => undefined} />);
-  fireEvent.click(screen.getByRole("button", { name: /Ir para lâmina 02/u }));
+  fireEvent.doubleClick(screen.getByRole("button", { name: /^Lâmina 02,/u }));
   act(() => canvasHarness.props?.onOpenSheetContextMenu?.("sheet-003", { x: 240, y: 180 }));
   const menu = screen.getByRole("menu", { name: "Ações da lâmina 03" });
   await act(async () => { fireEvent.keyDown(within(menu).getByRole("menuitem", { name: "Excluir" }), { key: "Delete" }); });
@@ -1264,8 +1269,8 @@ test("opens and dismisses an explicit Sheet context menu without navigating the 
       scale: 0.5,
     });
   });
-  fireEvent.click(
-    screen.getByRole("button", { name: /Ir para lâmina 02/u }),
+  fireEvent.doubleClick(
+    screen.getByRole("button", { name: /^Lâmina 02,/u }),
   );
   const before = {
     centeredSheetId: useEditorView.getState().centeredSheetId,
@@ -1347,8 +1352,8 @@ test("selects a Sheet through the Bar seam without navigating the Canvas", () =>
       scale: 0.5,
     });
   });
-  fireEvent.click(
-    screen.getByRole("button", { name: /Ir para lâmina 02/u }),
+  fireEvent.doubleClick(
+    screen.getByRole("button", { name: /^Lâmina 02,/u }),
   );
   const before = {
     centeredSheetId: canvasHarness.props?.centeredSheetId,
@@ -5540,7 +5545,7 @@ test("presents the Grade with reference metadata and navigation state", () => {
   expect(tiles[1]).not.toHaveAttribute("aria-current");
   expect(tiles[0]).toHaveAttribute("data-active-sides", "both");
   expect(tiles[0]).toHaveAccessibleName(
-    "Ir para lâmina 01, páginas 7–8",
+    "Lâmina 01, páginas 7–8",
   );
   expect(tiles[0].querySelector(".sheet-tile__number")).toHaveTextContent(
     "01",
@@ -5612,10 +5617,10 @@ test("shows Page numbers instead of cover and final aliases", () => {
     ),
   ).toEqual(["1", "2"]);
   expect(tiles[0]).toHaveAccessibleName(
-    "Ir para lâmina 01, lâmina inicial, página 1",
+    "Lâmina 01, lâmina inicial, página 1",
   );
   expect(tiles[1]).toHaveAccessibleName(
-    "Ir para lâmina 02, lâmina final, página 2",
+    "Lâmina 02, lâmina final, página 2",
   );
   expect(
     tilePreviews[0]?.style.getPropertyValue(
@@ -6082,6 +6087,212 @@ test("keeps a retained Decorative preview while preserving unavailable state", (
   ).toHaveAttribute("href", decorativePreviewUrl);
 });
 
+test("selects Grade Sheets with a click, Ctrl and Shift without moving the Canvas", () => {
+  const physicalProjection = createThreeSheetProjection();
+  render(
+    <ProjectWorkspace
+      exportPipelinePort={exportPipelinePort}
+      projection={physicalProjection}
+      projectCorePort={projectCorePortWithApply(async () => physicalProjection)}
+      onProjectionChange={() => undefined}
+    />,
+  );
+  act(() => {
+    canvasHarness.props?.onCanvasMetricsChange?.({
+      width: 1_000,
+      height: 500,
+      scale: 0.5,
+    });
+  });
+  const before = {
+    centeredSheetId: useEditorView.getState().centeredSheetId,
+    offsetX: useEditorView.getState().viewport.offsetX,
+  };
+  const tile = (number: string) =>
+    screen.getByRole("button", { name: new RegExp(`^Lâmina ${number},`, "u") });
+  const pressed = () =>
+    ["01", "02", "03"].filter(
+      (number) => tile(number).getAttribute("aria-pressed") === "true",
+    );
+
+  fireEvent.click(tile("02"));
+  expect(pressed()).toEqual(["02"]);
+  expect(canvasHarness.props?.focusedSheetId).toBe("sheet-002");
+
+  fireEvent.click(tile("03"), { ctrlKey: true });
+  expect(pressed()).toEqual(["02", "03"]);
+  expect(canvasHarness.props?.selectedSheetIds).toEqual(["sheet-002", "sheet-003"]);
+
+  fireEvent.click(tile("01"), { shiftKey: true });
+  expect(pressed()).toEqual(["01", "02", "03"]);
+
+  fireEvent.click(tile("02"), { ctrlKey: true });
+  expect(pressed()).toEqual(["01", "03"]);
+  expect(useEditorView.getState()).toMatchObject({
+    centeredSheetId: before.centeredSheetId,
+    viewport: { offsetX: before.offsetX },
+  });
+
+  act(() => canvasHarness.props?.sheetReorder?.onSelect("sheet-002"));
+  expect(pressed()).toEqual(["02"]);
+
+  fireEvent.click(tile("03"), { ctrlKey: true });
+  fireEvent.doubleClick(tile("01"));
+  expect(pressed()).toEqual(["01"]);
+  expect(useEditorView.getState().centeredSheetId).toBe("sheet-001");
+});
+
+function createFourSheetProjection(): EditorProjection {
+  const four = createThreeSheetProjection();
+  const [, , third] = four.state.album.sheets;
+  const thirdComposition = four.composition.sheets[2];
+  third.role = "internal";
+  four.state.album.sheets.push({
+    ...structuredClone(third), id: "sheet-004", number: 4, role: "final", pageNumbers: [7, 8], frames: [],
+  });
+  four.composition.sheets.push({
+    ...structuredClone(thirdComposition), sheetId: "sheet-004", number: 4, frames: [],
+  });
+  four.state.album.sheets = refreshSheetStructureFixture(four.state.album.sheets);
+  return four;
+}
+
+function renderSheetCommandWorkspace(sheetProjection = createFourSheetProjection()) {
+  const port = projectCorePortWithApply(async () => sheetProjection);
+  const applyWithOutcome = vi.fn(async () => ({
+    projection: sheetProjection,
+    affectedFrameId: null,
+    affectedSheetId: null,
+  }));
+  port.applyWithOutcome = applyWithOutcome;
+  const view = render(
+    <ProjectWorkspace
+      exportPipelinePort={exportPipelinePort}
+      projection={sheetProjection}
+      projectCorePort={port}
+      onProjectionChange={() => undefined}
+    />,
+  );
+  const tile = (number: string) =>
+    screen.getByRole("button", { name: new RegExp(`^Lâmina ${number},`, "u") });
+  return { applyWithOutcome, tile, view };
+}
+
+test("Delete and Duplicate act on the Grade selection in one action each", async () => {
+  const { applyWithOutcome, tile } = renderSheetCommandWorkspace();
+  expect(useEditorView.getState().centeredSheetId).toBe("sheet-001");
+
+  fireEvent.click(tile("02"));
+  fireEvent.click(tile("04"), { ctrlKey: true });
+  expect(getApplicationCommand("Lâmina", "Duplicar 2 lâminas")).toBeEnabled();
+  expect(getApplicationCommand("Lâmina", "Excluir 2 lâminas")).toBeEnabled();
+  fireEvent.keyDown(screen.getByRole("menuitem", { name: "Lâmina" }), { key: "Escape" });
+
+  fireEvent.keyDown(tile("04"), { key: "Delete" });
+  await waitFor(() => expect(applyWithOutcome).toHaveBeenCalledWith(
+    { kind: "deleteSheets", sheetIds: ["sheet-002", "sheet-004"] }, expect.any(Function),
+  ));
+  await waitFor(() => expect(applyWithOutcome).toHaveBeenCalledOnce());
+
+  fireEvent.keyDown(tile("04"), { ctrlKey: true, key: "d" });
+  await waitFor(() => expect(applyWithOutcome).toHaveBeenLastCalledWith(
+    { kind: "duplicateSheets", sheetIds: ["sheet-002", "sheet-004"] }, expect.any(Function),
+  ));
+});
+
+test("a single Grade click makes Delete remove the clicked Sheet, not the centered one", async () => {
+  const { applyWithOutcome, tile } = renderSheetCommandWorkspace();
+
+  fireEvent.click(tile("03"));
+  expect(getApplicationCommand("Lâmina", "Excluir")).toBeEnabled();
+  fireEvent.keyDown(screen.getByRole("menuitem", { name: "Lâmina" }), { key: "Escape" });
+  fireEvent.keyDown(tile("03"), { key: "Delete" });
+
+  await waitFor(() => expect(applyWithOutcome).toHaveBeenCalledExactlyOnceWith(
+    { kind: "deleteSheet", sheetId: "sheet-003" }, expect.any(Function),
+  ));
+});
+
+test("the centered Sheet is the target again after the Bar selects or the Grade hides", async () => {
+  const { applyWithOutcome, tile } = renderSheetCommandWorkspace();
+
+  fireEvent.click(tile("03"));
+  act(() => canvasHarness.props?.sheetReorder?.onSelect("sheet-002"));
+  fireEvent.keyDown(window, { key: "Delete" });
+  await waitFor(() => expect(applyWithOutcome).toHaveBeenLastCalledWith(
+    { kind: "deleteSheet", sheetId: "sheet-001" }, expect.any(Function),
+  ));
+  await waitFor(() => expect(applyWithOutcome).toHaveBeenCalledOnce());
+
+  fireEvent.click(tile("02"));
+  fireEvent.click(tile("04"), { ctrlKey: true });
+  fireEvent.click(getApplicationCommand("Exibir", "Painel contextual"));
+  expect(screen.queryByTestId("sheet-reorder-grid")).not.toBeInTheDocument();
+  fireEvent.keyDown(window, { key: "Delete" });
+  await waitFor(() => expect(applyWithOutcome).toHaveBeenCalledTimes(2));
+  expect(applyWithOutcome).toHaveBeenNthCalledWith(
+    2, { kind: "deleteSheet", sheetId: "sheet-001" }, expect.any(Function),
+  );
+
+  // The outlined selection on the Canvas is not a target while the Grade is hidden.
+  act(() => canvasHarness.props?.onOpenSheetContextMenu?.("sheet-004", { x: 240, y: 180 }));
+  const menu = screen.getByRole("menu", { name: "Ações da lâmina 04" });
+  fireEvent.click(within(menu).getByRole("menuitem", { name: "Excluir" }));
+  await waitFor(() => expect(applyWithOutcome).toHaveBeenCalledTimes(3));
+  expect(applyWithOutcome).toHaveBeenNthCalledWith(
+    3, { kind: "deleteSheet", sheetId: "sheet-004" }, expect.any(Function),
+  );
+});
+
+test("collapsing the Grade section returns Delete and Duplicate to the centered Sheet", async () => {
+  const { applyWithOutcome, tile } = renderSheetCommandWorkspace();
+
+  fireEvent.click(tile("02"));
+  fireEvent.click(tile("04"), { ctrlKey: true });
+  fireEvent.click(screen.getByRole("button", { name: "Grade de lâminas" }));
+  expect(screen.queryByTestId("sheet-reorder-grid")).not.toBeInTheDocument();
+  expect(getApplicationCommand("Lâmina", "Excluir")).toBeEnabled();
+  expect(getApplicationCommand("Lâmina", "Duplicar lâmina")).toBeEnabled();
+  fireEvent.keyDown(screen.getByRole("menuitem", { name: "Lâmina" }), { key: "Escape" });
+
+  fireEvent.keyDown(window, { ctrlKey: true, key: "d" });
+  await waitFor(() => expect(applyWithOutcome).toHaveBeenCalledExactlyOnceWith(
+    { kind: "duplicateSheet", sheetId: "sheet-001" }, expect.any(Function),
+  ));
+});
+
+test("the Sheet menu on a selected Sheet acts on the whole selection", async () => {
+  const { applyWithOutcome, tile } = renderSheetCommandWorkspace();
+
+  fireEvent.click(tile("02"));
+  fireEvent.click(tile("03"), { ctrlKey: true });
+  fireEvent.contextMenu(tile("03").closest(".sheet-grid-slot")!, { clientX: 40, clientY: 50 });
+  const menu = screen.getByRole("menu", { name: "Ações das 2 lâminas" });
+  expect(within(menu).getByRole("menuitem", { name: "Adicionar depois" })).toBeDisabled();
+  fireEvent.click(within(menu).getByRole("menuitem", { name: "Excluir 2 lâminas" }));
+  await waitFor(() => expect(applyWithOutcome).toHaveBeenCalledExactlyOnceWith(
+    { kind: "deleteSheets", sheetIds: ["sheet-002", "sheet-003"] }, expect.any(Function),
+  ));
+
+  fireEvent.contextMenu(tile("04").closest(".sheet-grid-slot")!, { clientX: 40, clientY: 50 });
+  const single = screen.getByRole("menu", { name: "Ações da lâmina 04" });
+  fireEvent.click(within(single).getByRole("menuitem", { name: "Duplicar lâmina" }));
+  await waitFor(() => expect(applyWithOutcome).toHaveBeenLastCalledWith(
+    { kind: "duplicateSheet", sheetId: "sheet-004" }, expect.any(Function),
+  ));
+});
+
+test("Delete never leaves fewer than two Sheets from a Grade selection", () => {
+  const { applyWithOutcome, tile } = renderSheetCommandWorkspace();
+
+  fireEvent.click(tile("01"));
+  fireEvent.click(tile("03"), { shiftKey: true });
+  expect(getApplicationCommand("Lâmina", "Excluir 3 lâminas")).toBeDisabled();
+  fireEvent.keyDown(screen.getByRole("menuitem", { name: "Lâmina" }), { key: "Escape" });
+  fireEvent.keyDown(tile("03"), { key: "Delete" });
+  expect(applyWithOutcome).not.toHaveBeenCalled();
+});
+
 test("centers a Grade navigation target in the visible Canvas", () => {
   render(
     <ProjectWorkspace
@@ -6099,7 +6310,7 @@ test("centers a Grade navigation target in the visible Canvas", () => {
       scale: 0.5,
     });
   });
-  fireEvent.click(screen.getByText("02").closest("button")!);
+  fireEvent.doubleClick(screen.getByText("02").closest("button")!);
 
   const targetCenter =
     canvasHarness.props!.continuousCanvasLayout.entriesAtScale(0.5)[1].center;
@@ -6208,7 +6419,7 @@ test("completes Grade navigation requested before Canvas metrics exist", () => {
     />,
   );
 
-  fireEvent.click(screen.getByText("02").closest("button")!);
+  fireEvent.doubleClick(screen.getByText("02").closest("button")!);
   expect(useEditorView.getState().viewport.offsetX).toBe(42);
 
   act(() => {
