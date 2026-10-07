@@ -431,7 +431,7 @@ const DEFINITIONS = [
   command({
     id: "duplicate-sheet",
     label: "Duplicar lâmina",
-    description: "Duplica a lâmina ativa.",
+    description: "Duplica a lâmina centralizada ou as selecionadas na grade.",
     kind: "domain",
     contexts: ["sheet"],
     availability: "implemented",
@@ -440,7 +440,7 @@ const DEFINITIONS = [
   command({
     id: "delete-sheet",
     label: "Excluir",
-    description: "Exclui a lâmina ativa.",
+    description: "Exclui a lâmina centralizada ou as selecionadas na grade.",
     kind: "domain",
     contexts: ["sheet"],
     availability: "implemented",

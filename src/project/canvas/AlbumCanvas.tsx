@@ -555,6 +555,7 @@ export function AlbumCanvas(props: AlbumCanvasProps) {
             bleedUm={props.technicalGuides?.bleedUm}
             disabled={props.sheetReorder.disabled || isolated}
             focusedSheetId={props.focusedSheetId}
+            selectedSheetIds={props.selectedSheetIds}
             layout={barLayout}
             mediaPreviewUrls={props.mediaPreviewUrls}
             metrics={canvasMetrics}

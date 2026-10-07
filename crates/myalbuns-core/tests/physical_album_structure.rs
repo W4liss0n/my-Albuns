@@ -845,3 +845,115 @@ fn reordering_is_atomic_persistent_and_never_interiorizes_a_single_page() {
         ]
     );
 }
+
+#[test]
+fn deleting_several_sheets_is_one_action_that_centers_the_first_gap() {
+    let root = tempfile::tempdir().expect("temporary multi-deletion Album root");
+    let project_path = root.path().join("Excluir várias Lâminas.myalbuns");
+    let core = ProjectCore::new()
+        .with_identity_storage_roots(root.path().join("leases"), root.path().join("identities"));
+    let mut project = create_project(&core, &project_path, 6);
+    let initial = project.projection();
+    let ids: Vec<String> = initial
+        .state
+        .album
+        .sheets
+        .iter()
+        .map(|sheet| sheet.id.clone())
+        .collect();
+
+    let intent = serde_json::from_value(serde_json::json!({
+        "kind": "deleteSheets",
+        "sheetIds": [ids[4], ids[1], ids[3], ids[1]],
+    }))
+    .expect("the plural deletion is part of the public intent contract");
+    let deleted = project
+        .apply_with_outcome(intent)
+        .expect("three of six Sheets may be deleted together");
+    let remaining: Vec<&str> = deleted
+        .projection
+        .state
+        .album
+        .sheets
+        .iter()
+        .map(|sheet| sheet.id.as_str())
+        .collect();
+    assert_eq!(
+        remaining,
+        [ids[0].as_str(), ids[2].as_str(), ids[5].as_str()]
+    );
+    assert_eq!(
+        deleted.affected_sheet_id.as_deref(),
+        Some(ids[2].as_str()),
+        "the Sheet that takes the place of the first deleted one is centered"
+    );
+    assert_eq!(
+        deleted.projection.state.revision,
+        initial.state.revision + 1
+    );
+
+    let restored = project
+        .undo()
+        .expect("one Undo restores every deleted Sheet");
+    assert_eq!(restored.state.album, initial.state.album);
+    assert_eq!(restored.composition, initial.composition);
+}
+
+#[test]
+fn deleting_several_sheets_keeps_two_and_refuses_unknown_or_empty_lists() {
+    let root = tempfile::tempdir().expect("temporary multi-deletion limits root");
+    let project_path = root.path().join("Limites da exclusão.myalbuns");
+    let core = ProjectCore::new()
+        .with_identity_storage_roots(root.path().join("leases"), root.path().join("identities"));
+    let mut project = create_project(&core, &project_path, 4);
+    let initial = project.projection();
+    let ids: Vec<String> = initial
+        .state
+        .album
+        .sheets
+        .iter()
+        .map(|sheet| sheet.id.clone())
+        .collect();
+
+    assert_eq!(
+        project
+            .apply(ProjectIntent::DeleteSheets {
+                sheet_ids: ids[1..].to_vec(),
+            })
+            .expect_err("deleting three of four would leave one Sheet"),
+        CoreError::MinimumSheetCount
+    );
+    assert_eq!(
+        project
+            .apply(ProjectIntent::DeleteSheets {
+                sheet_ids: vec![
+                    ids[1].clone(),
+                    "00000000-0000-4000-8000-000000000099".into()
+                ],
+            })
+            .expect_err("every listed Sheet must exist"),
+        CoreError::SheetNotFound("00000000-0000-4000-8000-000000000099".into())
+    );
+    assert!(
+        project
+            .apply(ProjectIntent::DeleteSheets { sheet_ids: vec![] })
+            .is_err()
+    );
+    assert_eq!(project.projection(), initial);
+
+    let deleted = project
+        .apply_with_outcome(ProjectIntent::DeleteSheets {
+            sheet_ids: vec![ids[2].clone(), ids[3].clone()],
+        })
+        .expect("two of four Sheets may be deleted");
+    assert_eq!(deleted.projection.state.album.sheets.len(), 2);
+    assert_eq!(
+        deleted.affected_sheet_id.as_deref(),
+        Some(ids[1].as_str()),
+        "deleting the end centers the new last Sheet"
+    );
+    assert_eq!(
+        deleted.projection.state.album.sheets[1].role,
+        SheetRole::Final
+    );
+}

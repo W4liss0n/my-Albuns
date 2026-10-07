@@ -1,7 +1,7 @@
 ---
 status: accepted
 document: design
-updated: 2026-09-25
+updated: 2026-10-07
 ---
 
 # Estrutura da Janela do Projeto
@@ -108,9 +108,9 @@ A Janela usa uma barra de menus desktop convencional. Os grupos inicialmente pre
 
 Nos modos normal e de edição, `Editar` oferece `Copiar` e `Colar` para Frames, com os atalhos fixos do MVP `Ctrl + C` e `Ctrl + V`. `Copiar` exige ao menos um Frame selecionado; `Colar` exige conteúdo de Frame copiado e fica desabilitado quando a Lâmina de destino possui Layout travado. No Modo normal, o destino é sempre a Lâmina centralizada, mesmo com um Frame de outra Lâmina selecionado; no Modo de edição, é a Lâmina isolada. Os atalhos respeitam campos de texto, menus, diálogos e o foco do Painel de imagens.
 
-O menu `Lâmina` contém `Adicionar antes`, `Adicionar depois`, `Duplicar Lâmina`, `Excluir` e `Converter extremidade`. Esses comandos usam a Lâmina mais centralizada no Canvas como alvo implícito.
+O menu `Lâmina` contém `Adicionar antes`, `Adicionar depois`, `Duplicar Lâmina`, `Excluir` e `Converter extremidade`. Esses comandos usam a Lâmina mais centralizada no Canvas como alvo implícito, exceto `Duplicar Lâmina` e `Excluir` enquanto a Grade mostra uma seleção feita nela: então agem sobre as Lâminas selecionadas.
 
-Os mesmos comandos aparecem no menu de contexto da superfície e da Barra de cada Lâmina, usando a Lâmina clicada como alvo explícito. Abrir, fechar, cancelar com `Esc` ou dispensar esse menu não seleciona, navega, centraliza nem altera a Transformação da visualização; seus comandos continuam independentes da Lâmina centralizada. `Converter extremidade` fica disponível somente quando o alvo é uma extremidade e a conversão produz uma estrutura válida. Uma regra própria de centralização só acontece depois do sucesso de um comando estrutural que a defina.
+Os mesmos comandos aparecem no menu de contexto da superfície e da Barra de cada Lâmina, usando a Lâmina clicada como alvo explícito; se ela faz parte de uma seleção de várias Lâminas que a Grade mostra, `Duplicar Lâmina` e `Excluir` agem sobre todas. Abrir, fechar, cancelar com `Esc` ou dispensar esse menu não seleciona, navega, centraliza nem altera a Transformação da visualização; seus comandos continuam independentes da Lâmina centralizada. `Converter extremidade` fica disponível somente quando o alvo é uma extremidade e a conversão produz uma estrutura válida. Uma regra própria de centralização só acontece depois do sucesso de um comando estrutural que a defina.
 
 No Modo de edição, o menu `Lâmina` continua visível, mas `Adicionar antes`, `Adicionar depois`, `Duplicar Lâmina`, `Excluir` e `Converter extremidade` ficam desabilitados. Barra e Grade não oferecem reordenação nesse modo; o usuário retorna ao Canvas contínuo com `Esc` antes de alterar a sequência.
 
@@ -118,17 +118,17 @@ No Modo de edição, o menu `Lâmina` continua visível, mas `Adicionar antes`, 
 
 Após inserir, a Numeração de Página é recalculada e o Canvas rola para centralizar a nova Lâmina. A inserção inteira entra como uma única ação de Undo/Redo; o deslocamento do Canvas não pertence ao Histórico.
 
-`Duplicar Lâmina` insere imediatamente depois da original uma cópia independente de toda a composição: Background, Overlay, Frames, Fotos ou placeholders, estilos, ajustes, ordem visual, Último Layout aplicado e estado de Layout travado. Os itens reutilizam os mesmos vínculos externos, sem copiar os Arquivos originais, e alterações posteriores em uma Lâmina não atingem a outra.
+`Duplicar Lâmina` insere imediatamente depois da original uma cópia independente de toda a composição: Background, Overlay, Frames, Fotos ou placeholders, estilos, ajustes, ordem visual, Último Layout aplicado e estado de Layout travado. Os itens reutilizam os mesmos vínculos externos, sem copiar os Arquivos originais, e alterações posteriores em uma Lâmina não atingem a outra. Com várias Lâminas selecionadas, cada sequência de Lâminas consecutivas selecionadas é repetida logo depois dela, na mesma ordem, numa única ação de Undo/Redo; o comando fica indisponível se alguma for extremidade de Página única.
 
 O comando fica indisponível para uma extremidade de Página única, cuja cópia ocuparia o interior do Álbum. Após uma duplicação válida, papéis e Numeração são recalculados, a nova Lâmina é centralizada e toda a operação forma uma única ação de Undo/Redo; a centralização permanece fora do Histórico.
 
-`Excluir` fica desabilitado quando o Álbum possui somente duas Lâminas. Nos demais casos, remove a Lâmina sem confirmação como uma única ação de Undo/Redo; Fotos e Decorativos importados continuam no Painel de imagens, mesmo quando perdem seu último uso.
+`Excluir` fica desabilitado quando o Álbum possui somente duas Lâminas. Nos demais casos, remove a Lâmina sem confirmação como uma única ação de Undo/Redo; várias Lâminas selecionadas na Grade também saem numa única ação, desde que restem ao menos duas; Fotos e Decorativos importados continuam no Painel de imagens, mesmo quando perdem seu último uso.
 
 Depois da exclusão, papéis e Numeração são recalculados. O Canvas centraliza a Lâmina seguinte ou, se a última foi excluída, a anterior. Um Painel de Layouts direcionado à Lâmina removida é fechado. Esses ajustes da interface não entram no Histórico, embora o Undo restaure integralmente a Lâmina e sua composição.
 
 ### Reordenação das Lâminas no Canvas
 
-Pressionar uma área livre da Barra da Lâmina e mover além do limiar padrão de arraste inicia a reordenação por eventos de ponteiro e captura o ponteiro durante o gesto. Movimento abaixo do limiar continua sendo clique: ele seleciona/ativa a Lâmina para comandos e feedback visual, mas preserva a Lâmina centralizada e `viewport.offsetX`. Essa regra vale uniformemente nas metades esquerda e direita e no restante da área visual pertinente; os botões da Barra permanecem reservados às próprias ações e não iniciam o gesto. A Grade conserva sua regra própria de clique para centralizar, sem compartilhar esse efeito com a Barra.
+Pressionar uma área livre da Barra da Lâmina e mover além do limiar padrão de arraste inicia a reordenação por eventos de ponteiro e captura o ponteiro durante o gesto. Movimento abaixo do limiar continua sendo clique: ele seleciona/ativa a Lâmina para comandos e feedback visual, mas preserva a Lâmina centralizada e `viewport.offsetX`. Essa regra vale uniformemente nas metades esquerda e direita e no restante da área visual pertinente; os botões da Barra permanecem reservados às próprias ações e não iniciam o gesto. Na Grade, o clique também só seleciona; centralizar exige duplo clique ou `Enter` na miniatura.
 
 Durante o arraste:
 
@@ -171,7 +171,7 @@ Comandos rotineiros e serializados, como `Salvar`, `Desfazer`, `Refazer` e alter
 - Um arraste completo cria uma única ação de Undo/Redo ao soltar. Passos consecutivos de `Alt` + roda são agrupados em uma ação quando a sequência de rolagem termina.
 - Selecionar um Frame ou Foto em qualquer Lâmina troca a seleção para aquele elemento e atualiza o contexto à direita.
 - Clicar em uma área vazia remove a seleção do elemento e retorna ao contexto geral do Álbum, sem desativar nenhuma Lâmina.
-- Clicar na Grade de Lâminas, usar as teclas físicas `←` e `→` ou executar qualquer comando `Ir para Lâmina` posiciona o centro visual da Lâmina de destino no centro horizontal da área útil do Canvas, mas não torna as demais inativas. `←` e `→` percorrem respectivamente a Lâmina física anterior e seguinte no Modo normal e são encaminhadas pelo catálogo público de comandos; não existem botões permanentes de Lâmina anterior/próxima nos cantos do Canvas. Campos editáveis, diálogos, menus, Modo de edição e interações que possuem semântica própria conservam ownership dessas teclas. Arrastar uma miniatura da Grade inicia a reordenação estrutural descrita para a Barra.
+- Dar duplo clique numa miniatura da Grade de Lâminas (ou `Enter` com o foco nela), usar as teclas físicas `←` e `→` ou executar qualquer comando `Ir para Lâmina` posiciona o centro visual da Lâmina de destino no centro horizontal da área útil do Canvas, mas não torna as demais inativas. `←` e `→` percorrem respectivamente a Lâmina física anterior e seguinte no Modo normal e são encaminhadas pelo catálogo público de comandos; não existem botões permanentes de Lâmina anterior/próxima nos cantos do Canvas. Campos editáveis, diálogos, menus, Modo de edição e interações que possuem semântica própria conservam ownership dessas teclas. Arrastar uma miniatura da Grade inicia a reordenação estrutural descrita para a Barra.
 - Apenas percorrer o Canvas por rolagem não troca o conteúdo do Painel contextual.
 - A Lâmina cujo centro visual está mais próximo do centro horizontal da área visível é a `Lâmina centralizada no Canvas`.
 - Essa referência é recalculada durante a navegação e permanece independente da Lâmina ou do Frame em foco. Ela não cria uma seleção exclusiva; apenas fornece o destino para comandos que não receberam um alvo pelo ponteiro, inclusive o duplo clique em uma mídia no Painel de imagens.
@@ -324,7 +324,7 @@ Quando a Lâmina alvo possui Layout travado, a preview aplicada permanece destac
 - O menu de contexto de um Frame preenchido oferece `Abrir no Photoshop`. A ação envia somente o Arquivo vinculado original da Foto, sem aplicar seu enquadramento ou efeitos do MyAlbuns; o atalho fixo do MVP é `Ctrl + E`.
 - `Abrir no Photoshop` e seu atalho agem nas Fotos de todos os Frames preenchidos selecionados; Frames vazios são ignorados. Se algum original estiver ausente ou inacessível, nenhuma Foto é aberta.
 - `R` executa `Girar 90° à esquerda`, `H` alterna `Espelhar horizontalmente` e `V` alterna `Preto e branco` nas Fotos dos Frames selecionados, como os botões do Painel contextual, cujas dicas mostram a tecla. Valem também com o foco numa miniatura do Painel de imagens, como depois de preencher um Frame com dois cliques, e nunca em campos de texto.
-- Atalhos dos menus: `Ctrl + Enter` adiciona uma Lâmina depois da centralizada, `Ctrl + D` duplica a Lâmina centralizada, `Ctrl + Shift + E` abre `Exportar…`, `Ctrl + ,` abre as Configurações, `Ctrl + 1` e `Ctrl + 2` mostram ou ocultam o Painel de imagens e o Painel contextual, e `X` troca o conteúdo de dois Frames no Modo de edição. Cada atalho executa o item do menu correspondente e fica sem efeito quando o item está desabilitado.
+- Atalhos dos menus: `Ctrl + Enter` adiciona uma Lâmina depois da centralizada, `Ctrl + D` duplica a Lâmina centralizada (ou as Lâminas selecionadas, enquanto a Grade mostra uma seleção feita nela), `Ctrl + Shift + E` abre `Exportar…`, `Ctrl + ,` abre as Configurações, `Ctrl + 1` e `Ctrl + 2` mostram ou ocultam o Painel de imagens e o Painel contextual, e `X` troca o conteúdo de dois Frames no Modo de edição. Cada atalho executa o item do menu correspondente e fica sem efeito quando o item está desabilitado.
 - `Ctrl + Shift + ]` traz os Frames selecionados para frente e `Ctrl + Shift + [` os envia para trás, completando `Ctrl + ]` e `Ctrl + [`.
 - `Ctrl + I` abre `Importar > Arquivos…` na aba ativa do Painel de imagens.
 - `Editar > Adicionar Frame` e `Adicionar Frame` no menu de contexto da área vazia do Canvas criam imediatamente um único placeholder centralizado e selecionado.
@@ -454,11 +454,13 @@ No Canvas contínuo, quando não existe um Frame ou uma Foto selecionada, o Pain
 2. `Design do Álbum`;
 3. `Grade de Lâminas`.
 
-`Grade de Lâminas` mostra previews compactos de todo o Álbum, serve como navegação rápida e também permite reordenar a sequência.
+`Grade de Lâminas` mostra previews compactos de todo o Álbum, serve como navegação rápida, permite selecionar várias Lâminas e também reordenar a sequência.
 
 Cada preview é uma representação vetorial da `ComposedSheet` correspondente na projeção atual do Editor, nunca uma miniatura genérica. Ela preserva proporção, superfície, linha central, geometria e ordem dos Frames, recorte e transformação das Fotos, placeholders e Overlay. Uma nova projeção produzida pelo domínio atualiza Canvas e Grade a partir da mesma composição; o destaque de navegação permanece uma camada da interface externa à preview.
 
-Um clique sem ultrapassar o limiar de arraste centraliza a Lâmina correspondente no Canvas. Ao arrastar uma miniatura, sua célula vira um espaço reservado, um fantasma da miniatura acompanha o ponteiro e as células intermediárias se deslocam na ordem linear do Álbum. Soltar confirma a mesma operação de inserção e Undo/Redo usada no Canvas; `Esc`, soltura inválida e posições que interiorizariam uma Página única restauram a grade original.
+Um clique sem ultrapassar o limiar de arraste seleciona a Lâmina sem mover o Canvas, como o clique na Barra. `Ctrl` + clique acrescenta ou retira a Lâmina da seleção, e `Shift` + clique seleciona todas entre a Lâmina de referência e esta, na ordem do Álbum; `Ctrl` + `Shift` acrescenta esse intervalo à seleção. A referência é a última Lâmina escolhida sem `Shift` (clique, `Ctrl` + clique, Barra, Canvas ou navegação), e `Shift` + clique não a muda. A seleção nunca fica vazia: `Ctrl` + clique na única Lâmina selecionada a mantém. As miniaturas selecionadas usam o destaque azul já existente, e as mesmas Lâminas recebem o contorno azul no Canvas. Duplo clique na miniatura, ou `Enter` com o foco nela, centraliza a Lâmina no Canvas e deixa só ela selecionada; `Espaço` seleciona com os mesmos modificadores do clique. O nome acessível da miniatura é `Lâmina 02, páginas 2–3`, com o estado de seleção exposto como botão pressionado, e a dica `Duplo clique para ir até a lâmina` aparece no tooltip nativo, como nas miniaturas do Painel de imagens. Clicar na Barra, num Frame ou na Lâmina no Canvas volta a selecionar uma única Lâmina. Abrir o menu contextual de uma miniatura não altera a seleção. Enquanto a Grade mostra uma seleção feita nela, `Duplicar Lâmina` e `Excluir` agem sobre todas as Lâminas selecionadas, pela tecla `Delete`, por `Ctrl+D`, pelo menu `Lâmina` ou pelo menu contextual de uma Lâmina selecionada; os rótulos dizem quantas (`Excluir 3 lâminas`). Os demais comandos continuam na Lâmina centralizada. Com várias Lâminas, o menu contextual de uma delas mostra `Ações das 3 lâminas`, e `Adicionar antes`, `Adicionar depois` e `Converter extremidade` ficam desabilitados com a dica `Disponível somente para uma lâmina`. Clicar com o botão direito numa Lâmina fora da seleção continua agindo só sobre ela.
+
+Ao arrastar uma miniatura, sua célula vira um espaço reservado, um fantasma da miniatura acompanha o ponteiro e as células intermediárias se deslocam na ordem linear do Álbum. Soltar confirma a mesma operação de inserção e Undo/Redo usada no Canvas; `Esc`, soltura inválida e posições que interiorizariam uma Página única restauram a grade original.
 
 Nas bordas superior e inferior da área visível da Grade, o arraste inicia rolagem vertical automática do contêiner. A velocidade cresce com a proximidade da borda e as células continuam se reorganizando durante a rolagem.
 

@@ -8,7 +8,14 @@ export type { SheetStructureAvailability } from "../domain/project";
 export type SheetStructureIntent = Extract<
   ProjectIntent,
   {
-    kind: "addSheet" | "duplicateSheet" | "convertEdgeSheet" | "deleteSheet" | "reorderSheet";
+    kind:
+      | "addSheet"
+      | "duplicateSheet"
+      | "duplicateSheets"
+      | "convertEdgeSheet"
+      | "deleteSheet"
+      | "deleteSheets"
+      | "reorderSheet";
   }
 >;
 
@@ -30,6 +37,32 @@ export function sheetStructureAvailability(
     canConvertEdge: false,
     canDelete: false,
     canDuplicate: false,
+  };
+}
+
+export interface SheetSelectionAvailability {
+  readonly canDelete: boolean;
+  readonly canDuplicate: boolean;
+}
+
+/**
+ * Delete and Duplicate over several Sheets at once, as the core accepts them:
+ * every listed Sheet exists, at least two Sheets remain after a deletion and
+ * only double Sheets are duplicated.
+ */
+export function sheetSelectionAvailability(
+  sheets: readonly SheetSnapshot[],
+  sheetIds: readonly string[],
+): SheetSelectionAvailability {
+  const listed = sheets.filter((sheet) => sheetIds.includes(sheet.id));
+  if (listed.length === 0 || listed.length !== new Set(sheetIds).size) {
+    return { canDelete: false, canDuplicate: false };
+  }
+  return {
+    canDelete: sheets.length - listed.length >= 2,
+    canDuplicate: listed.every(
+      (sheet) => sheet.structure.availability.canDuplicate,
+    ),
   };
 }
 
@@ -75,8 +108,10 @@ export function isSheetStructureIntent(
   return (
     intent.kind === "addSheet" ||
     intent.kind === "duplicateSheet" ||
+    intent.kind === "duplicateSheets" ||
     intent.kind === "convertEdgeSheet" ||
     intent.kind === "deleteSheet" ||
+    intent.kind === "deleteSheets" ||
     intent.kind === "reorderSheet"
   );
 }
@@ -100,6 +135,14 @@ export function materializeSheetStructureIntent(
       intent.targetIndex,
     );
     return targetIndex === null ? null : { ...intent, targetIndex };
+  }
+  if (intent.kind === "deleteSheets" || intent.kind === "duplicateSheets") {
+    const availability = sheetSelectionAvailability(latestSheets, intent.sheetIds);
+    return (intent.kind === "deleteSheets"
+      ? availability.canDelete
+      : availability.canDuplicate)
+      ? intent
+      : null;
   }
 
   const sheetId =

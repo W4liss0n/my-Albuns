@@ -487,3 +487,120 @@ fn duplication_rejects_single_page_edges_without_history_and_preserves_the_final
     );
     assert!(duplicated_final.state.album.sheets[4].frames.is_empty());
 }
+
+#[test]
+fn duplicating_several_sheets_repeats_each_run_after_itself_in_one_action() {
+    let root = tempfile::tempdir().unwrap();
+    let path = root.path().join("Duplicar várias.myalbuns");
+    let core = ProjectCore::new()
+        .with_identity_storage_roots(root.path().join("leases"), root.path().join("identities"));
+    let mut project = core
+        .create_editable(CreateProjectRequest::new(
+            location(&path),
+            InitialProject::configured(InitialProjectConfiguration::new(
+                DisplayUnit::Mm,
+                600_000,
+                300_000,
+                300,
+                3_000,
+                3_000,
+                6,
+                EndSheetFormat::SinglePage,
+                EndSheetFormat::SinglePage,
+            )),
+            CreateAuthorization::CreateOnly,
+        ))
+        .unwrap();
+    let before = project.projection();
+    let ids: Vec<String> = before
+        .state
+        .album
+        .sheets
+        .iter()
+        .map(|sheet| sheet.id.clone())
+        .collect();
+    project
+        .apply(ProjectIntent::AddFrame {
+            sheet_id: ids[2].clone(),
+        })
+        .unwrap();
+    let before = project.projection();
+
+    let intent = serde_json::from_value(serde_json::json!({
+        "kind": "duplicateSheets",
+        "sheetIds": [ids[4], ids[1], ids[2]],
+    }))
+    .unwrap();
+    let outcome = project.apply_with_outcome(intent).unwrap();
+    let after = outcome.projection;
+    assert_eq!(after.state.revision, before.state.revision + 1);
+    let order: Vec<&str> = after
+        .state
+        .album
+        .sheets
+        .iter()
+        .map(|sheet| sheet.id.as_str())
+        .collect();
+    assert_eq!(order.len(), 9);
+    assert_eq!(
+        &order[..3],
+        [ids[0].as_str(), ids[1].as_str(), ids[2].as_str()]
+    );
+    assert_eq!(order[5], ids[3].as_str());
+    assert_eq!(order[6], ids[4].as_str());
+    assert_eq!(order[8], ids[5].as_str());
+    assert_eq!(outcome.affected_sheet_id.as_deref(), Some(order[3]));
+    let copied = |index: usize| &after.state.album.sheets[index];
+    for (copy, source) in [(3, 1), (4, 2), (7, 6)] {
+        assert!(!ids.contains(&copied(copy).id));
+        assert_eq!(copied(copy).visuals, copied(source).visuals);
+        assert_eq!(copied(copy).frames.len(), copied(source).frames.len());
+    }
+    assert_ne!(copied(4).frames[0].id, copied(2).frames[0].id);
+    assert_eq!(copied(4).frames[0].rect, copied(2).frames[0].rect);
+    let restored = project.undo().unwrap();
+    assert_eq!(restored.state.album, before.state.album);
+    assert_eq!(restored.composition, before.composition);
+}
+
+#[test]
+fn duplicating_several_sheets_refuses_single_page_edges_without_changes() {
+    let root = tempfile::tempdir().unwrap();
+    let path = root.path().join("Duplicar extremidade.myalbuns");
+    let core = ProjectCore::new()
+        .with_identity_storage_roots(root.path().join("leases"), root.path().join("identities"));
+    let mut project = core
+        .create_editable(CreateProjectRequest::new(
+            location(&path),
+            InitialProject::configured(InitialProjectConfiguration::new(
+                DisplayUnit::Mm,
+                600_000,
+                300_000,
+                300,
+                3_000,
+                3_000,
+                4,
+                EndSheetFormat::SinglePage,
+                EndSheetFormat::SinglePage,
+            )),
+            CreateAuthorization::CreateOnly,
+        ))
+        .unwrap();
+    let before = project.projection();
+    let ids: Vec<String> = before
+        .state
+        .album
+        .sheets
+        .iter()
+        .map(|sheet| sheet.id.clone())
+        .collect();
+    assert_eq!(
+        project
+            .apply(ProjectIntent::DuplicateSheets {
+                sheet_ids: vec![ids[0].clone(), ids[1].clone()],
+            })
+            .unwrap_err(),
+        CoreError::InvalidSheetDuplication
+    );
+    assert_eq!(project.projection(), before);
+}

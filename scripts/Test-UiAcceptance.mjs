@@ -152,6 +152,7 @@ test("editor scenarios declare honest, surface-matched comparisons", () => {
     "media-panel-popup-keyboard",
     "sheet-grid",
     "sheet-grid-hover",
+    "sheet-grid-multiple-selection",
     "sheet-grid-selection",
   ]);
   const editorScenarios = manifest.scenarios.filter((scenario) =>

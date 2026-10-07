@@ -2,7 +2,7 @@
 status: accepted
 document: design
 date: 2026-08-27
-updated: 2026-10-02
+updated: 2026-10-07
 ticket: 4-programa-05-arquitetura-de-ui-mapa-de-telas-e-interacao-do-editor
 ---
 
@@ -151,8 +151,8 @@ sem quebrar os rótulos nem alterar ordem, foco ou semântica.
 - Um Frame selecionado no Modo normal, como o recém-preenchido pelo duplo clique no Painel de imagens, não retém as setas: elas seguem navegando e trocando o Layout da Lâmina centralizada. `Delete` e `Enter` continuam pertencendo à seleção; `Delete` a alcança mesmo com o foco na miniatura, porque o Painel não tem atalho de remoção.
 - Quando a Lâmina centralizada muda, por `←` e `→`, pela rolagem do Canvas ou pela Lâmina criada em `Adicionar depois` e `Duplicar lâmina`, os Frames de outras Lâminas saem da Seleção de Frames. Nenhum Frame fica selecionado fora da tela ao alcance de `Delete`, `R`, `H` e `V`.
 - A roda navega horizontalmente sobre toda a superfície e Barra da Lâmina, sem zona morta assimétrica; um controle só a retém quando possui semântica específica de wheel.
-- Abrir ou dispensar o menu contextual não navega, seleciona ou centraliza. O alvo clicado permanece explícito para seus comandos, independentemente da Lâmina centralizada.
-- Barra da Lâmina e Grade iniciam a mesma operação de reordenação, mas não compartilham a semântica do clique: a Barra seleciona/ativa sem navegar nem alterar `viewport.offsetX`, enquanto a Grade centraliza a Lâmina.
+- Abrir ou dispensar o menu contextual não navega, seleciona ou centraliza. O alvo clicado (ou a seleção de várias Lâminas que o contém, enquanto a Grade a mostra) permanece explícito para seus comandos, independentemente da Lâmina centralizada.
+- Barra da Lâmina e Grade iniciam a mesma operação de reordenação, e o clique nas duas seleciona sem navegar nem alterar `viewport.offsetX`. A Barra seleciona uma Lâmina por vez; na Grade, `Ctrl` acrescenta ou retira uma Lâmina e `Shift` seleciona o intervalo a partir da Lâmina de referência, a última escolhida sem `Shift`. Só o duplo clique na miniatura, ou `Enter` com o foco nela, centraliza a Lâmina. Enquanto a Grade mostra uma seleção feita nela, `Delete`, `Ctrl+D`, `Duplicar Lâmina` e `Excluir` (no menu `Lâmina` ou no menu contextual de uma Lâmina selecionada) agem sobre todas as Lâminas selecionadas, numa única ação de Undo/Redo. As setas e os demais comandos continuam na Lâmina centralizada; clicar na Barra ou no Canvas, navegar (duplo clique, `Enter`, `←`/`→`) ou esconder a Grade devolve esse alvo também a `Delete` e `Ctrl+D`. Rolar o Canvas não muda a seleção nem o alvo.
 - Clique sem vencer o limiar de arraste aplica a semântica da superfície originadora; somente depois do
   limiar surgem placeholder, ghost e deslocamento intermediário. Soltar fora da
   superfície originadora ou receber `pointercancel` cancela sem commit. Barra e
@@ -220,6 +220,7 @@ renderizada e uma revisão explícita posterior decide `accepted`, `rejected` ou
 | roda sobre a Barra inteira | `canvas-wheel-sheet-bar-forward`, `canvas-wheel-sheet-bar-backward` |
 | reordenação pela Barra | `sheet-reorder-bar-preview`, `sheet-reorder-bar-commit`, `sheet-reorder-cancelled` |
 | reordenação pela Grade | `sheet-reorder-grid-preview`, `sheet-reorder-grid-commit`, `sheet-reorder-invalid-target-preview`, `sheet-reorder-invalid-drop` |
+| seleção na Grade e navegação por duplo clique | `sheet-grid-selection`, `sheet-grid-multiple-selection`, `sheet-grid-selection-preserves-navigation`, `sheet-grid-double-click-navigates`, `sheet-grid-selection-context-menu` |
 | seleção semântica de texto | `project-text-selection-policy`, `new-project-operational-failure-dialog` |
 | Recuperação em diálogo externo do fluxo de abertura | `project-recovery-modal` |
 | Cópia externa no mesmo diálogo do fluxo de abertura | `external-copy-opening-dialog` |

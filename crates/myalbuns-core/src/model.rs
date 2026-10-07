@@ -989,6 +989,15 @@ pub enum ProjectIntent {
     DeleteSheet {
         sheet_id: String,
     },
+    /// Duplicates the listed Sheets as one action: each run of consecutive
+    /// listed Sheets is repeated as a block right after the run.
+    DuplicateSheets {
+        sheet_ids: Vec<String>,
+    },
+    /// Deletes the listed Sheets as one action.
+    DeleteSheets {
+        sheet_ids: Vec<String>,
+    },
     ConvertEdgeSheet {
         sheet_id: String,
     },

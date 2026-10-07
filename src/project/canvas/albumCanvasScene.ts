@@ -821,10 +821,12 @@ export class AlbumCanvasScene {
     } else delete this.app.canvas.dataset.frameContentDragTarget;
     const highlight = this.input.photoDropHighlight;
     const decorativeDragging = this.input.mediaDrag?.kind === "decorative";
+    const selectedSheetIds = this.input.selectedSheetIds ?? [];
     for (const [sheetId, node] of this.sheetNodes) {
       node.container.visible =
         sheetId !== this.sheetReorderPlaceholderSheetId;
-      node.focusOutline.visible = !decorativeDragging && sheetId === this.input.focusedSheetId;
+      node.focusOutline.visible = !decorativeDragging &&
+        (sheetId === this.input.focusedSheetId || selectedSheetIds.includes(sheetId));
       node.frameSelectionLayer.visible = !decorativeDragging;
       node.sheetBar.container.visible = !decorativeDragging && albumCanvasModePolicy(this.input.mode).showsSheetBar;
       node.sheetDropOutline.visible =

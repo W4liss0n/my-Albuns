@@ -6,6 +6,7 @@ import {
   type ProjectCommandContext,
   type ProjectCommandId,
 } from "../../application/projectCommandCatalog";
+import { sheetSelectionCommandLabel } from "../../application/sheetSelection";
 import type { FrameStackAction } from "../../domain/project";
 import type {
   ApplicationMenuCommand,
@@ -47,6 +48,8 @@ interface ProjectApplicationMenuOptions {
   convertEdge(): void;
   deleteSheet(): void;
   duplicateSheet(): void;
+  /** Sheets that Delete and Duplicate will change; more than one names the count. */
+  sheetCommandTargetCount?: number;
   exportSheet(): void;
   exportAlbum(): void;
   mediaPanelVisible: boolean;
@@ -94,6 +97,7 @@ export function createProjectApplicationMenus({
   convertEdge,
   deleteSheet,
   duplicateSheet,
+  sheetCommandTargetCount = 1,
   exportSheet,
   exportAlbum,
   mediaPanelVisible,
@@ -160,14 +164,20 @@ export function createProjectApplicationMenus({
           addSheetAfter,
           structuralCommandsDisabled || !canAddAfter,
         ),
-        implemented("duplicate-sheet", "sheet", duplicateSheet,
-          structuralCommandsDisabled || !canDuplicate),
-        implemented(
-          "delete-sheet",
-          "sheet",
-          deleteSheet,
-          structuralCommandsDisabled || !canDelete,
-        ),
+        {
+          ...implemented("duplicate-sheet", "sheet", duplicateSheet,
+            structuralCommandsDisabled || !canDuplicate),
+          label: sheetSelectionCommandLabel("duplicate-sheet", sheetCommandTargetCount),
+        },
+        {
+          ...implemented(
+            "delete-sheet",
+            "sheet",
+            deleteSheet,
+            structuralCommandsDisabled || !canDelete,
+          ),
+          label: sheetSelectionCommandLabel("delete-sheet", sheetCommandTargetCount),
+        },
         separator("sheet-edge-separator"),
         implemented(
           "convert-edge",

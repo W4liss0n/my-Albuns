@@ -336,6 +336,7 @@ export function useProjectEditorController({
     continuousCanvasLayout: navigation.canvasLayout,
     selectedFrameIds: navigation.selectedFrameIds,
     focusedSheetId: navigation.focusedSheetId,
+    selectedSheetIds: navigation.selectedSheetIds,
     centeredSheetId: navigation.centeredSheetId,
     viewport: navigation.viewport,
     photoZoomPreview: properties.singleZoom.preview,
@@ -437,6 +438,17 @@ export function useProjectEditorController({
     return applyStructuralIntent({ kind: "deleteSheet", sheetId });
   };
 
+  // Several Sheets change in one core action, so one Undo restores them all.
+  const duplicateSheets = (sheetIds: readonly string[]) =>
+    sheetIds.length <= 1
+      ? duplicateSheet(sheetIds[0])
+      : applyStructuralIntent({ kind: "duplicateSheets", sheetIds: [...sheetIds] });
+
+  const deleteSheets = (sheetIds: readonly string[]) =>
+    sheetIds.length <= 1
+      ? deleteSheet(sheetIds[0])
+      : applyStructuralIntent({ kind: "deleteSheets", sheetIds: [...sheetIds] });
+
   const convertEdge = (sheetId = navigation.implicitSheetId) => {
     if (!sheetId) return Promise.resolve(false);
     return applyStructuralIntent({ kind: "convertEdgeSheet", sheetId });
@@ -497,6 +509,8 @@ export function useProjectEditorController({
     structuralMutationPending,
     canvasProps,
     navigateToSheet: navigation.navigateToSheet,
+    selectSheet: navigation.selectSheet,
+    sheetSelectionSource: navigation.sheetSelectionSource,
     navigateToAdjacentSheet: navigation.navigateToAdjacentSheet,
     cycleLayout,
     applyAlbumInformation: mutations.applyAlbumInformation,
@@ -508,8 +522,10 @@ export function useProjectEditorController({
     addSheetBefore,
     addSheetAfter,
     duplicateSheet,
+    duplicateSheets,
     convertEdge,
     deleteSheet,
+    deleteSheets,
     reorderSheet,
     save: () => { flushPropertyDrafts(); return mutations.save(); },
     saveAs: () => { flushPropertyDrafts(); return mutations.saveAs(); },

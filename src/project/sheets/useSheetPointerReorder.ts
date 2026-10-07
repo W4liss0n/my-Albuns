@@ -5,6 +5,11 @@ import {
   type PointerEvent as ReactPointerEvent,
 } from "react";
 
+import {
+  sheetSelectionModifiers,
+  type SheetSelectionModifiers,
+} from "../../application/sheetSelection";
+
 export const SHEET_REORDER_POINTER_THRESHOLD_PX = 5;
 
 export interface SheetReorderPointerPosition {
@@ -27,9 +32,16 @@ interface ActivePointer extends SheetReorderPointerState {
   readonly resolvedTargetIndex: number | null;
 }
 
+/** What a pointer release was: a drag (even one already cancelled), a press under the threshold, or not ours. */
+export type SheetPointerRelease = "click" | "drag" | "ignored";
+
 export interface SheetPointerReorderOptions {
   readonly enabled: boolean;
-  readonly onActivate: (sourceId: string) => void;
+  /** A release under the drag threshold: a click on the Sheet. */
+  readonly onActivate: (
+    sourceId: string,
+    modifiers: SheetSelectionModifiers,
+  ) => void;
   readonly onCancel: () => void;
   readonly onDrop: () => void;
   readonly onFinish?: () => void;
@@ -52,7 +64,7 @@ export interface SheetPointerReorder {
     captureTarget?: HTMLElement | null,
   ) => void;
   readonly move: (event: ReactPointerEvent<HTMLElement>) => void;
-  readonly end: (event: ReactPointerEvent<HTMLElement>) => void;
+  readonly end: (event: ReactPointerEvent<HTMLElement>) => SheetPointerRelease;
   readonly cancel: (event: ReactPointerEvent<HTMLElement>) => void;
   readonly lostCapture: (event: ReactPointerEvent<HTMLElement>) => void;
   readonly consumeClickSuppression: (sourceId: string) => boolean;
@@ -67,6 +79,8 @@ export function useSheetPointerReorder(
   const activeRef = useRef<ActivePointer | null>(null);
   const suppressedClickSourceRef = useRef<string | null>(null);
   const clickSuppressionTimerRef = useRef<number | null>(null);
+  const cancelledDragPointerIdRef = useRef<number | null>(null);
+  const stopWaitingForReleaseRef = useRef<(() => void) | null>(null);
   const [pointer, setPointer] = useState<SheetReorderPointerState | null>(null);
 
   function clearClickSuppression() {
@@ -75,6 +89,9 @@ export function useSheetPointerReorder(
     }
     clickSuppressionTimerRef.current = null;
     suppressedClickSourceRef.current = null;
+    cancelledDragPointerIdRef.current = null;
+    stopWaitingForReleaseRef.current?.();
+    stopWaitingForReleaseRef.current = null;
   }
 
   function scheduleClickSuppression(sourceId: string) {
@@ -86,6 +103,34 @@ export function useSheetPointerReorder(
       }
       clickSuppressionTimerRef.current = null;
     }, 0);
+  }
+
+  // Escape cancels a drag while the button is still down. The click that
+  // follows its release, wherever it happens, must not select the source.
+  function suppressClickUntilRelease(sourceId: string, pointerId: number) {
+    clearClickSuppression();
+    suppressedClickSourceRef.current = sourceId;
+    cancelledDragPointerIdRef.current = pointerId;
+    const release = (event: PointerEvent) => {
+      if (event.pointerId !== pointerId) return;
+      stopWaitingForReleaseRef.current?.();
+      stopWaitingForReleaseRef.current = null;
+      clickSuppressionTimerRef.current = window.setTimeout(() => {
+        if (suppressedClickSourceRef.current === sourceId) {
+          suppressedClickSourceRef.current = null;
+        }
+        if (cancelledDragPointerIdRef.current === pointerId) {
+          cancelledDragPointerIdRef.current = null;
+        }
+        clickSuppressionTimerRef.current = null;
+      }, 0);
+    };
+    window.addEventListener("pointerup", release, true);
+    window.addEventListener("pointercancel", release, true);
+    stopWaitingForReleaseRef.current = () => {
+      window.removeEventListener("pointerup", release, true);
+      window.removeEventListener("pointercancel", release, true);
+    };
   }
 
   function releasePointerCapture(active: ActivePointer) {
@@ -110,10 +155,12 @@ export function useSheetPointerReorder(
     if (outcome === "cancel") optionsRef.current.onCancel();
   }
 
-  function cancelActivePointer() {
+  function cancelActivePointer({ buttonStillDown = false } = {}) {
     const active = activeRef.current;
     if (!active) return;
-    if (active.active) {
+    if (active.active && buttonStillDown) {
+      suppressClickUntilRelease(active.sourceId, active.pointerId);
+    } else if (active.active) {
       scheduleClickSuppression(active.sourceId);
     }
     finishPointer(
@@ -127,7 +174,7 @@ export function useSheetPointerReorder(
       if (event.key !== "Escape" || !activeRef.current) return;
       event.preventDefault();
       event.stopImmediatePropagation();
-      cancelActivePointer();
+      cancelActivePointer({ buttonStillDown: true });
     };
     window.addEventListener("keydown", cancelOnEscape, true);
     return () => {
@@ -143,7 +190,7 @@ export function useSheetPointerReorder(
   }, []);
 
   useEffect(() => {
-    if (!options.enabled) cancelActivePointer();
+    if (!options.enabled) cancelActivePointer({ buttonStillDown: true });
   }, [options.enabled]);
 
   useEffect(() => {
@@ -214,9 +261,13 @@ export function useSheetPointerReorder(
     }
   }
 
-  function end(event: ReactPointerEvent<HTMLElement>) {
+  function end(event: ReactPointerEvent<HTMLElement>): SheetPointerRelease {
     const current = activeRef.current;
-    if (!current || current.pointerId !== event.pointerId) return;
+    if (!current || current.pointerId !== event.pointerId) {
+      return cancelledDragPointerIdRef.current === event.pointerId
+        ? "drag"
+        : "ignored";
+    }
     const position = { clientX: event.clientX, clientY: event.clientY };
     if (!current.active) {
       const shouldActivate = optionsRef.current.validRelease(position);
@@ -225,9 +276,12 @@ export function useSheetPointerReorder(
       }
       finishPointer(current.pointerId, "none");
       if (shouldActivate) {
-        optionsRef.current.onActivate(current.sourceId);
+        optionsRef.current.onActivate(
+          current.sourceId,
+          sheetSelectionModifiers(event),
+        );
       }
-      return;
+      return "click";
     }
     event.preventDefault();
     event.stopPropagation();
@@ -235,6 +289,7 @@ export function useSheetPointerReorder(
     const valid =
       current.previewed && optionsRef.current.validRelease(position);
     finishPointer(current.pointerId, valid ? "drop" : "cancel");
+    return "drag";
   }
 
   function cancel(event: ReactPointerEvent<HTMLElement>) {
