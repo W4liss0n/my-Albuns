@@ -688,6 +688,22 @@ impl ProjectDocument {
         Ok(candidate)
     }
 
+    /// Changes several media paths at once, so paths that trade places among
+    /// them are validated only in their final state.
+    pub(crate) fn with_rebound_media(&self, changes: &[(Uuid, PathBuf)]) -> Result<Self, ()> {
+        let mut candidate = self.clone();
+        for (media_id, path) in changes {
+            let media = candidate
+                .media
+                .iter_mut()
+                .find(|media| media.id == *media_id)
+                .ok_or(())?;
+            media.path = path.clone();
+        }
+        validate_project_state(&candidate)?;
+        Ok(candidate)
+    }
+
     /// Facts for the current validated sequence, shared by projections and commands.
     /// The reorder interval is compact so dragging needs no per-pointer IPC query.
     pub(crate) fn sheet_structure(&self, index: usize) -> crate::model::SheetStructureProjection {

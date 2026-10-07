@@ -2,7 +2,7 @@
 status: accepted
 document: design
 date: 2026-09-29
-updated: 2026-10-02
+updated: 2026-10-06
 ---
 
 # Acesso aos Arquivos vinculados
@@ -88,14 +88,15 @@ Originais por conta própria. Cada exceção fica listada com o motivo.
 
 | Fluxo | observe | headers | inspect_decoded | list_folder |
 | --- | :-: | :-: | :-: | :-: |
+| Abertura: Reencontro pela estrutura de pastas (ADR 0016) | ✓ | | | |
 | Abertura: recuperação do Cache e preparação das imagens | ✓ | ✓ | | |
 | Monitor de Arquivos vinculados | ✓ (interrompível) | | ✓ (mudança confirmada) | ✓ |
 | Importação de imagens e de pastas | ✓ | ✓ | ✓ (verificação da seleção) | ✓ |
 | Religação e Substituir imagem | ✓ | ✓ | ✓ | ✓ |
 | Preparação do Cache e publicação das prévias | ✓ | ✓ | | |
 | Exportação normal (verificação prévia) | ✓ | | | |
-| Exportação em lote (planejamento e descoberta de projetos) | ✓ | ✓ | | ✓ |
-| Geração em lote (pastas de origem) | | | | ✓ |
+| Exportação em lote (planejamento, Reencontro pela estrutura e descoberta de projetos) | ✓ | ✓ | | ✓ |
+| Geração em lote (pastas de origem; modelo na linha de comando: Reencontro pela estrutura) | ✓ | | | ✓ |
 | Visualizador | | | ✓ | |
 
 ## Fora do módulo

@@ -1,7 +1,7 @@
 ---
 status: accepted
 date: 2026-07-27
-updated: 2026-09-23
+updated: 2026-10-06
 ---
 
 # Vincular arquivos de mídia em vez de incorporá-los
@@ -20,3 +20,4 @@ Os Projetos armazenam os caminhos nativos dos arquivos de mídia originais, e su
 - Falha de rede ou de acesso que impeça confirmar a existência produz Arquivo indisponível, não Arquivo ausente, e nunca reescreve automaticamente o vínculo.
 - A forma textual do caminho não é usada como identidade física; representações diferentes do mesmo alvo continuam sendo resolvidas pela política do [ADR 0007](0007-tratar-caminhos-windows-e-identidade-fisica.md).
 - O Projeto não é autocontido, e uma representação em cache nunca pode substituir o arquivo original durante a exportação.
+- Atualização de 06/10/2026: ao abrir, em lote e na linha de comando, o Projeto procura primeiro cada arquivo no mesmo caminho relativo a uma pasta em comum com sua localização atual ([ADR 0016](0016-reencontrar-arquivos-vinculados-pela-estrutura-de-pastas.md)). Não é Religação nem reescrita por falha de rede: só um arquivo existente nessa estrutura é adotado, em silêncio, sem Histórico e sem mudança pendente.

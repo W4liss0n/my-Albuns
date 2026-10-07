@@ -1,7 +1,7 @@
 ---
 status: accepted
 document: design
-updated: 2026-09-01
+updated: 2026-10-06
 ---
 
 # Resolução e política de caminhos
@@ -179,6 +179,10 @@ As raízes são obtidas pelas pastas conhecidas do Windows, nunca pelo diretóri
 
 Cache usa a Identidade do Projeto sob a raiz local do aplicativo. A localização de Projeto ou mídia em UNC não move esse namespace. O contexto de resolução de uma geração de Cache é memória operacional, não uma nova categoria persistente.
 
+### Abertura do Projeto
+
+Antes de observar os Arquivos vinculados, a abertura procura cada um pela estrutura de pastas do Projeto ([ADR 0016](../adr/0016-reencontrar-arquivos-vinculados-pela-estrutura-de-pastas.md)). `structural_candidates` deriva, por componentes e sem I/O, os caminhos exatos sob as pastas acima da localização atual do Projeto cujo nome aparece no caminho gravado; a comparação de nomes ignora maiúsculas, acentos incluídos, e nunca usa a raiz como âncora. Todos os candidatos ficam sob a raiz do próprio Projeto, já capturada no plano. O primeiro que `LinkedFiles` confirma como arquivo legível substitui o caminho no documento aberto, sem Histórico nem mudança pendente; o caminho gravado dessas mídias não é tocado. A Exportação em lote e a Geração em lote pela linha de comando usam a mesma derivação no próprio planejamento.
+
 ### Monitor de Arquivos vinculados
 
 O Monitor apenas solicita nova inspeção diante de uma possível mudança. A cada segundo, ele lista uma vez cada pasta que contém Arquivos vinculados, sem abrir os arquivos, e compara tamanho e datas. A observação completa, que abre cada original, só roda quando essa listagem muda, enquanto uma mudança ainda não se estabilizou ou a cada 30 segundos, para perceber o que a listagem não mostra, como uma trava ou um arquivo trocado com o mesmo tamanho e datas. A listagem é apenas um indício e nunca confirma uma origem. Depois de confirmada, `MediaRuntime` atualiza o estado observado e `CacheEngine` invalida a representação aplicável. Perda do compartilhamento ou falha transitória produz `Unavailable`; não transforma em massa seus arquivos em ausentes. Ao recuperar acesso, a validação normal atualiza os estados.
@@ -215,6 +219,9 @@ O executável e o Arquivo vinculado são resolvidos para a ação corrente. Uma 
 | DFS ou SMB muda o servidor físico | o contrato conserva o binding operacional, sem prometer identidade do backend |
 | servidor fica offline | itens ficam indisponíveis, não ausentes |
 | servidor retorna | revalidação recupera o acesso sem Religação quando o caminho não mudou |
+| pasta de trabalho copiada para fora da rede com a mesma estrutura | a abertura acha as mídias na cópia sem esperar o servidor e sem marcar o Projeto |
+| mídia em pasta irmã da pasta do Projeto | a pasta em comum acima do Projeto ancora o caminho relativo |
+| mídia sem nenhuma pasta em comum com o Projeto | nenhum candidato; segue o caminho gravado |
 | caminho verbatim de disco/UNC longo | operação preserva a forma necessária e não o trunca |
 | caminho relativo externo | validação rejeita antes de iniciar a operação |
 | namespace de dispositivo | validação rejeita |

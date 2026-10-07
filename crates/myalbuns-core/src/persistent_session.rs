@@ -1,4 +1,4 @@
-use std::collections::VecDeque;
+use std::{collections::VecDeque, path::PathBuf};
 
 use crate::{
     model::{CoreError, ProjectIntent, RelinkMedia},
@@ -660,6 +660,30 @@ impl PersistentProjectSession {
         })
     }
 
+    /// Paths found by folder structure when the Project opens replace the
+    /// opened baseline itself: no Undo step, no new revision and no unsaved
+    /// change. A later save writes them with whatever else changed.
+    pub(crate) fn rebind_opened_media(
+        &mut self,
+        changes: &[(Uuid, PathBuf)],
+    ) -> Result<(), CoreError> {
+        if !self.undo.is_empty() || !self.redo.is_empty() {
+            return Err(CoreError::InvalidProject(
+                "os caminhos só podem ser reencontrados ao abrir o projeto".into(),
+            ));
+        }
+        let project = self
+            .current
+            .project
+            .with_rebound_media(changes)
+            .map_err(|()| {
+                CoreError::InvalidProject("a nova referência de mídia não é válida".into())
+            })?;
+        self.current =
+            ProjectRevision::new(self.current.project_id, self.current.revision, project);
+        Ok(())
+    }
+
     fn commit_edit(
         &mut self,
         edit: impl FnOnce(&ProjectDocument) -> Result<ProjectDocument, CoreError>,
@@ -790,6 +814,50 @@ mod tests {
         }
         assert_eq!(session.current, latest);
         assert!(session.history_bytes <= session.history_budget);
+    }
+
+    #[test]
+    fn paths_found_when_opening_change_the_baseline_without_history_or_unsaved_changes() {
+        let revision = crate::project_store::decode(include_bytes!(
+            "../tests/fixtures/project_file_v1/base.myalbuns"
+        ))
+        .unwrap();
+        let opened_revision = revision.revision;
+        let media_id = revision.project.media()[0].id();
+        let found = PathBuf::from(r"E:\Copia\Overlay.png");
+        let mut session = PersistentProjectSession::from_persisted(revision.clone());
+
+        session
+            .rebind_opened_media(&[(media_id, found.clone())])
+            .unwrap();
+
+        assert_eq!(session.project().media()[0].path(), found.as_path());
+        assert_eq!(session.revision(), opened_revision);
+        assert!(!session.has_unsaved_changes());
+        assert!(session.undo().is_none(), "finding a path is not an edit");
+
+        let edited = session.current.project.with_dpi(240).unwrap();
+        session.publish_edit(edited).unwrap();
+        session.undo().unwrap();
+        assert_eq!(
+            session.project().media()[0].path(),
+            found.as_path(),
+            "undoing an edit keeps the path found when opening"
+        );
+        assert!(
+            session
+                .rebind_opened_media(&[(media_id, PathBuf::from(r"E:\Outra\Overlay.png"))])
+                .is_err(),
+            "after an edit the paths change only through Religação"
+        );
+
+        let mut recovered =
+            PersistentProjectSession::from_recovery(revision, opened_revision.saturating_sub(1));
+        recovered.rebind_opened_media(&[(media_id, found)]).unwrap();
+        assert!(
+            recovered.has_unsaved_changes(),
+            "a recovered Project stays unsaved"
+        );
     }
 
     #[test]

@@ -922,26 +922,37 @@ pub(crate) fn background_fixture(
     root: &Path,
     name: &str,
 ) -> (ProjectCore, myalbuns_core::EditableProject, PathBuf) {
+    let path = root.join("source").join(format!("{name}.myalbuns"));
+    let original = root.join("originals").join(name).join("001.jpg");
+    let (core, project) = background_project(root, &path, &original);
+    (core, project, original)
+}
+
+/// A saved Project at `path` whose Background links a new 2 × 2 image at
+/// `original`; identities live under `root`.
+pub(crate) fn background_project(
+    root: &Path,
+    path: &Path,
+    original: &Path,
+) -> (ProjectCore, myalbuns_core::EditableProject) {
     use myalbuns_core::{
         InitialBackground, InitialBackgroundContent, InitialFrameBorder, InitialOverlay,
         InitialProjectPersonalization,
     };
-    let path = root.join("source").join(format!("{name}.myalbuns"));
-    let original = root.join("originals").join(name).join("001.jpg");
     std::fs::create_dir_all(path.parent().unwrap()).unwrap();
     std::fs::create_dir_all(original.parent().unwrap()).unwrap();
-    image::RgbImage::new(2, 2).save(&original).unwrap();
+    image::RgbImage::new(2, 2).save(original).unwrap();
     let core = ProjectCore::new()
         .with_identity_storage_roots(root.join("leases"), root.join("identities"));
     let mut paths = OperationPathContext::new();
-    paths.capture(&path).unwrap();
+    paths.capture(path).unwrap();
     let project = core
         .create_editable(CreateProjectRequest::new(
-            ProjectLocation::new(path, paths.freeze()),
+            ProjectLocation::new(path.to_path_buf(), paths.freeze()),
             InitialProject::neutral().with_personalization(InitialProjectPersonalization::new(
                 InitialBackground::BothSides {
                     both: InitialBackgroundContent::Media {
-                        path: original.clone(),
+                        path: original.to_path_buf(),
                     },
                 },
                 InitialOverlay::BothSides { both: None },
@@ -950,7 +961,7 @@ pub(crate) fn background_fixture(
             CreateAuthorization::CreateOnly,
         ))
         .unwrap();
-    (core, project, original)
+    (core, project)
 }
 
 #[test]
@@ -1123,6 +1134,47 @@ fn global_relink_does_not_share_a_candidate_between_projects_or_match_a_differen
             .problems
             .is_empty()
     );
+}
+
+#[test]
+fn a_copied_job_folder_exports_with_the_images_found_beside_it_and_is_never_saved() {
+    let root = tempfile::tempdir().unwrap();
+    let project_path = root.path().join(r"source\Job\Modelo\Modelo.myalbuns");
+    let original = root.path().join(r"server\Job\Arte\001.jpg");
+    let copy = root.path().join(r"source\Job\Arte\001.jpg");
+    let (core, project) = background_project(root.path(), &project_path, &original);
+    drop(project);
+    std::fs::create_dir_all(copy.parent().unwrap()).unwrap();
+    std::fs::rename(&original, &copy).unwrap();
+    let bytes = std::fs::read(&project_path).unwrap();
+
+    let batch = BatchRunner::discover(
+        BatchConfiguration {
+            source: root.path().join("source"),
+            destination: None,
+            format: ExportFormat::Png,
+            mode: ExportMode::Sheet,
+        },
+        core,
+        root.path().join("checkpoints"),
+    )
+    .unwrap();
+    assert!(
+        batch.view().can_continue,
+        "{:?}",
+        batch.view().items[0].problems
+    );
+    let mut transport = RecordingTransport::default();
+    tauri::async_runtime::block_on(batch.run(
+        &mut transport,
+        &BatchCancellation::default(),
+        ExportConflictPolicy::Ask,
+        &|_| {},
+    ))
+    .unwrap();
+
+    assert_eq!(transport.sources, [vec![copy]]);
+    assert_eq!(std::fs::read(&project_path).unwrap(), bytes);
 }
 
 #[test]

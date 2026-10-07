@@ -97,6 +97,24 @@ impl ProjectTemplate {
     pub fn media(&self) -> &[MediaRef] {
         self.project.media()
     }
+
+    /// The same template with paths found by the model's folder structure.
+    pub fn with_rebound_media(&self, changes: &[(MediaId, PathBuf)]) -> Result<Self, CoreError> {
+        let project = self
+            .project
+            .with_rebound_media(&media_changes(changes))
+            .map_err(|()| {
+                CoreError::InvalidProject("a nova referência de mídia não é válida".into())
+            })?;
+        Ok(Self { project })
+    }
+}
+
+fn media_changes(changes: &[(MediaId, PathBuf)]) -> Vec<(Uuid, PathBuf)> {
+    changes
+        .iter()
+        .map(|(media_id, path)| (media_id.into_uuid(), path.clone()))
+        .collect()
 }
 
 impl LoadedProjectRevision {
@@ -962,6 +980,15 @@ impl EditableProject {
         }
         self.session.relink_media(command)?;
         Ok(self.projection())
+    }
+
+    /// Adopts paths found by the Project's folder structure right after
+    /// opening, before any edit: no History, no unsaved change.
+    pub fn rebind_opened_media(&mut self, changes: &[(MediaId, PathBuf)]) -> Result<(), CoreError> {
+        if !self.session_valid {
+            return Err(CoreError::EditableSessionInvalidated);
+        }
+        self.session.rebind_opened_media(&media_changes(changes))
     }
 
     pub fn validate_album_information(
