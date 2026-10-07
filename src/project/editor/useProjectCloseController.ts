@@ -141,8 +141,14 @@ export function useProjectCloseController({
   ]);
 
   const requestClose = useCallback(async () => {
-    if (requestBlockedRef.current || phaseRef.current !== "idle") return null;
     const operationId = createLogInstanceId("project-close");
+    if (requestBlockedRef.current || phaseRef.current !== "idle") {
+      logClose(
+        operationId, "project_close_request_ignored",
+        requestBlockedRef.current ? "workspace_blocked" : phaseRef.current,
+      );
+      return null;
+    }
     transition("requesting");
     logClose(operationId, "project_close_requested");
     try {
@@ -155,6 +161,7 @@ export function useProjectCloseController({
         pendingOutcome?.status === "failed" ||
         pendingOutcome?.status === "obsolete"
       ) {
+        logClose(operationId, "project_close_request_dropped", pendingOutcome.status);
         transition("idle");
         return null;
       }
@@ -275,7 +282,8 @@ export function useProjectCloseController({
   useEffect(() => {
     let active = true;
     let unsubscribe: (() => void) | undefined;
-    const releaseNativeClose = async () => {
+    const releaseNativeClose = async (operationId: string, reason: string) => {
+      logClose(operationId, "project_close_native_released", reason);
       try {
         const resolution = await projectWindowPort.resolveClose("cancel");
         if (!active || !hasClosePhase(phaseRef, "requesting")) return;
@@ -293,10 +301,16 @@ export function useProjectCloseController({
     };
     void projectWindowPort
       .onCloseRequested(() => {
-        if (!active || phaseRef.current !== "idle") return;
+        if (!active) return;
+        const operationId = createLogInstanceId("project-close");
+        if (phaseRef.current !== "idle") {
+          logClose(operationId, "project_close_native_ignored", phaseRef.current);
+          return;
+        }
+        logClose(operationId, "project_close_native_received");
         transition("requesting");
         if (requestBlockedRef.current) {
-          void releaseNativeClose();
+          void releaseNativeClose(operationId, "workspace_blocked");
           return;
         }
         void waitForPendingMutations().then((pendingOutcome) => {
@@ -305,7 +319,7 @@ export function useProjectCloseController({
             pendingOutcome?.status === "failed" ||
             pendingOutcome?.status === "obsolete"
           ) {
-            void releaseNativeClose();
+            void releaseNativeClose(operationId, pendingOutcome.status);
             return;
           }
           presentConfirmation();
@@ -323,6 +337,7 @@ export function useProjectCloseController({
       unsubscribe?.();
     };
   }, [
+    logClose,
     onError,
     onProjectionChange,
     presentConfirmation,

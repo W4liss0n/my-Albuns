@@ -21,15 +21,20 @@ import { tauriProjectWindowPort } from "../platform/tauriProjectWindowPort";
 import { tauriMediaDropPort } from "../platform/tauriMediaDropPort";
 import { tauriProjectDialogPort } from "../platform/tauriProjectDialogPort";
 import { tauriPhotoshopPort } from "../platform/tauriPhotoshopPort";
-import { tauriWindowControls } from "../platform/tauriWindowControls";
+import {
+  tauriWindowControls,
+  withLoggedProjectClose,
+} from "../platform/tauriWindowControls";
 import { tauriImageViewerWindow } from "../platform/tauriImageViewerWindow";
 import { WindowControlsProvider } from "../ui";
 
 installDesktopWebViewPolicy(document);
 
+const projectWindowControls = withLoggedProjectClose(tauriWindowControls, tauriLogger);
+
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>
-    <WindowControlsProvider controls={tauriWindowControls}>
+    <WindowControlsProvider controls={projectWindowControls}>
       <App
         projectLauncher={tauriProjectLauncher}
         generationLauncher={tauriProjectGenerationLauncher}

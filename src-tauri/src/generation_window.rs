@@ -553,6 +553,12 @@ pub(crate) fn on_window_event(window: &tauri::Window, event: &WindowEvent) -> bo
             state.lifetime.close();
         }
         if window.label() == "project" && state.template.lock().is_ok_and(|model| model.is_some()) {
+            tracing::info!(
+                target: "myalbuns.desktop",
+                window_label = window.label(),
+                reason = "generation_open",
+                event = "project_close_blocked",
+            );
             api.prevent_close();
             return true;
         }
