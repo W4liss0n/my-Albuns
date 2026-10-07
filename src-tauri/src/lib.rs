@@ -41,6 +41,7 @@ mod legacy_layouts;
 mod linked_files;
 mod local_store_io;
 mod logging;
+mod media_by_structure;
 mod media_confirmation;
 mod media_file_drop;
 mod media_import_selection;

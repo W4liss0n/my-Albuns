@@ -1,6 +1,7 @@
 use std::{
     collections::HashMap,
     io,
+    path::PathBuf,
     sync::{Arc, Mutex, MutexGuard},
 };
 
@@ -13,6 +14,7 @@ use myalbuns_core::{
 use myalbuns_imaging_protocol::RenderSource;
 
 use crate::{
+    media_by_structure::FoundMedia,
     media_runtime::{MediaBinding, MediaObservation, MediaRelinkProposal},
     project_recovery::RecoveryCoordinator,
 };
@@ -502,6 +504,38 @@ impl ProjectHost {
         let projection = project.projection();
         self.schedule_recovery(&project);
         Ok(projection)
+    }
+
+    pub(crate) fn project_path(&self) -> Result<PathBuf, String> {
+        Ok(self.project()?.project_path().to_path_buf())
+    }
+
+    /// Adopts paths found by the Project's folder structure while it opens.
+    /// It is not an edit: no History, no unsaved change, no recovery
+    /// checkpoint. A media whose path changed since the search is skipped.
+    pub(crate) fn rebind_opened_media(&self, found: &[FoundMedia]) -> Result<(), String> {
+        let mut project = self.project()?;
+        let mut changes = Vec::new();
+        for found in found {
+            let media_id: MediaId = found
+                .media_id
+                .parse()
+                .map_err(|error| format!("A ocorrência de mídia é inválida: {error}"))?;
+            if project
+                .project()
+                .media()
+                .iter()
+                .any(|media| media.id() == media_id.into_uuid() && media.path() == found.stored)
+            {
+                changes.push((media_id, found.found.clone()));
+            }
+        }
+        if changes.is_empty() {
+            return Ok(());
+        }
+        project
+            .rebind_opened_media(&changes)
+            .map_err(crate::project_error_message::project_error_message)
     }
 
     pub(crate) fn project_photo_drop_target(

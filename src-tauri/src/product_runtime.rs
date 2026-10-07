@@ -348,10 +348,44 @@ fn initialize_project_host(
     if !resolve_recovery(&host)? {
         return Ok(None);
     }
+    // Before anything keyed by a media path: hydration, Cache and the Monitor.
+    // Not finding them only leaves the stored paths, as before.
+    if let Err(error) = rebind_media_by_project_structure(&host) {
+        tracing::warn!(
+            target: "myalbuns.desktop",
+            %error,
+            event = "linked_files_structure_search_failed",
+        );
+    }
     // Recovery replaces creative state and clears transient source observations.
     // Hydrate the effective catalog before its first projection reaches the editor.
     hydrate_project_from_recovered_cache(&host, artifacts).map_err(io::Error::other)?;
     Ok(Some(host))
+}
+
+/// Looks for each Arquivo vinculado where the Project's folder structure says
+/// it would be after a copy or a move, before the stored path (ADR 0016).
+fn rebind_media_by_project_structure(host: &ProjectHost) -> Result<(), String> {
+    let project_path = host.project_path()?;
+    let catalog = host.authorized_media_catalog()?;
+    let mut paths = myalbuns_paths::OperationPathContext::new();
+    if paths.capture(&project_path).is_err() {
+        return Ok(());
+    }
+    let found = crate::media_by_structure::find_media_by_structure(
+        &paths.freeze(),
+        &project_path,
+        &catalog.bindings,
+    );
+    if found.is_empty() {
+        return Ok(());
+    }
+    tracing::info!(
+        target: "myalbuns.desktop",
+        count = found.len(),
+        event = "linked_files_found_by_structure",
+    );
+    host.rebind_opened_media(&found)
 }
 
 fn resolve_startup_recovery(
@@ -1197,7 +1231,8 @@ mod tests {
 
     use super::{
         InitialImageProcessing, StartupReadiness, StartupSignal,
-        hydrate_project_from_recovered_cache, project_window_title, refresh_changed_photo_sources,
+        hydrate_project_from_recovered_cache, project_window_title,
+        rebind_media_by_project_structure, refresh_changed_photo_sources,
         refresh_project_photos_for_media_update,
     };
     use crate::{
@@ -2148,6 +2183,81 @@ mod tests {
         assert_eq!(
             host.authorized_media_catalog().unwrap().bindings[0].logical_path,
             original_path
+        );
+    }
+
+    #[test]
+    fn a_copied_job_folder_opens_with_its_images_found_and_nothing_to_save() {
+        let root = tempfile::tempdir().expect("temporary job folders");
+        let server = root.path().join(r"Servidor\J040");
+        let project_path = server.join(r"02 - Templates\Modelo.myalbuns");
+        let original_path = server.join(r"03 - Artes\Foto.jpg");
+        std::fs::create_dir_all(project_path.parent().unwrap()).unwrap();
+        std::fs::create_dir_all(original_path.parent().unwrap()).unwrap();
+        std::fs::write(&original_path, b"linked Original").unwrap();
+        let mut create_context = OperationPathContext::new();
+        create_context.capture(&project_path).unwrap();
+        let core = ProjectCore::new().with_identity_storage_roots(
+            root.path().join("leases"),
+            root.path().join("identities"),
+        );
+        let mut project = core
+            .create_editable(CreateProjectRequest::new(
+                ProjectLocation::new(project_path.clone(), create_context.freeze()),
+                InitialProject::neutral(),
+                CreateAuthorization::CreateOnly,
+            ))
+            .unwrap();
+        let source_metadata = PhotoSourceMetadata::new(
+            800,
+            1_200,
+            ["#102030".into(), "#405060".into(), "#708090".into()],
+        )
+        .unwrap();
+        project
+            .import_photo(ImportPhoto::new(original_path.clone(), source_metadata))
+            .unwrap();
+        assert_eq!(
+            project.save(1).unwrap(),
+            SaveProjectOutcome::Saved { revision: 1 }
+        );
+        drop(project);
+        let copy = root.path().join(r"Copia\J040");
+        let copied_project = copy.join(r"02 - Templates\Modelo.myalbuns");
+        let copied_original = copy.join(r"03 - Artes\Foto.jpg");
+        std::fs::create_dir_all(copied_project.parent().unwrap()).unwrap();
+        std::fs::create_dir_all(copied_original.parent().unwrap()).unwrap();
+        std::fs::rename(&project_path, &copied_project).unwrap();
+        std::fs::rename(&original_path, &copied_original).unwrap();
+
+        let mut open_context = OperationPathContext::new();
+        open_context.capture(&copied_project).unwrap();
+        let reopened = core
+            .open_editable(OpenProjectRequest::new(ProjectLocation::new(
+                copied_project.clone(),
+                open_context.freeze(),
+            )))
+            .unwrap();
+        let host = ProjectHost::new(reopened);
+
+        rebind_media_by_project_structure(&host).unwrap();
+
+        assert_eq!(
+            host.authorized_media_catalog().unwrap().bindings[0].logical_path,
+            copied_original
+        );
+        let opened = host.projection().unwrap();
+        assert_eq!(opened.state.revision, 1);
+        assert!(
+            !opened.state.dirty,
+            "finding the copy is not a change to save"
+        );
+        assert!(!opened.state.can_undo);
+        assert!(
+            std::fs::read_to_string(&copied_project)
+                .unwrap()
+                .contains("Servidor"),
+            "the Project file is written only by a save"
         );
     }
 }

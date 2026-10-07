@@ -2,7 +2,7 @@
 status: ready-for-agent
 document: product-spec
 implementation-readiness: decision-tickets-required
-updated: 2026-10-05
+updated: 2026-10-06
 ---
 
 # Programa de Diagramação de Álbuns
@@ -1016,6 +1016,7 @@ validação das superfícies descritas nesta seção.
 - Pan, Zoom, Frames, Layouts e demais decisões de composição não invalidam a representação reduzida; as mesmas regras determinísticas calculam o plano que a prévia e a saída final adaptam aos seus respectivos renderizadores.
 - Um Arquivo ausente ou indisponível pode conservar sua última representação e metadados conhecidos com indicação própria, mas continua inválido como fonte de Exportação.
 - Se uma origem acessível confirmar que um arquivo foi movido ou removido, cada Projeto o considera ausente e pode religá-lo independentemente. Arquivo indisponível preserva o vínculo e oferece nova tentativa, não Religação. Uma Religação aceita altera somente a referência daquele Projeto, participa de Undo/Redo, exige Salvamento e nunca move o arquivo original.
+- Ao abrir, o Projeto procura primeiro cada Foto e Imagem decorativa onde a estrutura de pastas ao seu redor indica: subindo da pasta atual do Projeto, a primeira pasta cujo nome também está no caminho gravado ancora o caminho relativo que vinha depois dela. Só um arquivo existente nesse caminho exato é adotado, sem listar pastas nem procurar por outros nomes. O Reencontro pela estrutura é silencioso: não cria Undo/Redo nem mudança pendente, e o arquivo de Projeto só recebe o caminho novo num Salvamento feito por outro motivo. A Exportação em lote e a Geração em lote pela linha de comando aplicam a mesma regra sem salvar o Projeto ou o modelo ([ADR 0016](../adr/0016-reencontrar-arquivos-vinculados-pela-estrutura-de-pastas.md)).
 - Arquivo ausente usado na seleção bloqueia a Exportação. Arquivo ausente apenas no Painel de imagens mantém indicação no próprio item, mas não bloqueia. O Painel contextual não apresenta aviso nem atalho de revisão de ausentes.
 - Na miniatura do Painel de imagens, um ícone quadrado no canto superior direito indica Arquivo ausente, sem texto ou botão sobre a imagem. Com Cache, a miniatura real permanece; sem Cache, aparece o placeholder genérico. `Localizar imagem…` é oferecido apenas no menu do botão direito quando alguma imagem selecionada está ausente e age em todas as ausentes da seleção, com o nome `Localizar imagens…` quando houver mais de uma. As demais imagens selecionadas são ignoradas.
 - `Localizar imagem…` no Painel solicita uma única pasta e procura, para cada imagem, o mesmo nome e extensão somente entre seus arquivos diretos, sem pesquisar subpastas. As encontradas são religadas, cada uma como uma etapa de Undo/Redo; cada imagem não encontrada é informada pelo nome e mantém o vínculo.

@@ -27,6 +27,7 @@ use crate::{
         BatchProblem, BatchProblemKind, ExportConflictPolicy,
     },
     linked_files::{LinkedFiles, ListFolderError},
+    media_by_structure::find_media_by_structure,
     media_runtime::{MediaAvailability, MediaBinding},
 };
 
@@ -372,6 +373,42 @@ fn load_in_plan(
     })
 }
 
+/// Referenced media without a temporary relink, found by the Project's
+/// folder structure (ADR 0016). Nothing is saved: each check looks again.
+fn media_found_by_structure(
+    loaded: &LoadedProjectRevision,
+    item: &BatchItem,
+    referenced: &HashSet<MediaId>,
+    paths: &RootBindingPlan,
+) -> HashMap<String, PathBuf> {
+    let searched = loaded
+        .project()
+        .media()
+        .iter()
+        .filter(|media| {
+            let id = media.id().to_string();
+            let relinked = [&item.relinks.individual, &item.relinks.global]
+                .iter()
+                .any(|relinks| {
+                    relinks
+                        .get(&id)
+                        .is_some_and(|relink| relink.original == media.path())
+                });
+            MediaId::try_from(media.id()).is_ok_and(|media_id| referenced.contains(&media_id))
+                && !relinked
+        })
+        .map(|media| MediaBinding {
+            media_id: media.id().to_string(),
+            kind: media.kind(),
+            logical_path: media.path().to_path_buf(),
+        })
+        .collect::<Vec<_>>();
+    find_media_by_structure(paths, &item.path, &searched)
+        .into_iter()
+        .map(|found| (found.media_id, found.found))
+        .collect()
+}
+
 fn inspect_and_plan(
     loaded: &LoadedProjectRevision,
     item: &BatchItem,
@@ -410,8 +447,14 @@ fn inspect_and_plan(
     // on the Photo's dimensions; read them from each header before composing.
     let mut photo_sources = HashMap::new();
     let mut checked = Vec::new();
+    let found_by_structure = media_found_by_structure(loaded, item, &referenced, paths);
     for media in loaded.project().media() {
-        originals.push(media.path().to_path_buf());
+        let found = found_by_structure.get(&media.id().to_string());
+        // The stored path of a media found elsewhere is not one of its
+        // sources; it may sit on a server that no longer answers.
+        if found.is_none() {
+            originals.push(media.path().to_path_buf());
+        }
         if !paths.covers(media.path()) {
             problems.push(problem(
                 BatchProblemKind::Unavailable,
@@ -435,7 +478,10 @@ fn inspect_and_plan(
                     .get(&id)
                     .filter(|relink| relink.original == media.path())
             });
-        let path = replacement.map_or(media.path(), |relink| relink.replacement.as_path());
+        let path = replacement.map_or_else(
+            || found.map_or(media.path(), PathBuf::as_path),
+            |relink| relink.replacement.as_path(),
+        );
         if !paths.covers(path) {
             let file_name = path
                 .file_name()

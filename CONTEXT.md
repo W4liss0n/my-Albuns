@@ -395,6 +395,9 @@ Arquivo vinculado cuja existência não pôde ser confirmada porque sua origem d
 **Religação de arquivo**:
 Substituição do caminho registrado de um Arquivo ausente por um caminho válido dentro de um único Projeto.
 
+**Reencontro pela estrutura**:
+Uso automático, ao abrir o Projeto ou em lote, de um Arquivo vinculado encontrado no mesmo caminho relativo a uma pasta em comum com a localização atual do Projeto. Não é Religação: não pede escolha, não cria Histórico e não marca o Projeto.
+
 **Substituição de imagem**:
 Troca explícita do Original vinculado a uma Foto ou Decorativo por outro arquivo,
 independentemente de sua disponibilidade, conservando sua identidade e seus usos

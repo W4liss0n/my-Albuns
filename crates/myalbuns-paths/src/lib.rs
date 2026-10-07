@@ -17,6 +17,7 @@ mod project_file_lock;
 mod project_transition_barrier;
 mod resolve;
 mod storage_volume;
+mod structure;
 mod windows_path;
 
 #[cfg(feature = "test-support")]
@@ -49,5 +50,6 @@ pub use resolve::{
     ResolveError, ResolvedObject,
 };
 pub use storage_volume::StorageVolume;
+pub use structure::{same_path, structural_candidates};
 #[cfg(windows)]
 pub use windows_path::wide_api_path;

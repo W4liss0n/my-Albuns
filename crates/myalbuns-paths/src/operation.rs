@@ -224,7 +224,7 @@ fn validate_operational_base(path: &Path) -> Result<(), AppPathsError> {
 }
 
 #[cfg(windows)]
-fn external_path_root(path: &Path) -> Result<(PathBuf, PathRootKind), AppPathsError> {
+pub(crate) fn external_path_root(path: &Path) -> Result<(PathBuf, PathRootKind), AppPathsError> {
     use std::path::Prefix;
 
     let mut components = path.components();
@@ -282,7 +282,7 @@ fn remote_drive(_drive: &Path) -> bool {
 }
 
 #[cfg(not(windows))]
-fn external_path_root(path: &Path) -> Result<(PathBuf, PathRootKind), AppPathsError> {
+pub(crate) fn external_path_root(path: &Path) -> Result<(PathBuf, PathRootKind), AppPathsError> {
     if !path.is_absolute() {
         return Err(AppPathsError::InvalidOperationPath);
     }

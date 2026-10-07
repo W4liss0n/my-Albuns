@@ -1,8 +1,8 @@
 use std::path::{Path, PathBuf};
 
-use myalbuns_core::{LoadProjectRequest, ProjectCore, ProjectLocation, ProjectTemplate};
+use myalbuns_core::{LoadProjectRequest, MediaId, ProjectCore, ProjectLocation, ProjectTemplate};
 use myalbuns_logging::{ProcessRole, init_local_logging};
-use myalbuns_paths::{AppPaths, OperationPathContext};
+use myalbuns_paths::{AppPaths, OperationPathContext, RootBindingPlan};
 use serde::Deserialize;
 
 use super::{
@@ -15,6 +15,8 @@ use crate::{
         GenerationDecision, GenerationItemStatus, GenerationItemView, GenerationOptions,
         GenerationPhase, GenerationView,
     },
+    media_by_structure::find_media_by_structure,
+    media_runtime::MediaBinding,
 };
 
 #[derive(Debug, Deserialize)]
@@ -103,15 +105,44 @@ fn load_template(core: &ProjectCore, model: &Path) -> Result<ProjectTemplate, St
         tracing::warn!(target: "myalbuns.desktop", %error, event = "automation_model_unavailable");
         UNAVAILABLE
     })?;
-    core.load_persisted_revision(LoadProjectRequest::new(ProjectLocation::new(
-        model.to_path_buf(),
-        paths.freeze(),
-    )))
-    .map(|loaded| loaded.freeze_template())
-    .map_err(|error| {
-        tracing::warn!(target: "myalbuns.desktop", ?error, event = "automation_model_unavailable");
-        UNAVAILABLE.into()
-    })
+    let paths = paths.freeze();
+    let template = core
+        .load_persisted_revision(LoadProjectRequest::new(ProjectLocation::new(
+            model.to_path_buf(),
+            paths.clone(),
+        )))
+        .map(|loaded| loaded.freeze_template())
+        .map_err(|error| {
+            tracing::warn!(target: "myalbuns.desktop", ?error, event = "automation_model_unavailable");
+            UNAVAILABLE
+        })?;
+    Ok(rebind_template_by_structure(template, model, &paths))
+}
+
+/// The generated projects link the model's images where the model's folder
+/// structure finds them (ADR 0016); the model file itself is not changed.
+fn rebind_template_by_structure(
+    template: ProjectTemplate,
+    model: &Path,
+    paths: &RootBindingPlan,
+) -> ProjectTemplate {
+    let bindings = template
+        .media()
+        .iter()
+        .map(|media| MediaBinding {
+            media_id: media.id().to_string(),
+            kind: media.kind(),
+            logical_path: media.path().to_path_buf(),
+        })
+        .collect::<Vec<_>>();
+    let changes = find_media_by_structure(paths, model, &bindings)
+        .into_iter()
+        .filter_map(|found| Some((found.media_id.parse::<MediaId>().ok()?, found.found)))
+        .collect::<Vec<_>>();
+    if changes.is_empty() {
+        return template;
+    }
+    template.with_rebound_media(&changes).unwrap_or(template)
 }
 
 fn awaits_replacement(item: &GenerationItemView) -> bool {
@@ -265,4 +296,34 @@ fn reports(view: &GenerationView) -> Vec<ItemReport> {
             }
         })
         .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::load_template;
+
+    #[test]
+    fn a_copied_model_links_the_images_found_beside_it_without_changing_the_model() {
+        let root = tempfile::tempdir().unwrap();
+        let job = root.path().join("Copia").join("Job");
+        let model = job.join("Modelo").join("Modelo.myalbuns");
+        let original = root
+            .path()
+            .join("Servidor")
+            .join("Job")
+            .join("Arte")
+            .join("001.jpg");
+        let copy = job.join("Arte").join("001.jpg");
+        let (core, project) =
+            crate::batch_runner::tests::background_project(root.path(), &model, &original);
+        drop(project);
+        std::fs::create_dir_all(copy.parent().unwrap()).unwrap();
+        std::fs::rename(&original, &copy).unwrap();
+        let bytes = std::fs::read(&model).unwrap();
+
+        let template = load_template(&core, &model).unwrap();
+
+        assert_eq!(template.media()[0].path(), copy);
+        assert_eq!(std::fs::read(&model).unwrap(), bytes);
+    }
 }
