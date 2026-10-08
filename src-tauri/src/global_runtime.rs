@@ -1468,18 +1468,34 @@ async fn launch_burst_project(
     project_path: PathBuf,
     root_bindings: RootBindingPlan,
 ) -> ProjectLaunchOutcome {
-    let outcome = match ticket.lead_row().cloned() {
-        None => ticket
-            .lead_outcome()
-            .await
-            .unwrap_or_else(|| ProjectLaunchOutcome::Failed {
-                error: simple_failure(
-                    "host_unavailable",
-                    "Não foi possível iniciar a Janela do projeto.",
-                    "Tente novamente. Se o problema continuar, reinicie o MyAlbuns.",
-                ),
-            }),
-        Some(row) => {
+    let outcome = loop {
+        let Some(row) = ticket.lead_row().cloned() else {
+            match ticket.lead_outcome().await {
+                // The attempt this repeat followed did not open the Project
+                // (its decision was cancelled, or it failed): the repeat
+                // makes its own attempt, as it would have in turn.
+                Some(
+                    outcome @ (ProjectLaunchOutcome::Cancelled
+                    | ProjectLaunchOutcome::Failed { .. }),
+                ) => {
+                    if ticket.take_over_path() {
+                        continue;
+                    }
+                    break outcome;
+                }
+                Some(outcome) => break outcome,
+                None => {
+                    break ProjectLaunchOutcome::Failed {
+                        error: simple_failure(
+                            "host_unavailable",
+                            "Não foi possível iniciar a Janela do projeto.",
+                            "Tente novamente. Se o problema continuar, reinicie o MyAlbuns.",
+                        ),
+                    };
+                }
+            }
+        };
+        break {
             let burst = Arc::clone(ticket.burst());
             state.bootstrap = state.bootstrap.with_progress(row.reporter());
             if let Some(claim) = ticket.focus_claim_id() {
@@ -1538,7 +1554,7 @@ async fn launch_burst_project(
             } else {
                 outcome
             }
-        }
+        };
     };
     if let Some(finished) = ticket.finish(outcome.clone()) {
         finalize_opening_burst(app, &state, finished).await;

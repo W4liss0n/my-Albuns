@@ -810,6 +810,51 @@ impl<L> ProjectTicket<L> {
         let _ = running.wait_for(|count| *count == 0).await;
     }
 
+    /// A repeat whose followed launch did not open the Project makes its
+    /// own attempt, as a later activation of the same file would have: it
+    /// becomes the path's launch in the same row, or follows the repeat that
+    /// already did. `false` when there is nothing to take over.
+    pub(crate) fn take_over_path(&mut self) -> bool {
+        let ProjectRole::Duplicate {
+            path: (index, _), ..
+        } = self.role
+        else {
+            return false;
+        };
+        let mut registry = self.bursts.lock();
+        let Some(entry) = registry
+            .current
+            .as_mut()
+            .filter(|current| Arc::ptr_eq(&current.burst, &self.burst))
+            .and_then(|current| current.paths.get_mut(index))
+        else {
+            return false;
+        };
+        if let Some(lead) = entry.lead.clone() {
+            self.role = ProjectRole::Duplicate {
+                lead,
+                path: (index, entry.generation),
+            };
+            return true;
+        }
+        let (outcome, receiver) = watch::channel(None);
+        entry.generation += 1;
+        entry.lead = Some(receiver);
+        entry.row.restart();
+        let row = entry.row.clone();
+        let path = (index, entry.generation);
+        drop(registry);
+        self.burst.running_leads.send_modify(|count| *count += 1);
+        self.role = ProjectRole::Lead {
+            path,
+            row,
+            outcome,
+            presenter: None,
+            running: true,
+        };
+        true
+    }
+
     fn stop_running(&mut self) {
         if let ProjectRole::Lead { running, .. } = &mut self.role
             && *running
@@ -1298,6 +1343,36 @@ mod tests {
             *calls.lock().unwrap(),
             [true, false],
             "without a decision on screen nothing rises"
+        );
+    }
+
+    #[test]
+    fn a_repeat_makes_its_own_attempt_when_the_followed_one_is_cancelled() {
+        let bursts = OpeningBursts::<()>::default();
+        let batch = bursts.join_batch();
+        let first = batch.add_project(path("A"), "A".into());
+        let mut repeat = batch.add_project(path("A"), "A".into());
+        let mut third = batch.add_project(path("A"), "A".into());
+        let _ = batch.finish(None);
+        assert!(repeat.lead_row().is_none() && third.lead_row().is_none());
+
+        assert!(first.finish(ProjectLaunchOutcome::Cancelled).is_none());
+        assert!(repeat.take_over_path(), "the repeat makes its own attempt");
+        assert!(repeat.lead_row().is_some(), "in the same row");
+        assert!(third.take_over_path());
+        assert!(
+            third.lead_row().is_none(),
+            "a later repeat follows the attempt that took over"
+        );
+
+        assert!(repeat.finish(ProjectLaunchOutcome::Opened).is_none());
+        let finished = third
+            .finish(ProjectLaunchOutcome::Focused)
+            .expect("the last launch ends the burst");
+        assert_eq!(
+            finished.terminal,
+            Some(ProjectLaunchOutcome::Opened),
+            "the cancelled attempt no longer decides the terminal"
         );
     }
 
