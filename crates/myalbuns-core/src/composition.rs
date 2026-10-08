@@ -426,17 +426,28 @@ fn compose_overlays(
         })
         .collect()
 }
-pub(crate) fn resized_photo_pan(
+
+/// Pan that keeps the Photo point at the Frame center when the Frame (a
+/// dimensional change) or the user zoom changes. The center offset grows with
+/// the effective scale, fill × user zoom; Pan stops at its limit rather than
+/// reveal an empty area, so the point moves only when the fill requires it.
+pub(crate) fn anchored_photo_pan(
     before: &RectUm,
     after: &RectUm,
     transform: &crate::model::MediaTransform,
+    next_zoom: f32,
     source: (u32, u32),
 ) -> NormalizedPan {
     let old = PhotoFit::new(before, transform, source);
-    let new = PhotoFit::new(after, transform, source);
+    let next = crate::model::MediaTransform {
+        user_zoom: next_zoom,
+        ..transform.clone()
+    };
+    let new = PhotoFit::new(after, &next, source);
+    let growth = (new.scale / old.scale) * (new.zoom / old.zoom);
     let pan = |value: f32, old_span: f64, new_span: f64| {
-        if new_span > 0.0 {
-            (f64::from(value) * old_span * (new.scale / old.scale) / new_span).clamp(-1.0, 1.0)
+        if has_pan_room(old_span) && has_pan_room(new_span) {
+            (f64::from(value) * old_span * growth / new_span).clamp(-1.0, 1.0)
         } else {
             0.0
         }
@@ -447,9 +458,19 @@ pub(crate) fn resized_photo_pan(
     }
 }
 
-/// Canonical fill and Pan room, shared by rendering and dimensional changes.
+/// Whether a Pan span is real room rather than the floating-point remainder
+/// of an exact fill (about 1e-10 µm), which would otherwise turn any Pan into
+/// a full ±1. The canvas preview (photoGeometry.ts) likewise centers an axis
+/// whose squared half-span is within `EPSILON`.
+fn has_pan_room(span: f64) -> bool {
+    (span / 2.0).powi(2) > f64::EPSILON
+}
+
+/// Canonical fill and Pan room, shared by rendering, dimensional changes and
+/// user zoom changes.
 struct PhotoFit {
     scale: f64,
+    zoom: f64,
     draw_width: f64,
     draw_height: f64,
     horizontal_span: f64,
@@ -470,6 +491,7 @@ impl PhotoFit {
         let zoom = f64::from(transform.user_zoom.clamp(PHOTO_ZOOM_MIN, PHOTO_ZOOM_MAX));
         Self {
             scale,
+            zoom,
             draw_width,
             draw_height,
             horizontal_span: (draw_width * zoom - required_width).max(0.0),
@@ -499,10 +521,7 @@ fn compose_photo(frame: &RectUm, photo: &PhotoSnapshot, media: &MediaCatalogItem
         x: photo.transform.pan_x.clamp(PHOTO_PAN_MIN, PHOTO_PAN_MAX) as f64,
         y: photo.transform.pan_y.clamp(PHOTO_PAN_MIN, PHOTO_PAN_MAX) as f64,
     };
-    let current_zoom = photo
-        .transform
-        .user_zoom
-        .clamp(PHOTO_ZOOM_MIN, PHOTO_ZOOM_MAX) as f64;
+    let current_zoom = fit.zoom;
     let pan_origin = VectorUm {
         x: frame_width / 2.0,
         y: frame_height / 2.0,

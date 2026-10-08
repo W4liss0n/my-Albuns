@@ -2,7 +2,7 @@
 status: accepted
 document: design
 date: 2026-08-20
-updated: 2026-10-02
+updated: 2026-10-08
 ticket: 17-programa-09-primeira-composicao-com-foto
 ---
 
@@ -117,6 +117,18 @@ Modo de edição, `Alt+arraste` altera somente Pan e `Alt+roda` altera somente
 Zoom. A prévia é transitória; o término do gesto envia um único
 `TransformPhoto`, que participa de Undo/Redo. No Modo de edição esses gestos
 são ignorados para que a geometria do Frame permaneça sob o modo proprietário.
+
+O Zoom do usuário cresce a partir do centro do Frame: mudar o Zoom conserva o
+ponto da Foto nesse centro, e o deslocamento do centro da Foto passa a valer
+`deslocamento × (zoomNovo / zoomAnterior)`. Em cada eixo de Pan,
+`panNovo = clamp(pan × folga anterior × zoomNovo / zoomAnterior / folga nova, −1, 1)`,
+e um eixo sem folga fica em `0`; só a redução perto de uma borda atinge o limite.
+O Core é o dono dessa regra. `TransformPhoto` aplica primeiro `deltaZoom`, ancorado
+a partir do Pan confirmado, e depois soma `deltaPan`; um gesto que combine
+arraste e roda envia como `deltaPan` a diferença entre o Pan final e o Pan
+ancorado. `SetPhotoZoom` reancora cada Foto da seleção no seu próprio Frame.
+Sem as dimensões do Original na sessão, o Pan normalizado é mantido. A prévia
+do Canvas apenas prevê o mesmo resultado.
 
 Canvas e Exportação consomem a mesma Projeção composta. Frame, vínculo, Pan e
 Zoom sobrevivem a Salvamento e reabertura; o Host reidrata apenas os metadados

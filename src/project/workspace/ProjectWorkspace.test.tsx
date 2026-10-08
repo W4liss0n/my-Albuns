@@ -2297,6 +2297,31 @@ test("consumes the first Escape in the image-panel options before leaving Sheet 
   expect(canvasHarness.props?.mode).toEqual({ kind: "normal" });
 });
 
+test("leaves Sheet Edit Mode with Enter on the Canvas while fields, buttons and menus keep their Enter", () => {
+  render(
+    <ProjectWorkspace
+      exportPort={exportPort}
+      projection={projection}
+      projectSessionPort={projectSessionPortWithApply(async () => projection)}
+      onProjectionChange={() => undefined}
+    />,
+  );
+  const editing = { kind: "sheet-editing", sheetId: "sheet-001" };
+  act(() => canvasHarness.props?.onEditSheet?.("sheet-001"));
+  expect(canvasHarness.props?.mode).toEqual(editing);
+
+  fireEvent.keyDown(screen.getByLabelText("Buscar fotos"), { key: "Enter" });
+  fireEvent.keyDown(screen.getByRole("button", { name: "Design da lâmina" }), { key: "Enter" });
+  expect(fireEvent.keyDown(screen.getByRole("menuitem", { name: "Lâmina" }), { key: "Enter" })).toBe(false);
+  fireEvent.keyDown(screen.getByRole("menu", { name: "Lâmina" }), { key: "Enter" });
+  fireEvent.keyDown(screen.getByRole("menu", { name: "Lâmina" }), { key: "Escape" });
+  fireEvent.keyDown(screen.getByTestId("album-canvas"), { key: "Enter", ctrlKey: true });
+  expect(canvasHarness.props?.mode).toEqual(editing);
+
+  expect(fireEvent.keyDown(screen.getByTestId("album-canvas"), { key: "Enter" })).toBe(false);
+  expect(canvasHarness.props?.mode).toEqual({ kind: "normal" });
+});
+
 test("starts the implemented Lâmina export from the Arquivo menu", async () => {
   const startSheet = vi.fn<ExportPort["startSheet"]>(() => ({
     completion: Promise.resolve({

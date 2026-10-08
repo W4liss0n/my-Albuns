@@ -1,5 +1,6 @@
 import { matchProjectCommandShortcut } from "../../application/projectCommandCatalog";
 import type { AlbumCanvasProps } from "./albumCanvasContract";
+import { isGestureCancelKey } from "./gestureCancelKey";
 import { isTextEntryTarget } from "../workspace/isTextEntryTarget";
 import { boundedEditingTransform, fittedEditingTransform, resizedEditingTransform,
   zoomEditingTransform, type EditingCanvasFit, type EditingCanvasTransform, type ViewPoint } from "./editingCanvasViewport";
@@ -99,7 +100,7 @@ export class EditingCanvasNavigation {
   };
 
   private readonly keyDown = (event: KeyboardEvent) => {
-    if (this.pan && event.key === "Escape") {
+    if (this.pan && isGestureCancelKey(event)) {
       event.preventDefault();
       event.stopImmediatePropagation();
       this.cancelPan();

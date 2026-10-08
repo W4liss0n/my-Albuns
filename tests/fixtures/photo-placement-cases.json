@@ -1,7 +1,7 @@
 {
   "cases": [
     {
-      "name": "horizontal pan remains stable while zooming",
+      "name": "zoom keeps the Photo point at the Frame center",
       "frame": {
         "x": 0,
         "y": 0,
@@ -61,8 +61,9 @@
       "zoomPreviews": [
         {
           "zoom": 1.12,
+          "expectedPan": { "x": -0.6810810810810811, "y": 0 },
           "expectedPlacement": {
-            "center": { "x": 83400, "y": 100000 },
+            "center": { "x": 99600, "y": 100000 },
             "size": { "width": 448000, "height": 224000 }
           }
         }
@@ -129,9 +130,79 @@
       "zoomPreviews": [
         {
           "zoom": 2,
+          "expectedPan": { "x": 0.9047619047619047, "y": -0.6666666666666666 },
           "expectedPlacement": {
-            "center": { "x": 300000, "y": 450000 },
+            "center": { "x": 250000, "y": 416666.6666666667 },
             "size": { "width": 900000, "height": 600000 }
+          }
+        }
+      ]
+    },
+    {
+      "name": "zooming out near an edge clamps the anchored pan",
+      "frame": {
+        "x": 0,
+        "y": 0,
+        "width": 300000,
+        "height": 200000
+      },
+      "photo": {
+        "mediaId": "media-horizontal",
+        "name": "Foto horizontal.jpg",
+        "sourceWidthPx": 6000,
+        "sourceHeightPx": 3000,
+        "palette": ["#10202b", "#648493", "#dfa75e"],
+        "transform": {
+          "panX": -0.9,
+          "panY": 0,
+          "userZoom": 2,
+          "quarterTurns": 0,
+          "fineRotationDegrees": 0,
+          "mirrorX": false
+        }
+      },
+      "expectedPlan": {
+        "baseFillZoom": 66.66666666666667,
+        "currentPan": { "x": -0.9, "y": 0 },
+        "currentZoom": 2,
+        "panRange": { "minimum": -1, "maximum": 1 },
+        "zoomRange": { "minimum": 1, "maximum": 5 },
+        "current": {
+          "center": { "x": -75000, "y": 100000 },
+          "size": { "width": 800000, "height": 400000 }
+        },
+        "panOrigin": { "x": 150000, "y": 100000 },
+        "panToCenter": {
+          "xx": 250000,
+          "xy": 0,
+          "yx": 0,
+          "yy": 100000
+        },
+        "panToCenterPerZoom": {
+          "xx": 200000,
+          "xy": 0,
+          "yx": 0,
+          "yy": 100000
+        },
+        "sizePerZoom": { "width": 400000, "height": 200000 }
+      },
+      "panPreviews": [
+        {
+          "center": { "x": 1000000, "y": 1000000 },
+          "expectedPan": { "x": 1, "y": 1 },
+          "expectedPlacement": {
+            "center": { "x": 400000, "y": 200000 },
+            "size": { "width": 800000, "height": 400000 }
+          }
+        }
+      ],
+      "zoomPreviews": [
+        {
+          "zoom": 1.2,
+          "expectedPan": { "x": -1, "y": 0 },
+          "expectedPlacement": {
+            "center": { "x": 60000, "y": 100000 },
+            "size": { "width": 480000, "height": 240000 }
           }
         }
       ]

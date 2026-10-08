@@ -2,6 +2,7 @@
 status: accepted
 document: design
 date: 2026-09-17
+updated: 2026-10-08
 platform: windows
 implementation-readiness: ready-for-agent
 ---
@@ -46,8 +47,11 @@ a tipografia, o foco neutro, a escala e os tokens dos controles de propriedades;
 não há nova paleta, superfície, hierarquia ou sistema de espaçamento.
 
 A apresentação compartilhada preserva dois comandos: individual envia
-`transformPhoto`, com delta de quatro casas e sem alterar Pan; seleção múltipla
-envia `setPhotoZoom` absoluto. A prévia individual continua acompanhando o Canvas.
+`transformPhoto`, com delta de quatro casas e sem delta de Pan; seleção múltipla
+envia `setPhotoZoom` absoluto. Nos dois casos o Core reancora o Pan para
+conservar o ponto da Foto no centro do Frame, conforme o design
+[0017](0017-contrato-da-primeira-composicao-com-foto.md). A prévia individual
+continua acompanhando o Canvas.
 Enquanto seu delta aguarda a fila, o controle fica desabilitado. Troca de seleção,
 cancelamento e conclusão tardia não recuperam o rascunho antigo.
 

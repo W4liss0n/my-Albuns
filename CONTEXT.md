@@ -222,13 +222,13 @@ Recorte da Foto que cobre toda a área interna do Frame sem deixar regiões vaza
 Escala mínima calculada para garantir o Preenchimento do Frame.
 
 **Zoom do usuário**:
-Acréscimo de escala escolhido pelo usuário sobre o Zoom de preenchimento.
+Acréscimo de escala escolhido pelo usuário sobre o Zoom de preenchimento. Alterá-lo conserva o Ponto focal da Foto sempre que o Preenchimento do Frame permite.
 
 **Pan da Foto**:
 Deslocamento da Foto dentro de seu Frame sem alterar a Geometria do Frame.
 
 **Ponto focal da Foto**:
-Ponto da Foto usado como referência para conservar a região enquadrada durante uma mudança de formato.
+Ponto da Foto no centro do Frame, usado como referência para conservar a região enquadrada durante uma mudança de formato ou de Zoom do usuário.
 
 **Ajustes da Foto**:
 Transformações não destrutivas próprias de uma colocação, como Pan, Zoom, espelhamento, preto e branco, giro em passos de 90 graus e Ângulo da Foto.

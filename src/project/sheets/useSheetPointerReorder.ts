@@ -9,6 +9,7 @@ import {
   sheetSelectionModifiers,
   type SheetSelectionModifiers,
 } from "../../application/sheetSelection";
+import { isGestureCancelKey } from "../canvas/gestureCancelKey";
 
 export const SHEET_REORDER_POINTER_THRESHOLD_PX = 5;
 
@@ -171,7 +172,7 @@ export function useSheetPointerReorder(
 
   useEffect(() => {
     const cancelOnEscape = (event: KeyboardEvent) => {
-      if (event.key !== "Escape" || !activeRef.current) return;
+      if (!isGestureCancelKey(event) || !activeRef.current) return;
       event.preventDefault();
       event.stopImmediatePropagation();
       cancelActivePointer({ buttonStillDown: true });

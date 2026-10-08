@@ -47,21 +47,29 @@ export interface ConstrainedPhotoPlacement {
   placement: CanvasPhotoPlacement;
 }
 
-export interface ZoomedPhotoPlacement {
+/** A previewed Photo center and the Zoom it is drawn at. */
+export interface PhotoZoomStart {
+  center: CanvasPoint;
   zoom: number;
-  placement: CanvasPhotoPlacement;
 }
 
 export interface PhotoGeometry {
   current: CanvasPhotoPlacement;
   panRange: NumberRange;
   zoomRange: NumberRange;
-  zoom(targetZoom: number): ZoomedPhotoPlacement;
+  /**
+   * Zooms keeping fixed the Photo point at the Frame center, as the Core
+   * does; Preenchimento clamps the Pan when zooming out near an edge.
+   * Starts from the committed placement unless a preview is given.
+   */
+  zoom(targetZoom: number, from?: PhotoZoomStart): ConstrainedPhotoPlacement;
   constrain(
     center: CanvasPoint,
     targetZoom?: number,
   ): ConstrainedPhotoPlacement;
 }
+
+const CENTERED_PAN: NormalizedPan = { x: 0, y: 0 };
 
 export function createPhotoGeometry(
   sourcePlan: PhotoPlacementPlan,
@@ -69,19 +77,43 @@ export function createPhotoGeometry(
 ): PhotoGeometry {
   const plan = scalePlan(sourcePlan, unitScale);
 
-  function zoom(targetZoom: number): ZoomedPhotoPlacement {
+  function zoom(
+    targetZoom: number,
+    from: PhotoZoomStart = {
+      center: plan.current.center,
+      zoom: plan.currentZoom,
+    },
+  ): ConstrainedPhotoPlacement {
     const boundedZoom = clampToRange(targetZoom, plan.zoomRange);
-    return {
-      zoom: boundedZoom,
-      placement: placementAt(plan.currentPan, boundedZoom),
-    };
+    const ratio = boundedZoom / from.zoom;
+    // Projecting the scaled offset onto the Pan axes equals the Core's
+    // per-axis rule; an axis without room keeps the Photo centered on it.
+    return constrainAt(
+      {
+        x: plan.panOrigin.x + (from.center.x - plan.panOrigin.x) * ratio,
+        y: plan.panOrigin.y + (from.center.y - plan.panOrigin.y) * ratio,
+      },
+      boundedZoom,
+      CENTERED_PAN,
+    );
   }
 
   function constrain(
     center: CanvasPoint,
     targetZoom = plan.currentZoom,
   ): ConstrainedPhotoPlacement {
-    const boundedZoom = clampToRange(targetZoom, plan.zoomRange);
+    return constrainAt(
+      center,
+      clampToRange(targetZoom, plan.zoomRange),
+      plan.currentPan,
+    );
+  }
+
+  function constrainAt(
+    center: CanvasPoint,
+    boundedZoom: number,
+    fallbackPan: NormalizedPan,
+  ): ConstrainedPhotoPlacement {
     const panToCenter = panToCenterAtZoom(boundedZoom);
     const offset = {
       x: center.x - plan.panOrigin.x,
@@ -92,14 +124,14 @@ export function createPhotoGeometry(
         offset,
         panToCenter.xx,
         panToCenter.yx,
-        plan.currentPan.x,
+        fallbackPan.x,
         plan.panRange,
       ),
       y: projectPanAxis(
         offset,
         panToCenter.xy,
         panToCenter.yy,
-        plan.currentPan.y,
+        fallbackPan.y,
         plan.panRange,
       ),
     };

@@ -203,7 +203,7 @@ impl PersistentProjectSession {
             ProjectIntent::TogglePhotoBlackAndWhite { frame_ids } => {
                 project.with_toggled_photo_black_and_white(&frame_ids)
             }
-            ProjectIntent::SetPhotoZoom { edit } => project.with_photo_zoom(&edit),
+            ProjectIntent::SetPhotoZoom { edit } => project.with_photo_zoom(&edit, sources),
             ProjectIntent::SetPhotoAngle { edit } => project.with_photo_angle(&edit),
             ProjectIntent::OrientPhotos { frame_ids, action } => {
                 project.with_oriented_photos(&frame_ids, action)
@@ -387,7 +387,7 @@ impl PersistentProjectSession {
                 let parsed = parse_uuid(&frame_id)
                     .map_err(|()| CoreError::FrameNotFound(frame_id.clone()))?;
                 let next = project
-                    .with_transformed_photo(parsed, delta_pan_x, delta_pan_y, delta_zoom)
+                    .with_transformed_photo(parsed, delta_pan_x, delta_pan_y, delta_zoom, sources)
                     .map_err(|()| CoreError::FrameNotFound(frame_id))?;
                 outcome.affected_frame_id = Some(parsed);
                 Ok(next)

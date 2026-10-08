@@ -191,19 +191,14 @@ impl ProjectDocument {
                         .get(&photo.media_id)
                         .ok_or(Failure::SheetDimensionsUnknownPhotoSize)?;
                     let t = &mut photo.transform;
-                    let transform = crate::model::MediaTransform {
-                        pan_x: t.pan_x(),
-                        pan_y: t.pan_y(),
-                        user_zoom: t.user_zoom(),
-                        quarter_turns: t.quarter_turns(),
-                        mirror_x: t.mirror_x(),
-                        fine_rotation_degrees: t.fine_rotation_degrees(),
-                        black_and_white: t.black_and_white(),
-                    };
-                    let pan =
-                        crate::composition::resized_photo_pan(&before, &after, &transform, *source);
-                    t.pan_x_scaled = (pan.x * f64::from(TRANSFORM_SCALE)).round() as i32;
-                    t.pan_y_scaled = (pan.y * f64::from(TRANSFORM_SCALE)).round() as i32;
+                    let pan = crate::composition::anchored_photo_pan(
+                        &before,
+                        &after,
+                        &t.media_transform(),
+                        t.user_zoom(),
+                        *source,
+                    );
+                    t.set_pan(pan);
                 }
                 frame.rect = ProjectRect::new(
                     after.x as u64,

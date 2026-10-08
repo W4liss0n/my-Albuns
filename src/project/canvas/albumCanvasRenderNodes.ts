@@ -625,6 +625,7 @@ export function applyPhotoZoomPreview(
 ) {
   const zoomed = node.geometry.zoom(targetZoom);
   applyPhotoPlacementPreview(node, zoomed.zoom, zoomed.placement);
+  return zoomed;
 }
 
 export function applyPhotoPlacementPreview(

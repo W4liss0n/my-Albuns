@@ -167,7 +167,7 @@ Comandos rotineiros e serializados, como `Salvar`, `Desfazer`, `Refazer` e alter
 - Para o Pan, o usuário mantém `Alt`, pressiona sobre o Frame e inicia o arraste; o clique modificado é consumido pelo gesto e não seleciona o Frame. `Alt` + roda também preserva a seleção atual.
 - Enquanto o Pan estiver ativo, a porção da Foto fora do Frame aparece temporariamente com opacidade reduzida, a porção interna permanece com opacidade normal e quatro linhas-guia da regra dos terços são exibidas dentro do Frame. Esses auxílios desaparecem ao terminar o gesto e não integram o Projeto, o Histórico ou a Exportação.
 - Durante a prévia contínua de Pan ou Zoom, os valores correspondentes no Painel contextual acompanham imediatamente cada atualização do gesto. A prévia é transitória, volta aos valores confirmados em um cancelamento ou falha e não cria ações intermediárias no Histórico.
-- Esses gestos atuam na Foto sob o ponteiro sem mover ou redimensionar o Frame e sempre respeitam o Preenchimento do Frame.
+- Esses gestos atuam na Foto sob o ponteiro sem mover ou redimensionar o Frame e sempre respeitam o Preenchimento do Frame. Durante um `Alt` + arraste, `Alt` + roda altera o Zoom da Foto arrastada, mesmo que o ponteiro esteja sobre a Foto de outro Frame.
 - Um arraste completo cria uma única ação de Undo/Redo ao soltar. Passos consecutivos de `Alt` + roda são agrupados em uma ação quando a sequência de rolagem termina.
 - Selecionar um Frame ou Foto em qualquer Lâmina troca a seleção para aquele elemento e atualiza o contexto à direita.
 - Clicar em uma área vazia remove a seleção do elemento e retorna ao contexto geral do Álbum, sem desativar nenhuma Lâmina.
@@ -266,7 +266,7 @@ Quando a Lâmina alvo possui Layout travado, a preview aplicada permanece destac
 - Sair do modo descarta o nível de Zoom; uma nova entrada começa novamente em `Ajustar Lâmina`.
 - As demais Lâminas ficam temporariamente ocultas, sem alterar o Álbum.
 - Ao entrar, um Frame previamente selecionado no modo normal permanece selecionado somente se pertencer à Lâmina isolada; nos demais casos, o modo começa sem Seleção de Frames.
-- Sair com `Esc` limpa toda a Seleção de Frames antes de retornar ao Canvas contínuo.
+- Sair com `Esc` ou `Enter` limpa toda a Seleção de Frames antes de retornar ao Canvas contínuo.
 - Os gestos diretos sobre os elementos manipulam Frames — seleção simples ou múltipla, movimento e redimensionamento — e não executam Pan ou Zoom da Foto.
 - Um clique simples substitui a seleção pelo Frame atingido; `Ctrl` + clique adiciona ou remove esse Frame da seleção.
 - Pressionar e mover além do limiar padrão de arraste da plataforma inicia movimento, não um clique: sobre um Frame já selecionado, preserva a seleção e move todo o grupo; sobre um Frame não selecionado, substitui a seleção somente por ele e o move.
@@ -336,7 +336,7 @@ Quando a Lâmina alvo possui Layout travado, a preview aplicada permanece destac
 - Encerrar o modo retorna ao Canvas contínuo com a Lâmina que estava sendo editada centralizada.
 - Dois cliques em uma Lâmina entram no modo para aquela Lâmina.
 - Com o foco no Canvas, `Enter` entra no modo para a Lâmina centralizada.
-- `Esc` encerra o modo e retorna ao Canvas contínuo.
+- `Esc`, ou `Enter` com o foco no Canvas, encerra o modo e retorna ao Canvas contínuo. Durante o movimento ou redimensionamento de Frames, a Caixa de seleção e o Pan do Canvas, as duas teclas apenas cancelam o gesto e mantêm o modo.
 - O foco de teclado permanece visível no contorno da Lâmina em foco; o elemento Canvas não recebe contorno próprio no perímetro da área útil durante essa transição.
 
 Não existe faixa, rótulo, botão de retorno ou mudança adicional de fundo para identificar o modo. O isolamento da única Lâmina, o aumento do Canvas e a redução do Painel de imagens são a indicação visual suficiente.

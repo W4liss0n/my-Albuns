@@ -1,5 +1,6 @@
 import { Graphics, type Application, type FederatedPointerEvent } from "pixi.js";
 import type { AlbumCanvasProps } from "./albumCanvasContract";
+import { isGestureCancelKey } from "./gestureCancelKey";
 import { pixiColor } from "./pixiColor";
 import { SHEET_VISUAL_STYLE } from "./sheetVisualStyle";
 
@@ -173,7 +174,7 @@ export class FrameAreaSelectionSession {
   private readonly keyDown = (event: KeyboardEvent) => {
     if (event.code === "Space") this.spaceHeld = true;
     if (!this.gesture) return;
-    if (event.key === "Escape") {
+    if (isGestureCancelKey(event)) {
       event.preventDefault();
       event.stopImmediatePropagation();
       this.cancel();

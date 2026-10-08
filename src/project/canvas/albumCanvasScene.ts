@@ -188,14 +188,14 @@ export class AlbumCanvasScene {
       this.modeSignature !== null &&
       this.modeSignature !== modeSignature
     ) {
-      this.resetTransientInteractions();
+      this.resetTransientInteractions(true);
       this.lastCanvasMetrics = null;
     }
     this.modeSignature = modeSignature;
     this.input = input;
     this.frameAreaSelection.synchronize(input);
     this.app.canvas.setAttribute("aria-label", input.mode.kind === "sheet-editing"
-      ? `área de edição da lâmina em edição. Ctrl mais roda, ${projectCommandShortcutLabel("canvas-zoom-in")} ou ${projectCommandShortcutLabel("canvas-zoom-out")} ajustam o zoom; ${projectCommandShortcutLabel("fit-sheet")} mostra a lâmina inteira. Espaço mais arraste ou botão do meio movem a visualização ampliada. ${projectCommandShortcutLabel("select-all")} seleciona todos os quadros. Arraste na área vazia para selecionar por caixa; Ctrl acrescenta à seleção. Arraste um quadro para mover ou use as alças para redimensionar. Shift preserva a proporção; Alt preserva o centro; Ctrl suspende o encaixe automático; Esc cancela o gesto.`
+      ? `área de edição da lâmina em edição. Ctrl mais roda, ${projectCommandShortcutLabel("canvas-zoom-in")} ou ${projectCommandShortcutLabel("canvas-zoom-out")} ajustam o zoom; ${projectCommandShortcutLabel("fit-sheet")} mostra a lâmina inteira. Espaço mais arraste ou botão do meio movem a visualização ampliada. ${projectCommandShortcutLabel("select-all")} seleciona todos os quadros. Arraste na área vazia para selecionar por caixa; Ctrl acrescenta à seleção. Arraste um quadro para mover ou use as alças para redimensionar. Shift preserva a proporção; Alt preserva o centro; Ctrl suspende o encaixe automático; Esc ou ${projectCommandShortcutLabel("enter-sheet-editing")} cancela o gesto. Sem gesto em curso, ${projectCommandShortcutLabel("enter-sheet-editing")} ou Esc volta à área de edição contínua.`
       : input.mode.isolatedSheetId ? "área de edição da lâmina no painel de layouts. Passe sobre uma miniatura para visualizar o layout."
       : `Área de edição contínua do álbum. ${projectCommandShortcutLabel("enter-sheet-editing")} edita a lâmina centralizada. ${projectCommandShortcutLabel("next-layout")} e ${projectCommandShortcutLabel("previous-layout")} trocam o layout da lâmina centralizada. Arraste uma foto sobre outro quadro para trocar o conteúdo, inclusive entre lâminas. Esc cancela. Use a roda para navegar, Alt mais arraste para mover a foto e Alt mais roda para zoom.`);
     const modePolicy = albumCanvasModePolicy(input.mode);
@@ -218,6 +218,7 @@ export class AlbumCanvasScene {
       this.clearMaterializedSheets();
       this.presentedPreviewUrls.clear();
       this.previewTextures.sync([]);
+      this.photoInteractions.applyPreviews();
       return;
     }
     const navigationLayout = input.continuousCanvasLayout;
@@ -320,7 +321,7 @@ export class AlbumCanvasScene {
       shouldAnimateSheetPositions,
     );
     this.updateDecorations(presentedSheets);
-    this.photoInteractions.applyExternalPreview();
+    this.photoInteractions.applyPreviews();
   }
 
   resize(hostHeight: number) {
@@ -435,10 +436,12 @@ export class AlbumCanvasScene {
     this.pendingViewportOffsetX = null;
   }
 
-  private resetTransientInteractions() {
+  private resetTransientInteractions(modeChanged = false) {
     this.hoveredBar = null;
     this.focusedBarAction = null;
-    this.photoInteractions.reset();
+    // A mode change keeps the Photo edits the user already let go of.
+    if (modeChanged) this.photoInteractions.finishForModeChange();
+    else this.photoInteractions.reset();
     this.frameInteractions.reset();
     this.frameAreaSelection.reset();
     this.frameContentDrag.reset();
