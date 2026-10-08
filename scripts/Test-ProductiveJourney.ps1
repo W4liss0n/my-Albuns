@@ -301,7 +301,7 @@ try {
     $expectedRecoveryChoices = @(
         "Agora n$([char]0x00E3)o",
         "Abrir $([char]0x00FA)ltima vers$([char]0x00E3)o salva",
-        'Reabrir e recuperar'
+        'Recuperar e abrir'
     )
     $expectedExternalCopyChoices = @(
         'Cancelar',
@@ -367,7 +367,7 @@ try {
         $gate.sessionRecovery.presentation.ariaModal -cne 'true' -or
         $gate.sessionRecovery.presentation.owner -cne 'global-opening' -or
         $gate.sessionRecovery.presentation.title -cne "Recuperar trabalho n$([char]0x00E3)o salvo?" -or
-        $gate.sessionRecovery.presentation.initialFocus -cne 'Reabrir e recuperar' -or
+        $gate.sessionRecovery.presentation.initialFocus -cne 'Recuperar e abrir' -or
         -not $gate.sessionRecovery.presentation.contentFitted -or
         $gate.sessionRecovery.presentation.viewportWidth -ne 492 -or
         $recoveryActionGeometry.Count -ne 3 -or

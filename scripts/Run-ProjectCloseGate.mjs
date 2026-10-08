@@ -110,7 +110,7 @@ async function command(driver, label) {
   await click(driver, "xpath", `//*[@role='menu' and @aria-label='Arquivo']//button[@aria-label='${label}']`);
 }
 async function dpiInput(driver) {
-  const section = await find(driver, "css selector", "button[aria-label='Informações do Álbum']");
+  const section = await find(driver, "css selector", "button[aria-label='Informações do álbum']");
   if (await driver.request("GET", `${endpoint(driver, section)}/attribute/aria-expanded`) !== "true") await clickElement(driver, section);
   return find(driver, "css selector", "input[aria-label='DPI']");
 }
@@ -126,7 +126,7 @@ async function changeDpi(session, dpi, revision) {
   const dialog = await attach(session.dialogPort, dialogLabel);
   try {
     await switchToWebDriverWindow(dialog, (url) => new URL(url).pathname.endsWith("/project-dialog.html"), "Album confirmation");
-    await click(dialog, "xpath", "//*[@role='dialog' and @aria-labelledby = //*[normalize-space()='Aplicar alterações no Álbum?']/@id]//button[normalize-space()='Aplicar']");
+    await click(dialog, "xpath", "//*[@role='dialog' and @aria-labelledby = //*[normalize-space()='Aplicar alterações no álbum?']/@id]//button[normalize-space()='Aplicar']");
   } finally { await dispose(dialogLabel); }
   await waitFor("exact Host mutation", () => recordsFor("project_intent_applied").find((record) =>
     Number(record.process_id) === session.host.processId && Number(record.revision) === revision,
@@ -213,7 +213,7 @@ try {
   await step("change-before-save-as", () => changeDpi(copySession, 360, baseRevision + 1));
   await step("save-as-independent-copy", async () => {
     await command(copySession.driver, "Salvar como…");
-    driveNativeDialog(copyHost, "select", "Salvar Projeto como", copyPath);
+    driveNativeDialog(copyHost, "select", "Salvar projeto como", copyPath);
     await waitFor("Save As adoption", () => existsSync(copyPath) && recordsFor("project_save_as_completed").find((record) =>
       record.project_id === savedFile(copyPath).projectId && Number(record.revision) === baseRevision + 1,
     ));
@@ -232,7 +232,7 @@ try {
     requestedAtUtc = new Date().toISOString();
     evidence.requestedAtUtc = requestedAtUtc;
     writeJson("project-close-before.json", { ...evidence, originalUi: await readProjectInteractionState(originalSession.driver) });
-    await command(originalSession.driver, "Fechar Projeto");
+    await command(originalSession.driver, "Fechar projeto");
     await waitFor("original clean close terminal", () => recordsFor("clean_project_close_requested").find((record) =>
       Number(record.process_id) === originalHost.processId && record.timestamp >= requestedAtUtc,
     ));
