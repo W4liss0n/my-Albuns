@@ -296,6 +296,12 @@ export function InspectorPanel({
   const reorderGhostPageMetadata = formatSheetPageMetadata(
     reorderGhostSheetState,
   );
+  // The floating copy exists only under the pointer: after release the commit
+  // keeps the session's ghost, and an unpositioned copy would flash at the top.
+  const reorderGhostStyle = gridGhostStyle(
+    pointerReorder.pointer,
+    gridGhostAnchorRef.current,
+  );
 
   function endGridPointer(event: ReactPointerEvent<HTMLDivElement>) {
     gridDragEndedRef.current = pointerReorder.end(event) === "drag";
@@ -672,7 +678,9 @@ export function InspectorPanel({
                     </div>
                   );
                 })}
-                {reorderGhostSheetId && reorderGhostSheet ? (
+                {reorderGhostSheetId &&
+                reorderGhostSheet &&
+                reorderGhostStyle ? (
                   <span
                     aria-hidden="true"
                     className="sheet-reorder-ghost"
@@ -685,10 +693,7 @@ export function InspectorPanel({
                     data-pointer-y={pointerReorder.pointer?.clientY}
                     data-sheet-id={reorderGhostSheetId}
                     data-testid="reorder-ghost"
-                    style={gridGhostStyle(
-                      pointerReorder.pointer,
-                      gridGhostAnchorRef.current,
-                    )}
+                    style={reorderGhostStyle}
                   >
                     <SheetPreviewShell
                       mediaPreviewUrls={mediaPreviewUrls}

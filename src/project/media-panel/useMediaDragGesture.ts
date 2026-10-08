@@ -1,6 +1,7 @@
 import { useEffect, useRef, type PointerEvent as ReactPointerEvent } from "react";
 import type { PointerDragThreshold } from "../../application/projectPorts";
 import type { MediaKind } from "../../domain/project";
+import { blockContextMenuDuringGesture } from "../../application/gestureContextMenu";
 
 export interface MediaDrag {
   gestureId: number;
@@ -35,7 +36,9 @@ export function useMediaDragGesture({ threshold, disabled, onChange }: {
       const gestureId = ++sequence.current;
       let active = false;
       let last: MediaDrag = { gestureId, mediaId, kind, ...origin, shiftKey: event.shiftKey, phase: "dragging" };
+      const unblockContextMenu = blockContextMenuDuringGesture();
       const release = () => {
+        unblockContextMenu();
         document.removeEventListener("pointermove", move);
         document.removeEventListener("pointerup", up);
         document.removeEventListener("pointercancel", cancel);

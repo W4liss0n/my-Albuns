@@ -259,6 +259,46 @@ test("reports the live Photo transform while Pan is moving", async () => {
   expect(onTransformCommit).not.toHaveBeenCalled();
 });
 
+test("keeps the hovered Sheet Bar shown when a committed Alt-Pan redraws the Sheet", async () => {
+  vi.useFakeTimers();
+  const view = renderCanvas({ compositionPlan: interactiveComposition });
+  await finishPixiInitialization();
+  const liveDisplay = (label: string) =>
+    [...pixiLifecycle.displays].reverse().find(
+      (display) => display.label === label,
+    )!;
+  const hoveredBar = liveDisplay("sheet-bar-sheet-001");
+  liveDisplay("canvas-sheet-sheet-001").emit("pointerenter", {});
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(160);
+  });
+  expect(hoveredBar.alpha).toBe(0.55);
+
+  altPress("frame-001");
+  pixiLifecycle.instances[0].stage.emit("globalpointermove", {
+    global: { x: -45, y: 0 },
+  });
+  pixiLifecycle.instances[0].stage.emit("pointerup", {
+    global: { x: -45, y: 0 },
+  });
+  // The committed Pan comes back as a new Sheet, drawn under a still pointer.
+  view.rerenderCanvas({ composition: pannedInteractiveComposition });
+
+  const redrawnBar = liveDisplay("sheet-bar-sheet-001");
+  expect(redrawnBar).not.toBe(hoveredBar);
+  expect(redrawnBar.alpha).toBe(0.55);
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(160);
+  });
+  expect(redrawnBar.alpha).toBe(0.55);
+
+  liveDisplay("canvas-sheet-sheet-001").emit("pointerleave", {});
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(160);
+  });
+  expect(redrawnBar.alpha).toBe(0);
+});
+
 test("keeps a crash-interrupted continuous gesture in memory without committing it", async () => {
   const onTransformPreview = vi.fn();
   const onTransformCommit = vi.fn(

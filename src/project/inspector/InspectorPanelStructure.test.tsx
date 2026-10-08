@@ -84,6 +84,38 @@ test("captures pointer reorder in the Grade and follows it in both directions", 
   expect(onDrop).toHaveBeenCalledTimes(2);
 });
 
+test("removes the Grade ghost on release while the reorder commits", () => {
+  const ids = sheetIds();
+  const panelProps = props();
+  const sheetReorder = (status: "committing" | "preview") => ({
+    disabled: false,
+    onCancel: vi.fn(),
+    onDrop: vi.fn(),
+    onPreview: vi.fn(),
+    representation: {
+      ghost: { sheetId: ids[0] },
+      order: ids,
+      placeholderIndex: 1,
+    },
+    status,
+  });
+  const view = render(
+    <InspectorPanel {...panelProps} sheetReorder={sheetReorder("preview")} />,
+  );
+  const { grid } = dragFirstGridSlot(62);
+  expect(screen.getByTestId("reorder-ghost")).toBeInTheDocument();
+
+  pointerUp(grid, 62, 50, 160);
+  view.rerender(
+    <InspectorPanel
+      {...panelProps}
+      sheetReorder={sheetReorder("committing")}
+    />,
+  );
+
+  expect(screen.queryByTestId("reorder-ghost")).not.toBeInTheDocument();
+});
+
 test("keeps the exact single-page source representation in the Grade ghost", () => {
   const firstSheet = projection.composition.sheets[0];
   const singlePageSheet = {
@@ -118,6 +150,7 @@ test("keeps the exact single-page source representation in the Grade ghost", () 
       }}
     />,
   );
+  dragFirstGridSlot();
 
   const sourcePreview = sheetButton(1).querySelector(".sheet-preview");
   const ghost = screen.getByTestId("reorder-ghost");
@@ -338,6 +371,7 @@ test("shows every selected Sheet and keeps the focused one current", () => {
       }}
     />,
   );
+  dragFirstGridSlot();
 
   expect(sheetButton(1)).toHaveAttribute("aria-pressed", "true");
   expect(sheetButton(2)).toHaveAttribute("aria-pressed", "true");
@@ -386,6 +420,7 @@ test("announces an invalid Grade target without inventing a placeholder", () => 
       }}
     />,
   );
+  dragFirstGridSlot();
 
   expect(
     screen.getByText(
@@ -638,6 +673,15 @@ function arrangeGridBounds({
     rect(0, 0, 220, viewportBottom),
   );
   return { first: first!, grid, second: second!, viewport };
+}
+
+/** Holds the first slot dragged down past the threshold, so its ghost floats. */
+function dragFirstGridSlot(pointerId = 61) {
+  const bounds = arrangeGridBounds();
+  pointerCapture(bounds.grid);
+  pointerDown(bounds.first, pointerId, 50, 50);
+  pointerMove(bounds.grid, pointerId, 50, 160);
+  return bounds;
 }
 
 function sheetIds() {

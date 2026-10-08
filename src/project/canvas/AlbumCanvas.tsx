@@ -26,6 +26,7 @@ import type {
   CanvasMetrics,
 } from "./albumCanvasContract";
 import { CanvasHorizontalScrollbar } from "./CanvasHorizontalScrollbar";
+import { DecorativePreviewImages } from "./DecorativePreviewImages";
 import { SheetBarOverlay } from "../sheets/SheetBarOverlay";
 import { albumCanvasModePolicy, sheetsForCanvasMode } from "./albumCanvasMode";
 import { createNormalCanvasLayout } from "./canvasSheetViewGeometry";
@@ -599,6 +600,10 @@ export function AlbumCanvas(props: AlbumCanvasProps) {
           />
         ) : null}
       </div>
+      {props.mediaPreviewUrls && <DecorativePreviewImages
+        sheets={props.composition.sheets}
+        mediaPreviewUrls={props.mediaPreviewUrls}
+      />}
       {!isolated && <CanvasHorizontalScrollbar
         centeredSheetId={props.centeredSheetId}
         layout={props.continuousCanvasLayout}

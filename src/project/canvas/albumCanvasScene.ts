@@ -31,7 +31,14 @@ import {
   albumCanvasModePolicy,
   sheetsForCanvasMode,
 } from "./albumCanvasMode";
-import { applySheetBarScale, setSheetBarOverlayHovered, setSheetBarActionFocused } from "./sheetBarRenderNode";
+import {
+  applySheetBarScale,
+  readSheetBarHoverState,
+  restoreSheetBarHoverState,
+  setSheetBarOverlayHovered,
+  setSheetBarActionFocused,
+  type SheetBarHoverState,
+} from "./sheetBarRenderNode";
 import { PhotoInteractionSession } from "./photoInteractionSession";
 import { FrameInteractionSession } from "./frameInteractionSession";
 import { FrameAreaSelectionSession } from "./frameAreaSelectionSession";
@@ -575,11 +582,15 @@ export class AlbumCanvasScene {
       );
     }
 
+    const redrawnBars = new Map<string, SheetBarHoverState>();
     for (const [sheetId, node] of this.sheetNodes) {
       if (
         !desiredIds.has(sheetId) ||
         node.signature !== signatures.get(sheetId)
       ) {
+        if (desiredIds.has(sheetId)) {
+          redrawnBars.set(sheetId, readSheetBarHoverState(node.sheetBar));
+        }
         this.removeSheetNode(sheetId, node);
       }
     }
@@ -596,6 +607,8 @@ export class AlbumCanvasScene {
           sheetBarMetadata.get(sheet.sheetId),
           signature,
         );
+        const redrawnBar = redrawnBars.get(sheet.sheetId);
+        if (redrawnBar) restoreSheetBarHoverState(node.sheetBar, redrawnBar);
         this.sheetNodes.set(sheet.sheetId, node);
         this.world.addChild(node.container);
       }

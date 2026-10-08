@@ -1883,6 +1883,54 @@ test("materializes and releases only the viewport margin while navigating a long
   });
 });
 
+test("draws a far Sheet's Overlay on arrival from the Album's loaded Decorative", async () => {
+  const overlayUrl = "http://myalbuns-cache.localhost/overlay.png";
+  const sheets = Array.from({ length: 20 }, (_, index) => ({
+    ...composition.sheets[0],
+    sheetId: `sheet-${String(index + 1).padStart(3, "0")}`,
+    number: index + 1,
+    overlays: index === 19 ? [{
+      mediaId: "overlay-media", name: "Overlay.png",
+      drawRect: { x: 0, y: 0, width: 600_000, height: 300_000 },
+    }] : [],
+  }));
+  const layout = createContinuousCanvasLayout(sheets);
+  const canvasScale = (500 - 2 * 28) / 300;
+  const callbacks = {
+    onSelectFrame: vi.fn(), onEditSheet: vi.fn(), onFocusSheet: vi.fn(),
+    onCenteredSheetChange: vi.fn(), onViewportChange: vi.fn(),
+    onTransformPreview: vi.fn(), onTransformCommit: vi.fn(async () => true),
+  };
+  const canvasAt = (sheetId: string) => (
+    <AlbumCanvas projectId="far-overlay" mode={{ kind: "normal" }}
+      composition={{ ...composition, sheets }} sheetBarMetadata={[]}
+      mediaPreviewUrls={{ "overlay-media": overlayUrl }} continuousCanvasLayout={layout}
+      selectedFrameIds={[]} focusedSheetId={sheetId} centeredSheetId={sheetId}
+      viewport={{ offsetX: layout.centeredOffset(sheetId, canvasScale, 1_200) ?? 0 }}
+      {...callbacks} />
+  );
+  const view = render(canvasAt("sheet-001"));
+  await finishPixiInitialization();
+  expect(pixiLifecycle.displays.some(({ label }) => label === "decorative-overlay-fallback-overlay-media")).toBe(false);
+
+  const image = view.container.querySelector<HTMLImageElement>(`img[src="${overlayUrl}"]`)!;
+  expect(image.closest("[hidden]")).not.toBeNull();
+  Object.defineProperties(image, {
+    complete: { value: true }, naturalWidth: { value: 1_600 },
+    naturalHeight: { value: 800 }, currentSrc: { value: overlayUrl },
+  });
+  fireEvent.load(image);
+
+  view.rerender(canvasAt("sheet-020"));
+
+  expect(pixiLifecycle.displays.some(({ label }) => label === "decorative-overlay-fallback-overlay-media")).toBe(false);
+  const overlay = pixiLifecycle.displays.find(
+    ({ label }) => label === "decorative-overlay-overlay-media",
+  ) as { texture?: { source?: { resource?: unknown } } } | undefined;
+  expect(overlay?.texture?.source?.resource === image).toBe(true);
+  expect(pixiLifecycle.assetLoads).not.toContain(overlayUrl);
+});
+
 test("reconciles only the composed sheet that changed", async () => {
   const canvasProps = {
     projectId: "project-spike-001",
