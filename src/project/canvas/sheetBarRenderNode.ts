@@ -149,6 +149,51 @@ export function createSheetBarRenderNode(
   return node;
 }
 
+/** How hover and focus left a Bar, kept while its Sheet is drawn again. */
+export interface SheetBarHoverState {
+  readonly directlyHovered: boolean;
+  readonly sheetHovered: boolean;
+  readonly swapFocused: boolean;
+  readonly layoutFocused: boolean;
+  readonly swapHovered: boolean;
+  readonly opacity: number;
+}
+
+export function readSheetBarHoverState(
+  node: SheetBarRenderNode,
+): SheetBarHoverState {
+  return {
+    directlyHovered: node.directlyHovered,
+    sheetHovered: node.sheetHovered,
+    swapFocused: node.swapFocused,
+    layoutFocused: node.layoutFocused,
+    swapHovered: node.swapHovered,
+    opacity: node.container.alpha,
+  };
+}
+
+/**
+ * A redrawn Sheet keeps its Bar as it was: a new Bar starts hidden, and Pixi
+ * tells the new Sheet about the pointer only when the pointer moves again.
+ */
+export function restoreSheetBarHoverState(
+  node: SheetBarRenderNode,
+  state: SheetBarHoverState,
+) {
+  node.directlyHovered = state.directlyHovered;
+  node.sheetHovered = state.sheetHovered;
+  node.swapFocused = state.swapFocused;
+  node.layoutFocused = state.layoutFocused;
+  node.swapHovered = state.swapHovered;
+  node.container.alpha = state.opacity;
+  updateSheetBarSwapAppearance(node);
+  setSheetBarActionHovered(node.layoutAction, node.layoutFocused);
+  // A fade the replaced Bar had not finished goes on from where it stopped.
+  if (node.container.alpha !== sheetBarTargetOpacity(node)) {
+    transitionSheetBarOpacity(node);
+  }
+}
+
 export function setSheetBarOverlayHovered(node: SheetBarRenderNode, hovered: boolean, swapHovered = false) {
   if (node.sheetHovered !== hovered || node.directlyHovered !== hovered) {
     node.sheetHovered = hovered;
@@ -190,17 +235,22 @@ function setSheetBarDirectlyHovered(
   transitionSheetBarOpacity(node);
 }
 
-function transitionSheetBarOpacity(node: SheetBarRenderNode) {
-  stopSheetBarTransition(node);
+function sheetBarTargetOpacity(node: SheetBarRenderNode) {
   const style = SHEET_VISUAL_STYLE.sheetBar;
-  const initialOpacity = node.container.alpha;
-  const targetOpacity = node.swapFocused || node.layoutFocused
+  return node.swapFocused || node.layoutFocused
     ? style.directHoverOpacity
     : !node.sheetHovered
     ? 0
     : node.directlyHovered
       ? style.directHoverOpacity
       : style.sheetHoverOpacity;
+}
+
+function transitionSheetBarOpacity(node: SheetBarRenderNode) {
+  stopSheetBarTransition(node);
+  const style = SHEET_VISUAL_STYLE.sheetBar;
+  const initialOpacity = node.container.alpha;
+  const targetOpacity = sheetBarTargetOpacity(node);
   let elapsedMs = 0;
   const tick = () => {
     elapsedMs += style.hoverTransitionFrameMs;
