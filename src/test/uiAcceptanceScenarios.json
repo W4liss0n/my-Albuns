@@ -4917,8 +4917,8 @@
           "selector": ".canvas-host canvas"
         },
         {
-          "type": "click-text",
-          "text": "Enviar para trás"
+          "type": "click",
+          "selector": "[role=\"menuitem\"][aria-label=\"Enviar para trás\"]"
         },
         {
           "type": "pointer-click",
@@ -5592,8 +5592,8 @@
           "text": "Editar"
         },
         {
-          "type": "click-text",
-          "text": "Trocar conteúdo dos quadros"
+          "type": "click",
+          "selector": "[role=\"menuitem\"][aria-label=\"Trocar conteúdo dos quadros\"]"
         }
       ]
     },
@@ -5620,8 +5620,8 @@
           "offsetY": 0
         },
         {
-          "type": "click-text",
-          "text": "Trocar conteúdo dos quadros"
+          "type": "click",
+          "selector": "[role=\"menuitem\"][aria-label=\"Trocar conteúdo dos quadros\"]"
         }
       ]
     },
@@ -5646,8 +5646,8 @@
           "text": "Editar"
         },
         {
-          "type": "click-text",
-          "text": "Trocar conteúdo dos quadros"
+          "type": "click",
+          "selector": "[role=\"menuitem\"][aria-label=\"Trocar conteúdo dos quadros\"]"
         }
       ]
     },
@@ -5694,8 +5694,8 @@
           "text": "Editar"
         },
         {
-          "type": "click-text",
-          "text": "Trocar conteúdo dos quadros"
+          "type": "click",
+          "selector": "[role=\"menuitem\"][aria-label=\"Trocar conteúdo dos quadros\"]"
         },
         {
           "type": "click-text",
@@ -5728,8 +5728,8 @@
           "text": "Editar"
         },
         {
-          "type": "click-text",
-          "text": "Trocar conteúdo dos quadros"
+          "type": "click",
+          "selector": "[role=\"menuitem\"][aria-label=\"Trocar conteúdo dos quadros\"]"
         },
         {
           "type": "click-text",
@@ -12826,6 +12826,16 @@
           "key": "ArrowRight"
         },
         {
+          "type": "pointer-click",
+          "selector": ".canvas-host canvas",
+          "offsetX": -200,
+          "offsetY": 0
+        },
+        {
+          "type": "assert",
+          "selector": "body[data-clipboard-selection=\"clipboard-frame-1-0\"][data-clipboard-centered-sheet=\"sheet-002\"]"
+        },
+        {
           "type": "focus",
           "selector": ".canvas-host canvas"
         },
@@ -13030,7 +13040,7 @@
         "kind": "implementation-only",
         "surface": "frame-clipboard",
         "implementationCaptureSelector": ".app-shell",
-        "reason": "Correção aceita: no Modo normal, Colar segue a Lâmina centralizada após rolagem, mesmo com um Frame da Lâmina anterior selecionado. A nova ocorrência reorganiza o Layout de destino."
+        "reason": "Correção aceita: no Modo normal, Colar segue a Lâmina centralizada após rolagem, mesmo com um Frame da Lâmina anterior selecionado. A nova ocorrência reorganiza o Layout de destino. Design 0018: a rolagem retira da seleção o Frame copiado; o cenário seleciona outro Frame da Lâmina anterior, ainda visível, antes de colar."
       },
       "viewport": {
         "width": 1567,
@@ -13070,11 +13080,21 @@
         {
           "type": "wheel",
           "selector": ".canvas-host canvas",
-          "deltaY": 1200
+          "deltaY": 800
         },
         {
           "type": "assert",
-          "selector": "body[data-clipboard-centered-sheet=\"sheet-003\"][data-clipboard-selection=\"clipboard-frame-1-0\"]"
+          "selector": "body[data-clipboard-centered-sheet=\"sheet-003\"][data-clipboard-selection=\"\"]"
+        },
+        {
+          "type": "pointer-click",
+          "selector": ".canvas-host canvas",
+          "offsetX": -518,
+          "offsetY": 0
+        },
+        {
+          "type": "assert",
+          "selector": "body[data-clipboard-centered-sheet=\"sheet-003\"][data-clipboard-selection=\"clipboard-frame-1-1\"]"
         },
         {
           "type": "key",
@@ -13102,6 +13122,24 @@
       "readySelector": "body[data-clipboard-count=\"9\"][data-clipboard-selection=\"pasted-frame-0\"][data-clipboard-editing-sheet=\"sheet-002\"]",
       "actions": [
         {
+          "type": "focus",
+          "selector": ".canvas-host canvas"
+        },
+        {
+          "type": "key",
+          "key": "ArrowRight"
+        },
+        {
+          "type": "pointer-click",
+          "selector": ".canvas-host canvas",
+          "offsetX": -200,
+          "offsetY": 0
+        },
+        {
+          "type": "assert",
+          "selector": "body[data-clipboard-selection=\"clipboard-frame-1-0\"][data-clipboard-centered-sheet=\"sheet-002\"]"
+        },
+        {
           "type": "click-text",
           "text": "Editar"
         },
@@ -13122,10 +13160,6 @@
         {
           "type": "assert",
           "selector": "body[data-clipboard-selection=\"\"]"
-        },
-        {
-          "type": "key",
-          "key": "ArrowRight"
         },
         {
           "type": "key",
