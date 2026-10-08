@@ -1,4 +1,5 @@
 import {
+  Activity,
   useEffect,
   useMemo,
   useRef,
@@ -533,188 +534,192 @@ export function InspectorPanel({
                 onReadyChange={setDesignDirty}
               />
             </InspectorSection>
-            <InspectorSection
-              accessibleTitle="Grade de lâminas"
-              key="album-sheet-grid"
-              title="Grade de lâminas"
-              preferenceKey="album.sheet-grid"
-              sectionState={sectionState}
-              meta={sheets.length}
-              defaultOpen
-            >
-              {sheets.length === 0 ? (
-                <EmptyState
-                  density="compact"
-                  description="As lâminas do projeto aparecerão aqui."
-                  icon={<AppIcon icon={PanelsTopLeft} size={16} />}
-                  title="Nenhuma lâmina na Grade"
-                />
-              ) : (
-                <div
-                  className="sheet-grid"
-                  data-reorder-state={sheetReorder?.status ?? "idle"}
-                  data-reorder-surface="grid"
-                  data-sheet-order={sheets.map((sheet) => sheet.sheetId).join(",")}
-                  data-testid="sheet-reorder-grid"
-                  onDoubleClick={navigateToSheetAtPointer}
-                  onLostPointerCapture={pointerReorder.lostCapture}
-                  onPointerCancel={pointerReorder.cancel}
-                  onPointerMove={pointerReorder.move}
-                  onPointerUp={endGridPointer}
-                  ref={gridRef}
-                >
-                  {orderedSheets.map((sheet, index) => {
-                    const number = String(sheet.number).padStart(2, "0");
-                    const pageMetadata = formatSheetPageMetadata(
-                      sheetStateById.get(sheet.sheetId),
-                    );
-                    const visualPageLabel =
-                      pageMetadata?.visualLabel ?? `Lâmina ${number}`;
-                    const accessiblePageLabel =
-                      pageMetadata?.accessibleLabel ?? `Lâmina ${number}`;
-                    const selected = selectedSheetIdSet.has(sheet.sheetId);
-                    const tileStyle = {
-                      aspectRatio: `${document.sheetWidthUm} / ${document.sheetHeightUm}`,
-                    } as CSSProperties;
-                    const reorderGhost =
-                      reorderGhostSheetId === sheet.sheetId;
-                    return (
-                      <div
-                        className="sheet-grid-slot"
-                        data-reorder-enabled={
-                          sheetReorderEnabled || undefined
-                        }
-                        data-reorder-ghost={reorderGhost || undefined}
-                        data-sheet-id={sheet.sheetId}
-                        data-slot-index={index}
-                        key={sheet.sheetId}
-                        onContextMenu={(event) =>
-                          openGridContextMenu(event, sheet.sheetId)
-                        }
-                        onClickCapture={(event) => {
-                          if (
-                            !pointerReorder.consumeClickSuppression(
-                              sheet.sheetId,
-                            )
-                          ) {
-                            return;
-                          }
-                          event.preventDefault();
-                          event.stopPropagation();
-                        }}
-                        onPointerDownCapture={(event) => {
-                          gridDragEndedRef.current = false;
-                          const bounds =
-                            event.currentTarget.getBoundingClientRect();
-                          gridGhostAnchorRef.current = {
-                            height: bounds.height,
-                            offsetX: event.clientX - bounds.left,
-                            offsetY: event.clientY - bounds.top,
-                            width: bounds.width,
-                          };
-                          pointerReorder.begin(
-                            event,
-                            sheet.sheetId,
-                            gridRef.current,
-                          );
-                        }}
-                      >
-                        {sheetReorder?.representation.placeholderIndex ===
-                        index ? (
-                          <span
-                            aria-hidden="true"
-                            className="sheet-reorder-placeholder"
-                            data-testid="reorder-placeholder"
-                          />
-                        ) : null}
-                      <button
-                        aria-current={
-                          sheet.sheetId === focusedSheetId ? "true" : undefined
-                        }
-                        aria-label={`Lâmina ${number}, ${accessiblePageLabel.toLocaleLowerCase("pt-BR")}`}
-                        aria-pressed={selected}
-                        className={selected ? "sheet-tile active" : "sheet-tile"}
-                        data-active-sides={sheet.activeSides}
-                        style={tileStyle}
-                        title="Duplo clique para ir até a lâmina"
-                        type="button"
-                        onClick={(event) =>
-                          onSelectSheet(
-                            sheet.sheetId,
-                            sheetSelectionModifiers(event),
-                          )
-                        }
-                        onKeyDown={(event) =>
-                          handleTileKeyDown(event, sheet.sheetId)
-                        }
-                      >
-                        <SheetPreviewShell
-                          sheet={sheet}
-                          mediaPreviewUrls={mediaPreviewUrls}
-                        >
-                          <span aria-hidden="true" className="sheet-tile__number">
-                            {number}
-                          </span>
-                          <span aria-hidden="true" className="sheet-tile__pages">
-                            {visualPageLabel}
-                          </span>
-                        </SheetPreviewShell>
-                      </button>
-                      </div>
-                    );
-                  })}
-                  {reorderGhostSheetId && reorderGhostSheet ? (
-                    <span
-                      aria-hidden="true"
-                      className="sheet-reorder-ghost"
-                      data-active-sides={reorderGhostSheet.activeSides}
-                      data-origin-selected={
-                        selectedSheetIdSet.has(reorderGhostSheetId) ||
-                        undefined
-                      }
-                      data-pointer-x={pointerReorder.pointer?.clientX}
-                      data-pointer-y={pointerReorder.pointer?.clientY}
-                      data-sheet-id={reorderGhostSheetId}
-                      data-testid="reorder-ghost"
-                      style={gridGhostStyle(
-                        pointerReorder.pointer,
-                        gridGhostAnchorRef.current,
-                      )}
-                    >
-                      <SheetPreviewShell
-                        mediaPreviewUrls={mediaPreviewUrls}
-                        sheet={reorderGhostSheet}
-                      >
-                        <span className="sheet-tile__number">
-                          {String(
-                            reorderGhostSheetState?.number ??
-                              reorderGhostSheet.number,
-                          ).padStart(2, "0")}
-                        </span>
-                        <span className="sheet-tile__pages">
-                          {reorderGhostPageMetadata?.visualLabel ??
-                            `Lâmina ${String(
-                              reorderGhostSheet.number,
-                            ).padStart(2, "0")}`}
-                        </span>
-                      </SheetPreviewShell>
-                    </span>
-                  ) : null}
-                  {sheetReorder?.status === "invalid" &&
-                  sheetReorder.representation.ghost ? (
-                    <span
-                      className="sheet-grid__reorder-invalid"
-                      data-reorder-invalid-indicator
-                      role="status"
-                    >
-                      {SHEET_REORDER_INVALID_MESSAGE}
-                    </span>
-                  ) : null}
-                </div>
-              )}
-            </InspectorSection>
           </>
         )}
+        {/* Hidden instead of unmounted: new tiles would load their Cache previews
+            again and fill in one by one. */}
+        <Activity mode={context.kind === "album" ? "visible" : "hidden"}>
+          <InspectorSection
+            accessibleTitle="Grade de lâminas"
+            key="album-sheet-grid"
+            title="Grade de lâminas"
+            preferenceKey="album.sheet-grid"
+            sectionState={sectionState}
+            meta={sheets.length}
+            defaultOpen
+          >
+            {sheets.length === 0 ? (
+              <EmptyState
+                density="compact"
+                description="As lâminas do projeto aparecerão aqui."
+                icon={<AppIcon icon={PanelsTopLeft} size={16} />}
+                title="Nenhuma lâmina na Grade"
+              />
+            ) : (
+              <div
+                className="sheet-grid"
+                data-reorder-state={sheetReorder?.status ?? "idle"}
+                data-reorder-surface="grid"
+                data-sheet-order={sheets.map((sheet) => sheet.sheetId).join(",")}
+                data-testid="sheet-reorder-grid"
+                onDoubleClick={navigateToSheetAtPointer}
+                onLostPointerCapture={pointerReorder.lostCapture}
+                onPointerCancel={pointerReorder.cancel}
+                onPointerMove={pointerReorder.move}
+                onPointerUp={endGridPointer}
+                ref={gridRef}
+              >
+                {orderedSheets.map((sheet, index) => {
+                  const number = String(sheet.number).padStart(2, "0");
+                  const pageMetadata = formatSheetPageMetadata(
+                    sheetStateById.get(sheet.sheetId),
+                  );
+                  const visualPageLabel =
+                    pageMetadata?.visualLabel ?? `Lâmina ${number}`;
+                  const accessiblePageLabel =
+                    pageMetadata?.accessibleLabel ?? `Lâmina ${number}`;
+                  const selected = selectedSheetIdSet.has(sheet.sheetId);
+                  const tileStyle = {
+                    aspectRatio: `${document.sheetWidthUm} / ${document.sheetHeightUm}`,
+                  } as CSSProperties;
+                  const reorderGhost =
+                    reorderGhostSheetId === sheet.sheetId;
+                  return (
+                    <div
+                      className="sheet-grid-slot"
+                      data-reorder-enabled={
+                        sheetReorderEnabled || undefined
+                      }
+                      data-reorder-ghost={reorderGhost || undefined}
+                      data-sheet-id={sheet.sheetId}
+                      data-slot-index={index}
+                      key={sheet.sheetId}
+                      onContextMenu={(event) =>
+                        openGridContextMenu(event, sheet.sheetId)
+                      }
+                      onClickCapture={(event) => {
+                        if (
+                          !pointerReorder.consumeClickSuppression(
+                            sheet.sheetId,
+                          )
+                        ) {
+                          return;
+                        }
+                        event.preventDefault();
+                        event.stopPropagation();
+                      }}
+                      onPointerDownCapture={(event) => {
+                        gridDragEndedRef.current = false;
+                        const bounds =
+                          event.currentTarget.getBoundingClientRect();
+                        gridGhostAnchorRef.current = {
+                          height: bounds.height,
+                          offsetX: event.clientX - bounds.left,
+                          offsetY: event.clientY - bounds.top,
+                          width: bounds.width,
+                        };
+                        pointerReorder.begin(
+                          event,
+                          sheet.sheetId,
+                          gridRef.current,
+                        );
+                      }}
+                    >
+                      {sheetReorder?.representation.placeholderIndex ===
+                      index ? (
+                        <span
+                          aria-hidden="true"
+                          className="sheet-reorder-placeholder"
+                          data-testid="reorder-placeholder"
+                        />
+                      ) : null}
+                    <button
+                      aria-current={
+                        sheet.sheetId === focusedSheetId ? "true" : undefined
+                      }
+                      aria-label={`Lâmina ${number}, ${accessiblePageLabel.toLocaleLowerCase("pt-BR")}`}
+                      aria-pressed={selected}
+                      className={selected ? "sheet-tile active" : "sheet-tile"}
+                      data-active-sides={sheet.activeSides}
+                      style={tileStyle}
+                      title="Duplo clique para ir até a lâmina"
+                      type="button"
+                      onClick={(event) =>
+                        onSelectSheet(
+                          sheet.sheetId,
+                          sheetSelectionModifiers(event),
+                        )
+                      }
+                      onKeyDown={(event) =>
+                        handleTileKeyDown(event, sheet.sheetId)
+                      }
+                    >
+                      <SheetPreviewShell
+                        sheet={sheet}
+                        mediaPreviewUrls={mediaPreviewUrls}
+                      >
+                        <span aria-hidden="true" className="sheet-tile__number">
+                          {number}
+                        </span>
+                        <span aria-hidden="true" className="sheet-tile__pages">
+                          {visualPageLabel}
+                        </span>
+                      </SheetPreviewShell>
+                    </button>
+                    </div>
+                  );
+                })}
+                {reorderGhostSheetId && reorderGhostSheet ? (
+                  <span
+                    aria-hidden="true"
+                    className="sheet-reorder-ghost"
+                    data-active-sides={reorderGhostSheet.activeSides}
+                    data-origin-selected={
+                      selectedSheetIdSet.has(reorderGhostSheetId) ||
+                      undefined
+                    }
+                    data-pointer-x={pointerReorder.pointer?.clientX}
+                    data-pointer-y={pointerReorder.pointer?.clientY}
+                    data-sheet-id={reorderGhostSheetId}
+                    data-testid="reorder-ghost"
+                    style={gridGhostStyle(
+                      pointerReorder.pointer,
+                      gridGhostAnchorRef.current,
+                    )}
+                  >
+                    <SheetPreviewShell
+                      mediaPreviewUrls={mediaPreviewUrls}
+                      sheet={reorderGhostSheet}
+                    >
+                      <span className="sheet-tile__number">
+                        {String(
+                          reorderGhostSheetState?.number ??
+                            reorderGhostSheet.number,
+                        ).padStart(2, "0")}
+                      </span>
+                      <span className="sheet-tile__pages">
+                        {reorderGhostPageMetadata?.visualLabel ??
+                          `Lâmina ${String(
+                            reorderGhostSheet.number,
+                          ).padStart(2, "0")}`}
+                      </span>
+                    </SheetPreviewShell>
+                  </span>
+                ) : null}
+                {sheetReorder?.status === "invalid" &&
+                sheetReorder.representation.ghost ? (
+                  <span
+                    className="sheet-grid__reorder-invalid"
+                    data-reorder-invalid-indicator
+                    role="status"
+                  >
+                    {SHEET_REORDER_INVALID_MESSAGE}
+                  </span>
+                ) : null}
+              </div>
+            )}
+          </InspectorSection>
+        </Activity>
       </div>
     </aside>
   );

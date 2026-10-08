@@ -306,3 +306,22 @@ test("shows Sheet-design origin and local controls without placeholders", () => 
   expect(design.getByRole("button", { name: "Salvar disposição como layout" })).toBeDisabled();
   expect(section.querySelector('[data-placeholder-feature="save-sheet-layout"]')).toBeNull();
 });
+
+test("keeps the Sheet Grid tiles while a Frame or Sheet owns the Inspector", () => {
+  const albumProps = inspectorProps({ kind: "album" });
+  const view = render(<InspectorPanel {...albumProps} />);
+  const grid = view.container.querySelector(".sheet-grid");
+  expect(grid).not.toBeNull();
+
+  // New tiles would load their Cache previews again and fill in one by one.
+  for (const context of [
+    { kind: "frame", frame: sheetState.frames[0], composedPhoto: null },
+    sheetContext(),
+  ] satisfies InspectorContext[]) {
+    view.rerender(<InspectorPanel {...albumProps} context={context} />);
+    expect(screen.queryByRole("button", { name: "Grade de lâminas" })).not.toBeInTheDocument();
+    view.rerender(<InspectorPanel {...albumProps} />);
+    expect(view.container.querySelector(".sheet-grid")).toBe(grid);
+    expect(screen.getByRole("button", { name: "Grade de lâminas" })).toBeVisible();
+  }
+});
