@@ -1,4 +1,5 @@
 import type { FederatedPointerEvent } from "pixi.js";
+import { blockContextMenuDuringGesture } from "../../application/gestureContextMenu";
 import type { PhotoDropTarget } from "../../domain/project";
 import type { AlbumCanvasProps, CanvasFrameContentSwap, CanvasPhotoDropPoint } from "./albumCanvasContract";
 import { edgeAutoScrollVelocity } from "./edgeAutoScroll";
@@ -33,6 +34,7 @@ export class FrameContentDragSession {
   private spaceHeld = false;
   private animation: number | undefined;
   private previousTime = 0;
+  private unblockContextMenu: (() => void) | null = null;
 
   constructor(
     private readonly canvas: HTMLCanvasElement,
@@ -69,6 +71,7 @@ export class FrameContentDragSession {
       pointerId: event.pointerId, origin: { clientX: event.clientX, clientY: event.clientY },
       point: { clientX: event.clientX, clientY: event.clientY }, dragging: false,
       request: 0, pending: false, desired: null };
+    this.unblockContextMenu = blockContextMenuDuringGesture();
     event.stopPropagation();
   }
 
@@ -86,6 +89,8 @@ export class FrameContentDragSession {
     this.animation = undefined;
     this.canvas.classList.remove("pixi-canvas--frame-gesture");
     this.canvas.style.removeProperty("--frame-gesture-cursor");
+    this.unblockContextMenu?.();
+    this.unblockContextMenu = null;
     if (drag) {
       try { this.canvas.releasePointerCapture(drag.pointerId); } catch { /* Capture already released. */ }
     }

@@ -76,6 +76,33 @@ test("a Photo drag highlights the Core target and queues release independently o
   expect(h.input.onSelectFrame).not.toHaveBeenCalled();
 });
 
+test("a right click during a Photo drag opens no context menu and keeps the drag", async () => {
+  // Earlier drags lift their own block on the next task.
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  vi.useFakeTimers();
+  const h = harness(); const menu = vi.fn(); document.addEventListener("contextmenu", menu);
+  try {
+    h.start(); h.pointer("pointermove");
+    const rightClick = () => {
+      const event = new MouseEvent("contextmenu", { bubbles: true, cancelable: true, button: 2 });
+      document.body.dispatchEvent(event);
+      return event;
+    };
+    expect(rightClick().defaultPrevented).toBe(true);
+    expect(menu).not.toHaveBeenCalled();
+    expect(h.session.preview).not.toBeNull();
+    h.pointer("pointerup", 700);
+    expect(h.commit).toHaveBeenCalledOnce();
+    // Windows sends the menu right after the release that ended the drag.
+    expect(rightClick().defaultPrevented).toBe(true);
+    vi.runAllTimers();
+    expect(rightClick().defaultPrevented).toBe(false);
+    expect(menu).toHaveBeenCalledOnce();
+  } finally {
+    document.removeEventListener("contextmenu", menu);
+  }
+});
+
 test.each(["escape", "pointercancel", "outside", "mode", "projection", "blocked", "blur"])("%s cancels without applying or accepting a stale hover", async (reason) => {
   const h = harness(); let resolve!: (target: PhotoDropTarget) => void;
   h.resolveTarget.mockReturnValueOnce(new Promise((yes) => { resolve = yes; }));

@@ -74,6 +74,18 @@ test("the ghost reuses the thumbnail, follows the pointer beyond the panel, and 
   expect(h.props.onMediaDragChange).toHaveBeenLastCalledWith(expect.objectContaining({ phase: "drop" }));
 });
 
+test("a right click during a drag opens no menu and the drag still drops", async () => {
+  const h = harness(); dragHit(null); startDrag(); moveDrag();
+  fireEvent.contextMenu(screen.getByRole("button", { name: "001.jpg" }), { button: 2, clientX: 320, clientY: 16 });
+  expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+  expect(dragGhost()).not.toBeNull();
+  dropDrag();
+  expect(h.props.onMediaDragChange).toHaveBeenLastCalledWith(expect.objectContaining({ phase: "drop" }));
+  await act(() => new Promise((resolve) => window.setTimeout(resolve, 0)));
+  fireEvent.contextMenu(screen.getByRole("button", { name: "001.jpg" }), { button: 2 });
+  expect(screen.getByRole("menu", { name: "Ações das imagens" })).toBeInTheDocument();
+});
+
 test("a missing photo without observed dimensions keeps a visible placeholder during drag", () => {
   const h = harness();
   h.view.rerender(<MediaPanel {...h.props}
