@@ -368,7 +368,7 @@ const DEFINITIONS = [
   command({
     id: "enter-sheet-editing",
     label: "Editar lâmina",
-    description: "Isola a lâmina centralizada para editar seus quadros e fotos.",
+    description: "Isola a lâmina centralizada para editar seus quadros e fotos ou volta à área de edição contínua.",
     kind: "interface",
     contexts: ["sheet"],
     availability: "implemented",

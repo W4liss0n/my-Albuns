@@ -2,6 +2,7 @@ import type { FederatedPointerEvent } from "pixi.js";
 import type { PhotoDropTarget } from "../../domain/project";
 import type { AlbumCanvasProps, CanvasFrameContentSwap, CanvasPhotoDropPoint } from "./albumCanvasContract";
 import { edgeAutoScrollVelocity } from "./edgeAutoScroll";
+import { isGestureCancelKey } from "./gestureCancelKey";
 
 interface Drag {
   sourceFrameId: string;
@@ -202,7 +203,7 @@ export class FrameContentDragSession {
   private readonly keyDown = (event: KeyboardEvent) => {
     if (event.code === "Space") this.spaceHeld = true;
     if (!this.drag) return;
-    if (event.key === "Escape") { event.preventDefault(); event.stopImmediatePropagation(); }
+    if (isGestureCancelKey(event)) { event.preventDefault(); event.stopImmediatePropagation(); }
     this.cancel();
   };
   private readonly keyUp = (event: KeyboardEvent) => { if (event.code === "Space") this.spaceHeld = false; };

@@ -86,7 +86,9 @@ test("reserves Escape for the local owner and keeps keyboard commands in their d
   for (const context of contexts) {
     expect(matchProjectCommandShortcut(keyboardShortcut("Escape"), context)).toBeNull();
   }
+  // The same Enter also leaves Sheet editing; no other command claims it there.
   expect(matchProjectCommandShortcut(keyboardShortcut("Enter"), "sheet")).toBe("enter-sheet-editing");
+  expect(matchProjectCommandShortcut(keyboardShortcut("Enter"), "frame")).toBeNull();
   expect(matchProjectCommandShortcut(keyboardShortcut("Enter"), "media-panel")).toBeNull();
   expect(matchProjectCommandShortcut(keyboardShortcut("ArrowUp"), "sheet")).toBe("next-layout");
   expect(matchProjectCommandShortcut(keyboardShortcut("ArrowDown"), "sheet")).toBe("previous-layout");

@@ -2,7 +2,7 @@
 status: accepted
 document: design
 date: 2026-08-27
-updated: 2026-10-07
+updated: 2026-10-08
 ticket: 4-programa-05-arquitetura-de-ui-mapa-de-telas-e-interacao-do-editor
 ---
 
@@ -94,7 +94,7 @@ flowchart LR
   EC -->|Salvar cópia como…| PN
   EC -->|Cancelar| W
   PG -->|falha de abertura| W
-  PN <-->|duplo clique ou Enter / Esc| PE
+  PN <-->|duplo clique ou Enter / Esc ou Enter| PE
   PN --> EX
   PN --> BG
   PN -->|falha tardia de WebGL2| GF
@@ -127,7 +127,7 @@ para essas superfícies não criam um owner global compartilhado.
 | Recuperação | `Reabrir e recuperar` | Modo normal | cria uma sessão não salva no mesmo Host, uma única vez | falha mantém terminal explícito e não abre segunda sessão |
 | Recuperação | `Abrir última versão salva` | confirmação no mesmo modal e Modo normal | só descarta o checkpoint após confirmação e sucesso | cancelar retorna à decisão; falha não descarta por aproximação |
 | Modo normal | falha tardia irrecuperável de WebGL2 | Falha gráfica | o diálogo externo pertencente bloqueia a Janela do Projeto, o Canvas perde autoridade e a demanda residente é cancelada; o workspace não é substituído | `Fechar Projeto` usa o fechamento existente; se sua confirmação for cancelada, o aviso gráfico volta a ocupar a sessão serializada |
-| Modo normal | duplo clique na Lâmina ou `Enter` | Modo de edição | isola a Lâmina, fecha/suspende Barra e Layouts e inicia em `Ajustar Lâmina` | `Esc` descarta `ViewportTransform`, restaura painéis e centraliza a Lâmina |
+| Modo normal | duplo clique na Lâmina ou `Enter` | Modo de edição | isola a Lâmina, fecha/suspende Barra e Layouts e inicia em `Ajustar Lâmina` | `Esc`, ou `Enter` com foco no Canvas, descarta `ViewportTransform`, restaura painéis e centraliza a Lâmina |
 | Modo normal | arrastar pela Barra ou Grade | prévia local de reordenação | somente a superfície originadora mostra placeholder, ghost e deslocamento | `Esc` ou drop inválido restaura; drop válido comita uma ação e sincroniza a outra superfície |
 | Modo normal | `Exportar` | Exportação | pertence à Janela do Projeto | cancelar/fechar retorna ao mesmo Projeto |
 | Modo normal | `Ferramentas → Gerar Projetos em lote…` | Configuração de lote | captura o modelo visível e bloqueia sua Janela do Projeto | cancelar retorna à mesma sessão sem salvá-la |

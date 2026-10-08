@@ -503,7 +503,7 @@ test("expires synthetic click suppression before a later deliberate click", () =
   }
 });
 
-test.each(["Escape", "pointercancel", "outside release"] as const)(
+test.each(["Escape", "Enter", "pointercancel", "outside release"] as const)(
   "cancels an active Bar pointer reorder once on %s",
   (termination) => {
     const onAutoScrollVelocity = vi.fn();
@@ -521,8 +521,9 @@ test.each(["Escape", "pointercancel", "outside release"] as const)(
     pointerDown(first, 31, 100, 40);
     pointerMove(surface, 31, 240, 40);
 
-    if (termination === "Escape") {
-      fireEvent.keyDown(window, { key: "Escape" });
+    if (termination === "Escape" || termination === "Enter") {
+      const consumed = !fireEvent.keyDown(window, { key: termination });
+      expect(consumed).toBe(true);
     } else if (termination === "pointercancel") {
       fireEvent.pointerCancel(surface, { pointerId: 31 });
     } else {

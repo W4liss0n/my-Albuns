@@ -83,7 +83,7 @@ A saída final será uma Exportação JPEG, PNG ou PDF, `Por lâmina` ou `Por p�
 1. Como pessoa diagramadora, quero soltar um Decorativo à esquerda, à direita ou no centro de uma Lâmina, para aplicá-lo respectivamente a um lado ou a Ambos os lados.
 1. Como pessoa diagramadora, quero selecionar um Frame em qualquer Lâmina e receber imediatamente seu contexto, para alternar o trabalho com um único clique.
 1. Como pessoa diagramadora, quero que comandos sem alvo explícito usem a Lâmina mais centralizada, para agir previsivelmente sem selecionar uma Lâmina antes.
-1. Como pessoa diagramadora, quero pressionar `Enter` para editar a Lâmina centralizada, para entrar rapidamente no modo detalhado.
+1. Como pessoa diagramadora, quero pressionar `Enter` para editar a Lâmina centralizada e pressioná-lo de novo para sair, para entrar e sair rapidamente do modo detalhado.
 1. Como pessoa diagramadora, quero dar dois cliques em uma Foto do Painel para preencher o placeholder mais à esquerda ou, se não houver um, adicioná-la à Lâmina centralizada, para evitar arrastá-la por uma grande distância.
 1. Como pessoa diagramadora, quero dar dois cliques em um Decorativo para aplicá-lo como Background a Ambos os lados da Lâmina centralizada ou usar `Shift` para Overlay, para aplicar rapidamente um design completo.
 1. Como pessoa diagramadora, quero que o Modo de edição isole e amplie uma Lâmina, para concentrar a manipulação detalhada nela.
@@ -596,7 +596,7 @@ validação das superfícies descritas nesta seção.
 - Na navegação normal, todas as Lâminas compartilham uma escala automática que enquadra sua altura completa com margem; não existe rolagem vertical. Uma barra de rolagem horizontal abaixo do Canvas representa os mesmos limites da navegação pela roda e permite percorrer a mesma visualização, sem criar estado do Projeto. A roda navega horizontalmente sobre toda a superfície e toda a Barra da Lâmina, nos lados esquerdo, central e direito, salvo quando o alvo possui ownership específico da roda. Enquanto o Painel de Layouts está aberto, a navegação horizontal e sua barra ficam suspensas; somente a Lâmina alvo é enquadrada por largura e altura, centralizada nos dois eixos.
 - Nas extremidades da navegação, o centro da primeira e o centro da última Lâmina podem alcançar o centro visível do Canvas, mas nunca ultrapassá-lo em direção à borda oposta.
 - Redimensionar a Janela ou o splitter do Painel de imagens sincroniza primeiro a superfície do renderizador com a área útil e então recalcula essa escala, mantendo a Lâmina inteira visível sem alterar o Projeto ou criar um estado de Zoom.
-- Fora do Modo de edição, `Alt` + clique e arraste sobre um Frame faz Pan da Foto e `Alt` + roda do mouse altera o Zoom da Foto sob o ponteiro, sem mudar a geometria do Frame; ambos integram a `MediaTransform` persistente da colocação.
+- Fora do Modo de edição, `Alt` + clique e arraste sobre um Frame faz Pan da Foto e `Alt` + roda do mouse altera o Zoom da Foto sob o ponteiro, sem mudar a geometria do Frame; ambos integram a `MediaTransform` persistente da colocação. Durante um `Alt` + arraste, `Alt` + roda altera o Zoom da Foto arrastada, mesmo que o ponteiro esteja sobre a Foto de outro Frame.
 - `Alt` + pressionar e iniciar o arraste é consumido como Pan e não seleciona o Frame; `Alt` + roda também preserva a seleção atual.
 - O arraste completo gera uma ação ao soltar; eventos consecutivos de `Alt` + roda são agrupados em uma ação quando a sequência termina.
 - Soltar uma Foto usa a Lâmina sob o ponteiro como destino. Selecionar um Frame ou Foto em outra Lâmina transfere a seleção diretamente para aquele elemento.
@@ -617,7 +617,7 @@ validação das superfícies descritas nesta seção.
 - As mídias do Painel de imagens formam uma grade iniciada no canto superior esquerdo, preenchida por colunas e novas linhas conforme a largura disponível. Quando necessário, a região rola verticalmente e nunca se transforma em uma faixa horizontal contínua.
 - Painel de imagens e Painel contextual reservam permanentemente a largura potencial de suas barras de rolagem vertical, evitando deslocamento horizontal do conteúdo quando elas aparecem ou desaparecem.
 - O chrome estrutural da aplicação — menus, botões, títulos, abas, cabeçalhos, labels, unidades, badges, toolbars, Barra da Lâmina, Grade, Painel de imagens, mensagens vazias e textos auxiliares — não permite seleção nativa. Inputs, textareas, conteúdo editável e superfícies estáticas explicitamente marcadas como copiáveis preservam seleção, caret e cópia.
-- Dois cliques numa Lâmina entram no Modo de edição para ela. Com foco no Canvas, `Enter` entra para a Lâmina centralizada e `Esc` retorna ao Canvas contínuo.
+- Dois cliques numa Lâmina entram no Modo de edição para ela. Com foco no Canvas, `Enter` entra para a Lâmina centralizada. No Modo de edição, `Esc` retorna ao Canvas contínuo; com foco no Canvas, `Enter` também retorna. Durante o movimento ou redimensionamento de Frames, a Caixa de seleção, o Pan do Canvas, o arraste de uma Foto para outro Frame e a reordenação de Lâminas pela Barra ou pela Grade, `Esc` e `Enter` apenas cancelam o gesto e não mudam o modo.
 - O foco de teclado no Canvas é representado pelo contorno da Lâmina em foco. Esse contorno reutiliza a linha técnica azul de `1 px` da Seleção de Frames, centralizada exatamente na geometria visível da Lâmina, sem ampliar sua superfície. O elemento Canvas não desenha uma moldura no perímetro da área útil ao entrar ou sair do Modo de edição. O contorno externo permanece reservado ao seletor de escopo da Personalização no diálogo `Novo Projeto`.
 - Dois cliques em uma Foto no Painel de imagens usam a Lâmina centralizada ou, no Modo de edição, a Lâmina isolada. Se houver placeholders, preenchem primeiro o mais à esquerda; sem placeholder, criam um novo Frame conforme as regras do modo.
 - O placeholder do duplo clique é ordenado pela coordenada horizontal da borda esquerda e, em empate, pela coordenada vertical da borda superior, ambas crescentes.
@@ -784,7 +784,7 @@ validação das superfícies descritas nesta seção.
 - Um Frame contém no máximo uma Foto e pode atravessar a divisão central somente quando ambos os lados da Lâmina estão ativos.
 - A primeira versão permite uma Seleção de Frames com um ou vários elementos no Modo de edição; a seleção é transitória, não participa de Undo/Redo e não é persistida no Projeto.
 - Ao entrar no Modo de edição, o Frame selecionado no modo normal é preservado somente se pertencer à Lâmina isolada; caso contrário, a Seleção de Frames começa vazia.
-- Sair com `Esc` limpa toda a Seleção de Frames.
+- Sair com `Esc` ou `Enter` limpa toda a Seleção de Frames.
 - Um clique simples substitui a seleção pelo Frame atingido; `Ctrl` + clique alterna a presença desse Frame na seleção.
 - Ultrapassar o limiar padrão de arraste da plataforma sobre um Frame já selecionado preserva a seleção e move o grupo inteiro; sobre um Frame não selecionado, substitui a seleção por ele antes de movê-lo.
 - Soltar antes desse limiar executa somente o clique normal e não inicia movimento.
@@ -873,6 +873,7 @@ validação das superfícies descritas nesta seção.
 - Restaurar o padrão do Frame reaplica a Borda atual, redefine Opacidade para `100%` e retoma a herança.
 - Fotos nunca podem revelar áreas vazias dentro do Frame. O Zoom de preenchimento é recalculado sempre que necessário.
 - O Zoom do usuário é um multiplicador adicional iniciado em `1×` e nunca reduz a Foto abaixo do Zoom de preenchimento.
+- Alterar o Zoom do usuário, por `Alt` + roda, pelo Painel contextual ou na seleção múltipla, conserva o ponto da Foto que está no centro do Frame: a Foto cresce e diminui a partir desse centro, e não a partir do ponteiro. Ao reduzir perto de uma borda, o Pan para no limite do Preenchimento e o ponto se desloca somente o necessário para não revelar área vazia. Na seleção múltipla, cada Foto conserva o seu próprio ponto.
 - O gesto direto de enquadramento existe no modo normal: `Alt` + arraste faz Pan e `Alt` + roda altera o Zoom da Foto no Frame sob o ponteiro. No Modo de edição, os gestos diretos manipulam a geometria do Frame.
 - Durante o Pan, a porção da Foto fora do Frame é exibida temporariamente com opacidade reduzida, sem diminuir a opacidade da porção interna, e o Frame apresenta as quatro linhas-guia da regra dos terços. Os dois auxílios desaparecem ao encerrar o gesto e nunca participam do Projeto, Undo/Redo ou Exportação.
 - Enquanto Pan ou Zoom apresenta uma prévia contínua, o Painel contextual atualiza imediatamente os valores correspondentes sem esperar a soltura ou a consolidação da roda. Cancelar ou falhar restaura os valores confirmados, e somente o gesto consolidado pode criar uma ação de Undo/Redo.

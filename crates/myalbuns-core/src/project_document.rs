@@ -357,19 +357,74 @@ impl ProjectPhotoTransform {
         })
     }
 
-    fn advanced(self, delta_pan_x: f32, delta_pan_y: f32, delta_zoom: f32) -> Result<Self, ()> {
+    fn media_transform(&self) -> crate::model::MediaTransform {
+        crate::model::MediaTransform {
+            pan_x: self.pan_x(),
+            pan_y: self.pan_y(),
+            user_zoom: self.user_zoom(),
+            quarter_turns: self.quarter_turns(),
+            mirror_x: self.mirror_x(),
+            fine_rotation_degrees: self.fine_rotation_degrees(),
+            black_and_white: self.black_and_white(),
+        }
+    }
+
+    fn set_pan(&mut self, pan: crate::model::NormalizedPan) {
+        self.pan_x_scaled = (pan.x * f64::from(TRANSFORM_SCALE)).round() as i32;
+        self.pan_y_scaled = (pan.y * f64::from(TRANSFORM_SCALE)).round() as i32;
+    }
+
+    /// Changes the user zoom keeping the Photo point at the Frame center,
+    /// limited by the fill. Without the source size the Pan stays as it is.
+    fn with_anchored_zoom(
+        mut self,
+        user_zoom_scaled: u32,
+        frame: ProjectRect,
+        source: Option<(u32, u32)>,
+    ) -> Self {
+        if user_zoom_scaled == self.user_zoom_scaled {
+            return self;
+        }
+        if let Some(source) = source {
+            let rect = crate::RectUm::from(frame);
+            self.set_pan(crate::composition::anchored_photo_pan(
+                &rect,
+                &rect,
+                &self.media_transform(),
+                user_zoom_scaled as f32 / TRANSFORM_SCALE,
+                source,
+            ));
+        }
+        self.user_zoom_scaled = user_zoom_scaled;
+        self
+    }
+
+    /// The zoom delta applies first, anchored at the Frame center from the
+    /// committed Pan; the Pan delta is then added to that anchored Pan.
+    fn advanced(
+        self,
+        delta_pan_x: f32,
+        delta_pan_y: f32,
+        delta_zoom: f32,
+        frame: ProjectRect,
+        source: Option<(u32, u32)>,
+    ) -> Result<Self, ()> {
         if !delta_pan_x.is_finite() || !delta_pan_y.is_finite() || !delta_zoom.is_finite() {
             return Err(());
         }
-        let mut next = Self::new(
-            (self.pan_x() + delta_pan_x).clamp(PHOTO_PAN_MIN, PHOTO_PAN_MAX),
-            (self.pan_y() + delta_pan_y).clamp(PHOTO_PAN_MIN, PHOTO_PAN_MAX),
+        let zoom = Self::new(
+            0.0,
+            0.0,
             (self.user_zoom() + delta_zoom).clamp(PHOTO_ZOOM_MIN, PHOTO_ZOOM_MAX),
         )?;
-        next.quarter_turns = self.quarter_turns;
-        next.mirror_x = self.mirror_x;
-        next.angle = self.angle;
-        next.black_and_white = self.black_and_white;
+        let mut next = self.with_anchored_zoom(zoom.user_zoom_scaled, frame, source);
+        let pan = Self::new(
+            (next.pan_x() + delta_pan_x).clamp(PHOTO_PAN_MIN, PHOTO_PAN_MAX),
+            (next.pan_y() + delta_pan_y).clamp(PHOTO_PAN_MIN, PHOTO_PAN_MAX),
+            PHOTO_ZOOM_MIN,
+        )?;
+        next.pan_x_scaled = pan.pan_x_scaled;
+        next.pan_y_scaled = pan.pan_y_scaled;
         Ok(next)
     }
 }
@@ -1190,6 +1245,7 @@ impl ProjectDocument {
         delta_pan_x: f32,
         delta_pan_y: f32,
         delta_zoom: f32,
+        sources: &PhotoDimensions,
     ) -> Result<Self, ()> {
         let mut candidate = self.clone();
         let frame = candidate
@@ -1198,10 +1254,15 @@ impl ProjectDocument {
             .flat_map(|sheet| &mut sheet.frames)
             .find(|frame| frame.id == frame_id)
             .ok_or(())?;
+        let rect = frame.rect;
         let photo = frame.photo.as_mut().ok_or(())?;
-        photo.transform = photo
-            .transform
-            .advanced(delta_pan_x, delta_pan_y, delta_zoom)?;
+        photo.transform = photo.transform.advanced(
+            delta_pan_x,
+            delta_pan_y,
+            delta_zoom,
+            rect,
+            sources.get(&photo.media_id).copied(),
+        )?;
         validate_project_state(&candidate)?;
         Ok(candidate)
     }
@@ -1375,9 +1436,11 @@ impl ProjectDocument {
         Ok(candidate)
     }
 
+    /// Every selected Photo keeps its own point at its Frame center.
     pub(crate) fn with_photo_zoom(
         &self,
         edit: &crate::PhotoZoomEdit,
+        sources: &PhotoDimensions,
     ) -> Result<Self, crate::CoreError> {
         let zoom = ProjectPhotoTransform::new(0.0, 0.0, edit.user_zoom)
             .map_err(|()| crate::CoreError::InvalidPhotoZoom)?;
@@ -1385,13 +1448,19 @@ impl ProjectDocument {
             .frame_selection(&edit.frame_ids)
             .map_err(|()| crate::CoreError::InvalidPhotoZoomSelection)?;
         let mut candidate = self.clone();
-        for photo in candidate.sheets[sheet_index]
+        for frame in candidate.sheets[sheet_index]
             .frames
             .iter_mut()
             .filter(|frame| selected.contains(&frame.id))
-            .filter_map(|frame| frame.photo.as_mut())
         {
-            photo.transform.user_zoom_scaled = zoom.user_zoom_scaled;
+            let rect = frame.rect;
+            if let Some(photo) = &mut frame.photo {
+                photo.transform = photo.transform.with_anchored_zoom(
+                    zoom.user_zoom_scaled,
+                    rect,
+                    sources.get(&photo.media_id).copied(),
+                );
+            }
         }
         Ok(candidate)
     }

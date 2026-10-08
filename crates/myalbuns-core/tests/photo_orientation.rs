@@ -3,9 +3,9 @@
 use std::{fs, path::Path};
 
 use myalbuns_core::{
-    CreateAuthorization, CreateProjectRequest, EditableProject, ImportPhoto, InitialProject,
-    OpenProjectRequest, PhotoOrientationAction, PhotoPlacementMode, PhotoSourceMetadata,
-    ProjectCore, ProjectIntent, ProjectLocation,
+    CreateAuthorization, CreateProjectRequest, EditableProject, EditorProjection, ImportPhoto,
+    InitialProject, OpenProjectRequest, PhotoOrientationAction, PhotoPlacementMode,
+    PhotoSourceMetadata, ProjectCore, ProjectIntent, ProjectLocation,
 };
 use myalbuns_paths::OperationPathContext;
 
@@ -59,6 +59,193 @@ fn orient(project: &mut EditableProject, frame_ids: Vec<String>, action: PhotoOr
     project
         .apply(ProjectIntent::OrientPhotos { frame_ids, action })
         .unwrap();
+}
+
+/// Photo point at the Frame center, as fractions of the drawn Photo. Inverts
+/// the renderer's rotation-then-mirror transform independently of the core.
+fn frame_center_point(projection: &EditorProjection, frame_id: &str) -> (f64, f64) {
+    let frame = projection
+        .composition
+        .sheets
+        .iter()
+        .flat_map(|sheet| &sheet.frames)
+        .find(|frame| frame.frame_id == frame_id)
+        .unwrap();
+    let photo = frame.photo.as_ref().unwrap();
+    let placement = &photo.placement.current;
+    let angle = f64::from(photo.rotation_degrees).to_radians();
+    let dx = (frame.clip_rect.width as f64 / 2.0 - placement.center.x)
+        * if photo.mirror_x { -1.0 } else { 1.0 };
+    let dy = frame.clip_rect.height as f64 / 2.0 - placement.center.y;
+    (
+        (dx * angle.cos() + dy * angle.sin()) / placement.size.width,
+        (-dx * angle.sin() + dy * angle.cos()) / placement.size.height,
+    )
+}
+
+fn assert_same_point(before: (f64, f64), after: (f64, f64)) {
+    assert!(
+        (before.0 - after.0).abs() <= 1e-5 && (before.1 - after.1).abs() <= 1e-5,
+        "the Photo point at the Frame center moved from {before:?} to {after:?}"
+    );
+}
+
+fn transform_of(project: &EditableProject, frame_id: &str) -> myalbuns_core::MediaTransform {
+    project.projection().state.album.sheets[0]
+        .frames
+        .iter()
+        .find(|frame| frame.id == frame_id)
+        .unwrap()
+        .photo
+        .as_ref()
+        .unwrap()
+        .transform
+        .clone()
+}
+
+fn transform_photo(project: &mut EditableProject, frame_id: &str, pan: (f32, f32), zoom: f32) {
+    project
+        .apply(ProjectIntent::TransformPhoto {
+            frame_id: frame_id.into(),
+            delta_pan_x: pan.0,
+            delta_pan_y: pan.1,
+            delta_zoom: zoom,
+        })
+        .unwrap();
+}
+
+/// The zoom reference shared with the TypeScript preview: 300 × 200 mm
+/// Frames holding a 6000 × 3000 px Photo, the first at the Sheet origin.
+fn zoom_reference_project(root: &Path) -> (EditableProject, Vec<String>) {
+    photo_frames_project(
+        root,
+        (6_000, 3_000),
+        (300_000, 200_000),
+        &[(0, 0), (300_000, 50_000)],
+    )
+}
+
+/// One Frame of `size` µm at each origin, each holding the same Photo.
+fn photo_frames_project(
+    root: &Path,
+    source: (u32, u32),
+    size: (i64, i64),
+    origins: &[(i64, i64)],
+) -> (EditableProject, Vec<String>) {
+    use myalbuns_core::{
+        FrameGeometryEdit, FrameGeometryGesture, FrameGeometryTarget, FrameResizeHandle,
+    };
+    let mut project = core(root)
+        .create_editable(CreateProjectRequest::new(
+            location(&root.join("Zoom.myalbuns")),
+            InitialProject::neutral(),
+            CreateAuthorization::CreateOnly,
+        ))
+        .unwrap();
+    let original = root.join("Panorama.jpg");
+    fs::write(&original, b"original unchanged").unwrap();
+    let metadata = PhotoSourceMetadata::new(
+        source.0,
+        source.1,
+        ["#C22C24", "#248044", "#2454C2"].map(String::from),
+    )
+    .unwrap();
+    let media_id = project
+        .import_photo(ImportPhoto::new(original, metadata))
+        .unwrap()
+        .media_id;
+    let sheet_id = project.projection().state.album.sheets[0].id.clone();
+    for _ in origins {
+        project
+            .apply(ProjectIntent::AddPhoto {
+                sheet_id: sheet_id.clone(),
+                media_id,
+                mode: PhotoPlacementMode::Edit,
+            })
+            .unwrap();
+    }
+    let ids: Vec<_> = project.projection().state.album.sheets[0]
+        .frames
+        .iter()
+        .map(|frame| frame.id.clone())
+        .collect();
+    for (id, &(x, y)) in ids.iter().zip(origins) {
+        for resize in [false, true] {
+            let rect = project.projection().state.album.sheets[0]
+                .frames
+                .iter()
+                .find(|frame| &frame.id == id)
+                .unwrap()
+                .rect
+                .clone();
+            let gesture = if resize {
+                FrameGeometryGesture::Resize {
+                    handle: FrameResizeHandle::BottomRight,
+                    delta_x_um: size.0 - rect.width,
+                    delta_y_um: size.1 - rect.height,
+                    preserve_aspect_ratio: false,
+                    from_center: false,
+                }
+            } else {
+                FrameGeometryGesture::Move {
+                    delta_x_um: x - rect.x,
+                    delta_y_um: y - rect.y,
+                }
+            };
+            project
+                .apply(ProjectIntent::EditFrameGeometry {
+                    edit: FrameGeometryEdit {
+                        snap: None,
+                        frames: vec![FrameGeometryTarget {
+                            frame_id: id.clone(),
+                            expected_rect: rect,
+                        }],
+                        gesture,
+                    },
+                })
+                .unwrap();
+        }
+    }
+    for (frame, &(x, y)) in project.projection().state.album.sheets[0]
+        .frames
+        .iter()
+        .zip(origins)
+    {
+        assert_eq!(
+            (
+                frame.rect.x,
+                frame.rect.y,
+                frame.rect.width,
+                frame.rect.height
+            ),
+            (x, y, size.0, size.1)
+        );
+    }
+    (project, ids)
+}
+
+fn placement_of(project: &EditableProject, frame_id: &str) -> myalbuns_core::PhotoPlacement {
+    project
+        .projection()
+        .composition
+        .sheets
+        .iter()
+        .flat_map(|sheet| &sheet.frames)
+        .find(|frame| frame.frame_id == frame_id)
+        .unwrap()
+        .photo
+        .as_ref()
+        .unwrap()
+        .placement
+        .current
+        .clone()
+}
+
+fn assert_close(actual: f64, expected: f64, tolerance: f64) {
+    assert!(
+        (actual - expected).abs() <= tolerance,
+        "{actual} is not within {tolerance} of {expected}"
+    );
 }
 
 #[test]
@@ -115,6 +302,8 @@ fn batch_zoom_preserves_other_properties_and_shares_preview_history_and_persiste
     let after = project.projection();
     assert_eq!(after.state.revision, before.state.revision + 1);
     assert_eq!(preview, after.composition.sheets[0].frames);
+    // Zoom keeps the point at the Frame center, so only an off-center Photo
+    // changes its normalized Pan; every other property stays.
     for (old, new) in before.state.album.sheets[0]
         .frames
         .iter()
@@ -122,10 +311,21 @@ fn batch_zoom_preserves_other_properties_and_shares_preview_history_and_persiste
     {
         let mut expected = old.clone();
         if let Some(photo) = &mut expected.photo {
+            let next = &new.photo.as_ref().unwrap().transform;
             photo.transform.user_zoom = 1.75;
+            photo.transform.pan_x = next.pan_x;
+            photo.transform.pan_y = next.pan_y;
+            assert_same_point(
+                frame_center_point(&before, &old.id),
+                frame_center_point(&after, &old.id),
+            );
         }
         assert_eq!(&expected, new);
     }
+    let off_center = transform_of(&project, &ids[0]);
+    assert!(off_center.pan_x != 0.4 && off_center.pan_y != -0.3);
+    let centered = transform_of(&project, &ids[1]);
+    assert_eq!((centered.pan_x, centered.pan_y), (0.0, 0.0));
     assert_eq!(project.undo().unwrap().state.album, before.state.album);
     assert_eq!(project.redo().unwrap().state.album, after.state.album);
     project.apply(ProjectIntent::SetPhotoZoom { edit }).unwrap();
@@ -212,6 +412,277 @@ fn batch_zoom_accepts_500_percent_and_rejects_invalid_values_and_selections_atom
         .unwrap();
     let photo = &project.projection().state.album.sheets[0].frames[0].photo;
     assert_eq!(photo.as_ref().unwrap().transform.user_zoom, 5.0);
+}
+
+#[test]
+fn zoom_keeps_the_photo_point_at_the_frame_center_until_the_fill_stops_it() {
+    let root = tempfile::tempdir().unwrap();
+    let (mut project, ids) = zoom_reference_project(root.path());
+    let id = ids[0].as_str();
+    transform_photo(&mut project, id, (-0.9, 0.0), 0.0);
+    assert_close(placement_of(&project, id).center.x, 105_000.0, 0.1);
+    let before = project.projection();
+
+    // Zooming in never needs the limit: the center offset grows with the zoom.
+    transform_photo(&mut project, id, (0.0, 0.0), 0.12);
+    let transform = transform_of(&project, id);
+    assert_close(f64::from(transform.pan_x), -50_400.0 / 74_000.0, 1e-6);
+    assert_eq!((transform.pan_y, transform.user_zoom), (0.0, 1.12));
+    let zoomed = placement_of(&project, id);
+    assert_close(zoomed.center.x, 99_600.0, 0.1);
+    assert_close(zoomed.center.y, 100_000.0, 0.1);
+    assert_close(zoomed.size.width, 448_000.0, 0.1);
+    assert_close(zoomed.size.height, 224_000.0, 0.1);
+    assert_same_point(
+        frame_center_point(&before, id),
+        frame_center_point(&project.projection(), id),
+    );
+    assert_eq!(project.undo().unwrap().state.album, before.state.album);
+
+    // The Pan delta is added to the anchored Pan, as two separate edits would.
+    transform_photo(&mut project, id, (0.1, 0.2), 0.12);
+    let combined = transform_of(&project, id);
+    assert_close(f64::from(combined.pan_x), -50_400.0 / 74_000.0 + 0.1, 1e-6);
+    assert_close(f64::from(combined.pan_y), 0.2, 1e-6);
+    project.undo().unwrap();
+    transform_photo(&mut project, id, (0.0, 0.0), 0.12);
+    transform_photo(&mut project, id, (0.1, 0.2), 0.0);
+    assert_eq!(transform_of(&project, id), combined);
+
+    // Zooming out near the edge stops the Pan at the fill limit.
+    let id = ids[1].as_str();
+    transform_photo(&mut project, id, (-0.9, 0.0), 1.0);
+    let transform = transform_of(&project, id);
+    assert_eq!((transform.pan_x, transform.user_zoom), (-0.9, 2.0));
+    assert_close(placement_of(&project, id).center.x, -75_000.0, 0.1);
+    transform_photo(&mut project, id, (0.0, 0.0), -0.8);
+    let transform = transform_of(&project, id);
+    assert_eq!(
+        (transform.pan_x, transform.pan_y, transform.user_zoom),
+        (-1.0, 0.0, 1.2)
+    );
+    assert_close(placement_of(&project, id).center.x, 60_000.0, 0.1);
+}
+
+#[test]
+fn zooming_back_to_the_fill_centers_every_axis_without_pan_room() {
+    // At 100% a Frame in the Photo's proportion has no Pan room on its tight
+    // axis; the floating-point remainder of 130667 × 98000 µm must not count
+    // as room, or a later angle or size change would move the Photo.
+    for size in [(130_667, 98_000), (132_000, 99_000), (200_000, 150_000)] {
+        let root = tempfile::tempdir().unwrap();
+        let (mut project, ids) = photo_frames_project(root.path(), (4_032, 3_024), size, &[(0, 0)]);
+        let id = ids[0].as_str();
+        transform_photo(&mut project, id, (0.5, 0.5), 0.5);
+        transform_photo(&mut project, id, (0.0, 0.0), -0.5);
+        let transform = transform_of(&project, id);
+        assert_eq!(
+            (transform.pan_x, transform.user_zoom),
+            (0.0, 1.0),
+            "{size:?}"
+        );
+        if size.0 * 3 == size.1 * 4 {
+            assert_eq!(transform.pan_y, 0.0, "{size:?}");
+        }
+        let placement = placement_of(&project, id);
+        assert_close(placement.center.x, size.0 as f64 / 2.0, 1e-6);
+        assert_close(placement.center.y, size.1 as f64 / 2.0, 1.0);
+    }
+}
+
+#[test]
+fn zoom_keeps_the_frame_center_point_of_rotated_and_mirrored_photos() {
+    use myalbuns_core::{PhotoAngleEdit, PhotoZoomEdit};
+    let root = tempfile::tempdir().unwrap();
+    let (mut project, ids) = zoom_reference_project(root.path());
+    orient(
+        &mut project,
+        ids.clone(),
+        PhotoOrientationAction::RotateCounterClockwise,
+    );
+    orient(
+        &mut project,
+        vec![ids[1].clone()],
+        PhotoOrientationAction::ToggleHorizontalMirror,
+    );
+    project
+        .apply(ProjectIntent::SetPhotoAngle {
+            edit: PhotoAngleEdit {
+                frame_ids: vec![ids[1].clone()],
+                angle_tenths: 123,
+            },
+        })
+        .unwrap();
+    for id in &ids {
+        transform_photo(&mut project, id, (0.6, -0.4), 0.5);
+    }
+    let before = project.projection();
+    for id in &ids {
+        transform_photo(&mut project, id, (0.0, 0.0), 0.5);
+        assert_same_point(
+            frame_center_point(&before, id),
+            frame_center_point(&project.projection(), id),
+        );
+        assert_eq!(transform_of(&project, id).user_zoom, 2.0);
+    }
+    project
+        .apply(ProjectIntent::SetPhotoZoom {
+            edit: PhotoZoomEdit {
+                frame_ids: ids.clone(),
+                user_zoom: 3.0,
+            },
+        })
+        .unwrap();
+    for id in &ids {
+        assert_same_point(
+            frame_center_point(&before, id),
+            frame_center_point(&project.projection(), id),
+        );
+    }
+}
+
+#[test]
+fn rotated_zoom_matches_the_canvas_preview_reference() {
+    // The rotated case of tests/fixtures/photo-placement-cases.json, which the
+    // canvas preview (photoGeometry.ts) checks with the same numbers.
+    let root = tempfile::tempdir().unwrap();
+    let (mut project, ids) = photo_frames_project(
+        root.path(),
+        (6_000, 4_000),
+        (300_000, 200_000),
+        &[(20_000, 30_000)],
+    );
+    let id = ids[0].as_str();
+    for _ in 0..3 {
+        orient(
+            &mut project,
+            ids.clone(),
+            PhotoOrientationAction::RotateCounterClockwise,
+        );
+    }
+    transform_photo(&mut project, id, (1.0, -1.0), 0.5);
+    let transform = transform_of(&project, id);
+    assert_eq!(
+        (
+            transform.quarter_turns,
+            transform.pan_x,
+            transform.pan_y,
+            transform.user_zoom
+        ),
+        (1, 1.0, -1.0, 1.5)
+    );
+    let placement = placement_of(&project, id);
+    assert_close(placement.center.x, 225_000.0, 0.1);
+    assert_close(placement.center.y, 337_500.0, 0.1);
+    let before = project.projection();
+
+    transform_photo(&mut project, id, (0.0, 0.0), 0.5);
+    let transform = transform_of(&project, id);
+    assert_close(f64::from(transform.pan_x), 0.904_761_904_761_904_7, 1e-6);
+    assert_close(f64::from(transform.pan_y), -0.666_666_666_666_666_6, 1e-6);
+    assert_eq!(transform.user_zoom, 2.0);
+    let placement = placement_of(&project, id);
+    assert_close(placement.center.x, 250_000.0, 0.1);
+    assert_close(placement.center.y, 416_666.666_666_666_7, 0.1);
+    assert_close(placement.size.width, 900_000.0, 0.1);
+    assert_close(placement.size.height, 600_000.0, 0.1);
+    assert_same_point(
+        frame_center_point(&before, id),
+        frame_center_point(&project.projection(), id),
+    );
+    project.undo().unwrap();
+
+    // A combined Alt-drag and wheel gesture sends the final Pan minus the
+    // anchored Pan, so the commit lands on the Pan the preview showed.
+    let anchored = (0.904_761_9_f32, -0.666_666_7_f32);
+    transform_photo(&mut project, id, (0.5 - anchored.0, -0.2 - anchored.1), 0.5);
+    let transform = transform_of(&project, id);
+    assert_close(f64::from(transform.pan_x), 0.5, 1e-6);
+    assert_close(f64::from(transform.pan_y), -0.2, 1e-6);
+    assert_eq!(transform.user_zoom, 2.0);
+}
+
+#[test]
+fn photo_zoom_anchors_each_selected_photo_and_keeps_pan_without_a_known_source() {
+    use myalbuns_core::PhotoZoomEdit;
+    let root = tempfile::tempdir().unwrap();
+    let (mut project, ids) = zoom_reference_project(root.path());
+    let edit = |user_zoom: f32| PhotoZoomEdit {
+        frame_ids: ids.clone(),
+        user_zoom,
+    };
+
+    // A centered Photo zooms from the Frame center and stays centered.
+    project
+        .apply(ProjectIntent::SetPhotoZoom { edit: edit(1.5) })
+        .unwrap();
+    for id in &ids {
+        let transform = transform_of(&project, id);
+        assert_eq!(
+            (transform.pan_x, transform.pan_y, transform.user_zoom),
+            (0.0, 0.0, 1.5)
+        );
+        let placement = placement_of(&project, id);
+        assert_close(placement.center.x, 150_000.0, 1e-6);
+        assert_close(placement.center.y, 100_000.0, 1e-6);
+    }
+    project.undo().unwrap();
+
+    transform_photo(&mut project, &ids[0], (-0.9, 0.0), 0.0);
+    transform_photo(&mut project, &ids[1], (0.5, -0.5), 1.0);
+    let before = project.projection();
+    let preview = project.preview_photo_zoom(&edit(1.12)).unwrap();
+    assert_eq!(project.projection(), before);
+    project
+        .apply(ProjectIntent::SetPhotoZoom { edit: edit(1.12) })
+        .unwrap();
+    let after = project.projection();
+    assert_eq!(after.state.revision, before.state.revision + 1);
+    assert_eq!(preview, after.composition.sheets[0].frames);
+    let first = transform_of(&project, &ids[0]);
+    assert_close(f64::from(first.pan_x), -50_400.0 / 74_000.0, 1e-6);
+    assert_close(placement_of(&project, &ids[0]).center.x, 99_600.0, 0.1);
+    assert_same_point(
+        frame_center_point(&before, &ids[0]),
+        frame_center_point(&after, &ids[0]),
+    );
+    // The second Photo keeps its own point horizontally; zooming out near the
+    // bottom edge stops its vertical Pan at the fill limit.
+    let second = transform_of(&project, &ids[1]);
+    assert_close(f64::from(second.pan_x), 70_000.0 / 74_000.0, 1e-6);
+    assert_eq!(second.pan_y, -1.0);
+    assert_close(placement_of(&project, &ids[1]).center.y, 88_000.0, 0.1);
+    assert_eq!((first.user_zoom, second.user_zoom), (1.12, 1.12));
+    assert_eq!(project.undo().unwrap().state.album, before.state.album);
+
+    // Without the source size the zoom keeps the normalized Pan instead of failing.
+    project.save(project.revision()).unwrap();
+    drop(project);
+    let mut reopened = core(root.path())
+        .open_editable(OpenProjectRequest::new(location(
+            &root.path().join("Zoom.myalbuns"),
+        )))
+        .unwrap();
+    let committed = transform_of(&reopened, &ids[1]);
+    reopened
+        .apply(ProjectIntent::SetPhotoZoom {
+            edit: PhotoZoomEdit {
+                frame_ids: vec![ids[1].clone()],
+                user_zoom: 1.5,
+            },
+        })
+        .unwrap();
+    let zoomed = transform_of(&reopened, &ids[1]);
+    assert_eq!(
+        (zoomed.pan_x, zoomed.pan_y, zoomed.user_zoom),
+        (committed.pan_x, committed.pan_y, 1.5)
+    );
+    transform_photo(&mut reopened, &ids[1], (0.0, 0.0), 0.5);
+    let zoomed = transform_of(&reopened, &ids[1]);
+    assert_eq!(
+        (zoomed.pan_x, zoomed.pan_y, zoomed.user_zoom),
+        (committed.pan_x, committed.pan_y, 2.0)
+    );
 }
 
 #[test]

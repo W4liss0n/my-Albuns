@@ -9,6 +9,7 @@ import type {
 } from "../../domain/project";
 import type { AlbumCanvasProps, CanvasFrameGeometry } from "./albumCanvasContract";
 import { MICROMETER_TO_CANVAS_PIXEL } from "./canvasGeometry";
+import { isGestureCancelKey } from "./gestureCancelKey";
 
 interface PointerPosition {
   clientX: number;
@@ -336,7 +337,7 @@ export class FrameInteractionSession {
     if (event.code === "Space") this.spaceHeld = true;
     const gesture = this.gesture;
     if (!gesture || gesture.phase === "committing") return;
-    if (event.key === "Escape") {
+    if (isGestureCancelKey(event)) {
       event.preventDefault();
       event.stopImmediatePropagation();
       this.cancel();

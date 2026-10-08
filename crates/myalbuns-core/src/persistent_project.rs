@@ -736,7 +736,9 @@ impl EditableProject {
         if !self.session_valid {
             return Err(CoreError::EditableSessionInvalidated);
         }
-        let candidate = self.project().with_photo_zoom(edit)?;
+        let candidate = self
+            .project()
+            .with_photo_zoom(edit, &self.observed_photo_dimensions())?;
         Ok(self.preview_frame_composition(candidate, &edit.frame_ids))
     }
 
