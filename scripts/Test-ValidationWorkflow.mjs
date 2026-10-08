@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, rmSync } from "node:fs";
+import { mkdtempSync, mkdirSync, readdirSync, readFileSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -128,3 +128,60 @@ test("default validation calls only the declared headless checks", () => {
   assert.match(workflow, /-Scenario external-copy-opening-owner/);
   assert.doesNotMatch(workflow, /test:productive-journey|continue-on-error: true/);
 });
+
+test("the full productive journey runs only from its manual GPU workflow", () => {
+  const journey = readFileSync(path.join(workspace, ".github/workflows/productive-journey.yml"), "utf8");
+  assert.match(journey, /^on:\r?\n  workflow_dispatch:\r?\n/m);
+  assert.doesNotMatch(journey, /^  (pull_request|push|schedule|workflow_run|workflow_call):/m, "no automatic trigger");
+  assert.match(journey, /gpu_runner:[\s\S]*?required: true/);
+  assert.match(journey, /runs-on: \$\{\{ inputs\.gpu_runner \}\}/);
+  const refusalAt = journey.indexOf("- name: Refuse runners without hardware WebGL2");
+  assert.ok(refusalAt >= 0 && refusalAt < journey.indexOf("actions/checkout"), "a runner without a GPU is refused before any work");
+  const refusal = stepScript(journey, refusalAt);
+  const hosted = { RUNNER_ENVIRONMENT: "github-hosted", RUNNER_ARCH: "X64" };
+  for (const label of ["windows-latest", "windows-2022", "windows-2025", "windows-2025-vs2026", "windows-11-arm", "windows-11-vs2026-arm"]) {
+    assert.notEqual(powershell(refusal, { ...hosted, GPU_RUNNER: label }).status, 0, `standard image ${label}`);
+  }
+  assert.notEqual(powershell(refusal, { RUNNER_ENVIRONMENT: "self-hosted", RUNNER_ARCH: "X64", GPU_RUNNER: "desk-gpu" }).status, 0, "self-hosted runner");
+  assert.notEqual(powershell(refusal, { ...hosted, RUNNER_ARCH: "ARM64", GPU_RUNNER: "arm-gpu" }).status, 0, "arm64 runner");
+  assert.equal(powershell(refusal, { ...hosted, GPU_RUNNER: "windows-gpu-t4" }).status, 0, "a hosted x64 GPU label runs");
+  assert.match(journey, /npm run test:productive-journey -- -OutputPath \S+ -ArtifactDirectory \$env:JOURNEY_EVIDENCE/);
+  assert.match(journey, /JOURNEY_EVIDENCE: \.scratch\/productive-journey-evidence\/ci-/);
+  assert.match(journey, /if \(\$report\.sourceInputsDirty\) \{ throw /);
+  assert.match(journey, /if \(\$report\.gitCommit -ne \$env:GITHUB_SHA\) \{ throw /);
+  const order = ["npm run test:productive-journey", "- name: Refuse evidence from changed source", "actions/upload-artifact@"].map((text) => journey.indexOf(text));
+  assert.ok(order.every((at) => at >= 0) && order[0] < order[1] && order[1] < order[2], "the report is checked after the journey and before the upload");
+  assert.match(journey, /if: always\(\)\r?\n\s+uses: actions\/upload-artifact@/);
+  assert.match(journey, /include-hidden-files: true/);
+  assert.match(journey, /cancel-in-progress: false/);
+  assert.doesNotMatch(journey, /continue-on-error|AllowVisibleWindows/);
+});
+
+test("every workflow keeps read-only credentials and pinned actions", () => {
+  const directory = path.join(workspace, ".github/workflows");
+  for (const file of readdirSync(directory).filter((name) => /\.ya?ml$/.test(name))) {
+    const workflow = readFileSync(path.join(directory, file), "utf8");
+    assert.match(workflow, /^permissions:\r?\n  contents: read\r?\n/m, file);
+    assert.doesNotMatch(workflow, /AllowVisibleWindows/, file);
+    for (const [, action] of workflow.matchAll(/uses: (\S+)/g)) {
+      assert.match(action, /@[0-9a-f]{40}$/, `${file}: ${action}`);
+    }
+    for (const checkout of workflow.split("actions/checkout@").slice(1)) {
+      const step = checkout.split(/\r?\n\s*- /)[0];
+      assert.match(step, /^\s*persist-credentials: false\s*$/m, `${file}: checkout must not persist credentials`);
+    }
+  }
+});
+
+/** The PowerShell body of the `run: |` block of the step that starts at `stepAt`. */
+function stepScript(workflow, stepAt) {
+  const lines = workflow.slice(stepAt).split(/\r?\n/);
+  const runAt = lines.findIndex((line) => /^\s+run: \|$/.test(line));
+  assert.ok(runAt > 0, "the step has a run script");
+  const body = [];
+  for (const line of lines.slice(runAt + 1)) {
+    if (!line.startsWith(" ".repeat(10))) break;
+    body.push(line.slice(10));
+  }
+  return body.join("\n");
+}

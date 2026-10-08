@@ -146,6 +146,15 @@ integration exception below does not change the scenario's assertions.
 
 The full productive journey remains a separate integration/release check with
 explicit permission. It is not part of daily validation or the focused CI pilot.
+Its own manual workflow, **Productive journey**, is the only CI channel for that
+check; dispatch it only when the user explicitly asks for that run. It requires
+`gpu_runner`, a GitHub-hosted Windows x64 runner label with verified hardware
+WebGL2, and before any other step refuses self-hosted and non-x64 runners and
+GitHub's standard Windows image labels (`windows-2022`, `windows-latest`,
+`windows-2025-vs2026`, the ARM images). It retains the evidence directory as an
+artifact, also on failure, and the report when the journey completes; it fails
+when the report was produced from changed source or another commit. No such
+runner is available to this repository yet, so the workflow has never run.
 The session-recovery and Save As aliases still invoke that same full legacy
 journey; never run all three as if they were independent suites. Further
 migration of its segments must preserve each public assertion and proof layer.

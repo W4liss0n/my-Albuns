@@ -87,6 +87,16 @@ A execução manual pelo GitHub exige que o workflow esteja na branch padrão.
 O piloto não aprova a jornada completa nem substitui a verificação de GPU no
 hardware final.
 
+A jornada produtiva completa tem um workflow próprio, **Productive journey**,
+somente com execução manual. Ele exige em `gpu_runner` o rótulo de um runner
+Windows x64 hospedado pelo GitHub com WebGL2 por hardware confirmado. Antes de
+qualquer etapa, recusa runners próprios, runners que não são x64 e os rótulos das
+imagens comuns do GitHub (`windows-2022`, `windows-latest`, `windows-2025-vs2026`
+e as imagens ARM). As evidências ficam retidas como artefatos, inclusive em caso
+de falha, e o relatório quando a jornada termina; a execução falha se o relatório
+vier de uma fonte alterada ou de outro commit. O repositório ainda não tem um
+runner desse tipo, então o workflow nunca foi executado.
+
 Para um ambiente Windows reservado aos testes, `npm run build:native-tests`
 prepara uma única compilação com hashes e commit. O comando
 `npm run test:native-owned-dialogs -- -Scenario external-copy-opening-owner`

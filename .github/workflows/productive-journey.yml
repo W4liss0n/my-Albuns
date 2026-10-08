@@ -1,0 +1,104 @@
+name: Productive journey
+
+# The full journey opens real windows and needs hardware WebGL2, which the
+# standard Windows images do not offer (docs/agents/native-ui-gates.md).
+on:
+  workflow_dispatch:
+    inputs:
+      gpu_runner:
+        description: 'Hosted Windows x64 runner label with verified hardware WebGL2'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+# A push to main must not cancel a long integration run.
+concurrency:
+  group: productive-journey-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  journey:
+    name: Productive journey
+    if: ${{ inputs.gpu_runner != '' }}
+    runs-on: ${{ inputs.gpu_runner }}
+    # Tests, the sidecar and a cold debug Tauri build all run before the journey.
+    timeout-minutes: 120
+    defaults:
+      run:
+        shell: powershell
+    env:
+      CARGO_BUILD_JOBS: '4'
+      CARGO_INCREMENTAL: '0'
+      CARGO_PROFILE_DEV_DEBUG: '0'
+      CARGO_PROFILE_TEST_DEBUG: '0'
+      GPU_RUNNER: ${{ inputs.gpu_runner }}
+      JOURNEY_REPORT: .scratch/gate-evidence/ci/productive-journey.json
+      JOURNEY_EVIDENCE: .scratch/productive-journey-evidence/ci-${{ github.run_id }}-${{ github.run_attempt }}
+    steps:
+      - name: Refuse runners without hardware WebGL2
+        run: |
+          if ($env:RUNNER_ENVIRONMENT -ne 'github-hosted') { throw "$env:GPU_RUNNER is not a GitHub-hosted runner." }
+          if ($env:RUNNER_ARCH -ne 'X64') { throw "$env:GPU_RUNNER runs on $env:RUNNER_ARCH; the journey needs Windows x64." }
+          # Standard images have no GPU, so the application stays in safe mode there.
+          if ($env:GPU_RUNNER -match '^windows-(latest|\d{4}(-vs\d{4})?|11(-vs\d{4})?-arm)$') {
+            throw "$env:GPU_RUNNER is a standard image without hardware WebGL2. Supply a runner label with a verified GPU."
+          }
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24.18.0'
+          cache: npm
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            .tools/rustup
+            .tools/cargo/bin
+            .tools/cargo/registry
+            .tools/cargo/git
+          key: windows-2022-rust-${{ hashFiles('rust-toolchain.toml', 'Cargo.lock') }}
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: target
+          key: windows-2022-target-${{ hashFiles('rust-toolchain.toml', 'Cargo.lock') }}
+      - name: Use the runner temporary directory for isolated fixtures
+        run: |
+          "TEMP=$env:RUNNER_TEMP" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "TMP=$env:RUNNER_TEMP" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+      - name: Install locked frontend dependencies
+        run: npm ci
+      - name: Prepare pinned local Rust toolchain
+        run: ./scripts/Setup-LocalToolchain.ps1 -SkipNodeInstall
+      - name: Ensure WebView2 on the hosted runner
+        run: |
+          $runtimeRoot = Join-Path ${env:ProgramFiles(x86)} 'Microsoft\EdgeWebView\Application'
+          if (-not (Test-Path -LiteralPath $runtimeRoot)) {
+            $installer = Join-Path $env:RUNNER_TEMP 'MicrosoftEdgeWebview2Setup.exe'
+            Invoke-WebRequest -UseBasicParsing -Uri 'https://go.microsoft.com/fwlink/p/?LinkId=2124703' -OutFile $installer
+            $installation = Start-Process -FilePath $installer -ArgumentList '/silent', '/install' -WindowStyle Hidden -Wait -PassThru
+            if ($installation.ExitCode -ne 0) { throw 'WebView2 installation failed.' }
+          }
+      - name: Run the full productive journey
+        timeout-minutes: 90
+        run: npm run test:productive-journey -- -OutputPath $env:JOURNEY_REPORT -ArtifactDirectory $env:JOURNEY_EVIDENCE
+      # The gate records changed source without failing; CI evidence must prove this commit.
+      - name: Refuse evidence from changed source
+        run: |
+          $report = Get-Content -Raw -LiteralPath $env:JOURNEY_REPORT | ConvertFrom-Json
+          if ($report.sourceInputsDirty) { throw 'The journey ran on changed source.' }
+          if ($report.gitCommit -ne $env:GITHUB_SHA) { throw "The journey proved $($report.gitCommit), not $env:GITHUB_SHA." }
+      - name: Retain journey evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: productive-journey-${{ github.run_id }}-${{ github.run_attempt }}
+          include-hidden-files: true
+          if-no-files-found: warn
+          retention-days: 14
+          path: |
+            .scratch/gate-evidence/ci/
+            .scratch/productive-journey-evidence/ci-${{ github.run_id }}-${{ github.run_attempt }}/
