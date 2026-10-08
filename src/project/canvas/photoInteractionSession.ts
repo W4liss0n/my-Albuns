@@ -66,6 +66,8 @@ export class PhotoInteractionSession {
   constructor(
     private readonly photoNodes: ReadonlyMap<string, PhotoRenderNode>,
     private readonly readContext: () => PhotoInteractionContext,
+    // The settle timer and commit results change nodes outside any input event.
+    private readonly requestRender: () => void = () => undefined,
   ) {}
 
   reset() {
@@ -206,6 +208,7 @@ export class PhotoInteractionSession {
       ) {
         return;
       }
+      this.requestRender();
       this.zoom = null;
       const commit = finishPhotoZoomGesture(runtime.gesture);
       const commitNode = commit ? this.photoNodes.get(commit.frameId) : null;
@@ -375,6 +378,7 @@ export class PhotoInteractionSession {
   ) {
     const context = this.readContext();
     if (generation !== context.projectGeneration) return;
+    this.requestRender();
     this.pendingCommitFrames.delete(frameId);
     if (!accepted && this.photoNodes.get(frameId) === node) {
       resetPhotoPreview(node);

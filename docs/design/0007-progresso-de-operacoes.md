@@ -1,7 +1,7 @@
 ---
 status: accepted
 document: design
-updated: 2026-09-24
+updated: 2026-10-07
 ---
 
 # Progresso de operações
@@ -97,6 +97,18 @@ com barra determinada, porcentagem e contagem `X de Y` das imagens que precisam
 ser preparadas. O espaço da porcentagem fica reservado desde o início para
 evitar alteração do tamanho da janela nessa transição. A conclusão da contagem
 não libera o editor antes da entrega das miniaturas visíveis.
+
+Quando o Windows abre vários Projetos juntos, eles compartilham uma única janela
+de abertura ([decisão de 07/10/2026](0002-tela-de-boas-vindas.md#vários-projetos-abertos-juntos)).
+Com um Projeto, ela segue exatamente a apresentação acima. Com vários, o título
+é `Abrindo N projetos` e cada Projeto ocupa uma linha: o nome do arquivo à
+esquerda, com reticências quando não cabe, e à direita o estado (`Abrindo…`,
+`X de Y fotos` com uma barra determinada pequena, `Pronto`, `Não abriu` ou
+`Cancelado`). A largura é fixa nesse estado; a altura acompanha as linhas até o
+limite da tela e depois a lista rola. As linhas concluídas permanecem até todos
+terminarem, e a janela fecha só então. O leitor de tela anuncia cada Projeto que
+fica `Pronto`, `Não abriu` ou `Cancelado`; as contagens de fotos não são
+anunciadas.
 
 Os diálogos de progresso do Global usam um grupo de processos WebView2 próprio,
 com perfil em `State/WebView2/global-progress` e renderização sem aceleração de

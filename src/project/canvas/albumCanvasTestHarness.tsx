@@ -57,15 +57,17 @@ const pixiLifecycle = vi.hoisted(() => ({
     canvas: HTMLCanvasElement;
     destroyCount: number;
     initialized: boolean;
+    renderCount: number;
     resizeCount: number;
     screen: { width: number; height: number };
     stage: {
       children: unknown[];
       emit(name: string, event: unknown): void;
     };
+    ticker: MockPixiTicker;
   }>,
+  systemTicker: null as MockPixiTicker | null,
   resizeCallbacks: [] as ResizeObserverCallback[],
-  tickerCallbacks: [] as Array<(ticker: { deltaMS: number }) => void>,
   resolveInitializations: [] as Array<() => void>,
   assetLoads: [] as string[],
   assetUnloads: [] as string[],
@@ -79,6 +81,14 @@ const pixiLifecycle = vi.hoisted(() => ({
     options: { glProgram?: { options: Record<string, unknown> } };
   }>,
 }));
+
+export interface MockPixiTicker {
+  readonly started: boolean;
+  readonly count: number;
+  start(): void;
+  stop(): void;
+  update(deltaMS: number): void;
+}
 
 export function getPixiLifecycle() {
   return pixiLifecycle;
@@ -225,6 +235,62 @@ vi.mock("pixi.js", () => {
 
   class Container extends DisplayObject {}
 
+  // Mirrors Pixi's Ticker: listeners run by descending priority, and frames
+  // arrive only while started. Pixi's autoStart restart on add is not modelled,
+  // nor is its frame timestamp guard (canvasRenderLoop.test.ts covers it).
+  class Ticker {
+    static readonly system = (pixiLifecycle.systemTicker = new Ticker(true)) as Ticker;
+    started: boolean;
+    deltaMS = 16;
+    lastTime = -1;
+    private listeners: Array<{ fn: (ticker: Ticker) => void; context: unknown; priority: number; once: boolean }> = [];
+
+    constructor(started = false) {
+      this.started = started;
+    }
+
+    get count() {
+      return this.listeners.length;
+    }
+
+    add(fn: (ticker: Ticker) => void, context?: unknown, priority = 0, once = false) {
+      const index = this.listeners.findIndex((listener) => priority > listener.priority);
+      const listener = { fn, context, priority, once };
+      if (index < 0) this.listeners.push(listener);
+      else this.listeners.splice(index, 0, listener);
+      return this;
+    }
+
+    // Like Pixi, runs on the next frame of a started ticker, never at once.
+    addOnce(fn: (ticker: Ticker) => void, context?: unknown, priority = 0) {
+      return this.add(fn, context, priority, true);
+    }
+
+    remove(fn: (ticker: Ticker) => void, context?: unknown) {
+      this.listeners = this.listeners.filter((listener) =>
+        listener.fn !== fn || (context !== undefined && listener.context !== context));
+      return this;
+    }
+
+    start() {
+      this.started = true;
+    }
+
+    stop() {
+      this.started = false;
+    }
+
+    update(deltaMS: number) {
+      if (!this.started) return;
+      this.deltaMS = deltaMS;
+      for (const listener of [...this.listeners]) {
+        if (!this.listeners.includes(listener)) continue;
+        if (listener.once) this.listeners = this.listeners.filter((other) => other !== listener);
+        listener.fn.call(listener.context, this);
+      }
+    }
+  }
+
   class FillGradient {
     colorStops: unknown;
     destroyCount = 0;
@@ -357,24 +423,23 @@ vi.mock("pixi.js", () => {
         return texture;
       },
     };
-    ticker = {
-      add: (callback: (ticker: { deltaMS: number }) => void) => {
-        pixiLifecycle.tickerCallbacks.push(callback);
-      },
-      addOnce: (callback: () => void) => callback(),
-      remove: (callback: (ticker: { deltaMS: number }) => void) => {
-        const index = pixiLifecycle.tickerCallbacks.indexOf(callback);
-        if (index >= 0) pixiLifecycle.tickerCallbacks.splice(index, 1);
-      },
-    };
+    renderCount = 0;
+    ticker = new Ticker();
 
     constructor() {
       pixiLifecycle.instances.push(this);
     }
 
+    render() {
+      this.renderCount += 1;
+    }
+
     init(options: Record<string, unknown>) {
       pixiLifecycle.initOptions.push(options);
       this.resizeTarget = options.resizeTo as HTMLElement;
+      // TickerPlugin registers app.render at UPDATE_PRIORITY.LOW.
+      this.ticker.add(this.render, this, -25);
+      if (options.autoStart !== false) this.ticker.start();
       return new Promise<void>((resolve) => {
         pixiLifecycle.resolveInitializations.push(() => {
           this.initialized = true;
@@ -447,6 +512,7 @@ vi.mock("pixi.js", () => {
     },
     Sprite,
     Text,
+    Ticker,
     Texture: { from: vi.fn((image: HTMLImageElement) => ({
       source: { resource: image }, orig: { width: image.naturalWidth, height: image.naturalHeight },
       destroy: vi.fn(),
@@ -636,13 +702,26 @@ export function displayWithLabel(label: string) {
   return display;
 }
 
+/** Runs one display frame on every started ticker, like requestAnimationFrame. */
 export async function advancePixiTicker(deltaMS: number) {
   await act(async () => {
-    for (const callback of [...pixiLifecycle.tickerCallbacks]) {
-      callback({ deltaMS });
-    }
+    for (const instance of pixiLifecycle.instances) instance.ticker.update(deltaMS);
+    pixiLifecycle.systemTicker?.update(deltaMS);
     await Promise.resolve();
   });
+}
+
+/**
+ * Dispatches an event the Canvas treats as user input. jsdom marks every
+ * script-dispatched event untrusted, so this goes through its internal dispatch.
+ */
+export function dispatchTrustedEvent(target: EventTarget, event: Event) {
+  const impl = (object: object) => (object as Record<symbol, { isTrusted?: boolean; _dispatch?: (event: unknown) => boolean }>)[
+    Object.getOwnPropertySymbols(object).find((symbol) => symbol.description === "impl")!
+  ];
+  const eventImpl = impl(event);
+  eventImpl.isTrusted = true;
+  return impl(target)._dispatch!(eventImpl);
 }
 
 export function setupAlbumCanvasTestHarness() {
@@ -651,7 +730,7 @@ export function setupAlbumCanvasTestHarness() {
     pixiLifecycle.initOptions.length = 0;
     pixiLifecycle.instances.length = 0;
     pixiLifecycle.resizeCallbacks.length = 0;
-    pixiLifecycle.tickerCallbacks.length = 0;
+    if (pixiLifecycle.systemTicker && !pixiLifecycle.systemTicker.started) pixiLifecycle.systemTicker.start();
     pixiLifecycle.resolveInitializations.length = 0;
     pixiLifecycle.assetLoads.length = 0;
     pixiLifecycle.assetUnloads.length = 0;

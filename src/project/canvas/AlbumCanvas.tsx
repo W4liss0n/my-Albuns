@@ -8,7 +8,7 @@ import {
   type MouseEvent as ReactMouseEvent,
 } from "react";
 import { Layers3 } from "lucide-react";
-import { Application } from "pixi.js";
+import { Application, Ticker } from "pixi.js";
 
 import {
   createLogInstanceId,
@@ -18,6 +18,7 @@ import type { GraphicsDiagnostic } from "../../application/graphics";
 import type { PhotoDropTarget } from "../../domain/project";
 import { AppIcon, EmptyState } from "../../ui";
 import { AlbumCanvasScene } from "./albumCanvasScene";
+import { CanvasRenderLoop, wakeOnCanvasInput } from "./canvasRenderLoop";
 import { useDecorativeDropPreview } from "./useDecorativeDropPreview";
 import type {
   AlbumCanvasProps,
@@ -227,6 +228,8 @@ export function AlbumCanvas(props: AlbumCanvasProps) {
     let initialized = false;
     let destroyed = false;
     let ownedScene: AlbumCanvasScene | null = null;
+    let renderLoop: CanvasRenderLoop | null = null;
+    let detachRenderInput: (() => void) | null = null;
     let contextListenersAttached = false;
     let restoreTimeout: number | null = null;
     let activeDiagnostic: GraphicsDiagnostic | null = null;
@@ -299,6 +302,8 @@ export function AlbumCanvas(props: AlbumCanvasProps) {
     };
     const handleContextRestored = () => {
       if (disposed) return;
+      // addOnce needs a running ticker; the scene update below keeps it awake.
+      renderLoop?.wake();
       app.ticker.addOnce(() => {
         if (disposed || !ownedScene || !hostRef.current) return;
         clearRestoreTimeout();
@@ -330,6 +335,10 @@ export function AlbumCanvas(props: AlbumCanvasProps) {
         materializedSceneRef.current = null;
       }
       ownedScene = null;
+      detachRenderInput?.();
+      detachRenderInput = null;
+      renderLoop?.destroy();
+      renderLoop = null;
       app.destroy(true, { children: true });
       logger.write({
         level: "debug",
@@ -353,6 +362,8 @@ export function AlbumCanvas(props: AlbumCanvasProps) {
         preference: "webgl",
         preferWebGLVersion: 2,
         powerPreference: "high-performance",
+        // The render loop starts the ticker only while something changes.
+        autoStart: false,
       })
       .then(() => {
         initialized = true;
@@ -390,6 +401,10 @@ export function AlbumCanvas(props: AlbumCanvasProps) {
         );
         app.canvas.tabIndex = 0;
         hostRef.current.appendChild(app.canvas);
+        // Attach input before the scene so its capture listeners cannot swallow it.
+        renderLoop = new CanvasRenderLoop({ ticker: app.ticker, sharedTickers: [Ticker.system] });
+        detachRenderInput = wakeOnCanvasInput(hostRef.current, renderLoop);
+        renderLoop.wake();
         ownedScene = new AlbumCanvasScene(
           app,
           () => {
@@ -416,6 +431,7 @@ export function AlbumCanvas(props: AlbumCanvasProps) {
               instanceId,
             });
           },
+          renderLoop,
         );
         sceneRef.current = ownedScene;
         sceneInstanceIdRef.current = instanceId;

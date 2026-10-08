@@ -23,15 +23,22 @@ use crate::{
     cache_service::{CacheScheduledCleanupOutcome, CacheService},
     desktop_webview_policy,
     global_activation::{
-        GlobalActivationEntry, PrimaryGlobalActivation, enter_global_activation,
-        enter_global_activation_with_request, enter_global_activation_with_settings,
+        GlobalActivationBatch, GlobalActivationEntry, PrimaryGlobalActivation,
+        enter_global_activation, enter_global_activation_with_request,
+        enter_global_activation_with_settings,
+    },
+    global_opening_burst::{
+        ActivationBatchSummary, BatchTicket, FinishedBurst, OpeningBursts, OpeningProgressBoard,
+        OpeningRow, ProjectTicket, project_display_name,
     },
     graphics_launch_gate::{
         GRAPHICS_GATE_TIMEOUT, GraphicsGateCompletion, GraphicsGateReport, GraphicsLaunchGate,
     },
     ipc_contract::OpeningExternalCopyDecision,
     logging,
-    native_dialog_window::{self, NativeProgressKind, ProjectFailureDialogContext},
+    native_dialog_window::{
+        self, NativeProgressDialog, NativeProgressKind, ProjectFailureDialogContext,
+    },
     native_project_dialog, path_io,
     project_bootstrap::{
         BootstrapFailure, BootstrapFailureKind, BootstrapOutcome, CreateWriteAuthorization,
@@ -50,9 +57,13 @@ use crate::{
 pub(crate) const GLOBAL_WINDOW_LABEL: &str = "global";
 const GLOBAL_ACTIVATION_TERMINAL_EVENT: &str = "myalbuns://global-activation-terminal";
 pub(crate) const GLOBAL_WEBVIEW_NAMESPACE: &str = "global";
-// Reopening after cleanup can rebuild the entire Cache before exposing the editor.
+// How long a starting Host may stay silent. Reopening after cleanup can rebuild
+// the entire Cache before exposing the editor, and Projects opened together
+// share the machine's imaging slots, so every progress message restarts this
+// limit; the supervisor still ends any opening after two hours.
 const HOST_TERMINAL_TIMEOUT: Duration = Duration::from_secs(300);
-// Creating also decodes initial originals and prepares their canonical Cache.
+// Creating also decodes initial originals and prepares their canonical Cache;
+// the same progress rule applies.
 const HOST_CREATION_TIMEOUT: Duration = Duration::from_secs(300);
 
 type ScheduledCleanupResult = Result<CacheScheduledCleanupOutcome, String>;
@@ -93,19 +104,25 @@ impl ScheduledCleanupGate {
     }
 }
 
+/// Project launches that Windows starts share the coordinator; every other
+/// launch source owns it alone. An exclusive owner never overlaps an opening
+/// in flight, and no opening starts while it runs. tokio's lock is fair: a
+/// waiting exclusive owner holds back later shared launches.
 #[derive(Clone, Default)]
 struct GlobalProjectLaunchCoordinator {
-    serial: Arc<tokio::sync::Mutex<()>>,
+    lock: Arc<tokio::sync::RwLock<()>>,
 }
 
-pub(crate) struct GlobalProjectLaunchPermit {
-    _guard: tokio::sync::OwnedMutexGuard<()>,
+/// Proof that the caller may start a Project Host.
+pub(crate) enum GlobalProjectLaunchPermit {
+    Shared(#[allow(dead_code)] tokio::sync::OwnedRwLockReadGuard<()>),
+    Exclusive(#[allow(dead_code)] tokio::sync::OwnedRwLockWriteGuard<()>),
 }
 
 pub(crate) async fn reserve_batch_launches(app: &AppHandle) -> GlobalProjectLaunchPermit {
     app.state::<GlobalRuntimeState>()
         .project_launches
-        .enter()
+        .enter_exclusive()
         .await
 }
 
@@ -117,7 +134,7 @@ pub(crate) async fn open_batch_project(app: &AppHandle, path: PathBuf) -> Projec
     if let Some(rejection) = state.project_host_gate_rejection() {
         return rejection;
     }
-    let permit = state.project_launches.enter_interactive().await;
+    let permit = state.project_launches.enter_exclusive().await;
     let outcome = launch_confirmed_project_with_progress(
         app,
         state,
@@ -139,17 +156,24 @@ pub(crate) async fn open_batch_project(app: &AppHandle, path: PathBuf) -> Projec
 }
 
 impl GlobalProjectLaunchCoordinator {
-    async fn enter_interactive(&self) -> GlobalProjectLaunchPermit {
-        self.enter().await
+    /// Welcome, creation, recent Projects, batch export, Settings and New
+    /// project requests forwarded by Windows.
+    async fn enter_exclusive(&self) -> GlobalProjectLaunchPermit {
+        GlobalProjectLaunchPermit::Exclusive(Arc::clone(&self.lock).write_owned().await)
     }
 
+    /// Project files opened by Windows: they start together.
     async fn enter_activation(&self) -> GlobalProjectLaunchPermit {
-        self.enter().await
+        GlobalProjectLaunchPermit::Shared(Arc::clone(&self.lock).read_owned().await)
     }
 
-    async fn enter(&self) -> GlobalProjectLaunchPermit {
-        GlobalProjectLaunchPermit {
-            _guard: Arc::clone(&self.serial).lock_owned().await,
+    /// The guard a forwarded activation takes first: exclusive for Settings,
+    /// New project and a launch without files, shared for files only.
+    async fn enter_forwarded(&self, batch: &GlobalActivationBatch) -> GlobalProjectLaunchPermit {
+        if forwarded_activation_owns_the_coordinator(batch) {
+            self.enter_exclusive().await
+        } else {
+            self.enter_activation().await
         }
     }
 }
@@ -253,6 +277,54 @@ pub(crate) struct ProjectLaunchFailure {
     message: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     action: Option<String>,
+    /// The Projects this failure is about, each with its own reason, when
+    /// several Projects were opened together. Empty for a single Project.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    projects: Vec<ProjectFailureDetail>,
+}
+
+/// One Project that did not open, among several opened together.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct ProjectFailureDetail {
+    pub(crate) name: String,
+    pub(crate) message: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) action: Option<String>,
+}
+
+impl ProjectLaunchFailure {
+    fn detail(&self, name: String) -> ProjectFailureDetail {
+        ProjectFailureDetail {
+            name,
+            message: self.message.clone(),
+            action: self.action.clone(),
+        }
+    }
+
+    /// The only failure of a window that listed several Projects: the same
+    /// reason and action, naming the Project.
+    pub(crate) fn naming_project(mut self, name: String) -> Self {
+        self.projects = vec![self.detail(name)];
+        self
+    }
+
+    /// Several Projects that did not open, presented once, each with its own
+    /// reason. A failure that happened before any Project started has no
+    /// name.
+    pub(crate) fn of_projects(failures: Vec<(Option<String>, ProjectLaunchFailure)>) -> Self {
+        let count = failures.len();
+        Self {
+            code: "projects_not_opened".into(),
+            stage: None,
+            message: format!("{count} projetos não abriram."),
+            action: Some("Veja o motivo de cada projeto e tente abri-lo novamente.".into()),
+            projects: failures
+                .into_iter()
+                .map(|(name, failure)| failure.detail(name.unwrap_or_default()))
+                .collect(),
+        }
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
@@ -262,50 +334,6 @@ pub(crate) enum ProjectLaunchOutcome {
     Focused,
     Cancelled,
     Failed { error: ProjectLaunchFailure },
-}
-
-struct ActivationBatchSummary {
-    success: ProjectLaunchOutcome,
-    first_non_success: Option<ProjectLaunchOutcome>,
-    opened_count: u32,
-    focused_count: u32,
-    failed_count: u32,
-}
-
-impl Default for ActivationBatchSummary {
-    fn default() -> Self {
-        Self {
-            success: ProjectLaunchOutcome::Focused,
-            first_non_success: None,
-            opened_count: 0,
-            focused_count: 0,
-            failed_count: 0,
-        }
-    }
-}
-
-impl ActivationBatchSummary {
-    fn observe(&mut self, outcome: ProjectLaunchOutcome) {
-        match outcome {
-            ProjectLaunchOutcome::Opened => {
-                self.opened_count += 1;
-                self.success = ProjectLaunchOutcome::Opened;
-            }
-            ProjectLaunchOutcome::Focused => self.focused_count += 1,
-            other => {
-                self.failed_count += 1;
-                if self.first_non_success.is_none() {
-                    self.first_non_success = Some(other);
-                }
-            }
-        }
-    }
-
-    fn terminal(&self) -> ProjectLaunchOutcome {
-        self.first_non_success
-            .clone()
-            .unwrap_or_else(|| self.success.clone())
-    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
@@ -384,40 +412,42 @@ async fn complete_graphics_gate(
     if let Some(error) = state.scheduled_cleanup_failure().await {
         return Some(ProjectLaunchOutcome::Failed { error });
     }
+    // Forwarded activations wait for the gate. Joining the opening burst
+    // before completing it keeps the initial files in the first burst, so a
+    // forwarded batch can never end a burst alone and let the Global exit
+    // before the initial files start.
+    let launch_permit = state.project_launches.enter_activation().await;
+    let batch = opening_bursts(&app).join_batch();
     match state.graphics_gate.complete(report) {
         GraphicsGateCompletion::Ready(projects) if !projects.is_empty() => {
-            let launch_permit = state.project_launches.enter_activation().await;
-            let outcome =
-                launch_activation_batch(&app, state.clone(), projects, &launch_permit).await;
-            match &outcome {
-                ProjectLaunchOutcome::Opened | ProjectLaunchOutcome::Focused => {
-                    exit_global_after_handoff(&app)
-                }
-                ProjectLaunchOutcome::Failed { error } => {
-                    state.cancel_requested_exit();
-                    state.record_startup_failure(error.clone());
-                    show_existing_global_window(&app);
-                }
-                ProjectLaunchOutcome::Cancelled => {
-                    state.cancel_requested_exit();
-                    show_existing_global_window(&app)
-                }
-            }
-            Some(outcome)
+            // The burst finalizer presents the outcome once, through the
+            // activation terminal, together with the other files opened with
+            // these.
+            launch_activation_batch(&app, state.clone(), batch, projects, &launch_permit).await;
+            None
         }
-        GraphicsGateCompletion::Rejected => {
-            if state
-                .global_activation
-                .as_ref()
-                .and_then(|activation| activation.initial_settings())
-                .is_none()
+        completion => {
+            if let Some(finished) = batch.finish(None) {
+                finalize_opening_burst(&app, &state, finished).await;
+            }
+            if matches!(completion, GraphicsGateCompletion::Rejected)
+                && state
+                    .global_activation
+                    .as_ref()
+                    .and_then(|activation| activation.initial_settings())
+                    .is_none()
             {
                 show_existing_global_window(&app);
             }
             None
         }
-        GraphicsGateCompletion::Ready(_) | GraphicsGateCompletion::AlreadyFinal => None,
     }
+}
+
+fn opening_bursts(app: &AppHandle) -> OpeningBursts<NativeProgressDialog> {
+    app.state::<OpeningBursts<NativeProgressDialog>>()
+        .inner()
+        .clone()
 }
 
 #[tauri::command]
@@ -439,7 +469,7 @@ async fn open_project(app: AppHandle) -> ProjectLaunchOutcome {
     if let Some(rejection) = state.project_host_gate_rejection() {
         return rejection;
     }
-    let launch_permit = state.project_launches.enter_interactive().await;
+    let launch_permit = state.project_launches.enter_exclusive().await;
     let (sender, receiver) = tokio::sync::oneshot::channel();
     app.dialog()
         .file()
@@ -500,47 +530,47 @@ async fn open_project(app: AppHandle) -> ProjectLaunchOutcome {
     outcome
 }
 
-enum ExternalCopyContinuation {
-    DestinationCancelled(PendingExternalCopyProcess),
-    Terminal(ProjectLaunchOutcome),
+/// Asks, over the opening window, where to save an editable copy. `None`
+/// when the person closes the picker without choosing.
+async fn choose_external_copy_destination(
+    decision_window: &WebviewWindow,
+) -> Result<Option<(PathBuf, CreateWriteAuthorization)>, ProjectLaunchOutcome> {
+    match native_project_dialog::choose_project_destination(decision_window).await {
+        Ok(native_project_dialog::ProjectSaveDialogOutcome::Cancelled) => Ok(None),
+        Ok(native_project_dialog::ProjectSaveDialogOutcome::Selected {
+            path,
+            authorization,
+        }) => Ok(Some((path, authorization))),
+        Err(error) => {
+            tracing::warn!(
+                target: "myalbuns.desktop",
+                process_role = ProcessRole::Global.as_str(),
+                error = %error,
+                event = "external_copy_destination_dialog_failed",
+            );
+            Err(ProjectLaunchOutcome::Failed {
+                error: simple_failure(
+                    "dialog_unavailable",
+                    "Não foi possível concluir o diálogo para salvar a cópia.",
+                    "Tente novamente.",
+                ),
+            })
+        }
+    }
 }
 
-async fn continue_external_copy_as(
+async fn save_external_copy_as(
     state: &GlobalRuntimeState,
     pending: PendingExternalCopyProcess,
-    decision_window: &WebviewWindow,
-) -> ExternalCopyContinuation {
-    let (destination_path, authorization) =
-        match native_project_dialog::choose_project_destination(decision_window).await {
-            Ok(native_project_dialog::ProjectSaveDialogOutcome::Cancelled) => {
-                return ExternalCopyContinuation::DestinationCancelled(pending);
-            }
-            Ok(native_project_dialog::ProjectSaveDialogOutcome::Selected {
-                path,
-                authorization,
-            }) => (path, authorization),
-            Err(error) => {
-                tracing::warn!(
-                    target: "myalbuns.desktop",
-                    process_role = ProcessRole::Global.as_str(),
-                    error = %error,
-                    event = "external_copy_destination_dialog_failed",
-                );
-                return ExternalCopyContinuation::Terminal(ProjectLaunchOutcome::Failed {
-                    error: simple_failure(
-                        "dialog_unavailable",
-                        "Não foi possível concluir o diálogo para salvar a cópia.",
-                        "Tente novamente.",
-                    ),
-                });
-            }
-        };
+    destination_path: PathBuf,
+    authorization: CreateWriteAuthorization,
+) -> ProjectLaunchOutcome {
     let root_bindings = match path_io::capture_root_bindings(vec![destination_path.clone()]).await {
         Ok(root_bindings) => root_bindings,
         Err(error) => {
-            return ExternalCopyContinuation::Terminal(ProjectLaunchOutcome::Failed {
+            return ProjectLaunchOutcome::Failed {
                 error: binding_failure(error),
-            });
+            };
         }
     };
     let destination_path = NativePathDto::from(destination_path);
@@ -551,7 +581,7 @@ async fn continue_external_copy_as(
     };
     let bootstrap = state.bootstrap.clone();
     let recent_projects = state.recent_projects.clone();
-    let outcome = match tauri::async_runtime::spawn_blocking(move || {
+    match tauri::async_runtime::spawn_blocking(move || {
         let outcome = bootstrap.save_external_copy_as(pending, destination, authorization)?;
         let recent_result = match &outcome {
             BootstrapOutcome::Ready(ready) => {
@@ -613,8 +643,7 @@ async fn continue_external_copy_as(
                 "Tente novamente. Se o problema continuar, reinicie o MyAlbuns.",
             ),
         },
-    };
-    ExternalCopyContinuation::Terminal(outcome)
+    }
 }
 
 #[tauri::command]
@@ -646,7 +675,7 @@ async fn create_project(
     if let Some(rejection) = state.project_host_gate_rejection() {
         return rejection;
     }
-    let launch_permit = state.project_launches.enter_interactive().await;
+    let launch_permit = state.project_launches.enter_exclusive().await;
     let provisional_decoratives = app.state::<ProvisionalDecorativeRegistry>().inner().clone();
     let resolution_registry = provisional_decoratives.clone();
     let configuration = match tauri::async_runtime::spawn_blocking(move || {
@@ -844,7 +873,7 @@ async fn open_recent_project(app: AppHandle, project_id: String) -> ProjectLaunc
     if let Some(rejection) = state.project_host_gate_rejection() {
         return rejection;
     }
-    let launch_permit = state.project_launches.enter_interactive().await;
+    let launch_permit = state.project_launches.enter_exclusive().await;
     let store = state.recent_projects.clone();
     let lookup_id = project_id.clone();
     let path = match tauri::async_runtime::spawn_blocking(move || store.path_for(&lookup_id)).await
@@ -907,6 +936,7 @@ async fn show_project_failure_dialog(
         context,
         &error.message,
         error.action.as_deref(),
+        &error.projects,
     )
     .await
     {
@@ -950,41 +980,37 @@ async fn launch_confirmed_project_with_progress(
     .await
 }
 
-/// Delivers Host image progress to an opening dialog that may not exist yet.
-#[derive(Clone, Default)]
-struct OpeningProgressRelay(Arc<Mutex<OpeningProgressRelayState>>);
-
-#[derive(Default)]
-struct OpeningProgressRelayState {
-    dialog: Option<crate::project_bootstrap::StartupProgressReporter>,
-    latest: Option<crate::ipc_contract::StartupImageProgress>,
-}
-
-impl OpeningProgressRelay {
-    fn reporter(&self) -> crate::project_bootstrap::StartupProgressReporter {
-        let relay = self.0.clone();
-        crate::project_bootstrap::StartupProgressReporter::new(move |progress| {
-            let Ok(mut state) = relay.lock() else {
-                return;
-            };
-            state.latest = Some(progress);
-            if let Some(dialog) = state.dialog.as_ref() {
-                dialog.publish(progress);
-            }
-        })
-    }
-
-    fn attach(&self, dialog: crate::project_bootstrap::StartupProgressReporter) {
-        let Ok(mut state) = self.0.lock() else {
-            return;
-        };
-        if let Some(progress) = state.latest {
-            dialog.publish(progress);
+async fn show_opening_dialog(
+    app: &AppHandle,
+    state: &GlobalRuntimeState,
+    owner_label: &str,
+    kind: NativeProgressKind,
+    board: &OpeningProgressBoard,
+) -> Option<NativeProgressDialog> {
+    match native_dialog_window::show_native_progress(
+        app,
+        owner_label,
+        kind,
+        &state.progress_webview_data_directory,
+        Some(board),
+    )
+    .await
+    {
+        Ok(progress) => Some(progress),
+        Err(error) => {
+            tracing::warn!(
+                target: "myalbuns.desktop",
+                process_role = ProcessRole::Global.as_str(),
+                error = %error,
+                event = "project_launch_progress_dialog_unavailable",
+            );
+            None
         }
-        state.dialog = Some(dialog);
     }
 }
 
+/// One launch with its own progress window: Welcome, creation, recent
+/// Projects and batch export. The window lists this one Project.
 async fn launch_confirmed_project_with_bindings_and_progress(
     app: &AppHandle,
     mut state: GlobalRuntimeState,
@@ -995,198 +1021,23 @@ async fn launch_confirmed_project_with_bindings_and_progress(
     _launch_permit: &GlobalProjectLaunchPermit,
 ) -> ProjectLaunchOutcome {
     // The Host starts while the progress dialog is still being created; the
-    // relay keeps its latest image progress until the dialog attaches.
-    let progress_relay = OpeningProgressRelay::default();
-    state.bootstrap = state.bootstrap.with_progress(progress_relay.reporter());
-    let dialog = async {
-        let progress = match native_dialog_window::show_native_progress(
+    // board keeps its latest image progress until the dialog attaches.
+    let board = OpeningProgressBoard::default();
+    let row = board.add_project(project_display_name(&project_path));
+    state.bootstrap = state.bootstrap.with_progress(row.reporter());
+    let (progress, launch) = tokio::join!(
+        show_opening_dialog(
             app,
+            &state,
             presentation.owner_label,
             presentation.kind,
-            &state.progress_webview_data_directory,
-        )
-        .await
-        {
-            Ok(progress) => Some(progress),
-            Err(error) => {
-                tracing::warn!(
-                    target: "myalbuns.desktop",
-                    process_role = ProcessRole::Global.as_str(),
-                    error = %error,
-                    event = "project_launch_progress_dialog_unavailable",
-                );
-                None
-            }
-        };
-        if let Some(dialog) = progress.as_ref() {
-            progress_relay.attach(dialog.image_progress_reporter());
-        }
-        progress
-    };
-    let (mut progress, launch) = tokio::join!(
-        dialog,
+            &board
+        ),
         launch_confirmed_project_with_bindings(state.clone(), project_path, launch, root_bindings),
     );
-    let (outcome, force_owner_restore) = match launch {
-        ConfirmedProjectLaunch::Completed(outcome) => (outcome, false),
-        ConfirmedProjectLaunch::ExternalCopyNotWritable { pending } => {
-            let Some(dialog) = progress.as_mut() else {
-                drop(pending);
-                return ProjectLaunchOutcome::Failed {
-                    error: simple_failure(
-                        "external_copy_dialog_unavailable",
-                        "Não foi possível apresentar a decisão sobre a Cópia externa.",
-                        "Tente abrir a cópia novamente.",
-                    ),
-                };
-            };
-            let mut pending = Some(pending);
-            loop {
-                let attempt_id = pending
-                    .as_ref()
-                    .expect("the external-copy Host remains pending until a terminal choice")
-                    .attempt_id()
-                    .to_owned();
-                let decision = match dialog.request_external_copy_decision(&attempt_id).await {
-                    Ok(decision) => decision,
-                    Err(error) => {
-                        tracing::warn!(
-                            target: "myalbuns.desktop",
-                            process_role = ProcessRole::Global.as_str(),
-                            error = %error,
-                            attempt_id,
-                            event = "external_copy_dialog_unavailable",
-                        );
-                        drop(pending.take());
-                        return ProjectLaunchOutcome::Failed {
-                            error: simple_failure(
-                                "external_copy_dialog_unavailable",
-                                "Não foi possível apresentar a decisão sobre a Cópia externa.",
-                                "Tente abrir a cópia novamente.",
-                            ),
-                        };
-                    }
-                };
-                match decision {
-                    OpeningExternalCopyDecision::Cancel => {
-                        let mut pending = pending
-                            .take()
-                            .expect("the exact pending Host is cancelled once");
-                        let host_process_id = pending.host_process_id();
-                        drop(pending);
-                        tracing::info!(
-                            target: "myalbuns.desktop",
-                            process_role = ProcessRole::Global.as_str(),
-                            attempt_id = %attempt_id,
-                            host_process_id,
-                            outcome = "cancelled",
-                            event = "external_copy_activation_terminal",
-                        );
-                        break (ProjectLaunchOutcome::Cancelled, true);
-                    }
-                    OpeningExternalCopyDecision::SaveCopyAs => {
-                        let decision_window = dialog.decision_window();
-                        let current = pending
-                            .take()
-                            .expect("the exact pending Host is continued once");
-                        match continue_external_copy_as(&state, current, &decision_window).await {
-                            ExternalCopyContinuation::DestinationCancelled(current) => {
-                                pending = Some(current);
-                            }
-                            ExternalCopyContinuation::Terminal(outcome) => {
-                                let restore_owner = !matches!(
-                                    outcome,
-                                    ProjectLaunchOutcome::Opened | ProjectLaunchOutcome::Focused
-                                );
-                                break (outcome, restore_owner);
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        ConfirmedProjectLaunch::RecoveryAvailable {
-            pending,
-            recent_path,
-        } => {
-            let Some(dialog) = progress.as_mut() else {
-                drop(pending);
-                return ProjectLaunchOutcome::Failed {
-                    error: simple_failure(
-                        "recovery_dialog_unavailable",
-                        "Não foi possível apresentar a decisão de Recuperação.",
-                        "Tente abrir o projeto novamente.",
-                    ),
-                };
-            };
-            let attempt_id = pending.attempt_id().to_owned();
-            let decision = match dialog.request_recovery_decision(&attempt_id).await {
-                Ok(decision) => decision,
-                Err(error) => {
-                    tracing::warn!(
-                        target: "myalbuns.desktop",
-                        process_role = ProcessRole::Global.as_str(),
-                        error = %error,
-                        attempt_id,
-                        event = "project_recovery_dialog_unavailable",
-                    );
-                    drop(pending);
-                    return ProjectLaunchOutcome::Failed {
-                        error: simple_failure(
-                            "recovery_dialog_unavailable",
-                            "Não foi possível apresentar a decisão de Recuperação.",
-                            "Tente abrir o projeto novamente.",
-                        ),
-                    };
-                }
-            };
-            let recent_projects = state.recent_projects.clone();
-            match tauri::async_runtime::spawn_blocking(move || {
-                let outcome = pending.resolve(decision)?;
-                let recent_result = match &outcome {
-                    RecoveryContinuationOutcome::Ready(ready) => {
-                        Some(recent_projects.promote(&ready.project_id, recent_path))
-                    }
-                    RecoveryContinuationOutcome::Deferred => None,
-                };
-                Ok::<_, BootstrapFailure>((outcome, recent_result))
-            })
-            .await
-            {
-                Ok(Ok((RecoveryContinuationOutcome::Ready(ready), recent_result))) => {
-                    if recent_result.is_some_and(|result| result.is_err()) {
-                        tracing::warn!(
-                            target: "myalbuns.desktop",
-                            process_role = ProcessRole::Global.as_str(),
-                            project_id = ready.project_id,
-                            event = "recent_project_promotion_failed",
-                        );
-                    }
-                    (ProjectLaunchOutcome::Opened, false)
-                }
-                Ok(Ok((RecoveryContinuationOutcome::Deferred, _))) => {
-                    (ProjectLaunchOutcome::Cancelled, true)
-                }
-                Ok(Err(failure)) => (
-                    ProjectLaunchOutcome::Failed {
-                        error: bootstrap_failure(failure),
-                    },
-                    true,
-                ),
-                Err(_) => (
-                    ProjectLaunchOutcome::Failed {
-                        error: simple_failure(
-                            "host_unavailable",
-                            "Não foi possível concluir a Recuperação do projeto.",
-                            "Tente novamente. Se o problema continuar, reinicie o MyAlbuns.",
-                        ),
-                    },
-                    true,
-                ),
-            }
-        }
-    };
-    if let Some(progress) = progress {
+    let lane = tokio::sync::Mutex::new(progress);
+    let (outcome, force_owner_restore) = settle_confirmed_launch(&state, &lane, &row, launch).await;
+    if let Some(progress) = lane.into_inner() {
         progress.finish(
             force_owner_restore
                 || presentation.restore_owner_on_failure
@@ -1197,6 +1048,213 @@ async fn launch_confirmed_project_with_bindings_and_progress(
         );
     }
     outcome
+}
+
+/// Brings a confirmed launch to its outcome, asking the Recovery or
+/// External-copy decision in the opening window when the Host needs one.
+/// Also returns whether the window owner must come back even after success.
+async fn settle_confirmed_launch(
+    state: &GlobalRuntimeState,
+    lane: &tokio::sync::Mutex<Option<NativeProgressDialog>>,
+    row: &OpeningRow,
+    launch: ConfirmedProjectLaunch,
+) -> (ProjectLaunchOutcome, bool) {
+    match launch {
+        ConfirmedProjectLaunch::Completed(outcome) => (outcome, false),
+        ConfirmedProjectLaunch::ExternalCopyNotWritable { pending } => {
+            resolve_external_copy_decision(state, lane, row, pending).await
+        }
+        ConfirmedProjectLaunch::RecoveryAvailable {
+            pending,
+            recent_path,
+        } => resolve_recovery_decision(state, lane, row, pending, recent_path).await,
+    }
+}
+
+fn external_copy_dialog_failure() -> ProjectLaunchOutcome {
+    ProjectLaunchOutcome::Failed {
+        error: simple_failure(
+            "external_copy_dialog_unavailable",
+            "Não foi possível apresentar a decisão sobre a Cópia externa.",
+            "Tente abrir a cópia novamente.",
+        ),
+    }
+}
+
+fn recovery_dialog_failure() -> ProjectLaunchOutcome {
+    ProjectLaunchOutcome::Failed {
+        error: simple_failure(
+            "recovery_dialog_unavailable",
+            "Não foi possível apresentar a decisão de Recuperação.",
+            "Tente abrir o projeto novamente.",
+        ),
+    }
+}
+
+/// The External-copy decision. The lane is held while the decision page and
+/// the Save picker are on screen, and released before the copy's Host starts.
+/// The decision page stays on screen, in front of other windows, through the
+/// Save picker: cancelling the picker asks again without showing the list in
+/// between.
+async fn resolve_external_copy_decision(
+    state: &GlobalRuntimeState,
+    lane: &tokio::sync::Mutex<Option<NativeProgressDialog>>,
+    row: &OpeningRow,
+    pending: PendingExternalCopyProcess,
+) -> (ProjectLaunchOutcome, bool) {
+    let mut lane_guard = lane.lock().await;
+    let Some(dialog) = lane_guard.as_mut() else {
+        drop(pending);
+        return (external_copy_dialog_failure(), true);
+    };
+    let attempt_id = pending.attempt_id().to_owned();
+    let project_name = row.decision_name();
+    let on_screen = row.present_decision();
+    on_screen.keep_in_front_while_several(dialog.front_control());
+    loop {
+        let decision = match dialog
+            .request_external_copy_decision(&attempt_id, project_name.as_deref())
+            .await
+        {
+            Ok(decision) => decision,
+            Err(error) => {
+                tracing::warn!(
+                    target: "myalbuns.desktop",
+                    process_role = ProcessRole::Global.as_str(),
+                    error = %error,
+                    attempt_id,
+                    event = "external_copy_dialog_unavailable",
+                );
+                drop(on_screen);
+                drop(pending);
+                return (external_copy_dialog_failure(), true);
+            }
+        };
+        match decision {
+            OpeningExternalCopyDecision::Cancel => {
+                drop(on_screen);
+                let mut pending = pending;
+                let host_process_id = pending.host_process_id();
+                drop(pending);
+                tracing::info!(
+                    target: "myalbuns.desktop",
+                    process_role = ProcessRole::Global.as_str(),
+                    attempt_id = %attempt_id,
+                    host_process_id,
+                    outcome = "cancelled",
+                    event = "external_copy_activation_terminal",
+                );
+                return (ProjectLaunchOutcome::Cancelled, true);
+            }
+            OpeningExternalCopyDecision::SaveCopyAs => {
+                let decision_window = dialog.decision_window();
+                match choose_external_copy_destination(&decision_window).await {
+                    Ok(None) => continue,
+                    Err(outcome) => {
+                        drop(on_screen);
+                        drop(pending);
+                        return (outcome, true);
+                    }
+                    Ok(Some((destination, authorization))) => {
+                        // The list comes back before the lane is released, so
+                        // the next decision replaces the list, not this page.
+                        drop(on_screen);
+                        drop(lane_guard);
+                        let outcome =
+                            save_external_copy_as(state, pending, destination, authorization).await;
+                        let restore_owner = !matches!(
+                            outcome,
+                            ProjectLaunchOutcome::Opened | ProjectLaunchOutcome::Focused
+                        );
+                        return (outcome, restore_owner);
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// The Recovery decision. The lane is held only while the decision page is
+/// on screen; the Host continues after it is released.
+async fn resolve_recovery_decision(
+    state: &GlobalRuntimeState,
+    lane: &tokio::sync::Mutex<Option<NativeProgressDialog>>,
+    row: &OpeningRow,
+    pending: PendingRecoveryProcess,
+    recent_path: NativePathDto,
+) -> (ProjectLaunchOutcome, bool) {
+    let decision = {
+        let mut lane_guard = lane.lock().await;
+        let Some(dialog) = lane_guard.as_mut() else {
+            drop(pending);
+            return (recovery_dialog_failure(), true);
+        };
+        let attempt_id = pending.attempt_id().to_owned();
+        let project_name = row.decision_name();
+        let _on_screen = row.present_decision();
+        _on_screen.keep_in_front_while_several(dialog.front_control());
+        match dialog
+            .request_recovery_decision(&attempt_id, project_name.as_deref())
+            .await
+        {
+            Ok(decision) => decision,
+            Err(error) => {
+                tracing::warn!(
+                    target: "myalbuns.desktop",
+                    process_role = ProcessRole::Global.as_str(),
+                    error = %error,
+                    attempt_id,
+                    event = "project_recovery_dialog_unavailable",
+                );
+                drop(pending);
+                return (recovery_dialog_failure(), true);
+            }
+        }
+    };
+    let recent_projects = state.recent_projects.clone();
+    match tauri::async_runtime::spawn_blocking(move || {
+        let outcome = pending.resolve(decision)?;
+        let recent_result = match &outcome {
+            RecoveryContinuationOutcome::Ready(ready) => {
+                Some(recent_projects.promote(&ready.project_id, recent_path))
+            }
+            RecoveryContinuationOutcome::Deferred => None,
+        };
+        Ok::<_, BootstrapFailure>((outcome, recent_result))
+    })
+    .await
+    {
+        Ok(Ok((RecoveryContinuationOutcome::Ready(ready), recent_result))) => {
+            if recent_result.is_some_and(|result| result.is_err()) {
+                tracing::warn!(
+                    target: "myalbuns.desktop",
+                    process_role = ProcessRole::Global.as_str(),
+                    project_id = ready.project_id,
+                    event = "recent_project_promotion_failed",
+                );
+            }
+            (ProjectLaunchOutcome::Opened, false)
+        }
+        Ok(Ok((RecoveryContinuationOutcome::Deferred, _))) => {
+            (ProjectLaunchOutcome::Cancelled, true)
+        }
+        Ok(Err(failure)) => (
+            ProjectLaunchOutcome::Failed {
+                error: bootstrap_failure(failure),
+            },
+            true,
+        ),
+        Err(_) => (
+            ProjectLaunchOutcome::Failed {
+                error: simple_failure(
+                    "host_unavailable",
+                    "Não foi possível concluir a Recuperação do projeto.",
+                    "Tente novamente. Se o problema continuar, reinicie o MyAlbuns.",
+                ),
+            },
+            true,
+        ),
+    }
 }
 
 #[tauri::command]
@@ -1325,41 +1383,49 @@ async fn launch_confirmed_project_with_bindings(
 
 /// Executes every project in one native activation under one frozen binding
 /// plan. Binding failure stops the batch before any Host side effect; after
-/// that boundary, one Host terminal does not suppress the remaining files.
+/// that boundary, every file starts at once inside the current opening burst
+/// and one Host terminal does not suppress the remaining files.
+///
+/// The returned outcome folds this batch's files in input order; the burst
+/// finalizer, not the caller, presents the outcome and asks the Global to
+/// exit.
 async fn launch_activation_batch(
     app: &AppHandle,
     state: GlobalRuntimeState,
+    batch: BatchTicket<NativeProgressDialog>,
     projects: Vec<PathBuf>,
-    launch_permit: &GlobalProjectLaunchPermit,
+    _launch_permit: &GlobalProjectLaunchPermit,
 ) -> ProjectLaunchOutcome {
     let project_count = projects.len();
-    if let Some(rejection) = state.project_host_gate_rejection() {
-        return rejection;
-    }
-    let root_bindings = match path_io::capture_root_bindings(projects.clone()).await {
+    let root_bindings = match activation_batch_bindings(&state, &projects).await {
         Ok(root_bindings) => root_bindings,
-        Err(error) => {
-            return ProjectLaunchOutcome::Failed {
-                error: binding_failure(error),
-            };
+        Err(outcome) => {
+            if let Some(finished) = batch.finish(Some(outcome.clone())) {
+                finalize_opening_burst(app, &state, finished).await;
+            }
+            return outcome;
         }
     };
+    // No cap on Host startups: the heavy Cache work is bounded machine-wide
+    // by the imaging slots. A cap would be a semaphore taken inside
+    // `launch_burst_project` before its Host starts.
+    let launches = projects
+        .into_iter()
+        .map(|project| {
+            let ticket = batch.add_project(
+                NativePathDto::from(project.clone()),
+                project_display_name(&project),
+            );
+            launch_burst_project(app, state.clone(), ticket, project, root_bindings.clone())
+        })
+        .collect::<Vec<_>>();
+    // Every file is registered: the batch's own participation ends now and
+    // the files keep the burst open.
+    if let Some(finished) = batch.finish(None) {
+        finalize_opening_burst(app, &state, finished).await;
+    }
     let mut summary = ActivationBatchSummary::default();
-    for project in projects {
-        let outcome = launch_confirmed_project_with_bindings_and_progress(
-            app,
-            state.clone(),
-            project,
-            ConfirmedLaunch::OpenExisting,
-            root_bindings.clone(),
-            ProjectLaunchProgress {
-                kind: NativeProgressKind::Opening,
-                owner_label: GLOBAL_WINDOW_LABEL,
-                restore_owner_on_failure: false,
-            },
-            launch_permit,
-        )
-        .await;
+    for outcome in futures_util::future::join_all(launches).await {
         summary.observe(outcome);
     }
     tracing::info!(
@@ -1372,6 +1438,193 @@ async fn launch_activation_batch(
         event = "global_activation_batch_completed",
     );
     summary.terminal()
+}
+
+async fn activation_batch_bindings(
+    state: &GlobalRuntimeState,
+    projects: &[PathBuf],
+) -> Result<RootBindingPlan, ProjectLaunchOutcome> {
+    if let Some(error) = state.scheduled_cleanup_failure().await {
+        return Err(ProjectLaunchOutcome::Failed { error });
+    }
+    if let Some(rejection) = state.project_host_gate_rejection() {
+        return Err(rejection);
+    }
+    path_io::capture_root_bindings(projects.to_vec())
+        .await
+        .map_err(|error| ProjectLaunchOutcome::Failed {
+            error: binding_failure(error),
+        })
+}
+
+/// One file of an activation batch inside the opening burst. The first file
+/// of the burst presents the combined window while its Host starts; a path
+/// already in the burst follows its first launch instead of starting a
+/// second Host.
+async fn launch_burst_project(
+    app: &AppHandle,
+    mut state: GlobalRuntimeState,
+    mut ticket: ProjectTicket<NativeProgressDialog>,
+    project_path: PathBuf,
+    root_bindings: RootBindingPlan,
+) -> ProjectLaunchOutcome {
+    let outcome = match ticket.lead_row().cloned() {
+        None => ticket
+            .lead_outcome()
+            .await
+            .unwrap_or_else(|| ProjectLaunchOutcome::Failed {
+                error: simple_failure(
+                    "host_unavailable",
+                    "Não foi possível iniciar a Janela do projeto.",
+                    "Tente novamente. Se o problema continuar, reinicie o MyAlbuns.",
+                ),
+            }),
+        Some(row) => {
+            let burst = Arc::clone(ticket.burst());
+            state.bootstrap = state.bootstrap.with_progress(row.reporter());
+            if let Some(claim) = ticket.focus_claim_id() {
+                state.bootstrap = state.bootstrap.with_focus_claim(claim);
+            }
+            let presenter = ticket.take_presenter();
+            let present = async {
+                let Some(mut lane) = presenter else {
+                    return;
+                };
+                // The previous burst's window uses the same label.
+                burst.previous_presentation_closed().await;
+                *lane = show_opening_dialog(
+                    app,
+                    &state,
+                    GLOBAL_WINDOW_LABEL,
+                    NativeProgressKind::Opening,
+                    burst.board(),
+                )
+                .await;
+            };
+            let (_, launch) = tokio::join!(
+                present,
+                launch_confirmed_project_with_bindings(
+                    state.clone(),
+                    project_path.clone(),
+                    ConfirmedLaunch::OpenExisting,
+                    root_bindings.clone(),
+                ),
+            );
+            let outcome = settle_confirmed_launch(&state, burst.lane(), &row, launch)
+                .await
+                .0;
+            if should_retry_after_other_launches(&outcome, ticket.others_running()) {
+                // The same Project under another spelling of its path (a
+                // mapped drive and its network path, for example) may still
+                // be starting in this burst, with its editor not shown yet.
+                // Once the other launches end, the retry focuses that editor
+                // or reports the real failure.
+                ticket.wait_for_other_launches().await;
+                tracing::info!(
+                    target: "myalbuns.desktop",
+                    process_role = ProcessRole::Global.as_str(),
+                    event = "burst_project_launch_retried",
+                );
+                let launch = launch_confirmed_project_with_bindings(
+                    state.clone(),
+                    project_path,
+                    ConfirmedLaunch::OpenExisting,
+                    root_bindings,
+                )
+                .await;
+                settle_confirmed_launch(&state, burst.lane(), &row, launch)
+                    .await
+                    .0
+            } else {
+                outcome
+            }
+        }
+    };
+    if let Some(finished) = ticket.finish(outcome.clone()) {
+        finalize_opening_burst(app, &state, finished).await;
+    }
+    outcome
+}
+
+/// A launch that met its Project in use while other launches of its burst
+/// still run retries once, after they end.
+fn should_retry_after_other_launches(outcome: &ProjectLaunchOutcome, others_running: bool) -> bool {
+    others_running
+        && matches!(
+            outcome,
+            ProjectLaunchOutcome::Failed { error } if error.code == "project_in_use"
+        )
+}
+
+/// What the end of a burst does, from its terminal.
+#[derive(Debug, Eq, PartialEq)]
+struct BurstEnding {
+    /// The window's owner comes back when the burst did not succeed.
+    restore_owner: bool,
+    /// Every editor took over: the Global may exit.
+    hand_off: bool,
+    /// The Global comes back and stays.
+    restore_global: bool,
+    /// Presented once, through the activation terminal.
+    failure: Option<ProjectLaunchFailure>,
+}
+
+fn burst_ending(terminal: Option<&ProjectLaunchOutcome>) -> BurstEnding {
+    match terminal {
+        Some(ProjectLaunchOutcome::Opened | ProjectLaunchOutcome::Focused) => BurstEnding {
+            restore_owner: false,
+            hand_off: true,
+            restore_global: false,
+            failure: None,
+        },
+        Some(ProjectLaunchOutcome::Failed { error }) => BurstEnding {
+            restore_owner: true,
+            hand_off: false,
+            restore_global: true,
+            failure: Some(error.clone()),
+        },
+        Some(ProjectLaunchOutcome::Cancelled) => BurstEnding {
+            restore_owner: true,
+            hand_off: false,
+            restore_global: true,
+            failure: None,
+        },
+        None => BurstEnding {
+            restore_owner: true,
+            hand_off: false,
+            restore_global: false,
+            failure: None,
+        },
+    }
+}
+
+/// Runs once per burst, in the launch that ended it: closes the combined
+/// window, then hands off or presents the terminal. Successful rows stay
+/// visible until here; failures are presented once, by the Welcome.
+async fn finalize_opening_burst(
+    app: &AppHandle,
+    state: &GlobalRuntimeState,
+    finished: FinishedBurst<NativeProgressDialog>,
+) {
+    let ending = burst_ending(finished.terminal.as_ref());
+    if let Some(dialog) = finished.burst.lane().lock().await.take() {
+        dialog.finish(ending.restore_owner);
+    }
+    if ending.hand_off {
+        exit_global_after_handoff(app);
+    }
+    if ending.restore_global {
+        state.cancel_requested_exit();
+        if let Some(error) = &ending.failure {
+            state.record_startup_failure(error.clone());
+        }
+        show_existing_global_window(app);
+    }
+    if let Some(error) = ending.failure {
+        publish_global_activation_terminal(app, state, ProjectLaunchOutcome::Failed { error });
+    }
+    // Dropping the finished burst lets the next burst present its window.
+    drop(finished);
 }
 
 fn resolve_focus_existing(
@@ -1674,6 +1927,7 @@ fn staged_failure(
         stage,
         message: message.into(),
         action: Some(action.into()),
+        projects: Vec::new(),
     }
 }
 
@@ -1786,73 +2040,106 @@ async fn listen_for_forwarded_activations(app: AppHandle, state: GlobalRuntimeSt
             project_count = batch.projects.len(),
             event = "global_activation_forwarded",
         );
+
         wait_for_graphics_terminal(&state).await;
         if state.runtime_exiting.load(Ordering::Acquire) {
             break;
         }
 
-        let launch_permit = state.project_launches.enter_activation().await;
-        if let Some(section) = batch.settings {
-            state.cancel_requested_exit();
-            if let Err(error) = crate::settings_window::show(&app, section).await {
-                tracing::warn!(error = %error, event = "settings_window_open_failed");
+        // Settings, New project and a plain launch without files own the
+        // coordinator alone, inline: they wait for the openings in flight and
+        // no opening starts meanwhile. Files never wait for each other: a
+        // batch with files joins the opening burst in flight while the
+        // listener keeps receiving. Its shared guard is taken here, in
+        // arrival order, so a Settings or New-project request received later
+        // waits for these files instead of overtaking them. A queued
+        // exclusive owner only delays this wait: it waits for launches that
+        // already hold their guard, and none of them waits for the listener.
+        let launch_permit = match state.project_launches.enter_forwarded(&batch).await {
+            exclusive @ GlobalProjectLaunchPermit::Exclusive(_) => {
+                if let Some(section) = batch.settings {
+                    state.cancel_requested_exit();
+                    if let Err(error) = crate::settings_window::show(&app, section).await {
+                        tracing::warn!(error = %error, event = "settings_window_open_failed");
+                    }
+                    if batch.projects.is_empty() {
+                        primary.complete_activation();
+                        continue;
+                    }
+                }
+                if batch.new_project {
+                    state.cancel_requested_exit();
+                    let sequence = state.new_project_requests.fetch_add(1, Ordering::AcqRel) + 1;
+                    let _ = app.emit_to(
+                        GLOBAL_WINDOW_LABEL,
+                        "myalbuns://new-project-requested",
+                        sequence,
+                    );
+                    show_existing_global_window(&app);
+                }
+                if batch.projects.is_empty() {
+                    let exit_was_waiting = primary.complete_activation();
+                    if should_restore_global_after_pathless_activation(
+                        state.exit_requested.load(Ordering::Acquire),
+                    ) {
+                        state.cancel_requested_exit();
+                        show_existing_global_window(&app);
+                    }
+                    if exit_was_waiting && state.exit_requested.load(Ordering::Acquire) {
+                        commit_global_exit(&app, &state);
+                    }
+                    continue;
+                }
+                // The request's own part is done; its files start like any
+                // other batch of files.
+                drop(exclusive);
+                state.project_launches.enter_activation().await
             }
-            if batch.projects.is_empty() {
-                primary.complete_activation();
-                continue;
-            }
-        }
-        if batch.new_project {
-            state.cancel_requested_exit();
-            let sequence = state.new_project_requests.fetch_add(1, Ordering::AcqRel) + 1;
-            let _ = app.emit_to(
-                GLOBAL_WINDOW_LABEL,
-                "myalbuns://new-project-requested",
-                sequence,
-            );
-            show_existing_global_window(&app);
-        }
-        let outcome = if batch.projects.is_empty() {
-            None
-        } else if let Some(error) = state.scheduled_cleanup_failure().await {
-            Some(ProjectLaunchOutcome::Failed { error })
-        } else {
-            Some(launch_activation_batch(&app, state.clone(), batch.projects, &launch_permit).await)
+            shared @ GlobalProjectLaunchPermit::Shared(_) => shared,
         };
-        let exit_was_waiting = primary.complete_activation();
-
-        match outcome {
-            Some(ProjectLaunchOutcome::Opened | ProjectLaunchOutcome::Focused) => {
-                exit_global_after_handoff(&app);
-            }
-            Some(ProjectLaunchOutcome::Failed { error }) => {
-                state.cancel_requested_exit();
-                state.record_startup_failure(error.clone());
-                show_existing_global_window(&app);
-                publish_global_activation_terminal(
-                    &app,
-                    &state,
-                    ProjectLaunchOutcome::Failed { error },
-                );
-            }
-            Some(ProjectLaunchOutcome::Cancelled) => {
-                state.cancel_requested_exit();
-                show_existing_global_window(&app);
-            }
-            None if should_restore_global_after_pathless_activation(
-                state.exit_requested.load(Ordering::Acquire),
-            ) =>
-            {
-                state.cancel_requested_exit();
-                show_existing_global_window(&app);
-            }
-            None => {}
-        }
-
-        if exit_was_waiting && state.exit_requested.load(Ordering::Acquire) {
-            commit_global_exit(&app, &state);
-        }
+        tauri::async_runtime::spawn(launch_forwarded_projects(
+            app.clone(),
+            state.clone(),
+            Arc::clone(&primary),
+            batch.projects,
+            launch_permit,
+        ));
     }
+}
+
+/// Settings, New project and a launch without files are handled inline
+/// under the exclusive guard; a batch with only files starts its Projects
+/// under a shared guard.
+fn forwarded_activation_owns_the_coordinator(batch: &GlobalActivationBatch) -> bool {
+    batch.settings.is_some() || batch.new_project || batch.projects.is_empty()
+}
+
+/// One forwarded batch with files. The burst finalizer, not the batch, hands
+/// off or presents the outcome; the batch completes its activation exactly
+/// once and commits only an exit that was waiting for it.
+async fn launch_forwarded_projects(
+    app: AppHandle,
+    state: GlobalRuntimeState,
+    primary: Arc<PrimaryGlobalActivation>,
+    projects: Vec<PathBuf>,
+    launch_permit: GlobalProjectLaunchPermit,
+) {
+    let batch = opening_bursts(&app).join_batch();
+    launch_activation_batch(&app, state.clone(), batch, projects, &launch_permit).await;
+    drop(launch_permit);
+    if should_commit_exit_after_forwarded_batch(
+        primary.complete_activation(),
+        state.exit_requested.load(Ordering::Acquire),
+    ) {
+        commit_global_exit(&app, &state);
+    }
+}
+
+fn should_commit_exit_after_forwarded_batch(
+    last_pending_completed: bool,
+    exit_requested: bool,
+) -> bool {
+    last_pending_completed && exit_requested
 }
 
 fn should_restore_global_after_pathless_activation(exit_requested: bool) -> bool {
@@ -2034,10 +2321,10 @@ fn on_global_window_event(window: &tauri::Window, event: &tauri::WindowEvent) {
         && matches!(event, tauri::WindowEvent::Destroyed)
     {
         let app = window.app_handle().clone();
-        // Serialize closure with forwarded activations, including Alt+F4.
+        // Serialize closure with every opening, including Alt+F4.
         tauri::async_runtime::spawn(async move {
             let state = app.state::<GlobalRuntimeState>();
-            let _permit = state.project_launches.enter_activation().await;
+            let _permit = state.project_launches.enter_exclusive().await;
             if app
                 .get_webview_window(GLOBAL_WINDOW_LABEL)
                 .is_none_or(|global| !global.is_visible().unwrap_or(false))
@@ -2223,7 +2510,8 @@ pub(crate) fn run(
         .manage(crate::imaging_processor::ImagingProcessor::default())
         .manage(crate::operation_gate::OperationGate::new(&app_paths))
         .manage(desktop_webview_policy::WindowWebviewVisibility::default())
-        .manage(native_dialog_window::OpeningImageProgressState::default())
+        .manage(native_dialog_window::OpeningProgressState::default())
+        .manage(OpeningBursts::<NativeProgressDialog>::default())
         .on_window_event(on_global_window_event)
         .manage(state)
         .manage(crate::settings_window::SettingsWindowState::new(
@@ -2294,7 +2582,7 @@ pub(crate) fn run(
             crate::native_dialog_window::fit_owned_window,
             crate::native_dialog_window::resolve_opening_external_copy,
             crate::native_dialog_window::resolve_opening_recovery,
-            crate::native_dialog_window::opening_image_progress,
+            crate::native_dialog_window::opening_progress,
             create_project,
             open_project,
             recent_projects,
@@ -2322,10 +2610,38 @@ pub(crate) fn run(
 mod tests {
     use super::*;
 
+    async fn enters_within(
+        permit: impl std::future::Future<Output = GlobalProjectLaunchPermit>,
+        limit: Duration,
+    ) -> Option<GlobalProjectLaunchPermit> {
+        tokio::time::timeout(limit, permit).await.ok()
+    }
+
+    fn forwarded_batch(projects: &[&str], new_project: bool) -> GlobalActivationBatch {
+        GlobalActivationBatch {
+            client: ProcessInstanceId::current().expect("the test process is identified"),
+            projects: projects.iter().map(PathBuf::from).collect(),
+            settings: None,
+            new_project,
+        }
+    }
+
     #[tokio::test]
     async fn empty_forwarded_activation_waits_for_the_active_launch_owner() {
+        // A plain Start-menu or taskbar launch while the Global is alive.
+        let launch = forwarded_batch(&[], false);
+        assert!(
+            forwarded_activation_owns_the_coordinator(&launch),
+            "a launch without files is handled inline, where it restores the Welcome"
+        );
+        assert!(should_restore_global_after_pathless_activation(false));
+        assert!(
+            !should_restore_global_after_pathless_activation(true),
+            "an exit that already waits is not undone"
+        );
+
         let coordinator = GlobalProjectLaunchCoordinator::default();
-        let interactive_owner = coordinator.enter_interactive().await;
+        let interactive_owner = coordinator.enter_exclusive().await;
         let forwarded_coordinator = coordinator.clone();
         let (started_sender, started_receiver) = tokio::sync::oneshot::channel();
         let (entered_sender, mut entered_receiver) = tokio::sync::oneshot::channel();
@@ -2333,9 +2649,12 @@ mod tests {
             started_sender
                 .send(())
                 .expect("the forwarded opening announces its wait");
-            let _forwarded_owner = forwarded_coordinator.enter_activation().await;
+            let forwarded_owner = forwarded_coordinator.enter_forwarded(&launch).await;
             entered_sender
-                .send(())
+                .send(matches!(
+                    forwarded_owner,
+                    GlobalProjectLaunchPermit::Exclusive(_)
+                ))
                 .expect("the forwarded opening announces ownership");
         });
 
@@ -2348,15 +2667,257 @@ mod tests {
                 .is_err(),
             "even a pathless forwarded activation cannot reveal the Global behind an interactive decision"
         );
+        assert!(
+            enters_within(coordinator.enter_activation(), Duration::from_millis(30))
+                .await
+                .is_none(),
+            "no Windows opening starts while an interactive launch runs"
+        );
 
         drop(interactive_owner);
-        tokio::time::timeout(Duration::from_secs(1), &mut entered_receiver)
+        let exclusive = tokio::time::timeout(Duration::from_secs(1), &mut entered_receiver)
             .await
             .expect("the forwarded opening proceeds after the decision terminal")
             .expect("the forwarded opening acquires ownership");
+        assert!(
+            exclusive,
+            "the launch without files owns the coordinator alone"
+        );
         forwarded
             .await
             .expect("the forwarded opening joins cleanly");
+    }
+
+    #[tokio::test]
+    async fn a_file_batch_keeps_its_place_before_a_later_new_project_request() {
+        let coordinator = GlobalProjectLaunchCoordinator::default();
+        let files = forwarded_batch(&[r"C:\Projetos\A.myalbuns"], false);
+        let new_project = forwarded_batch(&[], true);
+        assert!(!forwarded_activation_owns_the_coordinator(&files));
+        assert!(forwarded_activation_owns_the_coordinator(&new_project));
+
+        // The listener takes the files' guard before it receives the request.
+        let files_permit =
+            enters_within(coordinator.enter_forwarded(&files), Duration::from_secs(1))
+                .await
+                .expect("files start at once");
+        assert!(matches!(files_permit, GlobalProjectLaunchPermit::Shared(_)));
+        let request = tokio::spawn({
+            let coordinator = coordinator.clone();
+            async move { coordinator.enter_forwarded(&new_project).await }
+        });
+        tokio::time::sleep(Duration::from_millis(30)).await;
+        assert!(
+            !request.is_finished(),
+            "the New-project form waits until the files received first end"
+        );
+
+        drop(files_permit);
+        let request = tokio::time::timeout(Duration::from_secs(1), request)
+            .await
+            .expect("the request runs after the files")
+            .expect("the request task joins");
+        assert!(matches!(request, GlobalProjectLaunchPermit::Exclusive(_)));
+    }
+
+    #[tokio::test]
+    async fn openings_started_by_windows_share_the_coordinator() {
+        let coordinator = GlobalProjectLaunchCoordinator::default();
+        let initial = coordinator.enter_activation().await;
+        let forwarded = enters_within(coordinator.enter_activation(), Duration::from_secs(1))
+            .await
+            .expect("a forwarded batch starts while the initial batch is opening");
+        drop((initial, forwarded));
+    }
+
+    #[tokio::test]
+    async fn an_exclusive_owner_waits_for_openings_and_holds_back_new_ones() {
+        let coordinator = GlobalProjectLaunchCoordinator::default();
+        let opening = coordinator.enter_activation().await;
+        let exclusive = tokio::spawn({
+            let coordinator = coordinator.clone();
+            async move { coordinator.enter_exclusive().await }
+        });
+        tokio::time::sleep(Duration::from_millis(30)).await;
+        assert!(
+            !exclusive.is_finished(),
+            "batch export or Settings waits for the opening in flight"
+        );
+        assert!(
+            enters_within(coordinator.enter_activation(), Duration::from_millis(30))
+                .await
+                .is_none(),
+            "a waiting exclusive owner holds back later openings"
+        );
+
+        drop(opening);
+        let exclusive = tokio::time::timeout(Duration::from_secs(1), exclusive)
+            .await
+            .expect("the exclusive owner enters after the opening")
+            .expect("the exclusive task joins");
+        assert!(matches!(exclusive, GlobalProjectLaunchPermit::Exclusive(_)));
+        drop(exclusive);
+        assert!(
+            enters_within(coordinator.enter_activation(), Duration::from_secs(1))
+                .await
+                .is_some()
+        );
+    }
+
+    #[test]
+    fn a_forwarded_batch_commits_only_an_exit_that_waited_for_it() {
+        assert!(should_commit_exit_after_forwarded_batch(true, true));
+        assert!(!should_commit_exit_after_forwarded_batch(true, false));
+        assert!(!should_commit_exit_after_forwarded_batch(false, true));
+    }
+
+    #[test]
+    fn a_project_in_use_retries_only_while_other_launches_of_its_burst_run() {
+        let in_use = ProjectLaunchOutcome::Failed {
+            error: simple_failure("project_in_use", "Em uso.", "Use a outra janela."),
+        };
+        let other = ProjectLaunchOutcome::Failed {
+            error: simple_failure("not_found", "Não encontrado.", "Escolha outro."),
+        };
+        assert!(should_retry_after_other_launches(&in_use, true));
+        assert!(
+            !should_retry_after_other_launches(&in_use, false),
+            "alone in its burst, the Project is really in use"
+        );
+        assert!(!should_retry_after_other_launches(&other, true));
+        assert!(!should_retry_after_other_launches(
+            &ProjectLaunchOutcome::Opened,
+            true
+        ));
+    }
+
+    #[test]
+    fn a_burst_presents_its_failure_once_through_the_activation_terminal() {
+        let failure = simple_failure("not_found", "Não encontrado.", "Escolha outro.");
+        assert_eq!(
+            burst_ending(Some(&ProjectLaunchOutcome::Failed {
+                error: failure.clone()
+            })),
+            BurstEnding {
+                restore_owner: true,
+                hand_off: false,
+                restore_global: true,
+                failure: Some(failure),
+            }
+        );
+        for success in [ProjectLaunchOutcome::Opened, ProjectLaunchOutcome::Focused] {
+            assert_eq!(
+                burst_ending(Some(&success)),
+                BurstEnding {
+                    restore_owner: false,
+                    hand_off: true,
+                    restore_global: false,
+                    failure: None,
+                }
+            );
+        }
+        assert_eq!(
+            burst_ending(Some(&ProjectLaunchOutcome::Cancelled)),
+            BurstEnding {
+                restore_owner: true,
+                hand_off: false,
+                restore_global: true,
+                failure: None,
+            }
+        );
+        assert_eq!(
+            burst_ending(None),
+            BurstEnding {
+                restore_owner: true,
+                hand_off: false,
+                restore_global: false,
+                failure: None,
+            },
+            "a burst with nothing to open presents nothing"
+        );
+    }
+
+    #[test]
+    fn the_initial_batch_reaches_the_welcome_only_through_the_burst_terminal() {
+        // `complete_graphics_gate` hands the initial files to the burst and
+        // returns `None`; the finalizer presents the burst terminal once.
+        let bursts = OpeningBursts::<()>::default();
+        let initial = bursts.join_batch();
+        let project = initial.add_project(
+            NativePathDto::from(PathBuf::from(r"C:\Projetos\A.myalbuns")),
+            "A".into(),
+        );
+        assert!(initial.finish(None).is_none());
+        let failure = simple_failure("not_found", "Não encontrado.", "Escolha outro.");
+        let finished = project
+            .finish(ProjectLaunchOutcome::Failed {
+                error: failure.clone(),
+            })
+            .expect("the only file ends the burst");
+        let ending = burst_ending(finished.terminal.as_ref());
+        assert_eq!(
+            ending.failure,
+            Some(failure),
+            "one Project keeps today's failure, without a list"
+        );
+
+        let terminals = GlobalActivationTerminalStore::default();
+        if let Some(error) = ending.failure {
+            terminals.record(ProjectLaunchOutcome::Failed { error });
+        }
+        assert_eq!(
+            terminals.latest().map(|terminal| terminal.sequence),
+            Some(1)
+        );
+    }
+
+    #[test]
+    fn failures_of_projects_opened_together_name_each_project() {
+        let in_use = simple_failure(
+            "project_in_use",
+            "Este projeto já está aberto em outra janela.",
+            "Use a janela já aberta ou feche-a antes de tentar novamente.",
+        );
+        let named = serde_json::to_value(in_use.clone().naming_project("SARAH XAVIER".into()))
+            .expect("the failure serializes");
+        assert_eq!(named["code"], "project_in_use");
+        assert_eq!(
+            named["message"],
+            "Este projeto já está aberto em outra janela."
+        );
+        assert_eq!(
+            named["projects"],
+            serde_json::json!([{
+                "name": "SARAH XAVIER",
+                "message": "Este projeto já está aberto em outra janela.",
+                "action": "Use a janela já aberta ou feche-a antes de tentar novamente."
+            }])
+        );
+        assert!(
+            serde_json::to_value(&in_use)
+                .unwrap()
+                .get("projects")
+                .is_none(),
+            "a single Project keeps today's failure"
+        );
+
+        let missing = simple_failure(
+            "not_found",
+            "O arquivo não foi encontrado.",
+            "Escolha outro.",
+        );
+        let several = ProjectLaunchFailure::of_projects(vec![
+            (Some("SARAH XAVIER".into()), in_use),
+            (Some("YUELSON RODRIGO".into()), missing),
+        ]);
+        let several = serde_json::to_value(several).unwrap();
+        assert_eq!(several["code"], "projects_not_opened");
+        assert_eq!(several["projects"][0]["name"], "SARAH XAVIER");
+        assert_eq!(several["projects"][1]["name"], "YUELSON RODRIGO");
+        assert_eq!(
+            several["projects"][1]["message"],
+            "O arquivo não foi encontrado."
+        );
     }
 
     #[cfg(windows)]

@@ -2,7 +2,7 @@
 status: accepted
 document: design
 date: 2026-09-06
-updated: 2026-09-25
+updated: 2026-10-07
 platform: windows
 implementation-readiness: ready-for-agent
 ---
@@ -60,8 +60,12 @@ confirmada antes de liberar a reserva. Não existe um segundo controlador de
 processos paralelo ao `ImagingProcessor`.
 
 `ImagingProcessor` possui os limites de trabalhadores e de memória para todas
-as ações e demandas de Cache. A política considera capacidade de CPU, RAM física
-e commit disponíveis, limita reservas por imagem e reduz a concorrência até
+as ações e demandas de Cache do seu processo. Entre processos, cada Processador
+iniciado também ocupa uma vaga da máquina com o mesmo teto, e um trabalho
+admitido no modo de pouca memória ocupa a vaga única de pouca memória, conforme
+o [armazenamento local e Cache](0010-armazenamento-local-e-cache.md).
+A política considera capacidade de CPU, RAM física e commit disponíveis,
+limita reservas por imagem e reduz a concorrência até
 um trabalho sob pressão, conforme a
 [admissão por memória](0032-revisao-da-admissao-por-memoria.md).
 Não aprende continuamente pela velocidade do lote. A Exportação

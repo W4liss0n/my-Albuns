@@ -461,3 +461,36 @@ test("fails closed on malformed activation terminal payloads", async () => {
 
   expect(listener).not.toHaveBeenCalled();
 });
+
+test("a failure of Projects opened together keeps each named Project", async () => {
+  const listener = vi.fn();
+  vi.mocked(listen).mockResolvedValueOnce(vi.fn());
+  vi.mocked(invoke).mockResolvedValueOnce({
+    sequence: 1,
+    outcome: {
+      status: "failed",
+      error: {
+        code: "projects_not_opened",
+        message: "2 projetos não abriram.",
+        projects: [
+          { name: "SARAH XAVIER", message: "Em uso.", action: "Use a outra janela." },
+          { name: "YUELSON RODRIGO", message: "Não encontrado.", pathname: "C:\A.myalbuns" },
+        ],
+      },
+    },
+  });
+
+  await tauriGlobalProjectPort.onActivationTerminal(listener);
+
+  expect(listener).toHaveBeenCalledWith({
+    status: "failed",
+    error: {
+      code: "projects_not_opened",
+      message: "2 projetos não abriram.",
+      projects: [
+        { name: "SARAH XAVIER", message: "Em uso.", action: "Use a outra janela." },
+        { name: "YUELSON RODRIGO", message: "Não encontrado." },
+      ],
+    },
+  });
+});

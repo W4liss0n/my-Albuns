@@ -54,6 +54,7 @@ image = { workspace = true, features = ["jpeg", "png", "tiff"] }
 webview2-com = "0.38"
 windows = { version = "0.61", features = [
     "Win32_Foundation",
+    "Win32_Graphics_Dwm",
     "Win32_System_Com",
     "Win32_UI_Input_KeyboardAndMouse",
     "Win32_UI_Shell",

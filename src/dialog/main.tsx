@@ -3,6 +3,8 @@ import ReactDOM from "react-dom/client";
 
 import { OpeningExternalCopyDialog } from "./OpeningExternalCopyDialog";
 import { OpeningRecoveryDialog } from "./OpeningRecoveryDialog";
+import { ProjectFailureList } from "./ProjectFailureList";
+import { parseProjectFailureDetails } from "../global/platform/projectLaunchBridge";
 import { installDesktopWebViewPolicy } from "../platform/desktopWebViewPolicy";
 import {
   resolveOpeningExternalCopy,
@@ -10,9 +12,18 @@ import {
 } from "../platform/tauriOpeningDialogControls";
 import { dismissOwnedWindow } from "../platform/tauriOwnedDialogControls";
 import { tauriWindowControls } from "../platform/tauriWindowControls";
-import { subscribeOpeningImageProgress } from "../platform/tauriOpeningImageProgress";
-import type { StartupImageProgress } from "../contracts/generated/StartupImageProgress";
-import { OpeningProgressDialog } from "./OpeningProgressDialog";
+import {
+  parseOpeningProgress,
+  subscribeOpeningProgress,
+} from "../platform/tauriOpeningProgress";
+import type { OpeningProgress } from "../contracts/generated/OpeningProgress";
+import {
+  OPENING_PROJECT_LIST_WIDTH,
+  OpeningProgressDialog,
+  OpeningProjectsDialog,
+  openingProgressView,
+  type OpeningProgressView,
+} from "./OpeningProgressDialog";
 import {
   MessageDialog,
   OwnedWindowShell,
@@ -31,32 +42,68 @@ function parameter(name: string, fallback: string) {
   return value ? value.slice(0, 800) : fallback;
 }
 
+/** Projects opened together that did not open, each with its own reason. */
+function failedProjects() {
+  const projects = parameters.get("projects");
+  if (!projects) return null;
+  try {
+    return parseProjectFailureDetails(JSON.parse(projects));
+  } catch {
+    return null;
+  }
+}
+
 function openedFromLoadingOwner() {
   return window.sessionStorage.getItem(OPENING_OWNER_MARKER) === "loading";
 }
 
-function DialogContent() {
-  const windowControls = useWindowControls();
-  const kind = parameters.get("kind");
-  const [imageProgress, setImageProgress] = useState<StartupImageProgress | null>(() => {
-    const completedFiles = Number(parameters.get("imageCompleted"));
-    const totalFiles = Number(parameters.get("imageTotal"));
-    return Number.isSafeInteger(completedFiles) && Number.isSafeInteger(totalFiles) &&
-      totalFiles > 0 && completedFiles >= 0 && completedFiles <= totalFiles
-      ? { completedFiles, totalFiles } : null;
-  });
+const openingKinds = ["opening-project", "creating-project", "project-recovery", "external-copy"];
+const decisionKinds = ["project-recovery", "external-copy"];
+
+/**
+ * Preview pages describe the rows in the address: one Project's photos, or
+ * several Projects as JSON.
+ */
+function initialOpeningProgress(): OpeningProgress | null {
+  const projects = parameters.get("openingProjects");
+  if (projects) {
+    try {
+      return parseOpeningProgress(JSON.parse(projects));
+    } catch {
+      return null;
+    }
+  }
+  const completedFiles = Number(parameters.get("imageCompleted"));
+  const totalFiles = Number(parameters.get("imageTotal"));
+  return Number.isSafeInteger(completedFiles) && Number.isSafeInteger(totalFiles) &&
+    totalFiles > 0 && completedFiles >= 0 && completedFiles <= totalFiles
+    ? { projects: [{ name: "", state: "preparing", completedFiles, totalFiles }] }
+    : null;
+}
+
+function useOpeningProgressView(kind: string | null): OpeningProgressView | null {
+  const [progress, setProgress] = useState<OpeningProgress | null>(initialOpeningProgress);
   useEffect(() => {
-    if (!["opening-project", "creating-project", "project-recovery", "external-copy"].includes(kind ?? "")) return;
-    const subscription = subscribeOpeningImageProgress(setImageProgress);
+    if (!openingKinds.includes(kind ?? "")) return;
+    const subscription = subscribeOpeningProgress(setProgress);
     void subscription.ready.catch(() => undefined);
     return subscription.dispose;
   }, [kind]);
+  return openingProgressView(progress, decisionKinds.includes(kind ?? ""));
+}
+
+function DialogContent({ opening }: { opening: OpeningProgressView | null }) {
+  const windowControls = useWindowControls();
+  const kind = parameters.get("kind");
   useLayoutEffect(() => {
     if (kind === "opening-project") window.sessionStorage.setItem(OPENING_OWNER_MARKER, "loading");
   }, [kind]);
 
-  if (imageProgress) {
-    return <OpeningProgressDialog creating={kind === "creating-project"} images={imageProgress} />;
+  if (opening?.kind === "list") {
+    return <OpeningProjectsDialog projects={opening.projects} />;
+  }
+  if (opening?.kind === "single") {
+    return <OpeningProgressDialog creating={kind === "creating-project"} images={opening.images} />;
   }
 
   const closeDialog = () => {
@@ -80,15 +127,16 @@ function DialogContent() {
       "O MyAlbuns encontrou um problema ao preparar a janela do projeto.",
     );
     const action = parameter("action", "Tente novamente.");
+    const projects = failedProjects();
 
     return (
       <MessageDialog
-        description={
+        description={projects ? <ProjectFailureList projects={projects} /> : (
           <>
             <p>{message}</p>
             <p>{action}</p>
           </>
-        }
+        )}
         secondaryAction={{ label: "Fechar", onClick: closeDialog }}
         title={title}
         tone="error"
@@ -101,6 +149,7 @@ function DialogContent() {
       <OpeningRecoveryDialog
         attemptId={parameter("attemptId", "")}
         openedFromLoadingOwner={openedFromLoadingOwner()}
+        projectName={parameters.get("projectName")?.trim() || null}
         resolveOpeningRecovery={resolveOpeningRecovery}
       />
     );
@@ -111,6 +160,7 @@ function DialogContent() {
       <OpeningExternalCopyDialog
         attemptId={parameter("attemptId", "")}
         openedFromLoadingOwner={openedFromLoadingOwner()}
+        projectName={parameters.get("projectName")?.trim() || null}
         resolveOpeningExternalCopy={resolveOpeningExternalCopy}
       />
     );
@@ -121,6 +171,7 @@ function DialogContent() {
 
 function DialogWindow() {
   const kind = parameters.get("kind");
+  const opening = useOpeningProgressView(kind);
   const controls =
     kind === "project-failure"
       ? { ...tauriWindowControls, close: dismissOwnedWindow }
@@ -130,8 +181,9 @@ function DialogWindow() {
     <WindowControlsProvider controls={controls}>
       <OwnedWindowShell
         controls={kind === "project-failure" ? "close" : "none"}
+        width={opening?.kind === "list" ? OPENING_PROJECT_LIST_WIDTH : undefined}
       >
-        <DialogContent />
+        <DialogContent opening={opening} />
       </OwnedWindowShell>
     </WindowControlsProvider>
   );

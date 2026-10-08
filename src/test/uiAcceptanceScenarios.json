@@ -1785,6 +1785,96 @@
       "actions": []
     },
     {
+      "id": "opening-several-projects",
+      "title": "Diálogo de abertura — vários projetos abertos juntos",
+      "implementationPath": "/dialog.html?kind=opening-project&openingProjects=%7B%22projects%22%3A%5B%7B%22name%22%3A%22YUELSON%20RODRIGO%22%2C%22state%22%3A%22ready%22%2C%22completedFiles%22%3A40%2C%22totalFiles%22%3A40%7D%2C%7B%22name%22%3A%22SARAH%20XAVIER%22%2C%22state%22%3A%22preparing%22%2C%22completedFiles%22%3A32%2C%22totalFiles%22%3A70%7D%2C%7B%22name%22%3A%22SARAH%20DA%20SILVA%22%2C%22state%22%3A%22preparing%22%2C%22completedFiles%22%3A12%2C%22totalFiles%22%3A47%7D%2C%7B%22name%22%3A%22FORMATURA%20TURMA%20DE%20MEDICINA%202026%20%E2%80%94%20%C3%81LBUM%20DOS%20FORMANDOS%22%2C%22state%22%3A%22starting%22%2C%22completedFiles%22%3A0%2C%22totalFiles%22%3A0%7D%5D%7D",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "owned-progress-dialog",
+        "implementationCaptureSelector": ".ui-owned-window-shell",
+        "reason": "Vários projetos abertos juntos pelo Windows compartilham uma janela com uma linha por projeto, conforme a decisão de 07/10/2026 em docs/design/0002-tela-de-boas-vindas.md."
+      },
+      "viewport": {
+        "width": 520,
+        "height": 320
+      },
+      "readySelector": "ul[aria-label=\"Projetos\"] [role=\"progressbar\"][aria-valuenow=\"32\"][aria-valuemax=\"70\"]",
+      "actions": []
+    },
+    {
+      "id": "opening-several-projects-failed",
+      "title": "Abertura de vários projetos — falhas listadas por projeto",
+      "implementationPath": "/dialog.html?kind=project-failure&title=N%C3%A3o%20foi%20poss%C3%ADvel%20abrir%202%20projetos&message=N%C3%A3o%20foi%20poss%C3%ADvel%20abrir%202%20projetos.&action=Feche%20esta%20janela%20e%20tente%20novamente.&projects=%5B%7B%22name%22%3A%22SARAH%20XAVIER%22%2C%22message%22%3A%22Este%20projeto%20j%C3%A1%20est%C3%A1%20aberto%20em%20outra%20janela.%22%2C%22action%22%3A%22Use%20a%20janela%20que%20j%C3%A1%20est%C3%A1%20aberta.%22%7D%2C%7B%22name%22%3A%22YUELSON%20RODRIGO%22%2C%22message%22%3A%22O%20arquivo%20do%20projeto%20n%C3%A3o%20foi%20encontrado.%22%2C%22action%22%3A%22Verifique%20se%20o%20arquivo%20foi%20movido%20ou%20renomeado%20e%20abra%20de%20novo.%22%7D%5D",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "owned-message-dialog",
+        "implementationCaptureSelector": ".ui-owned-window-shell",
+        "reason": "Quando vários projetos abertos juntos não abrem, um único aviso lista cada projeto com o seu motivo, conforme a decisão de 07/10/2026 em docs/design/0002-tela-de-boas-vindas.md."
+      },
+      "viewport": {
+        "width": 520,
+        "height": 420
+      },
+      "readySelector": "ul[aria-label=\"Projetos que não abriram\"] li:nth-of-type(2)",
+      "actions": []
+    },
+    {
+      "id": "project-recovery-modal-named",
+      "title": "Recuperação de sessão — decisão nomeada entre vários projetos",
+      "implementationPath": "/dialog.html?kind=project-recovery&attemptId=acceptance-preview&projectName=SARAH%20XAVIER",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "project-recovery-modal",
+        "implementationCaptureSelector": ".ui-owned-window-shell",
+        "reason": "Com vários projetos na janela de abertura, a decisão de Recuperação diz a qual projeto se refere, conforme a decisão de 07/10/2026 em docs/design/0002-tela-de-boas-vindas.md."
+      },
+      "viewport": {
+        "width": 492,
+        "height": 320
+      },
+      "readySelector": ".ui-owned-window-shell:has([data-opening-owner-transition] [role=\"dialog\"][aria-modal=\"true\"]):not(:has(.ui-modal-dialog-layer)):not(:has(.ui-application-header__status:not(:empty)))",
+      "actions": [
+        {
+          "type": "assert-single-line",
+          "selector": ".project-recovery-dialog-scope .ui-dialog-window__footer button:nth-of-type(1)"
+        },
+        {
+          "type": "assert-single-line",
+          "selector": ".project-recovery-dialog-scope .ui-dialog-window__footer button:nth-of-type(2)"
+        },
+        {
+          "type": "assert-single-line",
+          "selector": ".project-recovery-dialog-scope .ui-dialog-window__footer button:nth-of-type(3)"
+        }
+      ]
+    },
+    {
+      "id": "external-copy-opening-dialog-named",
+      "title": "Cópia externa — decisão nomeada entre vários projetos",
+      "implementationPath": "/dialog.html?kind=external-copy&attemptId=acceptance-preview&projectName=SARAH%20XAVIER",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "external-copy-opening-dialog",
+        "implementationCaptureSelector": ".ui-owned-window-shell",
+        "reason": "Com vários projetos na janela de abertura, a decisão de Cópia externa diz a qual projeto se refere, conforme a decisão de 07/10/2026 em docs/design/0002-tela-de-boas-vindas.md."
+      },
+      "viewport": {
+        "width": 440,
+        "height": 320
+      },
+      "readySelector": ".ui-owned-window-shell:has([data-opening-owner-transition] .external-copy-decision-dialog-scope [role=\"dialog\"][aria-modal=\"true\"]):not(:has(.ui-modal-dialog-layer))",
+      "actions": [
+        {
+          "type": "assert-single-line",
+          "selector": ".external-copy-decision-dialog-scope .ui-dialog-window__footer button:nth-of-type(1)"
+        },
+        {
+          "type": "assert-single-line",
+          "selector": ".external-copy-decision-dialog-scope .ui-dialog-window__footer button:nth-of-type(2)"
+        }
+      ]
+    },
+    {
       "id": "new-project-operational-failure-dialog",
       "title": "Novo Projeto — falha operacional em diálogo pertencente",
       "implementationPath": "/dialog.html?kind=project-failure&title=N%C3%A3o%20foi%20poss%C3%ADvel%20escolher%20a%20Imagem%20decorativa&message=O%20arquivo%20escolhido%20n%C3%A3o%20cont%C3%A9m%20uma%20imagem%20JPEG%20ou%20PNG.&action=Escolha%20outro%20arquivo%20JPEG%20ou%20PNG.",

@@ -149,6 +149,7 @@ test("fits the complete sheet to the continuous Canvas at device resolution", as
   expect(pixiLifecycle.initOptions[0]).toMatchObject({
     autoDensity: true,
     resolution: window.devicePixelRatio,
+    autoStart: false,
   });
 });
 

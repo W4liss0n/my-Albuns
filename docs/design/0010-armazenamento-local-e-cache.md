@@ -1,7 +1,7 @@
 ---
 status: accepted
 document: design
-updated: 2026-09-24
+updated: 2026-10-07
 ---
 
 # Armazenamento local e Cache
@@ -283,6 +283,16 @@ Na reabertura, a recuperação exclusiva do namespace já valida e decodifica
 as representações indexadas. Ela conserva o hash desses bytes reduzidos para
 reaproveitar essa validação na primeira demanda, sem iniciar outro Processador.
 
+A concessão de manutenção do Cache só ordena a montagem do namespace em relação
+às limpezas. O Host que inicia espera essa concessão por até 30 segundos, em vez
+de falhar ao encontrá-la ocupada; ainda com ela, espera até 5 segundos pela
+reserva do namespace, que uma medição ou limpeza pode reter por um instante, e
+devolve a concessão assim que obtém essa reserva. `Salvar como` não espera nenhuma das
+duas, porque reserva o novo namespace durante a troca de identidade do Host. A
+espera pelos escritores anteriores e a recuperação acontecem apenas sob a
+reserva do namespace, que toda remoção adquire antes de tocar uma pasta. Assim,
+vários Projetos podem abrir ao mesmo tempo enquanto cada um recupera o seu.
+
 Quando faltarem gerações utilizáveis, inclusive depois de limpar o Cache, o
 diálogo de abertura permanece visível até terminar a preparação de todas as
 imagens cujos originais estejam disponíveis, mesmo fora da área visível do
@@ -344,7 +354,7 @@ permanece sujeita aos limites de residência do Painel e do Canvas.
 
 É aceito no MVP o caso raro de uma alteração feita com o aplicativo fechado conservar exatamente tamanho e data. A Exportação reabre o original e não depende dessa concessão.
 
-Fora de manutenção, o `CacheEngine` de cada Projeto é o proprietário lógico de seu namespace. Até oito Processadores de Imagens podem preparar mídias simultaneamente, com o mesmo limite para ações do usuário e miniaturas em segundo plano. Cada processo escreve uma geração própria; a atualização do índice permanece serializada pelo `CacheEngine`, e a coleta de gerações não remove candidatos de outros trabalhos ativos. Jobs equivalentes compartilham o resultado e obsoletos são cancelados. Cada escritor publica sua instância exata em um dos oito registros duráveis do namespace antes de receber trabalho; a recuperação espera a saída de todos eles antes de qualquer limpeza. O primeiro registro conserva o nome usado pela implementação anterior.
+Fora de manutenção, o `CacheEngine` de cada Projeto é o proprietário lógico de seu namespace. Até oito Processadores de Imagens podem preparar mídias simultaneamente, com o mesmo limite para ações do usuário e miniaturas em segundo plano. Esse limite vale para a máquina inteira, e não para cada Projeto: depois da admissão local, cada Processador, iniciado por um Host, pela janela Global ou pela linha de comando, ocupa uma das vagas da máquina (o mesmo teto, capacidade lógica de CPU menos um, até oito) enquanto executa e a devolve quando termina; uma Exportação com várias páginas disputa a vaga a cada Processador. As vagas são mutexes nomeados, liberados pelo Windows se o processo que as ocupa terminar. Um trabalho admitido no modo de pouca memória ocupa também a vaga única de pouca memória, de modo que esses trabalhos rodam um por vez entre todos os processos. Um Host sem nenhuma de suas janelas em foco (a Janela do projeto, o visualizador de imagens ou outra janela do próprio Host) inicia seus Processadores com prioridade abaixo do normal, inclusive na preparação da abertura, enquanto a janela ainda está oculta. O Projeto em foco, a janela Global e a linha de comando mantêm a prioridade normal. Todos usam as mesmas vagas. Cada processo escreve uma geração própria; a atualização do índice permanece serializada pelo `CacheEngine`, e a coleta de gerações não remove candidatos de outros trabalhos ativos. Jobs equivalentes compartilham o resultado e obsoletos são cancelados. Cada escritor publica sua instância exata em um dos oito registros duráveis do namespace antes de receber trabalho; a recuperação espera a saída de todos eles antes de qualquer limpeza. O primeiro registro conserva o nome usado pela implementação anterior.
 
 A importação combina a validação inicial dos JPEGs e o preparo da prévia no mesmo decode, em lotes limitados por processo. Uma inspeção alternativa de Original reserva toda a capacidade e a memória estimada, usando o mesmo plano de caminhos da tentativa. O teto de oito trabalhadores é reduzido pela capacidade de CPU e pelo orçamento de RAM/commit definido no [contrato de importação](0020-importacao-com-decode-unico-e-lotes.md). Os resultados são aplicados na ordem da seleção, em uma única ação do Histórico. A preparação do Cache informa conclusão por imagem, mesmo quando os resultados chegam fora de ordem, e uma falha individual não interrompe o lote. A Exportação aguarda a pausa do Cache e reserva toda a capacidade do Processador. Cache não participa de Salvamento, Undo/Redo ou Recuperação.
 
@@ -401,11 +411,13 @@ Depois da confirmação, a limpeza acontece em segundo plano, sem diálogo de pr
 | job obsoleto termina | geração descartada |
 | queda durante geração | temporário descartado; geração publicada anterior continua válida |
 | Projeto abre durante `Liberar espaço` | namespace reservado por quem vencer; nunca remoção concorrente |
+| Projeto abre durante manutenção do Cache ou a montagem de outro Projeto | espera a concessão por até 30 segundos; recupera o namespace sem retê-la |
 | limpeza total com Projeto ativo | agendada para a próxima inicialização |
 | Exportação | usa snapshot validado e originais; Cache não é fonte final |
 | Projeto ou mídia em UNC | Cache continua sob a raiz local do aplicativo e a Identidade do Projeto |
 | namespace vazio de Projeto fechado | removido na próxima inicialização |
 | vários Projetos abertos ao mesmo tempo | cada host ocupa um perfil WebView2 próprio, liberado ao fechar |
+| vários Projetos preparando Cache ao mesmo tempo | dividem as vagas de Processador da máquina; os que estão fora de foco rodam abaixo do normal |
 
 ## Decisões adiadas
 

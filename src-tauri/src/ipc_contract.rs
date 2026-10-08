@@ -770,6 +770,36 @@ pub struct StartupImageProgress {
     pub total_files: u32,
 }
 
+/// What the opening window shows: every Project being opened together, in the
+/// order its opening started. One Project keeps the single-Project dialog.
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub struct OpeningProgress {
+    pub(crate) projects: Vec<OpeningProjectProgress>,
+}
+
+/// One Project of the opening window. `name` is the file name without its
+/// extension; the full path never reaches the window.
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub struct OpeningProjectProgress {
+    pub(crate) name: String,
+    pub(crate) state: OpeningProjectState,
+    pub(crate) completed_files: u32,
+    pub(crate) total_files: u32,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub enum OpeningProjectState {
+    Starting,
+    Preparing,
+    Deciding,
+    Ready,
+    Failed,
+    Cancelled,
+}
+
 #[derive(Serialize, TS)]
 #[serde(
     tag = "kind",

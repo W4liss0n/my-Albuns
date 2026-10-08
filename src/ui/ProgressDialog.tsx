@@ -97,7 +97,8 @@ interface ProgressBarProps {
   total?: number;
 }
 
-function ProgressBar({
+/** The shared bar; measured when both counts are given. */
+export function ProgressBar({
   completed,
   indicatorStyle,
   title,

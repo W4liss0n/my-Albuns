@@ -6,10 +6,12 @@ import { ExternalCopyDecisionDialog } from "./ExternalCopyDecisionDialog";
 export function OpeningExternalCopyDialog({
   attemptId,
   openedFromLoadingOwner,
+  projectName = null,
   resolveOpeningExternalCopy,
 }: {
   attemptId: string;
   openedFromLoadingOwner: boolean;
+  projectName?: string | null;
   resolveOpeningExternalCopy(
     attemptId: string,
     decision: OpeningExternalCopyDecision,
@@ -37,6 +39,7 @@ export function OpeningExternalCopyDialog({
   return (
     <div data-opening-owner-transition={String(openedFromLoadingOwner)}>
       <ExternalCopyDecisionDialog
+        projectName={projectName}
         error={
           attemptId
             ? error

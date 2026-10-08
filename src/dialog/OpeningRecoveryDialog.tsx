@@ -6,10 +6,12 @@ import { ProjectRecoveryDialog } from "./ProjectRecoveryDialog";
 export function OpeningRecoveryDialog({
   attemptId,
   openedFromLoadingOwner,
+  projectName = null,
   resolveOpeningRecovery,
 }: {
   attemptId: string;
   openedFromLoadingOwner: boolean;
+  projectName?: string | null;
   resolveOpeningRecovery(
     attemptId: string,
     decision: ProjectRecoveryDecision,
@@ -43,6 +45,7 @@ export function OpeningRecoveryDialog({
   return (
     <div data-opening-owner-transition={String(openedFromLoadingOwner)}>
       <ProjectRecoveryDialog
+        projectName={projectName}
         error={
           attemptId
             ? error

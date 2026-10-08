@@ -1,8 +1,17 @@
+/** One Project that did not open, among several opened together. */
+export interface ProjectFailureDetail {
+  name: string;
+  message: string;
+  action?: string;
+}
+
 export interface ProjectLaunchFailure {
   code: string;
   stage?: string;
   message: string;
   action?: string;
+  /** Present when several Projects were opened together: each one named. */
+  projects?: readonly ProjectFailureDetail[];
 }
 
 export type ProjectLaunchOutcome =

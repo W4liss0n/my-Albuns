@@ -10,11 +10,14 @@ export function ExternalCopyDecisionDialog({
   error,
   onCancel,
   onSaveCopyAs,
+  projectName = null,
   resolving,
 }: {
   error: string | null;
   onCancel(): void;
   onSaveCopyAs(): void;
+  /** Named only when the opening window lists several Projects. */
+  projectName?: string | null;
   resolving: boolean;
 }) {
   const primaryActionRef = useRef<HTMLButtonElement>(null);
@@ -40,7 +43,9 @@ export function ExternalCopyDecisionDialog({
           onClick: onSaveCopyAs,
         }}
         confirmButtonRef={primaryActionRef}
-        description="Para editar este arquivo, salve uma cópia em outro local. O original será mantido."
+        description={projectName
+          ? `Para editar o projeto ${projectName}, salve uma cópia em outro local. O original será mantido.`
+          : "Para editar este arquivo, salve uma cópia em outro local. O original será mantido."}
         title="Cópia externa somente leitura"
       >
         {error ? <InlineNotice tone="error">{error}</InlineNotice> : null}

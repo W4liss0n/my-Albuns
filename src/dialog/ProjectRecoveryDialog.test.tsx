@@ -121,3 +121,19 @@ test("does not duplicate a decision while its resolution is in flight", () => {
   fireEvent.keyDown(dialog, { key: "Escape" });
   expect(props.onDefer).not.toHaveBeenCalled();
 });
+
+test("names the Project when the opening window lists several Projects", () => {
+  const { props, view } = recoveryDialog({ projectName: "SARAH XAVIER" });
+  expect(screen.getByRole("dialog", { name: "Recuperar trabalho não salvo?" }))
+    .toHaveTextContent("Há alterações não salvas no projeto SARAH XAVIER. Deseja recuperá-las?");
+
+  view.rerender(<ProjectRecoveryDialog {...props} state="confirmDiscard" />);
+  expect(screen.getByRole("dialog", { name: "Descartar o trabalho recuperável?" }))
+    .toHaveTextContent(
+      "As alterações não salvas do projeto SARAH XAVIER serão descartadas definitivamente. O projeto abrirá na última versão salva.",
+    );
+
+  view.rerender(<ProjectRecoveryDialog {...props} projectName={null} />);
+  expect(screen.getByRole("dialog", { name: "Recuperar trabalho não salvo?" }))
+    .toHaveTextContent("Há alterações não salvas deste projeto. Deseja recuperá-las?");
+});

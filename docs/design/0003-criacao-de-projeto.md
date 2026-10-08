@@ -1,7 +1,7 @@
 ---
 status: accepted
 document: design
-updated: 2026-09-24
+updated: 2026-10-07
 ---
 
 # Criação de Projeto
@@ -138,9 +138,10 @@ Projeto. Criar revalida o Original; o Host prepara o Cache canônico dessas
 imagens antes de liberar o editor. Uma falha de Cache preserva o Projeto criado
 e é apresentada como problema de processamento.
 
-A inicialização de um Projeto novo tem prazo de até cinco minutos para incluir
-essa preparação; a abertura de um Projeto existente mantém o prazo de trinta
-segundos. Os problemas iniciais são apresentados uma única vez, sem reaparecer
+A inicialização de um Projeto novo ou existente, incluindo essa preparação, é
+interrompida após 300 segundos sem progresso; cada mensagem de progresso
+validada reinicia esse prazo, e nenhuma inicialização passa de duas horas. Os
+problemas iniciais são apresentados uma única vez, sem reaparecer
 quando `Salvar como` substitui a janela do Projeto.
 
 ### Prévia viva

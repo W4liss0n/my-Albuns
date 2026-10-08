@@ -2,7 +2,7 @@
 status: accepted
 document: design
 date: 2026-09-10
-updated: 2026-09-25
+updated: 2026-10-07
 platform: windows
 implementation-readiness: ready-for-agent
 ---
@@ -17,6 +17,11 @@ sem exigir RAM física livre. Este contrato substitui a espera indefinida sob pr
 descrita anteriormente em
 [Importação com decode único e lotes](0020-importacao-com-decode-unico-e-lotes.md).
 Importação, Cache e inspeções compartilham o mesmo proprietário da admissão.
+Essa admissão é de cada processo. Com vários Projetos abertos, as vagas da
+máquina descritas no
+[armazenamento local e Cache](0010-armazenamento-local-e-cache.md) limitam o
+total de Processadores, e a execução individual abaixo ocupa também a vaga
+única de pouca memória, para que só um desses trabalhos rode por vez na máquina.
 
 ## Problema da política anterior
 

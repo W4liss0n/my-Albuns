@@ -16,6 +16,7 @@ export function ProjectRecoveryDialog({
   onDiscard,
   onRecover,
   onRequestDiscard,
+  projectName = null,
   state,
 }: {
   error: string | null;
@@ -24,6 +25,8 @@ export function ProjectRecoveryDialog({
   onDiscard(): void;
   onRecover(): void;
   onRequestDiscard(): void;
+  /** Named only when the opening window lists several Projects. */
+  projectName?: string | null;
   state: ProjectRecoveryDialogState;
 }) {
   const primaryActionRef = useRef<HTMLButtonElement>(null);
@@ -44,7 +47,9 @@ export function ProjectRecoveryDialog({
             onClick: onDiscard,
           }}
           confirmButtonRef={primaryActionRef}
-          description="As alterações não salvas serão descartadas definitivamente. O projeto abrirá na última versão salva."
+          description={projectName
+            ? `As alterações não salvas do projeto ${projectName} serão descartadas definitivamente. O projeto abrirá na última versão salva.`
+            : "As alterações não salvas serão descartadas definitivamente. O projeto abrirá na última versão salva."}
           title="Descartar o trabalho recuperável?"
           tone="danger"
         >
@@ -75,7 +80,9 @@ export function ProjectRecoveryDialog({
           onClick: onRecover,
         }}
         confirmButtonRef={primaryActionRef}
-        description="Há alterações não salvas deste projeto. Deseja recuperá-las?"
+        description={projectName
+          ? `Há alterações não salvas no projeto ${projectName}. Deseja recuperá-las?`
+          : "Há alterações não salvas deste projeto. Deseja recuperá-las?"}
         leadingAction={{
           disabled: busy,
           label: "Agora não",
