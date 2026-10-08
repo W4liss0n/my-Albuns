@@ -2512,7 +2512,7 @@
         "kind": "implementation-only",
         "surface": "project-workspace-photo-context",
         "implementationCaptureSelector": ".app-shell",
-        "reason": "Decisão do autor de 08/10/2026 (design 0048): a Foto inteira, sem recorte nem efeitos, fica fixa abaixo do cabeçalho do quadro e acima de Design. A referência visual vigente não representa essa prévia."
+        "reason": "Decisões do autor de 08/10/2026 (design 0048): a Foto inteira, sem recorte nem efeitos, fica fixa abaixo do cabeçalho do quadro e acima de Design, numa área quadrada com a largura do conteúdo do painel, até 360 px. A referência visual vigente não representa essa prévia."
       },
       "viewport": {
         "width": 1440,
@@ -2548,7 +2548,7 @@
         "width": 1440,
         "height": 900
       },
-      "readySelector": "#contextual-panel:not(:has([aria-label=\"Zoom da foto\"])) .inspector-scroll > .context-heading:first-child + .inspector-image-preview .media-preview-thumbnail[data-has-preview=\"true\"] img",
+      "readySelector": "#contextual-panel:not(:has([aria-label=\"Zoom da foto\"])) .inspector-scroll > .context-heading:first-child + .inspector-image-preview[data-media-id=\"media-002\"] .media-preview-thumbnail[data-has-preview=\"true\"] img",
       "actions": [
         {
           "type": "click",
@@ -2570,7 +2570,7 @@
         "width": 1440,
         "height": 900
       },
-      "readySelector": "#contextual-panel:has(.inspector-image-preview):not(:has([aria-label=\"Zoom da foto\"])) .inspector-image-preview .media-preview-thumbnail[data-has-preview=\"true\"] img",
+      "readySelector": "#contextual-panel:has(.inspector-image-preview):not(:has([aria-label=\"Zoom da foto\"])) .inspector-image-preview[data-media-id=\"media-002\"] .media-preview-thumbnail[data-has-preview=\"true\"] img",
       "actions": [
         {
           "type": "focus",

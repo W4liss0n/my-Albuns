@@ -120,10 +120,12 @@ do Painel de imagens e do visualizador, sem recorte, giro, espelhamento, preto e
 branco ou opacidade: não acompanha os ajustes do painel, cujo efeito continua
 visível no Canvas.
 
-O bloco é fixo, sem título de seção nem recolhimento. A imagem ocupa a largura
-do conteúdo do painel, centralizada, com altura máxima de cerca de 200 px e a
-proporção da foto. A área da imagem tem sempre essa altura, para que Design não
-mude de lugar entre fotos horizontais e verticais. Mantém a moldura branca e a
+O bloco é fixo, sem título de seção nem recolhimento. A imagem fica
+centralizada, com a proporção da foto, numa área de tamanho fixo, para que
+Design não mude de lugar entre fotos horizontais e verticais: um quadrado com a
+largura do conteúdo do painel, até 360 px, desde o
+[refinamento seguinte](#refinamento-de-08102026-2); a primeira versão tinha
+altura máxima de cerca de 200 px. Mantém a moldura branca e a
 sombra curta das miniaturas; o bloco usa o mesmo respiro do conteúdo das seções
 e termina com a mesma linha que as fecha, sem caixa, ícone ou divisória extra.
 Quadro vazio e seleção de vários quadros não mostram prévia.
@@ -134,10 +136,48 @@ não mostrar as dimensões em pixels nem outras informações abaixo da imagem.
 
 Durante o carregamento aparece o fundo listrado da miniatura. Arquivo ausente
 sem prévia retida mostra o símbolo de imagem ausente da miniatura, sem aviso ou
-atalho; uma prévia anterior retida é exibida sem aviso. Trocar de quadro nunca
-mostra a foto anterior sob o nome do novo.
+atalho; uma prévia anterior retida é exibida sem aviso. A troca de quadro ou de
+imagem segue o [refinamento seguinte](#refinamento-de-08102026-2).
 
 O mesmo bloco forma o contexto `Imagem selecionada`, aberto por uma imagem
 selecionada no Painel de imagens. A precedência entre as seleções do Canvas e
 do Painel de imagens está no
 [design 0001](0001-estrutura-da-janela-do-projeto.md#contexto-de-imagem-selecionada).
+
+## Refinamento de 08/10/2026 (2)
+
+Depois de usar a prévia, o autor fez dois pedidos: aumentar a área, porque uma
+foto vertical ficava muito pequena, e evitar a piscada que às vezes aparecia ao
+trocar de uma foto para outra.
+
+A área da prévia passa a ser um quadrado com a largura do conteúdo do painel,
+limitada a 360 px. Na largura padrão do painel, o quadrado tem cerca de
+272 × 272 px: uma foto vertical 2:3 passa de cerca de 133 × 200 px para cerca
+de 181 × 272 px, e uma horizontal ocupa toda a largura. O quadrado tem o mesmo
+tamanho para qualquer proporção, para que Design e os controles abaixo não
+mudem de lugar entre fotos. A imagem continua inteira e centralizada, com a
+moldura branca e a sombra das miniaturas; o respiro e a linha de fechamento do
+bloco não mudam.
+
+Ao trocar de quadro ou de imagem, inclusive ao passar de um quadro para uma
+imagem selecionada no Painel de imagens ou o contrário, a área mantém o que
+exibe até a próxima prévia estar carregada e pronta para exibição. Então troca
+a imagem e a proporção de uma vez, sem área vazia entre as duas. A espera é
+curta: se a próxima prévia não ficar pronta em cerca de 250 ms ou não puder ser
+lida, a troca acontece assim mesmo e a prévia termina de carregar na área, como
+uma miniatura do Painel de imagens. Um arquivo ausente com prévia retida espera
+como os demais. A troca é imediata quando a próxima imagem não tem prévia para
+exibir: com a prévia ainda em preparo, aparece o fundo listrado; com o arquivo
+ausente sem prévia retida, o símbolo de imagem ausente.
+
+Durante essa espera, o cabeçalho e os controles já são os da nova seleção, e a
+área continua com o que exibia: a foto anterior, o fundo listrado ou o símbolo
+de imagem ausente. É a única situação em que a prévia não corresponde ao nome
+do cabeçalho, e ela dura no máximo cerca de 250 ms depois de cada escolha.
+
+Em trocas rápidas, cada troca tem a sua espera e vale a última imagem
+escolhida: uma imagem intermediária nunca aparece depois de outra ter sido
+escolhida. Quando o painel não mostrava prévia, como ao sair do álbum, de
+Design da lâmina, de uma seleção múltipla ou de um quadro vazio, a prévia
+aparece sem espera. Voltar à mesma foto, como ao passar de um quadro para a sua
+imagem no Painel de imagens, não recarrega a prévia.

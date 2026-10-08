@@ -368,9 +368,11 @@ export function InspectorPanel({
   const groupZoomRange = context.kind === "multiple-frames"
     ? context.editingSheet.frames.find((frame) => frame.photo)?.photo?.placement.zoomRange : undefined;
   const framePhotoId = context.kind === "frame" ? context.frame.photo?.mediaId : undefined;
-  const framePhotoMedia = framePhotoId === undefined
-    ? undefined
-    : mediaItems.find((media) => media.id === framePhotoId);
+  const previewMedia = context.kind === "media"
+    ? context.media
+    : framePhotoId === undefined
+      ? undefined
+      : mediaItems.find((media) => media.id === framePhotoId);
 
   return (
     <aside
@@ -379,35 +381,23 @@ export function InspectorPanel({
       aria-label="Painel contextual"
     >
       <div className="inspector-scroll">
-        {context.kind === "multiple-media" ? (
-          <div className="context-heading">
-            <span>Seleção múltipla</span>
-            <h2>{context.count} imagens selecionadas</h2>
-          </div>
-        ) : context.kind === "media" ? (
-          <>
-            <div className="context-heading">
-              <span>Imagem selecionada</span>
-              <h2>{context.media.name}</h2>
-            </div>
-            <InspectorImagePreview
-              media={context.media}
-              missing={missingMediaIds.has(context.media.id)}
-              previewUrl={mediaPreviewUrls[context.media.id]}
-            />
-          </>
-        ) : null}
+        {/* The heading and the preview keep one place for every context, so the
+            preview stays mounted between a Frame and a selected image and keeps
+            the current photo on screen until the next one is ready. */}
+        <ContextHeading
+          context={context}
+          selectedPhotoCount={selectedPhotoCount}
+          selectedPlaceholderCount={selectedPlaceholderCount}
+        />
+        {previewMedia && (
+          <InspectorImagePreview
+            media={previewMedia}
+            missing={missingMediaIds.has(previewMedia.id)}
+            previewUrl={mediaPreviewUrls[previewMedia.id]}
+          />
+        )}
         {context.kind === "multiple-frames" ? (
           <>
-            <div className="context-heading">
-              <span>Seleção múltipla</span>
-              <h2>{context.frames.length} quadros selecionados</h2>
-              <p>
-                {selectedPhotoCount} {selectedPhotoCount === 1 ? "foto" : "fotos"}
-                {" · "}
-                {selectedPlaceholderCount} {selectedPlaceholderCount === 1 ? "quadro vazio" : "quadros vazios"}
-              </p>
-            </div>
             {(frameStyle || ((photoOrientation || photoZoom) && selectedPhotoCount > 0)) && (
               <InspectorSection
                 key="frame-photo-design"
@@ -433,17 +423,6 @@ export function InspectorPanel({
           </>
         ) : context.kind === "frame" ? (
           <>
-            <div className="context-heading">
-              <span>Quadro selecionado</span>
-              <h2>{context.composedPhoto?.name ?? "Quadro vazio"}</h2>
-            </div>
-            {framePhotoMedia && (
-              <InspectorImagePreview
-                media={framePhotoMedia}
-                missing={missingMediaIds.has(framePhotoMedia.id)}
-                previewUrl={mediaPreviewUrls[framePhotoMedia.id]}
-              />
-            )}
             <InspectorSection
               key="frame-photo-design"
               title="Design"
@@ -845,6 +824,55 @@ function distanceOutside(value: number, start: number, end: number): number {
   if (value < start) return start - value;
   if (value > end) return value - end;
   return 0;
+}
+
+/** The tone band naming a selection; the Album and the Sheet have none. */
+function ContextHeading({
+  context,
+  selectedPhotoCount,
+  selectedPlaceholderCount,
+}: {
+  context: InspectorContext;
+  selectedPhotoCount: number;
+  selectedPlaceholderCount: number;
+}) {
+  switch (context.kind) {
+    case "media":
+      return (
+        <div className="context-heading">
+          <span>Imagem selecionada</span>
+          <h2>{context.media.name}</h2>
+        </div>
+      );
+    case "multiple-media":
+      return (
+        <div className="context-heading">
+          <span>Seleção múltipla</span>
+          <h2>{context.count} imagens selecionadas</h2>
+        </div>
+      );
+    case "frame":
+      return (
+        <div className="context-heading">
+          <span>Quadro selecionado</span>
+          <h2>{context.composedPhoto?.name ?? "Quadro vazio"}</h2>
+        </div>
+      );
+    case "multiple-frames":
+      return (
+        <div className="context-heading">
+          <span>Seleção múltipla</span>
+          <h2>{context.frames.length} quadros selecionados</h2>
+          <p>
+            {selectedPhotoCount} {selectedPhotoCount === 1 ? "foto" : "fotos"}
+            {" · "}
+            {selectedPlaceholderCount} {selectedPlaceholderCount === 1 ? "quadro vazio" : "quadros vazios"}
+          </p>
+        </div>
+      );
+    default:
+      return null;
+  }
 }
 
 function InspectorSection({
