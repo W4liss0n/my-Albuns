@@ -2,9 +2,9 @@ use std::{
     io::{BufReader, Read, Write},
     path::{Path, PathBuf},
     process::{Child, ChildStdin, Command, Stdio},
-    sync::{Arc, mpsc},
+    sync::{Arc, Mutex, mpsc},
     thread,
-    time::Duration,
+    time::{Duration, Instant},
 };
 
 use myalbuns_paths::ProcessInstanceId;
@@ -18,6 +18,65 @@ use super::{
 };
 
 const MAX_TERMINAL_BYTES: usize = 32 * 1024;
+/// A Host that keeps reporting progress is never stopped by the silence limit,
+/// but no single opening may last longer than this.
+const HOST_STARTUP_CEILING: Duration = Duration::from_secs(2 * 60 * 60);
+
+/// When the current wait for a Host terminal started and when the Host last
+/// proved it was progressing. The reader thread marks every validated
+/// progress message; the waiting side derives its deadline from both.
+#[derive(Debug)]
+struct StartupClock(Mutex<StartupInstants>);
+
+#[derive(Clone, Copy, Debug)]
+struct StartupInstants {
+    started: Instant,
+    last_progress: Instant,
+}
+
+impl StartupClock {
+    fn new() -> Self {
+        let now = Instant::now();
+        Self(Mutex::new(StartupInstants {
+            started: now,
+            last_progress: now,
+        }))
+    }
+
+    /// A continuation (recovery decision, external copy destination) starts a
+    /// new wait: the time the user spent deciding does not count.
+    fn restart(&self) {
+        let now = Instant::now();
+        *self
+            .0
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) = StartupInstants {
+            started: now,
+            last_progress: now,
+        };
+    }
+
+    fn mark_progress(&self) {
+        self.0
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .last_progress = Instant::now();
+    }
+
+    fn deadline(&self, silence: Duration) -> Instant {
+        let instants = *self
+            .0
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        terminal_deadline(instants, silence, HOST_STARTUP_CEILING)
+    }
+}
+
+/// The silence limit restarts with every validated progress message, within
+/// an absolute ceiling counted from the start of the wait.
+fn terminal_deadline(instants: StartupInstants, silence: Duration, ceiling: Duration) -> Instant {
+    (instants.last_progress.max(instants.started) + silence).min(instants.started + ceiling)
+}
 
 #[derive(Clone)]
 pub(crate) struct StartupProgressReporter(
@@ -50,6 +109,7 @@ pub(crate) struct ProjectHostBootstrap {
     terminal_timeout: Duration,
     creation_timeout: Duration,
     progress: Option<StartupProgressReporter>,
+    focus_claim: Option<String>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -77,6 +137,7 @@ pub(crate) struct PendingExternalCopyProcess {
     terminal_receiver: mpsc::Receiver<Result<HostTerminal, BootstrapFailure>>,
     request: BootstrapRequest,
     terminal_timeout: Duration,
+    clock: Arc<StartupClock>,
 }
 
 #[derive(Debug)]
@@ -86,6 +147,7 @@ pub(crate) struct PendingRecoveryProcess {
     terminal_receiver: mpsc::Receiver<Result<HostTerminal, BootstrapFailure>>,
     request: BootstrapRequest,
     terminal_timeout: Duration,
+    clock: Arc<StartupClock>,
 }
 
 #[derive(Debug)]
@@ -142,7 +204,15 @@ impl ProjectHostBootstrap {
             terminal_timeout,
             creation_timeout: terminal_timeout,
             progress: None,
+            focus_claim: None,
         }
+    }
+
+    /// Projects opened together share one claim: only the first editor that
+    /// becomes ready takes the focus (see `opening_focus`).
+    pub(crate) fn with_focus_claim(mut self, claim: &str) -> Self {
+        self.focus_claim = Some(claim.to_owned());
+        self
     }
 
     pub(crate) fn with_creation_timeout(mut self, timeout: Duration) -> Self {
@@ -189,7 +259,11 @@ impl ProjectHostBootstrap {
     }
 
     fn launch(&self, request: BootstrapRequest) -> Result<BootstrapOutcome, BootstrapFailure> {
-        let child = spawn_host(&self.executable, &request.launch_nonce)?;
+        let child = spawn_host(
+            &self.executable,
+            &request.launch_nonce,
+            self.focus_claim.as_deref(),
+        )?;
         let timeout = match request.intent {
             BootstrapIntent::CreateNew { .. } => self.creation_timeout,
             BootstrapIntent::OpenExisting => self.terminal_timeout,
@@ -225,13 +299,21 @@ fn new_request(
     })
 }
 
-fn spawn_host(executable: &Path, launch_nonce: &str) -> Result<Child, BootstrapFailure> {
+fn spawn_host(
+    executable: &Path,
+    launch_nonce: &str,
+    focus_claim: Option<&str>,
+) -> Result<Child, BootstrapFailure> {
     let mut command = Command::new(executable);
     command
         .arg(crate::runtime_role::PROJECT_HOST_ROLE_ARGUMENT)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::inherit());
+    match focus_claim {
+        Some(claim) => command.env(crate::opening_focus::FOCUS_CLAIM_ENV, claim),
+        None => command.env_remove(crate::opening_focus::FOCUS_CLAIM_ENV),
+    };
     #[cfg(debug_assertions)]
     configure_host_webview_debugging(&mut command)?;
     #[cfg(debug_assertions)]
@@ -315,6 +397,15 @@ fn supervise_child_with_progress(
     let (terminal_sender, terminal_receiver) = mpsc::sync_channel(2);
     let reader_request = request.clone();
     let host_pid = pending.child_mut().id();
+    let clock = Arc::new(StartupClock::new());
+    let reader_clock = Arc::clone(&clock);
+    // Only progress that passed validation reaches a reporter.
+    let progress = Some(StartupProgressReporter::new(move |message| {
+        reader_clock.mark_progress();
+        if let Some(progress) = &progress {
+            progress.publish(message);
+        }
+    }));
     thread::spawn(move || {
         let mut reader = BufReader::new(stdout);
         let first = read_terminal(&mut reader, &reader_request, host_pid, progress.as_ref());
@@ -333,7 +424,7 @@ fn supervise_child_with_progress(
         }
     });
 
-    let terminal = receive_terminal(&terminal_receiver, terminal_timeout)?;
+    let terminal = receive_terminal(&terminal_receiver, terminal_timeout, &clock)?;
 
     match validate_terminal(&request, pending.child_mut().id(), terminal) {
         Ok(ValidatedTerminal::Ready {
@@ -363,6 +454,7 @@ fn supervise_child_with_progress(
                 terminal_receiver,
                 request,
                 terminal_timeout,
+                clock,
             }),
         ),
         Ok(ValidatedTerminal::RecoveryAvailable { .. }) => Ok(BootstrapOutcome::RecoveryAvailable(
@@ -372,6 +464,7 @@ fn supervise_child_with_progress(
                 terminal_receiver,
                 request,
                 terminal_timeout,
+                clock,
             },
         )),
         Ok(ValidatedTerminal::RecoveryDeferred { .. }) => Err(BootstrapFailure {
@@ -418,7 +511,13 @@ fn continue_external_copy(
         .map_err(|_| transport_failure())?;
     pending.stdin.flush().map_err(|_| transport_failure())?;
     drop(pending.stdin);
-    let terminal = receive_terminal(&pending.terminal_receiver, pending.terminal_timeout)?;
+    // The Host now prepares the Project like any opening: the same rule applies.
+    pending.clock.restart();
+    let terminal = receive_terminal(
+        &pending.terminal_receiver,
+        pending.terminal_timeout,
+        &pending.clock,
+    )?;
     match validate_terminal(&pending.request, pending.child.child_mut().id(), terminal) {
         Ok(ValidatedTerminal::Ready {
             host_pid,
@@ -478,7 +577,13 @@ fn continue_project_recovery(
         .map_err(|_| transport_failure())?;
     pending.stdin.flush().map_err(|_| transport_failure())?;
     drop(pending.stdin);
-    let terminal = receive_terminal(&pending.terminal_receiver, pending.terminal_timeout)?;
+    // The Host now prepares the Project like any opening: the same rule applies.
+    pending.clock.restart();
+    let terminal = receive_terminal(
+        &pending.terminal_receiver,
+        pending.terminal_timeout,
+        &pending.clock,
+    )?;
     match validate_terminal(&pending.request, pending.child.child_mut().id(), terminal) {
         Ok(ValidatedTerminal::Ready {
             host_pid,
@@ -515,18 +620,29 @@ fn continue_project_recovery(
     }
 }
 
+/// `silence` is how long the Host may go without a validated progress message.
 fn receive_terminal(
     receiver: &mpsc::Receiver<Result<HostTerminal, BootstrapFailure>>,
-    terminal_timeout: Duration,
+    silence: Duration,
+    clock: &StartupClock,
 ) -> Result<HostTerminal, BootstrapFailure> {
-    match receiver.recv_timeout(terminal_timeout) {
-        Ok(result) => result,
-        Err(mpsc::RecvTimeoutError::Timeout) => Err(BootstrapFailure {
-            kind: BootstrapFailureKind::Timeout,
-            stage: Some(super::FailureStage::Transport),
-            code: Some(super::FailureCode::HostExitedBeforeReady),
-        }),
-        Err(mpsc::RecvTimeoutError::Disconnected) => Err(transport_failure()),
+    loop {
+        let remaining = clock
+            .deadline(silence)
+            .saturating_duration_since(Instant::now());
+        if remaining.is_zero() {
+            return Err(BootstrapFailure {
+                kind: BootstrapFailureKind::Timeout,
+                stage: Some(super::FailureStage::Transport),
+                code: Some(super::FailureCode::HostExitedBeforeReady),
+            });
+        }
+        match receiver.recv_timeout(remaining) {
+            Ok(result) => return result,
+            // Progress may have moved the deadline while this wait slept.
+            Err(mpsc::RecvTimeoutError::Timeout) => {}
+            Err(mpsc::RecvTimeoutError::Disconnected) => return Err(transport_failure()),
+        }
     }
 }
 
@@ -691,6 +807,73 @@ mod tests {
     fn fixture_request() -> BootstrapRequest {
         let target = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("Projeto.myalbuns");
         new_open_request(authority(target)).expect("valid bootstrap fixture")
+    }
+
+    #[test]
+    fn the_terminal_deadline_follows_progress_up_to_the_ceiling() {
+        let started = std::time::Instant::now();
+        let silence = Duration::from_secs(300);
+        let ceiling = Duration::from_secs(7200);
+        let at = |seconds| started + Duration::from_secs(seconds);
+        let deadline = |last_progress| {
+            terminal_deadline(
+                StartupInstants {
+                    started,
+                    last_progress,
+                },
+                silence,
+                ceiling,
+            )
+        };
+
+        assert_eq!(
+            deadline(started),
+            at(300),
+            "a silent Host keeps today's limit"
+        );
+        assert_eq!(
+            deadline(at(250)),
+            at(550),
+            "each progress message restarts the silence limit"
+        );
+        assert_eq!(deadline(at(7000)), at(7200), "the ceiling is absolute");
+        assert_eq!(deadline(at(8000)), at(7200));
+    }
+
+    #[test]
+    fn progress_keeps_a_slow_host_alive_beyond_the_silence_limit() {
+        let clock = std::sync::Arc::new(StartupClock::new());
+        let (sender, receiver) = mpsc::sync_channel(1);
+        let reader_clock = std::sync::Arc::clone(&clock);
+        let host = std::thread::spawn(move || {
+            for _ in 0..6 {
+                std::thread::sleep(Duration::from_millis(60));
+                reader_clock.mark_progress();
+            }
+            sender
+                .send(Ok(HostTerminal::ready(
+                    &fixture_request(),
+                    "project".into(),
+                    1,
+                )))
+                .unwrap();
+        });
+
+        let started = std::time::Instant::now();
+        let terminal = receive_terminal(&receiver, Duration::from_millis(150), &clock)
+            .expect("a Host that keeps progressing is not timed out");
+        assert!(matches!(terminal, HostTerminal::Ready { .. }));
+        assert!(started.elapsed() >= Duration::from_millis(300));
+        host.join().unwrap();
+
+        let (_silent_sender, silent) = mpsc::sync_channel(1);
+        clock.restart();
+        assert_eq!(
+            receive_terminal(&silent, Duration::from_millis(100), &clock)
+                .expect_err("a silent Host still times out")
+                .kind,
+            BootstrapFailureKind::Timeout
+        );
     }
 
     #[test]

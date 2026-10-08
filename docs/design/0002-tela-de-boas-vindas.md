@@ -1,7 +1,7 @@
 ---
 status: accepted
 document: design
-updated: 2026-09-25
+updated: 2026-10-07
 ---
 
 # Tela de Boas-vindas
@@ -197,7 +197,17 @@ janela durante a preparação das imagens, Recuperação e decisão de Cópia ex
 e é removida ao encerrar o diálogo. A abertura direta pelo Windows segue a mesma
 regra, mesmo quando a Tela de Boas-vindas não chegou a aparecer.
 
-Se o Host correlacionado detectar Recuperação ou uma Cópia externa somente leitura, a janela externa de progresso permanece a proprietária causal da tentativa e troca apenas seu conteúdo para a decisão aplicável. A Global não renderiza essa decisão dentro da própria WebView e a Janela do Projeto ainda não é exibida. Em Cópia externa, `Salvar cópia como…` abre o seletor nativo a partir dessa janela e continua o mesmo Host; cancelar somente o seletor retorna à decisão, enquanto `Cancelar` encerra a tentativa. Ativações posteriores aguardam o terminal dessa tentativa em vez de substituir seu owner.
+Se o Host correlacionado detectar Recuperação ou uma Cópia externa somente leitura, a janela externa de progresso permanece a proprietária causal da tentativa e troca apenas seu conteúdo para a decisão aplicável. A Global não renderiza essa decisão dentro da própria WebView e a Janela do Projeto ainda não é exibida. Em Cópia externa, `Salvar cópia como…` abre o seletor nativo a partir dessa janela e continua o mesmo Host; cancelar somente o seletor retorna à decisão, enquanto `Cancelar` encerra a tentativa. Arquivos abertos depois pelo Windows entram na mesma janela, como descrito abaixo; as demais ativações (Configurações e `Novo projeto` pedidos pelo Windows) aguardam o fim das aberturas em andamento em vez de substituir seu owner.
+
+### Vários projetos abertos juntos
+
+Decisão de 07/10/2026: quando o Windows abre vários arquivos `.myalbuns` de uma vez, como na seleção múltipla do Explorador seguida de `Abrir`, todos começam juntos em uma única janela de abertura. Com um Projeto, ela é igual à abertura de um só Projeto. Com vários, o título informa a quantidade (`Abrindo 3 projetos`) e cada Projeto ocupa uma linha com o nome do arquivo e o seu estado: `Abrindo…`, a contagem de fotos com uma barra (`32 de 70 fotos`), `Pronto`, `Não abriu` ou `Cancelado`. Nomes longos terminam em reticências; a janela cresce com as linhas até o limite da tela e, a partir daí, a lista rola.
+
+Todos os Projetos preparam suas imagens ao mesmo tempo, e cada editor aparece sozinho assim que as suas imagens ficam prontas. Dos arquivos abertos juntos, somente o primeiro editor pronto recebe o foco; os seguintes abrem atrás da janela em uso, sem tirar o foco dela, e piscam na barra de tarefas. Um arquivo aberto alguns segundos depois é uma nova ação, e o seu editor pode receber o foco. As decisões de Recuperação e de Cópia externa aparecem uma de cada vez nessa mesma janela, enquanto os outros Projetos continuam a preparação. Enquanto a decisão está pendente e a janela lista vários Projetos, desde o início ou porque outro Projeto entrou na lista, ela fica à frente das demais, para que o editor de outro Projeto não a cubra. Quando a janela já lista vários Projetos ao abrir a decisão, a decisão diz a qual Projeto se refere. Em Cópia externa, a decisão continua na janela enquanto o seletor de destino está aberto; respondida a decisão, a janela volta à lista.
+
+Arquivos abertos pelo Windows enquanto essa janela está aberta entram na mesma lista em vez de esperar, salvo quando uma operação exclusiva já aguarda a vez: o fechamento das Configurações, a exportação em lote ou um pedido de Configurações ou de `Novo projeto` vindo do Windows. Nesse caso, os arquivos esperam essa operação e abrem depois, em outra janela. O mesmo arquivo repetido enquanto ainda abre não abre outra janela; repetido depois que o seu editor abriu, traz esse editor para a frente, e repetido depois de uma falha, tenta abrir de novo na mesma linha.
+
+As linhas concluídas permanecem até o fim; quando todos terminam, a janela fecha e as falhas são apresentadas uma única vez, pela Tela de Boas-vindas. Uma falha prevalece sobre `Agora não` respondido em outro Projeto. Quando a janela listava vários Projetos, o aviso nomeia o Projeto que não abriu; se vários não abriram, um único aviso lista cada um com o seu motivo.
 
 Após a decisão de Recuperação e antes de apresentar o editor, o Host aplica as dimensões já orientadas do Cache verificado ao catálogo efetivo da sessão. A correspondência exige a mesma mídia e o mesmo caminho, inclusive para Fotos importadas ou religadas após o último salvamento. Isso preserva as proporções das miniaturas e dos Frames mesmo quando o Original está ausente, sem salvar o Projeto nem incorporar dados de Cache ao estado criativo recuperável.
 

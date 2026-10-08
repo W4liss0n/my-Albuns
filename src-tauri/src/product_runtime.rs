@@ -17,7 +17,7 @@ use crate::{
     cache_service::{ActiveCacheNamespace, CacheService},
     desktop_webview_policy,
     export_attempts::ExportAttempts,
-    imaging_processor::ImagingProcessor,
+    imaging_processor::{HostWindowFocus, ImagingProcessor},
     ipc_contract::{LinkedMediaChanged, ProjectRecoveryDecision as IpcProjectRecoveryDecision},
     logging,
     media_confirmation::MediaConfirmation,
@@ -185,7 +185,23 @@ pub(crate) fn run(
         .manage(crate::photoshop::PhotoshopStateStore::new(&app_paths))
         .manage(layout_catalog)
         .manage(crate::workspace_preferences::WorkspacePreferencesStore::new(&app_paths))
+        .manage(HostWindowFocus::default())
         .on_window_event(|window, event| {
+            // Before any handler that may consume the event: Cache work for a
+            // Host none of whose windows is focused runs in the background.
+            match event {
+                tauri::WindowEvent::Focused(focused) => {
+                    window
+                        .state::<HostWindowFocus>()
+                        .observe(window.label(), *focused);
+                }
+                tauri::WindowEvent::Destroyed => {
+                    window
+                        .state::<HostWindowFocus>()
+                        .observe(window.label(), false);
+                }
+                _ => {}
+            }
             if crate::generation_window::on_window_event(window, event) {
                 return;
             }
@@ -1187,6 +1203,13 @@ impl ProjectStartupHandshake {
             .lock()
             .map_err(|_| io::Error::other("the startup handshake is unavailable"))?
             .maximized_placement;
+        // Of the Projects opened together, only the first editor that becomes
+        // ready takes the focus; the others open behind the window in use.
+        let take_focus = crate::opening_focus::may_take_focus();
+        #[cfg(windows)]
+        let quiet_show = (!take_focus)
+            .then(|| crate::opening_focus::QuietShow::begin(project_window))
+            .flatten();
         if let Some(placement) = maximized_placement {
             #[cfg(windows)]
             crate::project_window_placement::show_maximized(project_window, placement)?;
@@ -1197,7 +1220,25 @@ impl ProjectStartupHandshake {
             }
         }
         project_window.show().map_err(io::Error::other)?;
-        project_window.set_focus().map_err(io::Error::other)?;
+        if take_focus {
+            project_window.set_focus().map_err(io::Error::other)?;
+        }
+        #[cfg(windows)]
+        let shown_quietly = quiet_show.is_some();
+        #[cfg(not(windows))]
+        let shown_quietly = false;
+        #[cfg(windows)]
+        if let Some(quiet_show) = quiet_show {
+            quiet_show.finish();
+        }
+        tracing::info!(
+            target: "myalbuns.desktop",
+            process_role = ProcessRole::DesktopHost.as_str(),
+            took_focus = take_focus,
+            shown_quietly,
+            opened_with_others = std::env::var_os(crate::opening_focus::FOCUS_CLAIM_ENV).is_some(),
+            event = "project_window_presented",
+        );
         let mut state = self
             .state
             .lock()

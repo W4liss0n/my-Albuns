@@ -1,7 +1,7 @@
 ---
 status: accepted
 document: design
-updated: 2026-09-24
+updated: 2026-10-07
 ---
 
 # Configuração da Exportação em lote
@@ -95,6 +95,6 @@ Durante essa pausa, a janela mantém o estado e as Religações temporárias em 
 
 ## Propriedade da execução
 
-O Global mantém a execução mesmo se a interface deixar de responder. Antes de iniciar, serializa novas aberturas, adquire o `OperationGate` e solicita a pausa aos hosts dos Projetos. Cada host termina comandos já aceitos, pausa seu `CacheEngine`, reserva seu Processador e confirma o bloqueio de suas janelas. A execução só começa depois dessas confirmações, sob um único `OperationLease` do Global.
+O Global mantém a execução mesmo se a interface deixar de responder. Antes de iniciar, aguarda as aberturas em andamento, impede que novas aberturas comecem até terminar, adquire o `OperationGate` e solicita a pausa aos hosts dos Projetos. Cada host termina comandos já aceitos, pausa seu `CacheEngine`, reserva seu Processador e confirma o bloqueio de suas janelas. A execução só começa depois dessas confirmações, sob um único `OperationLease` do Global.
 
 As reservas entre processos usam posses do sistema operacional. O desaparecimento do proprietário libera o modo exclusivo, e os hosts devolvem a pausa e a interação. A janela de progresso tem largura própria, independente da configuração. Ao terminar, a configuração prepara o resultado antes de reaparecer; não há linha temporária de preparação.

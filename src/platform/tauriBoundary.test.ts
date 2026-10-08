@@ -35,7 +35,7 @@ const tauriCommandSources = {
   settings: ["./tauriCacheSettingsPort.ts", "./tauriSettingsWindow.ts"],
   ownedDialog: ["./tauriWindowControls.ts"],
   messageDialog: ["./tauriOwnedDialogControls.ts"],
-  openingDialog: ["./tauriOpeningDialogControls.ts", "./tauriOpeningImageProgress.ts"],
+  openingDialog: ["./tauriOpeningDialogControls.ts", "./tauriOpeningProgress.ts"],
   project: [
     "./tauriProjectLauncher.ts",
     "./tauriProjectGenerationLauncher.ts",

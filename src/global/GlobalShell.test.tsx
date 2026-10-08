@@ -749,6 +749,44 @@ test("reacts to terminal outcomes forwarded after Global mounted and releases th
   await waitFor(() => expect(unlisten).toHaveBeenCalledOnce());
 });
 
+test("files opened at startup present their failure once, through the activation terminal", async () => {
+  const present = vi.fn(async () => undefined);
+  const completeGraphicsGate = vi.fn(async () => null);
+  let activationListener:
+    | ((outcome: OpenProjectOutcome) => void)
+    | undefined;
+
+  render(
+    <GlobalShell
+      failureDialogPort={{ present }}
+      graphicsDiagnostic={supportedGraphics}
+      projectPort={createProjectPort({
+        completeGraphicsGate,
+        onActivationTerminal: async (listener) => {
+          activationListener = listener;
+          return () => undefined;
+        },
+      })}
+    />,
+  );
+  await waitFor(() => expect(completeGraphicsGate).toHaveBeenCalledOnce());
+  await waitFor(() => expect(activationListener).toBeTypeOf("function"));
+  expect(present).not.toHaveBeenCalled();
+
+  const error = {
+    code: "projects_not_opened",
+    message: "2 projetos não abriram.",
+    projects: [
+      { name: "SARAH XAVIER", message: "Em uso." },
+      { name: "YUELSON RODRIGO", message: "Não encontrado." },
+    ],
+  };
+  act(() => activationListener?.({ status: "failed", error }));
+
+  await waitFor(() => expect(present).toHaveBeenCalledOnce());
+  expect(present).toHaveBeenCalledWith({ context: "projectOpening", error });
+});
+
 test("does not overwrite a forwarded terminal with a late graphics-gate outcome", async () => {
   const graphicsGate = deferred<OpenProjectOutcome | null>();
   const present = vi.fn(async () => undefined);

@@ -20,8 +20,9 @@ use windows::Win32::UI::Input::KeyboardAndMouse::IsWindowEnabled;
 
 use crate::{
     desktop_webview_policy,
-    global_runtime::GLOBAL_WINDOW_LABEL,
-    ipc_contract::{OpeningExternalCopyDecision, ProjectRecoveryDecision},
+    global_opening_burst::OpeningProgressBoard,
+    global_runtime::{GLOBAL_WINDOW_LABEL, ProjectFailureDetail},
+    ipc_contract::{OpeningExternalCopyDecision, OpeningProgress, ProjectRecoveryDecision},
 };
 
 const DIALOG_LOAD_TIMEOUT: Duration = Duration::from_secs(5);
@@ -32,7 +33,7 @@ const OWNED_WINDOW_READY_PARAMETER: &str = "ownedReadyToken";
 pub(crate) const OWNED_WINDOW_TITLEBAR_HEIGHT: f64 = 36.0;
 const OPENING_PROGRESS_LABEL: &str = "dialog-opening-progress";
 pub(crate) const PROGRESS_WEBVIEW_NAMESPACE: &str = "global-progress";
-const OPENING_IMAGE_PROGRESS_EVENT: &str = "myalbuns://opening-image-progress";
+const OPENING_PROGRESS_EVENT: &str = "myalbuns://opening-progress";
 const PROJECT_FAILURE_LABEL: &str = "dialog-project-failure";
 static NEXT_OWNED_WINDOW_READY_TOKEN: AtomicU64 = AtomicU64::new(1);
 static OWNED_WINDOW_READINESS: OnceLock<Mutex<OwnedWindowReadinessRegistry>> = OnceLock::new();
@@ -375,24 +376,34 @@ impl ProjectFailureDialogContext {
     }
 }
 
+/// The rows of the opening window on screen, read by the window when it
+/// starts listening.
 #[derive(Clone, Default)]
-pub(crate) struct OpeningImageProgressState(
-    Arc<Mutex<Option<crate::ipc_contract::StartupImageProgress>>>,
-);
+pub(crate) struct OpeningProgressState(Arc<Mutex<Option<OpeningProgressBoard>>>);
+
+impl OpeningProgressState {
+    fn present(&self, board: Option<OpeningProgressBoard>) {
+        *self
+            .0
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) = board;
+    }
+}
 
 #[tauri::command]
-pub(crate) fn opening_image_progress(
+pub(crate) fn opening_progress(
     window: WebviewWindow,
-    state: tauri::State<'_, OpeningImageProgressState>,
-) -> Result<Option<crate::ipc_contract::StartupImageProgress>, String> {
+    state: tauri::State<'_, OpeningProgressState>,
+) -> Result<Option<OpeningProgress>, String> {
     if window.label() != OPENING_PROGRESS_LABEL {
         return Err("Opening progress belongs only to its owned dialog".into());
     }
-    state
+    let board = state
         .0
         .lock()
-        .map(|progress| *progress)
-        .map_err(|_| "the opening progress state is unavailable".into())
+        .map_err(|_| "the opening progress state is unavailable".to_owned())?
+        .clone();
+    Ok(board.and_then(|board| board.window_snapshot()))
 }
 
 pub(crate) struct NativeProgressDialog {
@@ -400,26 +411,17 @@ pub(crate) struct NativeProgressDialog {
     decision_attempt: Option<OpeningDecisionAttempt>,
     owner: WebviewWindow,
     owner_presentation: OwnerPresentation,
+    progress: Option<OpeningProgressBoard>,
     window: WebviewWindow,
 }
 
 impl NativeProgressDialog {
-    pub(crate) fn image_progress_reporter(
-        &self,
-    ) -> crate::project_bootstrap::StartupProgressReporter {
-        let window = self.window.clone();
-        let state = window.state::<OpeningImageProgressState>().inner().clone();
-        crate::project_bootstrap::StartupProgressReporter::new(move |progress| {
-            if let Ok(mut current) = state.0.lock() {
-                *current = Some(progress);
-                let _ = window.emit_to(window.label(), OPENING_IMAGE_PROGRESS_EVENT, progress);
-            }
-        })
-    }
-
+    /// `project_name` names the Project on the decision page when the window
+    /// lists several Projects; `None` keeps the single-Project wording.
     pub(crate) async fn request_external_copy_decision(
         &mut self,
         attempt_id: &str,
+        project_name: Option<&str>,
     ) -> io::Result<OpeningExternalCopyDecision> {
         self.ensure_opening_decision_available("the external-copy decision")?;
         resize_owned_window_width(&self.window, EXTERNAL_COPY_DIALOG_WIDTH)?;
@@ -430,6 +432,7 @@ impl NativeProgressDialog {
         self.request_opening_decision(
             OpeningDecisionAttempt::ExternalCopy(attempt_id.to_owned()),
             "external-copy",
+            project_name,
             decision_receiver,
             "the external-copy decision",
         )
@@ -439,6 +442,7 @@ impl NativeProgressDialog {
     pub(crate) async fn request_recovery_decision(
         &mut self,
         attempt_id: &str,
+        project_name: Option<&str>,
     ) -> io::Result<ProjectRecoveryDecision> {
         self.ensure_opening_decision_available("Recovery")?;
         resize_owned_window_width(&self.window, PROJECT_RECOVERY_DIALOG_WIDTH)?;
@@ -449,6 +453,7 @@ impl NativeProgressDialog {
         self.request_opening_decision(
             OpeningDecisionAttempt::Recovery(attempt_id.to_owned()),
             "project-recovery",
+            project_name,
             decision_receiver,
             "the Recovery decision",
         )
@@ -469,6 +474,7 @@ impl NativeProgressDialog {
         &mut self,
         attempt: OpeningDecisionAttempt,
         kind: &str,
+        project_name: Option<&str>,
         decision_receiver: tokio::sync::oneshot::Receiver<T>,
         name: &str,
     ) -> io::Result<T> {
@@ -491,12 +497,14 @@ impl NativeProgressDialog {
             .ok_or_else(|| io::Error::other("the opening presentation is unavailable"))?;
         let mut url = current_webview.url().map_err(io::Error::other)?;
         url.set_path("/dialog.html");
-        url.set_query(Some(&format!(
-            "kind={kind}&attemptId={}&{OWNED_WINDOW_READY_PARAMETER}={ready_token}",
-            encode_unbounded_component(match &attempt {
+        url.set_query(Some(&decision_query(
+            kind,
+            match &attempt {
                 OpeningDecisionAttempt::ExternalCopy(attempt_id)
                 | OpeningDecisionAttempt::Recovery(attempt_id) => attempt_id,
-            }),
+            },
+            project_name,
+            ready_token,
         )));
         if let Err(error) = current_webview.navigate(url) {
             cancel_owned_window_readiness(self.window.label(), ready_token);
@@ -540,8 +548,19 @@ impl NativeProgressDialog {
         self.window.clone()
     }
 
+    /// Raises (`true`) or lowers (`false`) the window above other windows,
+    /// so that an editor of another Project that becomes ready cannot cover
+    /// a pending decision.
+    pub(crate) fn front_control(&self) -> impl Fn(bool) + Send + Sync + 'static {
+        let window = self.window.clone();
+        move |front| {
+            let _ = window.set_always_on_top(front);
+        }
+    }
+
     pub(crate) fn finish(mut self, restore_owner_window: bool) {
         self.cancel_opening_decision();
+        self.stop_progress();
         match self.owner_presentation {
             OwnerPresentation::Replace if restore_owner_window => {
                 let _ = self.window.destroy_dialog();
@@ -556,6 +575,31 @@ impl NativeProgressDialog {
         }
         self.closed = true;
     }
+
+    fn stop_progress(&mut self) {
+        if let Some(board) = self.progress.take() {
+            board.detach();
+        }
+    }
+}
+
+/// The address of a decision page. The Project's name is present only when
+/// the window lists several Projects.
+fn decision_query(
+    kind: &str,
+    attempt_id: &str,
+    project_name: Option<&str>,
+    ready_token: u64,
+) -> String {
+    let mut query = format!(
+        "kind={kind}&attemptId={}",
+        encode_unbounded_component(attempt_id)
+    );
+    if let Some(name) = project_name.filter(|name| !name.is_empty()) {
+        let _ = write!(query, "&projectName={}", encode_component(name));
+    }
+    let _ = write!(query, "&{OWNED_WINDOW_READY_PARAMETER}={ready_token}");
+    query
 }
 
 fn resize_owned_window_width(window: &WebviewWindow, width: f64) -> io::Result<()> {
@@ -570,6 +614,7 @@ fn resize_owned_window_width(window: &WebviewWindow, width: f64) -> io::Result<(
 impl Drop for NativeProgressDialog {
     fn drop(&mut self) {
         self.cancel_opening_decision();
+        self.stop_progress();
         if !self.closed {
             match self.owner_presentation {
                 OwnerPresentation::BlockedBehindDialog => {
@@ -584,17 +629,17 @@ impl Drop for NativeProgressDialog {
     }
 }
 
+/// Shows the progress window. `progress` holds the rows an opening window
+/// lists; the window reads them when it starts and receives every change.
 pub(crate) async fn show_native_progress(
     app: &AppHandle,
     owner_label: &str,
     kind: NativeProgressKind,
     progress_webview_data_directory: &Path,
+    progress: Option<&OpeningProgressBoard>,
 ) -> io::Result<NativeProgressDialog> {
-    if let Some(state) = app.try_state::<OpeningImageProgressState>() {
-        *state
-            .0
-            .lock()
-            .map_err(|_| io::Error::other("the opening progress state is unavailable"))? = None;
+    if let Some(state) = app.try_state::<OpeningProgressState>() {
+        state.present(progress.cloned());
     }
     let owner = owned_window(app, owner_label)?;
     #[cfg(debug_assertions)]
@@ -626,13 +671,25 @@ pub(crate) async fn show_native_progress(
     )
     .await?;
 
+    if let Some(board) = progress {
+        let target = window.clone();
+        board.attach(move |snapshot| {
+            let _ = target.emit_to(target.label(), OPENING_PROGRESS_EVENT, snapshot);
+        });
+    }
     let owner_presentation = kind.owner_presentation();
-    display_progress_dialog(&owner, &window, kind)?;
+    if let Err(error) = display_progress_dialog(&owner, &window, kind) {
+        if let Some(board) = progress {
+            board.detach();
+        }
+        return Err(error);
+    }
     Ok(NativeProgressDialog {
         closed: false,
         decision_attempt: None,
         owner,
         owner_presentation,
+        progress: progress.cloned(),
         window,
     })
 }
@@ -642,14 +699,10 @@ pub(crate) async fn show_project_failure(
     context: ProjectFailureDialogContext,
     message: &str,
     action: Option<&str>,
+    projects: &[ProjectFailureDetail],
 ) -> io::Result<()> {
     let owner = owned_window(app, GLOBAL_WINDOW_LABEL)?;
-    let url = format!(
-        "dialog.html?kind=project-failure&title={}&message={}&action={}",
-        encode_component(context.title()),
-        encode_component(message),
-        encode_component(action.unwrap_or("Feche esta janela e tente novamente.")),
-    );
+    let url = project_failure_url(context, message, action, projects);
     let window = match build_hidden_owned_window(
         app,
         &owner,
@@ -678,6 +731,50 @@ pub(crate) async fn show_project_failure(
     });
 
     display_dialog(&owner, &window, context.owner_presentation(), false)
+}
+
+/// The failure page. One Project keeps today's page; Projects opened together
+/// are listed by name, each with its own reason, in one page.
+fn project_failure_url(
+    context: ProjectFailureDialogContext,
+    message: &str,
+    action: Option<&str>,
+    projects: &[ProjectFailureDetail],
+) -> String {
+    let title = match (context, projects.len()) {
+        (ProjectFailureDialogContext::ProjectOpening, count) if count >= 2 => {
+            format!("Não foi possível abrir {count} projetos")
+        }
+        _ => context.title().to_owned(),
+    };
+    let url = format!(
+        "dialog.html?kind=project-failure&title={}&message={}&action={}",
+        encode_component(&title),
+        encode_component(message),
+        encode_component(action.unwrap_or("Feche esta janela e tente novamente.")),
+    );
+    if projects.is_empty() {
+        return url;
+    }
+    let bounded = projects
+        .iter()
+        .map(|project| {
+            serde_json::json!({
+                "name": bounded_text(&project.name),
+                "message": bounded_text(&project.message),
+                "action": project.action.as_deref().map(bounded_text),
+            })
+        })
+        .collect::<Vec<_>>();
+    append_query_parameter(
+        &url,
+        "projects",
+        &serde_json::Value::Array(bounded).to_string(),
+    )
+}
+
+fn bounded_text(value: &str) -> String {
+    value.chars().take(400).collect()
 }
 
 #[tauri::command]
@@ -1263,6 +1360,73 @@ mod tests {
             "Projeto%20inv%C3%A1lido%20%26%20tente%20novamente."
         );
         assert!(encode_component(&"a".repeat(900)).len() <= 800);
+    }
+
+    #[test]
+    fn a_decision_page_names_its_project_only_when_given_a_name() {
+        assert_eq!(
+            decision_query("project-recovery", "attempt-42", None, 7),
+            "kind=project-recovery&attemptId=attempt-42&ownedReadyToken=7"
+        );
+        assert_eq!(
+            decision_query("project-recovery", "attempt-42", Some(""), 7),
+            "kind=project-recovery&attemptId=attempt-42&ownedReadyToken=7"
+        );
+        assert_eq!(
+            decision_query(
+                "external-copy",
+                "attempt 9",
+                Some("SARAH DA SILVA & Cia"),
+                8
+            ),
+            "kind=external-copy&attemptId=attempt%209&projectName=SARAH%20DA%20SILVA%20%26%20Cia&ownedReadyToken=8"
+        );
+    }
+
+    #[test]
+    fn projects_opened_together_share_one_failure_page_that_names_each_project() {
+        let single = project_failure_url(
+            ProjectFailureDialogContext::ProjectOpening,
+            "Não abriu.",
+            Some("Abra de novo."),
+            &[],
+        );
+        assert_eq!(
+            single,
+            "dialog.html?kind=project-failure&title=N%C3%A3o%20foi%20poss%C3%ADvel%20abrir%20o%20projeto&message=N%C3%A3o%20abriu.&action=Abra%20de%20novo."
+        );
+
+        let detail = |name: &str| ProjectFailureDetail {
+            name: name.into(),
+            message: "Não abriu.".into(),
+            action: Some("Abra de novo.".into()),
+        };
+        let named = project_failure_url(
+            ProjectFailureDialogContext::ProjectOpening,
+            "Não abriu.",
+            Some("Abra de novo."),
+            &[detail("SARAH XAVIER")],
+        );
+        assert!(
+            named.starts_with(&single),
+            "one named Project keeps the title"
+        );
+        let several = project_failure_url(
+            ProjectFailureDialogContext::ProjectOpening,
+            "2 projetos não abriram.",
+            None,
+            &[detail("SARAH XAVIER"), detail("YUELSON RODRIGO")],
+        );
+        let query = several.split_once('?').unwrap().1;
+        let parameters = tauri::Url::parse(&format!("http://dialog/?{query}"))
+            .unwrap()
+            .query_pairs()
+            .map(|(key, value)| (key.into_owned(), value.into_owned()))
+            .collect::<HashMap<_, _>>();
+        assert_eq!(parameters["title"], "Não foi possível abrir 2 projetos");
+        let projects: serde_json::Value = serde_json::from_str(&parameters["projects"]).unwrap();
+        assert_eq!(projects[1]["name"], "YUELSON RODRIGO");
+        assert_eq!(projects[1]["action"], "Abra de novo.");
     }
 
     #[test]

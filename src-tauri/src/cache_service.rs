@@ -15,6 +15,29 @@ use crate::{
 };
 
 const CLEAR_SCHEDULE_CONTENT: &[u8] = b"MyAlbuns Cache clear schedule v1\n";
+/// How long a reservation waits for each mutex before reporting `Busy`.
+#[derive(Clone, Copy, Debug)]
+struct ReservationWaits {
+    maintenance: std::time::Duration,
+    namespace: std::time::Duration,
+}
+
+impl ReservationWaits {
+    /// A starting Host waits instead of failing its opening: for maintenance
+    /// held by a cleanup or by a sibling Host mounting its namespace, and
+    /// briefly for its namespace, which `measure` or `free_closed_projects`
+    /// may hold for a moment. A namespace owned by a live Host stays `Busy`.
+    const STARTING_HOST: Self = Self {
+        maintenance: std::time::Duration::from_secs(30),
+        namespace: std::time::Duration::from_secs(5),
+    };
+    /// Save As reserves its fresh namespace under the Host state lock, so it
+    /// never waits.
+    const IMMEDIATE: Self = Self {
+        maintenance: std::time::Duration::ZERO,
+        namespace: std::time::Duration::ZERO,
+    };
+}
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum CacheScheduledCleanupOutcome {
@@ -115,12 +138,37 @@ impl CacheService {
         &self,
         authority: &ProjectIdentityAuthority,
     ) -> Result<CacheNamespaceOwner, CacheServiceError> {
-        let _maintenance = self.try_maintenance()?;
+        self.reserve_namespace_within(authority, ReservationWaits::STARTING_HOST)
+    }
+
+    /// Maintenance only orders the mount against cleanup: it is held until the
+    /// namespace reservation is owned. Writer synchronization and recovery can
+    /// take seconds and run under that reservation alone, which every removal
+    /// path takes before touching a namespace, so other Hosts can start meanwhile.
+    ///
+    /// Waiting for the namespace while holding maintenance cannot deadlock:
+    /// the order is always maintenance, then namespace, and every other user
+    /// either holds a namespace without ever waiting for maintenance (`measure`,
+    /// `free_closed_projects`, an open Host, whose `recover_storage` and Save As
+    /// only try maintenance without waiting) or takes maintenance first and
+    /// then only tries namespaces without waiting (`recover_storage`,
+    /// `try_clear_all`, `prune_empty_closed_namespaces`). Both waits are also
+    /// bounded, so the worst case is `Busy`, never a hang.
+    fn reserve_namespace_within(
+        &self,
+        authority: &ProjectIdentityAuthority,
+        waits: ReservationWaits,
+    ) -> Result<CacheNamespaceOwner, CacheServiceError> {
+        let maintenance = self
+            .maintenance
+            .try_acquire_within(waits.maintenance)
+            .map_err(map_reservation_error)?;
         let namespace = AuthorizedCacheNamespace::mount(&self.app_paths, authority)
             .map_err(|error| CacheServiceError::Storage(error.message))?;
         let reservation = namespace_mutex(&self.app_paths, namespace.paths())
-            .try_acquire()
+            .try_acquire_within(waits.namespace)
             .map_err(map_reservation_error)?;
+        drop(maintenance);
         synchronize_cache_writer(&self.app_paths, namespace.paths())?;
         let recovery = CacheEngine::recover_reserved_namespace(&self.app_paths, &namespace)
             .map_err(|error| CacheServiceError::Storage(error.message))?;
@@ -147,7 +195,7 @@ impl CacheService {
         &self,
         authority: &ProjectIdentityAuthority,
     ) -> Result<CacheNamespaceOwner, CacheServiceError> {
-        let owner = self.reserve_namespace(authority)?;
+        let owner = self.reserve_namespace_within(authority, ReservationWaits::IMMEDIATE)?;
         let occupied_bytes = self
             .app_paths
             .inspect_cache_namespace(owner.namespace.paths())
@@ -651,8 +699,11 @@ mod tests {
 
     use super::{
         ActiveCacheNamespace, CacheScheduledCleanupOutcome, CacheService, CacheServiceError,
-        namespace_mutex,
+        ReservationWaits, namespace_mutex,
     };
+
+    /// Windows timer resolution can end a wait up to one tick early.
+    const TIMER_MARGIN: Duration = Duration::from_millis(40);
 
     const NAMESPACE_OWNER_ROOT_ENV: &str = "MYALBUNS_CACHE_NAMESPACE_OWNER_ROOT";
     const NAMESPACE_OWNER_NAME_ENV: &str = "MYALBUNS_CACHE_NAMESPACE_OWNER_NAME";
@@ -703,17 +754,31 @@ mod tests {
             .reserve_namespace(project.identity_authority())
             .expect("the first owner reserves the namespace");
 
+        let briefly = ReservationWaits {
+            namespace: Duration::from_millis(150),
+            ..ReservationWaits::STARTING_HOST
+        };
+        let waited = Instant::now();
         assert_eq!(
             service
-                .reserve_namespace(project.identity_authority())
+                .reserve_namespace_within(project.identity_authority(), briefly)
                 .expect_err("one namespace has one owner"),
             CacheServiceError::Busy
         );
+        assert!(
+            waited.elapsed() + TIMER_MARGIN >= briefly.namespace,
+            "a starting Host waits briefly for its namespace"
+        );
+        let waited = Instant::now();
         assert_eq!(
             service
                 .reserve_fresh_namespace(project.identity_authority())
                 .expect_err("an owned namespace is not a fresh one"),
             CacheServiceError::Busy
+        );
+        assert!(
+            waited.elapsed() < Duration::from_secs(2),
+            "Save As runs under the Host state lock and never waits"
         );
         assert!(owner.namespace().paths().root().is_dir());
 
@@ -739,12 +804,29 @@ mod tests {
             .try_acquire()
             .expect("the maintenance reservation is free");
 
+        let briefly = ReservationWaits {
+            maintenance: Duration::from_millis(150),
+            ..ReservationWaits::STARTING_HOST
+        };
+        let waited = Instant::now();
         assert_eq!(
             service
-                .reserve_namespace(project.identity_authority())
-                .expect_err("no namespace is mounted during maintenance"),
+                .reserve_namespace_within(project.identity_authority(), briefly)
+                .expect_err("no namespace is mounted while maintenance outlasts the wait"),
             CacheServiceError::Busy
         );
+        assert!(
+            waited.elapsed() + TIMER_MARGIN >= briefly.maintenance,
+            "a starting Host waits for maintenance before giving up"
+        );
+        let waited = Instant::now();
+        assert_eq!(
+            service
+                .reserve_fresh_namespace(project.identity_authority())
+                .expect_err("Save As does not wait for maintenance"),
+            CacheServiceError::Busy
+        );
+        assert!(waited.elapsed() < Duration::from_secs(2));
         assert_eq!(
             service.recover_storage(&volume, false),
             Err(CacheServiceError::Busy)
@@ -764,6 +846,142 @@ mod tests {
         service
             .reserve_namespace(project.identity_authority())
             .expect("the namespace mounts after maintenance");
+    }
+
+    #[test]
+    fn a_starting_host_waits_for_brief_maintenance_instead_of_failing() {
+        let root = tempfile::tempdir().expect("temporary Cache maintenance wait fixture");
+        let core = ProjectCore::new().with_identity_storage_roots(
+            root.path().join("leases"),
+            root.path().join("identities"),
+        );
+        let project = create_project(&core, root.path().join("Projeto.myalbuns"));
+        let service = CacheService::new(app_paths(root.path()));
+        let maintenance = service
+            .maintenance
+            .try_acquire()
+            .expect("the maintenance reservation is free");
+        let releaser = thread::spawn(move || {
+            thread::sleep(Duration::from_millis(300));
+            drop(maintenance);
+        });
+
+        let waited = Instant::now();
+        let owner = service
+            .reserve_namespace(project.identity_authority())
+            .expect("the reservation proceeds once maintenance ends");
+
+        assert!(waited.elapsed() + TIMER_MARGIN >= Duration::from_millis(250));
+        assert!(owner.namespace().paths().root().is_dir());
+        releaser.join().expect("the maintenance holder finishes");
+    }
+
+    #[test]
+    fn a_starting_host_waits_for_a_brief_namespace_holder_instead_of_failing() {
+        let root = tempfile::tempdir().expect("temporary namespace wait fixture");
+        let paths = app_paths(root.path());
+        let core = ProjectCore::new().with_identity_storage_roots(
+            root.path().join("leases"),
+            root.path().join("identities"),
+        );
+        let project = create_project(&core, root.path().join("Projeto.myalbuns"));
+        let cache = paths
+            .project_cache(&project_data_namespace(
+                &project.project_id().hyphenated().to_string(),
+            ))
+            .expect("the authorized namespace plan is valid");
+        // A measurement or a cleanup holds the namespace for a moment.
+        let measuring = namespace_mutex(&paths, &cache)
+            .try_acquire()
+            .expect("the namespace reservation is free");
+        let releaser = thread::spawn(move || {
+            thread::sleep(Duration::from_millis(300));
+            drop(measuring);
+        });
+
+        let owner = CacheService::new(paths)
+            .reserve_namespace(project.identity_authority())
+            .expect("the reservation proceeds once the namespace is released");
+
+        assert!(owner.namespace().paths().root().is_dir());
+        releaser.join().expect("the namespace holder finishes");
+    }
+
+    #[test]
+    fn namespace_recovery_runs_without_holding_maintenance() {
+        let root = tempfile::tempdir().expect("temporary Cache recovery fixture");
+        let paths = app_paths(root.path());
+        let core = ProjectCore::new().with_identity_storage_roots(
+            root.path().join("leases"),
+            root.path().join("identities"),
+        );
+        let project = create_project(&core, root.path().join("Projeto.myalbuns"));
+        let cache = paths
+            .project_cache(&project_data_namespace(
+                &project.project_id().hyphenated().to_string(),
+            ))
+            .expect("the authorized namespace plan is valid");
+        drop(
+            paths
+                .prepare_cache_storage(&cache)
+                .expect("the namespace exists before the Host starts"),
+        );
+        // A live writer left by a previous Host keeps recovery waiting.
+        let mut writer = crate::test_process::ChildGuard::new(
+            Command::new("cmd")
+                .args(["/c", "pause"])
+                .stdin(Stdio::piped())
+                .stdout(Stdio::null())
+                .stderr(Stdio::null())
+                .spawn()
+                .expect("the lingering writer starts"),
+        );
+        let writer_identity = ProcessInstanceId::from_process_handle(
+            writer.id(),
+            writer.as_raw_handle().cast::<c_void>(),
+        )
+        .expect("the lingering writer has an exact identity");
+        std::fs::write(
+            cache.root().join(".processor-writer.v1.json"),
+            serde_json::to_vec(&serde_json::json!({
+                "schemaVersion": 1,
+                "process": writer_identity,
+            }))
+            .expect("the writer claim serializes"),
+        )
+        .expect("the writer claim is published");
+        let service = CacheService::new(paths.clone());
+        let starting_host = {
+            let service = service.clone();
+            let authority = project.identity_authority().clone();
+            thread::spawn(move || service.reserve_namespace(&authority).map(|_| ()))
+        };
+        let deadline = Instant::now() + Duration::from_secs(10);
+        while !namespace_mutex(&paths, &cache)
+            .is_owned()
+            .expect("the namespace reservation is observable")
+        {
+            assert!(Instant::now() < deadline, "the Host reserved its namespace");
+            thread::sleep(Duration::from_millis(10));
+        }
+
+        // The Host releases maintenance right after owning its namespace.
+        let maintenance = service
+            .maintenance
+            .try_acquire_within(Duration::from_secs(2))
+            .expect("maintenance is free while the Host recovers its namespace");
+        assert!(
+            !starting_host.is_finished(),
+            "recovery is still waiting for the previous writer"
+        );
+        drop(maintenance);
+        writer.kill().expect("the lingering writer is stopped");
+        writer.wait().expect("the lingering writer is reaped");
+
+        assert_eq!(
+            starting_host.join().expect("the Host thread finishes"),
+            Ok(())
+        );
     }
 
     #[test]

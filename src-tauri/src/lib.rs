@@ -26,6 +26,7 @@ mod generation_operation;
 mod generation_runner;
 mod generation_window;
 mod global_activation;
+mod global_opening_burst;
 mod global_runtime;
 mod graphics_launch_gate;
 mod image_processing;
@@ -54,6 +55,7 @@ mod native_dialog_window;
 mod native_project_dialog;
 mod opaque_image_protocol;
 mod open_projects;
+mod opening_focus;
 mod operation_gate;
 mod operation_lease;
 mod path_io;
@@ -387,7 +389,7 @@ mod tests {
             allowed_commands(&owned_dialog_permission),
             BTreeSet::from([
                 "fit_owned_window",
-                "opening_image_progress",
+                "opening_progress",
                 "owned_window_content_ready",
                 "resolve_opening_external_copy",
                 "resolve_opening_recovery",

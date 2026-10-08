@@ -1,0 +1,47 @@
+/* Several Projects opened together. The window keeps a fixed width; its
+   height follows the rows up to the screen, then the list scrolls. */
+.opening-project-list {
+  display: flex;
+  max-height: calc(
+    var(--ui-owned-window-height-limit, 100vh) - var(--ui-titlebar-height) - 76px
+  );
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  flex-direction: column;
+  gap: 10px;
+  list-style: none;
+}
+
+/* The bar column is fixed, so bars and counts line up from row to row. */
+.opening-project-list__row {
+  display: grid;
+  align-items: center;
+  column-gap: var(--ui-space-3);
+  grid-template-columns: minmax(0, 1fr) max-content 88px;
+}
+
+.opening-project-list__name {
+  overflow: hidden;
+  color: var(--ui-text);
+  font-size: var(--ui-font-size-control);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.opening-project-list__status {
+  color: var(--ui-text-secondary);
+  font-size: var(--ui-font-size-support);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.opening-project-list__status[data-state="failed"] {
+  color: var(--ui-danger-text);
+}
+
+.opening-project-list__bar {
+  display: flex;
+  align-items: center;
+}

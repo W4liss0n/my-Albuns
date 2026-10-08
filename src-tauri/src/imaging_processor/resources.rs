@@ -155,6 +155,14 @@ impl Default for ResourceBudget {
 pub(super) struct MemoryReservation {
     budget: Arc<ResourceBudget>,
     bytes: u64,
+    /// Admitted only because nothing else ran locally (`mode: "serial"`).
+    serial: bool,
+}
+
+impl MemoryReservation {
+    pub(super) fn is_serial(&self) -> bool {
+        self.serial
+    }
 }
 
 impl ResourceBudget {
@@ -234,6 +242,7 @@ impl ResourceBudget {
                     return Ok(MemoryReservation {
                         budget: Arc::clone(self),
                         bytes: estimate.0,
+                        serial: !parallel_admission,
                     });
                 }
                 if usage.active == 0 {
@@ -366,6 +375,10 @@ mod tests {
             .await
             .expect("one image must advance below the parallel headroom")
             .unwrap();
+            assert!(
+                first.is_serial(),
+                "low-memory admission also takes the machine-wide low-memory slot"
+            );
             let mut next =
                 Box::pin(budget.reserve(ImageMemoryEstimate(236 * MIB), &cancelled, &permits));
             assert!(
@@ -444,6 +457,7 @@ mod tests {
                 .reserve(ImageMemoryEstimate(3 * GIB), &cancelled, &permits)
                 .await
                 .unwrap();
+            assert!(!first.is_serial(), "headroom admits in parallel mode");
             let mut second =
                 Box::pin(budget.reserve(ImageMemoryEstimate(2 * GIB), &cancelled, &permits));
             assert!(

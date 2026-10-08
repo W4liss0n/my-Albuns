@@ -83,3 +83,17 @@ test("prevents duplicate decisions while the same Host attempt is resolving", ()
   expect(props.onCancel).not.toHaveBeenCalled();
   expect(props.onSaveCopyAs).not.toHaveBeenCalled();
 });
+
+test("names the Project when the opening window lists several Projects", () => {
+  const { props, view } = externalCopyDialog({ projectName: "SARAH XAVIER" });
+  expect(screen.getByRole("dialog", { name: "Cópia externa somente leitura" }))
+    .toHaveTextContent(
+      "Para editar o projeto SARAH XAVIER, salve uma cópia em outro local. O original será mantido.",
+    );
+
+  view.rerender(<ExternalCopyDecisionDialog {...props} projectName={null} />);
+  expect(screen.getByRole("dialog", { name: "Cópia externa somente leitura" }))
+    .toHaveTextContent(
+      "Para editar este arquivo, salve uma cópia em outro local. O original será mantido.",
+    );
+});

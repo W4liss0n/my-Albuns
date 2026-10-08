@@ -1,0 +1,27 @@
+/* Projects opened together that did not open. The list scrolls once the
+   window reaches the screen's height. */
+.project-failure-list {
+  display: flex;
+  max-height: calc(
+    var(--ui-owned-window-height-limit, 100vh) - var(--ui-titlebar-height) - 140px
+  );
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  flex-direction: column;
+  gap: 12px;
+  list-style: none;
+}
+
+.project-failure-list__item p {
+  margin: 0;
+}
+
+.project-failure-list__item p + p {
+  margin-top: 2px;
+}
+
+.project-failure-list__name {
+  overflow-wrap: anywhere;
+  color: var(--ui-text);
+}

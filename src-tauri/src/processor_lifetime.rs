@@ -15,10 +15,12 @@ use windows_sys::Win32::Foundation::WAIT_OBJECT_0;
 use windows_sys::Win32::System::{
     JobObjects::{
         AssignProcessToJobObject, CreateJobObjectW, JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE,
-        JOBOBJECT_EXTENDED_LIMIT_INFORMATION, JobObjectExtendedLimitInformation,
-        SetInformationJobObject,
+        JOB_OBJECT_LIMIT_PRIORITY_CLASS, JOBOBJECT_EXTENDED_LIMIT_INFORMATION,
+        JobObjectExtendedLimitInformation, SetInformationJobObject,
     },
-    Threading::{PROCESS_SET_QUOTA, PROCESS_TERMINATE, WaitForSingleObject},
+    Threading::{
+        BELOW_NORMAL_PRIORITY_CLASS, PROCESS_SET_QUOTA, PROCESS_TERMINATE, WaitForSingleObject,
+    },
 };
 
 #[cfg(test)]
@@ -102,8 +104,37 @@ impl PreparedCacheWriterQuiescence {
     }
 }
 
+/// CPU priority of a contained Imaging process.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum ProcessorPriority {
+    Normal,
+    /// Work for a Project whose window is not focused yields to the window
+    /// the user is working in.
+    BelowNormal,
+}
+
+impl ProcessorPriority {
+    pub(crate) const fn as_str(self) -> &'static str {
+        match self {
+            Self::Normal => "normal",
+            Self::BelowNormal => "below_normal",
+        }
+    }
+}
+
 impl ProcessorChildLifetime {
+    #[cfg(test)]
     pub(crate) fn attach(process_instance: ProcessInstanceId) -> io::Result<Self> {
+        Self::attach_with_priority(process_instance, ProcessorPriority::Normal)
+    }
+
+    /// The priority is a limit of the same Job that contains the process, set
+    /// before assignment: the process cannot raise it, and nothing else needs
+    /// rights on the child handle.
+    pub(crate) fn attach_with_priority(
+        process_instance: ProcessInstanceId,
+        priority: ProcessorPriority,
+    ) -> io::Result<Self> {
         // SAFETY: null security/name creates a private non-inheritable Job. A
         // successful raw handle is immediately transferred to OwnedHandle.
         let job = unsafe {
@@ -115,6 +146,10 @@ impl ProcessorChildLifetime {
         };
         let mut limits = JOBOBJECT_EXTENDED_LIMIT_INFORMATION::default();
         limits.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
+        if priority == ProcessorPriority::BelowNormal {
+            limits.BasicLimitInformation.LimitFlags |= JOB_OBJECT_LIMIT_PRIORITY_CLASS;
+            limits.BasicLimitInformation.PriorityClass = BELOW_NORMAL_PRIORITY_CLASS;
+        }
         // SAFETY: job is live and limits points to initialized storage of the
         // exact information-class size for the duration of this call.
         if unsafe {
@@ -290,7 +325,7 @@ mod tests {
 
     use super::{
         CACHE_WRITER_CLAIM_FILE, CACHE_WRITER_CLAIM_SCHEMA_VERSION, CACHE_WRITER_TEMPORARY_PREFIX,
-        CacheWriterClaim, ProcessorChildLifetime, await_cache_writer_quiescence,
+        CacheWriterClaim, ProcessorChildLifetime, ProcessorPriority, await_cache_writer_quiescence,
         cache_writer_claim_path, prepare_cache_writer_quiescence,
     };
 
@@ -334,6 +369,41 @@ mod tests {
     fn child_identity(child: &std::process::Child) -> ProcessInstanceId {
         ProcessInstanceId::from_process_handle(child.id(), child.as_raw_handle().cast::<c_void>())
             .expect("the exact child identity is observable through its causal handle")
+    }
+
+    #[test]
+    fn an_unfocused_project_contains_its_processor_below_normal_priority() {
+        use windows_sys::Win32::System::Threading::{
+            BELOW_NORMAL_PRIORITY_CLASS, GetPriorityClass,
+        };
+
+        for priority in [ProcessorPriority::BelowNormal, ProcessorPriority::Normal] {
+            let mut worker = crate::test_process::ChildGuard::new(
+                Command::new("cmd")
+                    .args(["/d", "/c", "pause"])
+                    .stdin(Stdio::piped())
+                    .stdout(Stdio::null())
+                    .stderr(Stdio::null())
+                    .spawn()
+                    .expect("the contained process starts"),
+            );
+            // SAFETY: the std child handle is live and has query rights.
+            let priority_class =
+                || unsafe { GetPriorityClass(worker.as_raw_handle().cast::<c_void>()) };
+            let inherited = priority_class();
+            let lifetime =
+                ProcessorChildLifetime::attach_with_priority(child_identity(&worker), priority)
+                    .expect("the process is contained");
+            let expected = match priority {
+                ProcessorPriority::BelowNormal => BELOW_NORMAL_PRIORITY_CLASS,
+                // Normal containment leaves the class the process started with.
+                ProcessorPriority::Normal => inherited,
+            };
+            assert_eq!(priority_class(), expected, "{priority:?}");
+            drop(lifetime);
+            worker.kill().ok();
+            worker.wait().expect("the contained process is reaped");
+        }
     }
 
     #[cfg(windows)]

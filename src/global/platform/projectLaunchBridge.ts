@@ -2,6 +2,7 @@ import {
   PROJECT_CONFIGURATION_VALIDATION_CODES,
   type ProjectConfigurationValidationCode,
   type ProjectConfigurationValidationOutcome,
+  type ProjectFailureDetail,
   type ProjectLaunchFailure,
   type ProjectLaunchOutcome,
   type ProvisionalDecorativeSelection,
@@ -24,6 +25,7 @@ function parseProjectLaunchFailure(
   ) {
     return null;
   }
+  const projects = parseProjectFailureDetails(candidate.projects);
   return {
     code: candidate.code,
     ...(typeof candidate.stage === "string"
@@ -33,7 +35,30 @@ function parseProjectLaunchFailure(
     ...(typeof candidate.action === "string"
       ? { action: candidate.action }
       : {}),
+    ...(projects ? { projects } : {}),
   };
+}
+
+/** The Projects a failure names; anything malformed is left out. */
+export function parseProjectFailureDetails(
+  value: unknown,
+): ProjectFailureDetail[] | null {
+  if (!Array.isArray(value)) return null;
+  const projects = value.flatMap((item): ProjectFailureDetail[] => {
+    if (
+      !isIpcRecord(item) ||
+      typeof item.name !== "string" ||
+      typeof item.message !== "string"
+    ) {
+      return [];
+    }
+    return [{
+      name: item.name,
+      message: item.message,
+      ...(typeof item.action === "string" ? { action: item.action } : {}),
+    }];
+  });
+  return projects.length > 0 ? projects : null;
 }
 
 export function toProjectLaunchFailure(

@@ -427,6 +427,7 @@ pub(crate) async fn choose_provisional_decorative(
         GLOBAL_WINDOW_LABEL,
         crate::native_dialog_window::NativeProgressKind::ProcessingImages,
         &profile,
+        None,
     )
     .await
     .map_err(|_| ProvisionalDecorativeFailure::dialog_unavailable())?;

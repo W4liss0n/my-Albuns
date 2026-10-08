@@ -692,6 +692,37 @@ mod tests {
     }
 
     #[test]
+    fn concurrent_forwarded_batches_keep_the_global_until_the_last_one_completes() {
+        let flow = super::ActivationFlow::default();
+        let (sender, _receiver) = std::sync::mpsc::channel();
+        let batch = || super::GlobalActivationBatch {
+            client: ProcessInstanceId::current().expect("the test process is identified"),
+            projects: vec![PathBuf::from(r"C:\Projetos\Lote.myalbuns")],
+            settings: None,
+            new_project: false,
+        };
+        assert!(flow.enqueue(batch(), &sender).unwrap());
+        assert!(flow.enqueue(batch(), &sender).unwrap());
+
+        // A burst that ends while both batches still run asks for the exit.
+        assert!(!flow.stop_accepting());
+        assert!(
+            !flow.enqueue(batch(), &sender).unwrap(),
+            "no activation is acknowledged while the exit waits"
+        );
+        assert!(!flow.complete_activation(), "one batch is still in flight");
+        assert!(
+            flow.complete_activation(),
+            "the last batch commits the exit"
+        );
+
+        // A failed burst cancels the exit: completing a batch no longer exits.
+        flow.resume_accepting();
+        assert!(flow.enqueue(batch(), &sender).unwrap());
+        assert!(!flow.complete_activation());
+    }
+
+    #[test]
     fn activation_retries_as_primary_while_the_previous_entry_is_exiting() {
         let root = tempfile::tempdir().expect("the activation fixture exists");
         let paths = AppPaths::from_roots(&root.path().join("roaming"), &root.path().join("local"));

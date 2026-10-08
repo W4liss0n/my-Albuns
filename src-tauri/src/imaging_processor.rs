@@ -1,4 +1,6 @@
+mod machine_slots;
 mod resources;
+use machine_slots::{MachineSlotGrant, MachineSlots, SlotWaitEnd};
 pub(crate) use resources::{ImageMemoryEstimate, ProcessorAdmissionFailure};
 use resources::{MemoryReservation, ResourceBudget, cancellable_reservation};
 
@@ -7,7 +9,7 @@ use std::{
     future::Future,
     pin::Pin,
     sync::{
-        Arc, Mutex,
+        Arc, Mutex, OnceLock,
         atomic::{AtomicBool, Ordering},
     },
     time::Duration,
@@ -30,7 +32,10 @@ use tauri_plugin_shell::{
 };
 use tokio::sync::{OwnedSemaphorePermit, Semaphore};
 
-use crate::{logging::LoggingState, processor_lifetime::ProcessorChildLifetime};
+use crate::{
+    logging::LoggingState,
+    processor_lifetime::{ProcessorChildLifetime, ProcessorPriority},
+};
 
 const PROCESS_TERMINATION_TIMEOUT: Duration = Duration::from_secs(5);
 const PROCESS_HANDSHAKE_TIMEOUT: Duration = Duration::from_secs(5);
@@ -45,13 +50,65 @@ pub(crate) struct ImagingProcessor {
     resources: Arc<ResourceBudget>,
 }
 
+/// One core stays free for the editor. The same value bounds the sidecars of
+/// one process and, through machine-wide slots, of every process together.
+fn default_capacity() -> usize {
+    std::thread::available_parallelism()
+        .map_or(1, usize::from)
+        .saturating_sub(1)
+        .clamp(1, IMAGE_PROCESSING_CONCURRENCY)
+}
+
 impl Default for ImagingProcessor {
     fn default() -> Self {
-        let capacity = std::thread::available_parallelism()
-            .map_or(1, usize::from)
-            .saturating_sub(1)
-            .clamp(1, IMAGE_PROCESSING_CONCURRENCY);
-        Self::with_capacity(capacity)
+        Self::with_capacity(default_capacity())
+    }
+}
+
+/// Whether any window of this Project Host is focused: the Project window,
+/// the image viewer (eye correction runs from it) or any other window the Host
+/// owns. Only a Project Host manages it; processes without a Project window
+/// keep normal priority and every machine slot. The windows start hidden, so
+/// startup preparation runs in the background.
+#[derive(Debug, Default)]
+pub(crate) struct HostWindowFocus {
+    focused_window: Mutex<Option<String>>,
+}
+
+impl HostWindowFocus {
+    /// Moving focus between two windows of the same Host reports the loss and
+    /// the gain in either order. Remembering which window holds focus makes a
+    /// late loss from the previous window harmless.
+    pub(crate) fn observe(&self, window: &str, focused: bool) {
+        let mut current = self
+            .focused_window
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        if focused {
+            *current = Some(window.to_owned());
+        } else if current.as_deref() == Some(window) {
+            *current = None;
+        }
+    }
+
+    fn is_focused(&self) -> bool {
+        self.focused_window
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .is_some()
+    }
+}
+
+/// `None` is a process without a Project window (Global, command line).
+fn host_focus(app: &AppHandle) -> Option<bool> {
+    app.try_state::<HostWindowFocus>()
+        .map(|focus| focus.is_focused())
+}
+
+fn sidecar_priority(host_focused: Option<bool>) -> ProcessorPriority {
+    match host_focused {
+        Some(false) => ProcessorPriority::BelowNormal,
+        Some(true) | None => ProcessorPriority::Normal,
     }
 }
 
@@ -525,6 +582,8 @@ async fn invoke_once(
                 format!("A correlação da solicitação é inválida: {error}"),
             )
         })?;
+    // Held until this function returns, which is after the sidecar ended.
+    let _machine_slots = acquire_machine_slots(app, reservation, control).await?;
     let handshake_challenge = uuid::Uuid::new_v4().simple().to_string();
     let sidecar = app
         .shell()
@@ -574,7 +633,9 @@ async fn invoke_once(
             }
         }
     };
-    let mut processor_lifetime = match ProcessorChildLifetime::attach(process_instance) {
+    let priority = sidecar_priority(host_focus(app));
+    let attached = ProcessorChildLifetime::attach_with_priority(process_instance, priority);
+    let mut processor_lifetime = match attached {
         Ok(lifetime) => lifetime,
         Err(error) => {
             let containment_message =
@@ -630,6 +691,7 @@ async fn invoke_once(
         process_id = std::process::id(),
         imaging_process_id,
         root_binding_plan_sha256,
+        priority = priority.as_str(),
         event = "imaging_process_spawned",
     );
     if let Err(error) = child.write(&payload) {
@@ -663,6 +725,64 @@ async fn invoke_once(
         }
         InvocationEventsEnd::Closed(result) => result,
     }
+}
+
+/// Every sidecar, whichever process starts it, holds one machine-wide worker
+/// slot after local admission; a job admitted only in low-memory mode first
+/// holds the single low-memory slot too. The grant covers one sidecar, not the
+/// whole reservation: an Export renders many pages under one reservation, and
+/// other Projects must be able to start their own work between those pages.
+async fn acquire_machine_slots(
+    app: &AppHandle,
+    reservation: &ProcessorReservation,
+    control: InvocationControl<'_>,
+) -> Result<Option<MachineSlotGrant>, InvocationFailure> {
+    let Some(app_paths) = machine_slot_paths(app) else {
+        tracing::warn!(
+            target: "myalbuns.desktop",
+            event = "imaging_machine_slot_unavailable",
+            reason = "application paths unavailable",
+        );
+        return Ok(None);
+    };
+    let low_memory = reservation
+        ._memory
+        .as_ref()
+        .is_some_and(MemoryReservation::is_serial);
+    MachineSlots::new(&app_paths, default_capacity())
+        .acquire(low_memory, || {
+            if control.is_cancelled() {
+                Some(SlotWaitEnd::Cancelled)
+            } else if reservation.permits.is_closed() {
+                Some(SlotWaitEnd::Unavailable)
+            } else {
+                None
+            }
+        })
+        .await
+        .map_err(|end| match end {
+            SlotWaitEnd::Cancelled => InvocationFailure::at_stage(
+                InvocationFailureStage::Cancelled,
+                None,
+                "A operação do Processador de Imagens foi cancelada.",
+            ),
+            SlotWaitEnd::Unavailable => InvocationFailure::at_stage(
+                InvocationFailureStage::ResolveSidecar,
+                None,
+                ProcessorUnavailable.to_string(),
+            ),
+        })
+        .map(Some)
+}
+
+/// A Project Host manages its paths; the Global and the command line resolve
+/// the same per-user root the way they did at startup.
+fn machine_slot_paths(app: &AppHandle) -> Option<AppPaths> {
+    if let Some(paths) = app.try_state::<AppPaths>() {
+        return Some(paths.inner().clone());
+    }
+    static DISCOVERED: OnceLock<Option<AppPaths>> = OnceLock::new();
+    DISCOVERED.get_or_init(|| AppPaths::discover().ok()).clone()
 }
 
 /// How the event stream of one invocation ended.
@@ -954,6 +1074,45 @@ mod tests {
 
     /// Long enough that only a missing event can exhaust it.
     const HANDSHAKE_WAIT: Duration = Duration::from_secs(30);
+
+    #[test]
+    fn only_a_host_without_a_focused_window_runs_in_the_background() {
+        use crate::processor_lifetime::ProcessorPriority;
+
+        assert_eq!(
+            super::sidecar_priority(Some(false)),
+            ProcessorPriority::BelowNormal
+        );
+        assert_eq!(
+            super::sidecar_priority(Some(true)),
+            ProcessorPriority::Normal
+        );
+        assert_eq!(
+            super::sidecar_priority(None),
+            ProcessorPriority::Normal,
+            "the Global and the command line have no Project window"
+        );
+    }
+
+    #[test]
+    fn any_focused_window_of_the_host_keeps_it_in_the_foreground() {
+        let focus = super::HostWindowFocus::default();
+        assert!(!focus.is_focused(), "the Host windows start hidden");
+
+        focus.observe("project", true);
+        assert!(focus.is_focused());
+        // Project -> viewer, with the gain reported before the loss.
+        focus.observe("image-viewer", true);
+        focus.observe("project", false);
+        assert!(focus.is_focused(), "eye correction runs from the viewer");
+        // Viewer -> Project, with the loss reported first.
+        focus.observe("image-viewer", false);
+        focus.observe("project", true);
+        assert!(focus.is_focused());
+
+        focus.observe("project", false);
+        assert!(!focus.is_focused(), "another application took focus");
+    }
 
     #[test]
     fn processor_reservation_serializes_callers_and_is_released_with_its_guard() {
