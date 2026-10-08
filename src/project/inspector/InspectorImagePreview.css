@@ -1,7 +1,8 @@
 /* The preview block follows the context heading like the content of a
    section: same padding and the same closing rule, with no band of its own. */
 .inspector-image-preview {
-  --inspector-image-preview-max-side: 360px;
+  /* Only a photo taller than this gets narrower, so Design stays in reach. */
+  --inspector-image-preview-max-height: 60vh;
 
   display: grid;
   justify-items: center;
@@ -9,26 +10,23 @@
   border-bottom: 1px solid var(--ui-border);
 }
 
-/* A fixed square box as wide as the panel content, up to the cap: the controls
-   below keep their place whatever the photo's proportion, and while a preview
-   without known dimensions loads. */
+/* The photo takes the whole width of the panel content and its own
+   proportion; the controls below move with its height. */
 .inspector-image-preview__frame {
   display: flex;
-  width: min(100%, var(--inspector-image-preview-max-side));
+  width: 100%;
   min-width: 0;
-  aspect-ratio: 1 / 1;
-  align-items: center;
   justify-content: center;
-  container-type: inline-size;
 }
 
-/* The whole image keeps its proportion inside the square: a landscape photo
-   takes the box's width, a portrait one its height. The media panel thumbnail
-   keeps its white border and shadow, so the photo reads the same in both
-   panels. */
+/* The whole image keeps its proportion. The media panel thumbnail keeps its
+   white border and shadow, so the photo reads the same in both panels. */
 .inspector-image-preview__frame > .media-preview-thumbnail,
 .inspector-image-preview__frame > .media-preview-thumbnail[data-portrait="true"] {
-  width: min(100cqi, calc(100cqi * (var(--media-aspect-ratio))));
+  width: min(
+    100%,
+    calc(var(--inspector-image-preview-max-height) * (var(--media-aspect-ratio)))
+  );
   height: auto;
-  max-height: 100%;
+  max-height: none;
 }

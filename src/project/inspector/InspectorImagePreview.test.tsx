@@ -168,23 +168,22 @@ test("a Frame with a Photo shows only its whole preview between the heading and 
   expect(previewBlock()!.textContent).toBe("");
 });
 
-test("the preview box is a fixed square as wide as the panel content, up to 360 px", () => {
+test("the photo takes the whole panel content width, and only a very tall one gets narrower", () => {
   const styles = readFileSync("src/project/inspector/InspectorImagePreview.css", "utf8") as string;
   const rule = (selector: string) => {
     const match = styles.match(new RegExp(`(?:^|\\n)${selector.replace(/[.[\]"=>]/g, "\\$&")}[^{]*\\{([^}]*)\\}`));
     expect(match, `missing rule ${selector}`).not.toBeNull();
     return match![1].replace(/\s+/g, " ");
   };
-  expect(rule(".inspector-image-preview")).toContain("--inspector-image-preview-max-side: 360px;");
+  expect(rule(".inspector-image-preview")).toContain("--inspector-image-preview-max-height: 60vh;");
   const box = rule(".inspector-image-preview__frame");
-  expect(box).toContain("width: min(100%, var(--inspector-image-preview-max-side));");
-  expect(box).toContain("aspect-ratio: 1 / 1;");
-  // The image measures itself against the square's side.
-  expect(box).toContain("container-type: inline-size;");
-  expect(rule(".inspector-image-preview__frame > .media-preview-thumbnail"))
-    .toContain("width: min(100cqi, calc(100cqi * (var(--media-aspect-ratio))));");
-  // No fixed height is left to break the square.
-  expect(styles).not.toMatch(/max-height:\s*200px|--inspector-image-preview-max-height/);
+  expect(box).toContain("width: 100%;");
+  // No fixed box: the height follows the photo.
+  expect(box).not.toMatch(/aspect-ratio|height:/);
+  const image = rule(".inspector-image-preview__frame > .media-preview-thumbnail");
+  expect(image).toContain("width: min( 100%, calc(var(--inspector-image-preview-max-height) * (var(--media-aspect-ratio))) );");
+  expect(image).toContain("height: auto;");
+  expect(styles).not.toMatch(/360px|max-height:\s*200px|aspect-ratio: 1 \/ 1/);
 });
 
 test("an empty Frame and several Frames have no preview", () => {

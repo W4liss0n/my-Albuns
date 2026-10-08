@@ -2512,7 +2512,7 @@
         "kind": "implementation-only",
         "surface": "project-workspace-photo-context",
         "implementationCaptureSelector": ".app-shell",
-        "reason": "Decisões do autor de 08/10/2026 (design 0048): a Foto inteira, sem recorte nem efeitos, fica fixa abaixo do cabeçalho do quadro e acima de Design, numa área quadrada com a largura do conteúdo do painel, até 360 px. A referência visual vigente não representa essa prévia."
+        "reason": "Decisões do autor de 08/10/2026 (design 0048): a Foto inteira, sem recorte nem efeitos, fica fixa abaixo do cabeçalho do quadro e acima de Design, ocupando toda a largura do conteúdo do painel, com a altura da proporção da foto. A referência visual vigente não representa essa prévia."
       },
       "viewport": {
         "width": 1440,

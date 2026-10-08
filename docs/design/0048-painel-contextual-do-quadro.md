@@ -120,12 +120,10 @@ do Painel de imagens e do visualizador, sem recorte, giro, espelhamento, preto e
 branco ou opacidade: não acompanha os ajustes do painel, cujo efeito continua
 visível no Canvas.
 
-O bloco é fixo, sem título de seção nem recolhimento. A imagem fica
-centralizada, com a proporção da foto, numa área de tamanho fixo, para que
-Design não mude de lugar entre fotos horizontais e verticais: um quadrado com a
-largura do conteúdo do painel, até 360 px, desde o
-[refinamento seguinte](#refinamento-de-08102026-2); a primeira versão tinha
-altura máxima de cerca de 200 px. Mantém a moldura branca e a
+O bloco é fixo, sem título de seção nem recolhimento. A imagem ocupa toda a
+largura do conteúdo do painel, com a proporção da foto, desde o
+[refinamento de 08/10/2026 (3)](#refinamento-de-08102026-3); a primeira versão
+tinha altura máxima de cerca de 200 px, e a segunda, um quadrado de até 360 px. Mantém a moldura branca e a
 sombra curta das miniaturas; o bloco usa o mesmo respiro do conteúdo das seções
 e termina com a mesma linha que as fecha, sem caixa, ícone ou divisória extra.
 Quadro vazio e seleção de vários quadros não mostram prévia.
@@ -150,14 +148,11 @@ Depois de usar a prévia, o autor fez dois pedidos: aumentar a área, porque uma
 foto vertical ficava muito pequena, e evitar a piscada que às vezes aparecia ao
 trocar de uma foto para outra.
 
-A área da prévia passa a ser um quadrado com a largura do conteúdo do painel,
-limitada a 360 px. Na largura padrão do painel, o quadrado tem cerca de
-272 × 272 px: uma foto vertical 2:3 passa de cerca de 133 × 200 px para cerca
-de 181 × 272 px, e uma horizontal ocupa toda a largura. O quadrado tem o mesmo
-tamanho para qualquer proporção, para que Design e os controles abaixo não
-mudem de lugar entre fotos. A imagem continua inteira e centralizada, com a
-moldura branca e a sombra das miniaturas; o respiro e a linha de fechamento do
-bloco não mudam.
+A área da prévia passou a ser um quadrado com a largura do conteúdo do
+painel, limitada a 360 px (cerca de 272 × 272 px na largura padrão), com o
+mesmo tamanho para qualquer proporção. O
+[refinamento seguinte](#refinamento-de-08102026-3) trocou esse quadrado pela
+largura inteira do painel.
 
 Ao trocar de quadro ou de imagem, inclusive ao passar de um quadro para uma
 imagem selecionada no Painel de imagens ou o contrário, a área mantém o que
@@ -181,3 +176,16 @@ escolhida. Quando o painel não mostrava prévia, como ao sair do álbum, de
 Design da lâmina, de uma seleção múltipla ou de um quadro vazio, a prévia
 aparece sem espera. Voltar à mesma foto, como ao passar de um quadro para a sua
 imagem no Painel de imagens, não recarrega a prévia.
+
+## Refinamento de 08/10/2026 (3)
+
+Testando o quadrado, o autor achou a prévia ainda muito pequena e pediu que a
+imagem ocupasse quase toda a largura do painel, com a margem.
+
+A imagem passa a ocupar toda a largura do conteúdo do painel, com a margem
+lateral das seções, e a altura segue a proporção da foto. Na largura padrão do
+painel, uma foto horizontal 3:2 tem cerca de 272 × 181 px e uma vertical 2:3,
+cerca de 272 × 408 px. Só uma foto mais alta que 60% da altura da janela fica
+mais estreita, para Design continuar ao alcance. Design e os controles abaixo
+passam a mudar de lugar conforme a altura da foto; a troca de imagem continua
+sem piscar e troca imagem e altura de uma vez.
