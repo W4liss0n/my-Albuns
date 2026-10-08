@@ -378,12 +378,12 @@ test("the manifest covers critical integrated workspace, panel, menu, and graphi
     },
     "project-workspace-media-selected-context": {
       path: "/previews/workspace-preview.html?previews=ready",
-      ready: /context-heading:first-child \+ \.inspector-image-preview /u,
+      ready: /context-heading:first-child \+ \.inspector-image-preview\[data-media-id="media-002"\] /u,
       actions: ["click"],
     },
     "project-workspace-media-over-frame-context": {
       path: "/previews/workspace-preview.html?frame=photo&previews=ready",
-      ready: /has\(\.inspector-image-preview\):not\(:has\(\[aria-label="Zoom da foto/u,
+      ready: /has\(\.inspector-image-preview\):not\(:has\(\[aria-label="Zoom da foto.* \.inspector-image-preview\[data-media-id="media-002"\] /u,
       actions: ["focus", "key", "click", "click"],
     },
     "project-workspace-media-multiple-context": {
