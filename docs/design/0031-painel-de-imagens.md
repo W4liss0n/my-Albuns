@@ -2,7 +2,7 @@
 status: accepted
 document: design
 date: 2026-09-10
-updated: 2026-09-24
+updated: 2026-10-08
 ticket: 24
 platform: windows
 implementation-readiness: ready-for-agent
@@ -22,6 +22,16 @@ A seleção solicitada após importar é um evento consumido uma vez; alteraçõ
 de ordenação e filtro não o repetem. Ocultar o Painel conserva esse estado;
 trocar de Projeto o reinicia. Aba, chave e direção da ordenação, filtro de uso
 e tamanho das miniaturas pertencem ao armazenamento global de preferências.
+
+Desde 08/10/2026, a seleção do Painel também pode ocupar o Painel contextual,
+pelo contexto `Imagem selecionada` do [design 0001](0001-estrutura-da-janela-do-projeto.md#contexto-de-imagem-selecionada).
+A seleção continua local ao Painel; ele informa ao dono da Janela cada mudança
+e se ela veio de um gesto de seleção. Clique, `Ctrl`, `Shift`, `Ctrl + A`,
+clique direito e clique no fundo da grade são gestos, e a última ação explícita,
+no Canvas ou no Painel, decide o que o Painel contextual descreve. A retirada
+de itens pela busca, pelos filtros, pela troca de aba ou pela remoção e a
+seleção solicitada após importar são automáticas e não trocam esse assunto.
+Uma seleção vazia devolve o Painel contextual ao Canvas.
 
 As miniaturas de Fotos e Decorativos não exibem tag nem contador de usos.
 A indicação visual de item usado acontece pelo esmaecimento da miniatura.
@@ -43,7 +53,9 @@ desconhecidas e o Nome natural desempata.
 
 O Painel contextual não exibe aviso de arquivos ausentes nem atalho para
 uma revisão temporária. A ausência continua indicada no próprio item do
-Painel de imagens. O filtro `Ausentes` permanece disponível por escolha do
+Painel de imagens. Quando uma imagem ausente sem prévia retida ocupa o
+Painel contextual, a prévia mostra o mesmo símbolo da miniatura sem Cache,
+sem texto nem ação. O filtro `Ausentes` permanece disponível por escolha do
 usuário, dentro da aba atual e em conjunto com a busca e o filtro de uso.
 Desde 24/09/2026, o chip `Ausentes` só aparece quando a aba atual tem arquivos
 ausentes. Se o filtro estiver ligado e o último arquivo voltar, o chip

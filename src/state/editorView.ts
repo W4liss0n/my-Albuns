@@ -1,5 +1,10 @@
 import { create } from "zustand";
 
+import {
+  inspectorSubjectAfterMediaSelection,
+  type InspectorSubject,
+  type MediaSelectionChange,
+} from "../application/inspectorContext";
 import type { SheetSelection } from "../application/sheetSelection";
 import type { ViewportState } from "./viewport";
 
@@ -20,8 +25,22 @@ interface EditorViewState {
   centeredSheetId: string | null;
   editingSheetId: string | null;
   viewport: ViewportState;
+  /**
+   * What the contextual panel describes. Only explicit selection gestures
+   * change it: selecting Frames claims it for the canvas, a gesture in the
+   * media panel for the media. Pruning after navigation, synchronization or a
+   * media filter never does.
+   */
+  inspectorSubject: InspectorSubject;
+  /** An explicit canvas selection; it also claims the contextual panel. */
   selectFrame(frameId: string | null, toggle?: boolean): void;
+  /** An explicit canvas selection; it also claims the contextual panel. */
   selectFrames(frameIds: readonly string[]): void;
+  /** Drops the selected Frames outside `frameIds` without claiming the panel. */
+  keepSelectedFrames(frameIds: readonly string[]): void;
+  /** An explicit canvas action that keeps the Frame selection as it is. */
+  showCanvasInInspector(): void;
+  reportMediaSelection(change: MediaSelectionChange): void;
   /** Selects one Sheet; any wider Sheet selection collapses to it. */
   focusSheet(sheetId: string): void;
   selectSheets(selection: SheetSelection): void;
@@ -48,14 +67,24 @@ export const useEditorView = create<EditorViewState>((set) => ({
   viewport: {
     offsetX: 0,
   },
+  inspectorSubject: "canvas",
   selectFrame: (frameId, toggle = false) => set((state) => ({
+    inspectorSubject: "canvas",
     selectedFrameIds: frameId === null ? [] : toggle && state.editingSheetId !== null
       ? state.selectedFrameIds.includes(frameId)
         ? state.selectedFrameIds.filter((id) => id !== frameId)
         : [...state.selectedFrameIds, frameId]
       : [frameId],
   })),
-  selectFrames: (frameIds) => set({ selectedFrameIds: [...frameIds] }),
+  selectFrames: (frameIds) => set({ inspectorSubject: "canvas", selectedFrameIds: [...frameIds] }),
+  keepSelectedFrames: (frameIds) => set((state) => {
+    const kept = state.selectedFrameIds.filter((id) => frameIds.includes(id));
+    return kept.length === state.selectedFrameIds.length ? state : { selectedFrameIds: kept };
+  }),
+  showCanvasInInspector: () => set({ inspectorSubject: "canvas" }),
+  reportMediaSelection: (change) => set((state) => ({
+    inspectorSubject: inspectorSubjectAfterMediaSelection(state.inspectorSubject, change),
+  })),
   focusSheet: (focusedSheetId) => set((state) => ({
     focusedSheetId,
     selectedSheetIds: singleSheetSelection(state.selectedSheetIds, focusedSheetId),
@@ -96,6 +125,7 @@ export const useEditorView = create<EditorViewState>((set) => ({
           centeredSheetId: firstSheetId,
           editingSheetId: null,
           viewport: { offsetX: 0 },
+          inspectorSubject: "canvas",
         };
       }
 

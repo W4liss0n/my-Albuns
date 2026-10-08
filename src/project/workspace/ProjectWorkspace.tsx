@@ -29,6 +29,11 @@ import type { ImageViewerWindowPort } from "../../application/imageViewerWindow"
 import { useImageViewerSession } from "../../application/useImageViewerSession";
 import type { GraphicsDiagnostic } from "../../application/graphics";
 import { mergeMediaPreviewDemands, renderableMediaPreviewUrls } from "../../application/mediaPreviews";
+import {
+  inspectorPreviewMediaId,
+  resolveInspectorContext,
+  type MediaSelectionChange,
+} from "../../application/inspectorContext";
 import type { DisplayUnit, EditorProjection } from "../../domain/project";
 import { ApplicationHeader } from "../../ui";
 import { AlbumCanvas } from "../canvas/AlbumCanvas";
@@ -39,10 +44,7 @@ import {
   ExportPreviewControl,
   type ExportPreviewControlHandle,
 } from "./ExportPreviewControl";
-import {
-  InspectorPanel,
-  type InspectorContext,
-} from "../inspector/InspectorPanel";
+import { InspectorPanel } from "../inspector/InspectorPanel";
 import { MediaPanel, type MediaPanelHandle } from "../media-panel/MediaPanel";
 import { adjacentViewerDemand, sheetViewerMediaIds } from "../../application/imageViewerModel";
 import { ownsEditingKeys } from "./keyboardEventOwnership";
@@ -153,6 +155,7 @@ export function ProjectWorkspace({
   const spaceCandidate = useRef<{ source: "panel" | "sheet"; mediaId: string; mediaIds: readonly string[]; focus: HTMLElement | null; cancelled: boolean } | null>(null);
   useEffect(() => {
     setMediaSelectionRequest(null);
+    setMediaPanelSelection([]);
     setMediaDrag(null);
     spaceCandidate.current = null;
   }, [projectId]);
@@ -165,6 +168,8 @@ export function ProjectWorkspace({
   const [mediaDrag, setMediaDrag] = useState<import("../media-panel/useMediaDragGesture").MediaDrag | null>(null);
   const draggedPhotoId = mediaDrag?.kind === "photo" ? mediaDrag.mediaId : null;
   const [mediaSelectionRequest, setMediaSelectionRequest] = useState<{ mediaId: string } | null>(null);
+  /** Mirror of the media panel's transient selection, for the contextual panel. */
+  const [mediaPanelSelection, setMediaPanelSelection] = useState<readonly string[]>([]);
   const [sheetContextMenu, setSheetContextMenu] = useState<{
     position: { x: number; y: number };
     sheetId: string;
@@ -218,22 +223,6 @@ export function ProjectWorkspace({
       ),
     [projection.state.album.media],
   );
-  useEffect(() => {
-    onMediaDemandChange(mergeMediaPreviewDemands(
-      canvasMediaDemand, panelMediaDemand,
-      { visibleMediaIds: [], preloadMediaIds: albumDesignPreloadMediaIds },
-      viewer?.projectId === projectId ? viewer.correction
-        ? { visibleMediaIds: [viewer.mediaId, viewer.correction.referenceMediaId], preloadMediaIds: [] }
-        : adjacentViewerDemand(viewer.mediaIds, viewer.mediaId) : { visibleMediaIds: [], preloadMediaIds: [] },
-    ));
-  }, [
-    albumDesignPreloadMediaIds,
-    canvasMediaDemand,
-    onMediaDemandChange,
-    panelMediaDemand,
-    viewer,
-    projectId,
-  ]);
   const reportCloseError = useCallback((value: string) => {
     setCloseMessage(value);
   }, []);
@@ -300,6 +289,15 @@ export function ProjectWorkspace({
     onApply: controller.applyAlbumInformation,
     onError: setCloseMessage,
   });
+  const { reportMediaSelection, showCanvasInInspector } = controller;
+  // A media panel that starts empty cannot own the contextual panel.
+  useEffect(() => {
+    showCanvasInInspector();
+  }, [projectId, showCanvasInInspector]);
+  const changeMediaPanelSelection = useCallback((change: MediaSelectionChange) => {
+    setMediaPanelSelection(change.mediaIds);
+    reportMediaSelection(change);
+  }, [reportMediaSelection]);
   useImageProcessingProgressDialog(controller.imageProcessingProgress, projectDialogPort);
   useProjectOperationResultDialog({
     importResult: controller.photoImportResult,
@@ -368,7 +366,6 @@ export function ProjectWorkspace({
       : "0px",
   };
   const {
-    selectedFrame,
     selectedComposedPhoto,
     displayedPhotoZoom,
   } = controller;
@@ -379,18 +376,41 @@ export function ProjectWorkspace({
           (sheet) => sheet.sheetId === canvasMode.sheetId,
         ) ?? null
       : null;
-  const inspectorContext: InspectorContext = editingSheet && controller.selectedFrames.length > 1
-    ? { kind: "multiple-frames", frames: controller.selectedFrames, editingSheet }
-    : selectedFrame
-    ? {
-        kind: "frame",
-        frame: selectedFrame,
-        composedPhoto: selectedComposedPhoto,
-        ...(editingSheet ? { editingSheet } : {}),
-      }
-    : editingSheet
-      ? { kind: "sheet", sheet: editingSheet }
-      : { kind: "album" };
+  const selectedMedia = useMemo(() => {
+    const mediaById = new Map(projection.state.album.media.map((media) => [media.id, media] as const));
+    return mediaPanelSelection.flatMap((mediaId) => mediaById.get(mediaId) ?? []);
+  }, [mediaPanelSelection, projection.state.album.media]);
+  const inspectorContext = resolveInspectorContext({
+    subject: controller.inspectorSubject,
+    mediaPanelVisible,
+    selectedMedia,
+    selectedFrames: controller.selectedFrames,
+    composedPhoto: selectedComposedPhoto,
+    editingSheet,
+  });
+  // The contextual panel's whole preview needs its Cache image even when the
+  // media panel has scrolled the item away or the Frame is off the viewport.
+  const inspectorPreviewId = workspacePanels.panels.inspector.visible
+    ? inspectorPreviewMediaId(inspectorContext)
+    : null;
+  useEffect(() => {
+    onMediaDemandChange(mergeMediaPreviewDemands(
+      canvasMediaDemand, panelMediaDemand,
+      { visibleMediaIds: [], preloadMediaIds: albumDesignPreloadMediaIds },
+      { visibleMediaIds: inspectorPreviewId ? [inspectorPreviewId] : [], preloadMediaIds: [] },
+      viewer?.projectId === projectId ? viewer.correction
+        ? { visibleMediaIds: [viewer.mediaId, viewer.correction.referenceMediaId], preloadMediaIds: [] }
+        : adjacentViewerDemand(viewer.mediaIds, viewer.mediaId) : { visibleMediaIds: [], preloadMediaIds: [] },
+    ));
+  }, [
+    albumDesignPreloadMediaIds,
+    canvasMediaDemand,
+    inspectorPreviewId,
+    onMediaDemandChange,
+    panelMediaDemand,
+    viewer,
+    projectId,
+  ]);
   const projectMetadata = projectAlbumMetadata(projection);
   const exportSheet = projection.composition.sheets.find(
     (sheet) => sheet.sheetId === controller.canvasProps.centeredSheetId,
@@ -678,7 +698,10 @@ export function ProjectWorkspace({
       return;
     }
     if (!projection.state.album.sheets.find((sheet) => sheet.id === canvasMode.sheetId)?.frames.some((frame) => frame.id === frameId)) return;
-    if (!controller.canvasProps.selectedFrameIds.includes(frameId)) controller.canvasProps.onSelectFrame(frameId);
+    // The menu acts on the selected Frames, so the contextual panel describes
+    // them again even when the selection itself does not change.
+    if (controller.canvasProps.selectedFrameIds.includes(frameId)) showCanvasInInspector();
+    else controller.canvasProps.onSelectFrame(frameId);
     if (!controller.canAddFrame || !controller.canArrangeFrames) {
       const frame = projection.state.album.sheets.flatMap((sheet) => sheet.frames).find((frame) => frame.id === frameId);
       if (frame?.photo) setFrameContextMenu({ kind: "photo", position, mediaId: frame.photo.mediaId, sheetId: canvasMode.sheetId });
@@ -940,6 +963,7 @@ export function ProjectWorkspace({
           document={projection.state.document}
           presentationUnit={presentationUnit}
           mediaItems={projection.state.album.media}
+          missingMediaIds={missingMediaIds}
           sheetStates={projection.state.album.sheets}
           sheets={controller.canvasProps.composition.sheets}
           visualDefaults={projection.state.album.visualDefaults}
@@ -998,6 +1022,7 @@ export function ProjectWorkspace({
           onApplyDecorative={controller.applyDecorative}
           onRemoveMedia={(ids) => { if (!commandsBlocked) void mediaRemoval.request(ids); }}
           selectionRequest={mediaSelectionRequest}
+          onSelectionChange={changeMediaPanelSelection}
           importPending={controller.importPending}
           onImportMedia={importMedia}
           onMediaDragChange={setMediaDrag}

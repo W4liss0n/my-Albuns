@@ -1,7 +1,7 @@
 ---
 status: accepted
 document: design
-updated: 2026-10-07
+updated: 2026-10-08
 ---
 
 # Estrutura da Janela do Projeto
@@ -388,6 +388,7 @@ Quando o Zoom ultrapassa `Ajustar Lâmina`, `Espaço` + arraste com o botão esq
 - O comando contextual `Remover` atua sobre a seleção resultante e não tem atalho. Com o foco no Painel, `Delete` age sobre a Seleção de Frames do Canvas e não faz nada quando nenhum Frame está selecionado.
 - Não existe Caixa de seleção no Painel. Arrastar ou dar dois cliques atua somente sobre a mídia diretamente acionada e nunca insere toda a seleção múltipla na Lâmina.
 - A seleção do Painel é estado transitório da interface e não pertence ao Projeto ou ao Undo/Redo.
+- Um gesto de seleção no Painel entrega o Painel contextual à imagem selecionada; a retirada automática de itens e a seleção da imagem importada não o fazem. A regra completa está em [Contexto de Imagem selecionada](#contexto-de-imagem-selecionada).
 - Remover uma seleção de Fotos sem uso retira diretamente os itens do Painel. Se ao menos uma estiver em uso, um único diálogo consolidado oferece `Remover tudo`, `Remover imagens e manter os Frames` e `Cancelar`, aplicando a escolha à seleção inteira.
 - `Remover tudo` exclui os Frames destravados que usam as Fotos selecionadas e preserva como placeholders os pertencentes a Layouts travados. `Remover imagens e manter os Frames` esvazia todas as ocorrências e preserva todos os Frames afetados.
 - Para Decorativos, um único item sem uso pode ser removido diretamente; um item em uso ou uma seleção múltipla abre uma única confirmação conjunta.
@@ -436,6 +437,8 @@ Arquivos vinculados usados pelos Projetos abertos são monitorados. Eventos suce
 
 Refinamento de 25/09/2026: o cabeçalho de cada seção é uma faixa de tom (`--ui-surface-muted`), separada do conteúdo por uma linha quando a seção está aberta, como as seções das Configurações; o cabeçalho de contexto (`Quadro selecionado`) usa a mesma faixa. Dentro das seções, os grupos (`Estrutura`, `Documento`, `Áreas técnicas`, `Ambos os lados`) usam o mesmo título de subseção em frase e ficam separados só por espaço, sem linhas. Não há rótulos em maiúsculas nem fonte monoespaçada: números, leituras e unidades usam a fonte da interface com algarismos alinhados, e as unidades ficam em cinza discreto. Seletores não reservam o espaço do `X` de restauração, que só existe nas entradas numéricas.
 
+Refinamento de 08/10/2026: o Painel descreve a seleção feita pela última ação explícita, no Canvas ou no Painel de imagens. Além dos contextos do Álbum, da Lâmina e de Frame e Foto, existe o contexto `Imagem selecionada`, descrito [abaixo](#contexto-de-imagem-selecionada). O contexto de Frame e o de `Imagem selecionada` mostram só a imagem inteira logo abaixo do cabeçalho, sem dimensões nem outras informações do arquivo.
+
 O estado aberto ou fechado das seções é lembrado separadamente para os contextos do Álbum, de `Design da Lâmina` e de Frame/Foto. Ao retornar a um contexto, sua disposição anterior é restaurada.
 
 Esses estados são preferências da interface reutilizadas entre Projetos e sessões; não pertencem ao Projeto e não participam de Undo/Redo.
@@ -448,7 +451,7 @@ Um splitter vertical separa o Painel contextual da coluna formada conjuntamente 
 
 ### Contexto do Álbum
 
-No Canvas contínuo, quando não existe um Frame ou uma Foto selecionada, o Painel apresenta:
+No Canvas contínuo, quando não existe um Frame ou uma Foto selecionada e nenhuma imagem do Painel de imagens [ocupa o Painel](#contexto-de-imagem-selecionada), o Painel apresenta:
 
 1. `Informações do Álbum`;
 2. `Design do Álbum`;
@@ -458,7 +461,7 @@ No Canvas contínuo, quando não existe um Frame ou uma Foto selecionada, o Pain
 
 Cada preview é uma representação vetorial da `ComposedSheet` correspondente na projeção atual do Editor, nunca uma miniatura genérica. Ela preserva proporção, superfície, linha central, geometria e ordem dos Frames, recorte e transformação das Fotos, placeholders e Overlay. Uma nova projeção produzida pelo domínio atualiza Canvas e Grade a partir da mesma composição; o destaque de navegação permanece uma camada da interface externa à preview.
 
-A Grade continua montada, apenas oculta, enquanto o Painel contextual mostra um Frame ou a Lâmina em edição. Ao voltar ao contexto do Álbum, as miniaturas não buscam de novo as prévias do Cache e reaparecem completas enquanto o WebView conserva as imagens decodificadas ([medição e limites](../research/2026-10-08-grade-de-laminas-ao-sair-da-selecao.md)).
+O contexto do Álbum — `Informações do Álbum`, `Design do Álbum` e a Grade — continua montado, apenas oculto, enquanto outro contexto ocupa o Painel contextual: um Frame, a Lâmina em edição ou uma imagem selecionada. Ao voltar, os rascunhos ainda não aplicados reaparecem como estavam, e as miniaturas da Grade não buscam de novo as prévias do Cache e reaparecem completas enquanto o WebView conserva as imagens decodificadas ([medição e limites](../research/2026-10-08-grade-de-laminas-ao-sair-da-selecao.md)). Enquanto `Informações do Álbum` está oculto, a janela usa a Unidade aplicada, e a Unidade pendente volta com o formulário.
 
 Um clique sem ultrapassar o limiar de arraste seleciona a Lâmina sem mover o Canvas, como o clique na Barra. `Ctrl` + clique acrescenta ou retira a Lâmina da seleção, e `Shift` + clique seleciona todas entre a Lâmina de referência e esta, na ordem do Álbum; `Ctrl` + `Shift` acrescenta esse intervalo à seleção. A referência é a última Lâmina escolhida sem `Shift` (clique, `Ctrl` + clique, Barra, Canvas ou navegação), e `Shift` + clique não a muda. A seleção nunca fica vazia: `Ctrl` + clique na única Lâmina selecionada a mantém. As miniaturas selecionadas usam o destaque azul já existente, e as mesmas Lâminas recebem o contorno azul no Canvas. Duplo clique na miniatura, ou `Enter` com o foco nela, centraliza a Lâmina no Canvas e deixa só ela selecionada; `Espaço` seleciona com os mesmos modificadores do clique. O nome acessível da miniatura é `Lâmina 02, páginas 2–3`, com o estado de seleção exposto como botão pressionado, e a dica `Duplo clique para ir até a lâmina` aparece no tooltip nativo, como nas miniaturas do Painel de imagens. Clicar na Barra, num Frame ou na Lâmina no Canvas volta a selecionar uma única Lâmina. Abrir o menu contextual de uma miniatura não altera a seleção. Enquanto a Grade mostra uma seleção feita nela, `Duplicar Lâmina` e `Excluir` agem sobre todas as Lâminas selecionadas, pela tecla `Delete`, por `Ctrl+D`, pelo menu `Lâmina` ou pelo menu contextual de uma Lâmina selecionada; os rótulos dizem quantas (`Excluir 3 lâminas`). Os demais comandos continuam na Lâmina centralizada. Com várias Lâminas, o menu contextual de uma delas mostra `Ações das 3 lâminas`, e `Adicionar antes`, `Adicionar depois` e `Converter extremidade` ficam desabilitados com a dica `Disponível somente para uma lâmina`. Clicar com o botão direito numa Lâmina fora da seleção continua agindo só sobre ela.
 
@@ -493,7 +496,7 @@ Em `Documento`, trocar a Unidade converte imediatamente somente a apresentação
 
 Mensagens de validação que orientam a correção de uma medida física seguem essa mesma Unidade pendente e o DPI corrente. Limites internos de raster são convertidos para o intervalo físico equivalente do campo — inclusive distinguindo largura da Lâmina aberta e largura da Lâmina fechada — em vez de expor pixels ou micrômetros como se fossem a entrada esperada da pessoa.
 
-O estado físico continua armazenado em micrômetros. Propagar a Unidade pendente não altera o draft de `Design do Álbum`, não habilita seu `Aplicar` e não cria operação de Undo/Redo. Descartar ou desmontar o formulário de `Informações do Álbum`, assim como trocar de Projeto, elimina essa apresentação pendente e restaura imediatamente a Unidade aplicada. Largura, altura e DPI permanecem pendentes até o mesmo `Aplicar` de `Informações do Álbum`.
+O estado físico continua armazenado em micrômetros. Propagar a Unidade pendente não altera o draft de `Design do Álbum`, não habilita seu `Aplicar` e não cria operação de Undo/Redo. Descartar o rascunho de `Informações do Álbum`, assim como trocar de Projeto, elimina essa apresentação pendente e restaura imediatamente a Unidade aplicada; ocultar o formulário sob outro contexto só a suspende até ele voltar. Largura, altura e DPI permanecem pendentes até o mesmo `Aplicar` de `Informações do Álbum`.
 
 Refinamento de 25/09/2026: a confirmação de `Informações do Álbum` só aparece quando aplicar tem uma consequência que o painel não mostra, e só descreve essa consequência. Os valores alterados continuam visíveis no próprio painel, marcados pelo `X` de restauração, e um único Desfazer reverte a aplicação; por isso a confirmação não lista campos nem valores `anterior → novo`. As consequências são duas, cada uma em uma frase:
 
@@ -588,9 +591,15 @@ Os estados internos `default` e `custom` não são exibidos literalmente ao usu�
 
 Ao selecionar um Frame com Foto ou a Foto dentro dele, o Painel troca para ferramentas relacionadas ao elemento:
 
-1. preview da imagem e informações do arquivo;
+1. a prévia inteira da Foto, logo abaixo do cabeçalho `Quadro selecionado`, que mostra o nome;
 2. `Design`, incluindo Zoom, Ângulo, Opacidade e Borda;
 3. `Ajustes e Efeitos`.
+
+O texto aceito previa no primeiro item a prévia da imagem e informações do arquivo. Em 08/10/2026, o autor decidiu mostrar só a prévia: o nome fica no cabeçalho, e não há dimensões nem outras informações do arquivo.
+
+A prévia é a mesma imagem de Cache da miniatura do Painel de imagens e do visualizador: a Foto inteira, sem recorte, Giro, Espelhamento, Preto e branco ou Opacidade. Ela não reage aos controles de `Design` e `Ajustes e Efeitos`; o Canvas continua sendo o lugar em que o enquadramento aparece. O bloco é fixo, sem título de seção e sem recolhimento, e fica entre o cabeçalho e `Design`. A imagem usa a largura do conteúdo do Painel, centralizada, com altura máxima de cerca de `200 px` e proporção preservada. A área da imagem tem sempre essa altura, para que `Design` e os controles abaixo não mudem de lugar ao passar de uma Foto horizontal para uma vertical nem quando a proporção só se conhece depois de a prévia carregar. Mantém a moldura branca e a sombra curta das miniaturas, para ser lida como a mesma foto do Painel de imagens; o bloco termina com a mesma linha que fecha as seções. Frame vazio (`Quadro vazio`) e seleção de vários Frames não mostram prévia.
+
+Enquanto a prévia carrega, aparece o fundo listrado da miniatura na proporção da Foto. Sem arquivo e sem prévia retida, aparece o mesmo símbolo de imagem ausente da miniatura, sem aviso, mensagem ou atalho de Religação; uma prévia anterior retida continua exibida sem aviso, como no resto do editor. Trocar de Frame ou de imagem nunca mostra a imagem anterior sob o nome da nova enquanto a nova prévia carrega. A imagem exibida faz parte da demanda de prévias enquanto o Painel contextual está visível, mesmo que o Painel de imagens tenha rolado a miniatura para fora da área visível.
 
 Na primeira versão, `Ajustes e Efeitos` contém somente a opção `Preto e branco`. Brilho, contraste, saturação e outros filtros não aparecem desabilitados ou como placeholders; novos controles entram apenas quando forem implementados.
 
@@ -620,6 +629,26 @@ As propriedades em lote respeitam o tipo do elemento:
 - quando nenhum Frame selecionado contém Foto, os controles exclusivos de Foto ficam ocultos;
 - cada alteração, ainda que alcance somente as Fotos compatíveis, constitui uma única ação de Undo/Redo.
 
+### Contexto de Imagem selecionada
+
+Decisão de 08/10/2026. Uma imagem selecionada no Painel de imagens pode ocupar o Painel contextual no lugar do contexto do Álbum, de `Design da Lâmina` ou de um Frame:
+
+1. cabeçalho em faixa de tom, como o do Frame: `Imagem selecionada` e, abaixo, o nome da imagem;
+2. a mesma prévia inteira descrita no contexto de Frame e Foto, sem dimensões nem outras informações do arquivo.
+
+Fotos e Decorativos mostram o mesmo bloco. Com mais de uma imagem selecionada, o Painel mostra somente o cabeçalho `Seleção múltipla` com a quantidade (`3 imagens selecionadas`), sem prévia: assim como na seleção de vários Frames, não elege uma imagem específica.
+
+A última ação explícita decide o que o Painel descreve:
+
+- clique, `Ctrl` + clique, `Shift` + clique, `Ctrl + A` e clique direito numa miniatura entregam o Painel à seleção de imagens, mesmo com um Frame selecionado no Canvas. O Frame continua selecionado; `R`, `H`, `V` e `Delete` continuam agindo sobre ele, sem mudança no roteamento do teclado;
+- tocar num Frame, iniciar o Pan da Foto, selecionar por área no Modo de edição, abrir o menu de um Frame, colar e a seleção do Frame afetado depois de inserir, preencher ou soltar uma Foto devolvem o Painel ao contexto de Frame;
+- tocar numa Lâmina ou fora das Lâminas limpa a Seleção de Frames e devolve o Painel ao Álbum ou a `Design da Lâmina`, mesmo que imagens continuem selecionadas no Painel de imagens;
+- clicar no fundo da grade limpa a seleção de imagens e devolve o Painel ao contexto do Canvas.
+
+Mudanças automáticas não trocam o assunto do Painel: a recentralização que retira um Frame de outra Lâmina, a sincronização depois de Undo/Redo, a Busca, os filtros, a troca de aba ou a remoção que retiram imagens da seleção, e a seleção da imagem recém-importada. Com o Painel de imagens oculto ou substituído pelo Painel de Layouts, o contexto `Imagem selecionada` não se aplica e o Painel mostra o contexto do Canvas. Uma imagem que ocupa o Painel durante o Modo de edição preserva o escopo escolhido em `Design da Lâmina`.
+
+Como os contextos de Frame e de Lâmina, a imagem só ocupa o Painel por cima do contexto do Álbum, que continua montado e oculto, com seus rascunhos e a Grade (ver [Contexto do Álbum](#contexto-do-álbum)).
+
 ## Regras confirmadas
 
 - O Painel contextual muda de conteúdo; não abre outra janela para cada seleção.
@@ -628,7 +657,8 @@ As propriedades em lote respeitam o tipo do elemento:
 - O Painel contextual não é coberto pelo Painel de imagens.
 - A navegação principal pelas Lâminas é contínua e horizontal.
 - O Modo de edição isola uma Lâmina e reduz temporariamente o Painel de imagens para ampliar o Canvas.
-- No Modo de edição, a ausência de seleção de Frame/Foto mostra `Design da Lâmina`; selecionar um desses elementos substitui esse contexto pelo de Frame e Foto.
+- No Modo de edição, a ausência de seleção de Frame/Foto mostra `Design da Lâmina`, salvo enquanto uma imagem selecionada no Painel de imagens ocupa o Painel; selecionar um desses elementos substitui esse contexto pelo de Frame e Foto.
+- A última ação explícita de seleção, no Canvas ou no Painel de imagens, decide o contexto do Painel contextual; mudanças automáticas de seleção não o trocam.
 - A primeira versão não oferece comandos de alinhamento ou distribuição de Frames; a seleção múltipla não implica essas ferramentas.
 - Termos internos de persistência e herança, como `default` e `custom`, nunca aparecem literalmente na interface.
 - A imagem de referência continua conceitual para comportamentos não especificados; margens, espaçamento, profundidade, cantos, linha central e tratamento de Frame vazio definidos acima são requisitos visuais aceitos.

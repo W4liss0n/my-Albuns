@@ -44,7 +44,10 @@ export function useProjectNavigation(projection: EditorProjection) {
   const focusSheet = useEditorView((state) => state.focusSheet);
   const selectSheets = useEditorView((state) => state.selectSheets);
   const centerSheetInView = useEditorView((state) => state.centerSheet);
-  const selectFrames = useEditorView((state) => state.selectFrames);
+  const keepSelectedFrames = useEditorView((state) => state.keepSelectedFrames);
+  const inspectorSubject = useEditorView((state) => state.inspectorSubject);
+  const showCanvasInInspector = useEditorView((state) => state.showCanvasInInspector);
+  const reportMediaSelection = useEditorView((state) => state.reportMediaSelection);
   const setViewport = useEditorView((state) => state.setViewport);
   const enterSheetEdit = useEditorView((state) => state.enterSheetEdit);
   const exitSheetEdit = useEditorView((state) => state.exitSheetEdit);
@@ -55,16 +58,13 @@ export function useProjectNavigation(projection: EditorProjection) {
     useState<CanvasMetrics | null>(null);
   // Arrows, scrolling and the new Sheet after Add or Duplicate all recenter
   // here. A Frame left on another Sheet would stay selected off screen, where
-  // Delete, R, H and V could still change it.
+  // Delete, R, H and V could still change it. Recentering is not a selection
+  // gesture, so it leaves the contextual panel's subject alone.
   const centerSheet = useCallback((sheetId: string) => {
-    const sheetFrameIds = new Set(projection.state.album.sheets
+    keepSelectedFrames(projection.state.album.sheets
       .find((sheet) => sheet.id === sheetId)?.frames.map((frame) => frame.id) ?? []);
-    const selected = useEditorView.getState().selectedFrameIds;
-    if (selected.some((frameId) => !sheetFrameIds.has(frameId))) {
-      selectFrames(selected.filter((frameId) => sheetFrameIds.has(frameId)));
-    }
     centerSheetInView(sheetId);
-  }, [centerSheetInView, projection.state.album.sheets, selectFrames]);
+  }, [centerSheetInView, keepSelectedFrames, projection.state.album.sheets]);
   const pendingSheetNavigationRef = useRef<string | null>(null);
 
   const synchronizeProjection = useCallback((current: EditorProjection) => {
@@ -218,6 +218,9 @@ export function useProjectNavigation(projection: EditorProjection) {
     viewport,
     canvasLayout,
     implicitSheetId,
+    inspectorSubject,
+    showCanvasInInspector,
+    reportMediaSelection,
     selectFrame,
     focusSheet,
     selectSheet,

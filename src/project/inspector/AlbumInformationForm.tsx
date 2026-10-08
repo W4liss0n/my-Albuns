@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { FieldResetButton, ValidatedTextField } from "../../ui/ValidatedTextField";
 
 import type {
@@ -134,8 +134,28 @@ export function AlbumInformationForm({
   } | null>(null);
   const [validationFailed, setValidationFailed] = useState(false);
   const [applying, setApplying] = useState(false);
+  const rebasedOn = useRef<{
+    applySettled: boolean;
+    baseline: AlbumInformationDraft;
+    revision: number;
+  } | null>(null);
 
   useEffect(() => {
+    // Rebasing discards the draft, so it happens only when the baseline or
+    // the apply state changed: a form shown again after being hidden keeps it.
+    const last = rebasedOn.current;
+    if (
+      last?.applySettled === applySettled &&
+      last.baseline === baseline &&
+      last.revision === semanticBaseline.revision
+    ) {
+      return;
+    }
+    rebasedOn.current = {
+      applySettled,
+      baseline,
+      revision: semanticBaseline.revision,
+    };
     setDraftSession((session) =>
       rebaseDraftSession(
         session,

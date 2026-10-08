@@ -14,6 +14,7 @@ beforeEach(() => {
     centeredSheetId: null,
     editingSheetId: null,
     viewport: { offsetX: 0 },
+    inspectorSubject: "canvas",
   });
 });
 
@@ -234,4 +235,53 @@ test("prunes deleted Sheets from the selection and keeps one focused", () => {
   const selectedBefore = useEditorView.getState().selectedSheetIds;
   view.synchronizeProject("project-001", ["sheet-004", "sheet-005"], []);
   expect(useEditorView.getState().selectedSheetIds).toBe(selectedBefore);
+});
+
+test("only explicit selection gestures change the subject of the contextual panel", () => {
+  const view = useEditorView.getState();
+  view.synchronizeProject("project-001", ["sheet-001", "sheet-002"], ["frame-001", "frame-002"]);
+  view.selectFrame("frame-001");
+  view.reportMediaSelection({ mediaIds: ["media-002"], explicit: true });
+  // The Frame stays selected for R, H, V and Delete while the image owns the panel.
+  expect(useEditorView.getState()).toMatchObject({ inspectorSubject: "media", selectedFrameIds: ["frame-001"] });
+
+  // Recentering prunes the Frame and synchronization prunes stale Frames,
+  // the media panel prunes or receives the import selection: none is a gesture.
+  view.keepSelectedFrames(["frame-002"]);
+  view.synchronizeProject("project-001", ["sheet-001", "sheet-002"], ["frame-002"]);
+  view.reportMediaSelection({ mediaIds: ["media-003"], explicit: false });
+  expect(useEditorView.getState()).toMatchObject({ inspectorSubject: "media", selectedFrameIds: [] });
+
+  // A tap on a Sheet or outside the Sheets clears the Frames and claims the panel.
+  view.selectFrame(null);
+  expect(useEditorView.getState().inspectorSubject).toBe("canvas");
+  view.reportMediaSelection({ mediaIds: ["media-003"], explicit: false });
+  expect(useEditorView.getState().inspectorSubject).toBe("canvas");
+
+  view.reportMediaSelection({ mediaIds: ["media-001", "media-003"], explicit: true });
+  view.selectFrames(["frame-002"]);
+  expect(useEditorView.getState().inspectorSubject).toBe("canvas");
+  view.reportMediaSelection({ mediaIds: ["media-001"], explicit: true });
+  view.showCanvasInInspector();
+  expect(useEditorView.getState()).toMatchObject({ inspectorSubject: "canvas", selectedFrameIds: ["frame-002"] });
+
+  view.reportMediaSelection({ mediaIds: ["media-001"], explicit: true });
+  view.reportMediaSelection({ mediaIds: [], explicit: true });
+  expect(useEditorView.getState().inspectorSubject).toBe("canvas");
+
+  view.reportMediaSelection({ mediaIds: ["media-001"], explicit: true });
+  view.synchronizeProject("project-002", ["sheet-101"], []);
+  expect(useEditorView.getState().inspectorSubject).toBe("canvas");
+});
+
+test("keeping the Frames of a recentered Sheet leaves an unchanged selection untouched", () => {
+  const view = useEditorView.getState();
+  view.synchronizeProject("project-001", ["sheet-001"], ["frame-001", "frame-002"]);
+  view.enterSheetEdit("sheet-001");
+  view.selectFrames(["frame-001", "frame-002"]);
+  const selection = useEditorView.getState().selectedFrameIds;
+  view.keepSelectedFrames(["frame-001", "frame-002", "frame-003"]);
+  expect(useEditorView.getState().selectedFrameIds).toBe(selection);
+  view.keepSelectedFrames(["frame-002"]);
+  expect(useEditorView.getState().selectedFrameIds).toEqual(["frame-002"]);
 });
