@@ -20,6 +20,7 @@ export interface SheetBarRenderNode {
   layoutAction: Container;
   canSwapSides: boolean;
   transitionTimer: ReturnType<typeof setTimeout> | null;
+  requestRender: () => void;
   width: number;
 }
 
@@ -28,6 +29,7 @@ export function createSheetBarRenderNode(
   metadata: SheetBarMetadata | undefined,
   presentation: CanvasSheetPresentation,
   viewGeometry: CanvasSheetViewGeometry,
+  requestRender: () => void = () => undefined,
 ): SheetBarRenderNode {
   const style = SHEET_VISUAL_STYLE.sheetBar;
   const width = viewGeometry.visibleOuterBounds.width;
@@ -134,6 +136,7 @@ export function createSheetBarRenderNode(
     layoutAction,
     canSwapSides: metadata?.canSwapSides ?? false,
     transitionTimer: null,
+    requestRender,
     width,
   };
   updateSheetBarSwapAppearance(node);
@@ -208,6 +211,7 @@ function transitionSheetBarOpacity(node: SheetBarRenderNode) {
     const easedProgress = progress * progress * (3 - 2 * progress);
     node.container.alpha =
       initialOpacity + (targetOpacity - initialOpacity) * easedProgress;
+    node.requestRender();
     if (progress < 1) {
       node.transitionTimer = setTimeout(
         tick,

@@ -2,6 +2,7 @@ import { StrictMode } from "react";
 import { act, render, waitFor } from "@testing-library/react";
 import { expect, test, vi } from "vitest";
 import {
+  advancePixiTicker,
   AlbumCanvas,
   finishPixiInitialization,
   getPixiLifecycle,
@@ -98,6 +99,8 @@ test("blocks the Canvas while WebGL2 is lost and resumes the same Canvas after r
   act(() => {
     canvas.dispatchEvent(new Event("webglcontextrestored"));
   });
+  // The scene comes back on the next frame.
+  await advancePixiTicker(16);
 
   await waitFor(() =>
     expect(view.queryByRole("status")).not.toBeInTheDocument(),

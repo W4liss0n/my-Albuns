@@ -40,6 +40,7 @@ import { FrameContentDragSession } from "./frameContentDragSession";
 import { FrameContentDragVisual } from "./frameContentDragVisual";
 import { ViewportTexturePool } from "./viewportTexturePool";
 import { createNormalCanvasLayout } from "./canvasSheetViewGeometry";
+import { idleCanvasRenderDemand, type CanvasRenderDemand } from "./canvasRenderLoop";
 
 const PRELOAD_MARGIN = 1;
 const VIEWPORT_PRELOAD_PX = 700;
@@ -73,6 +74,7 @@ export class AlbumCanvasScene {
   private sheetReorderPreviewActive = false;
   private sheetReorderPlaceholderSheetId: string | null = null;
   private sheetPositionTickerAttached = false;
+  private releaseSheetPositionHold: (() => void) | null = null;
   private readonly sheetPositionAnimations = new Map<
     string,
     SheetPositionAnimation
@@ -91,6 +93,8 @@ export class AlbumCanvasScene {
     onPreviewTextureError: () => void = () => undefined,
     private readonly onPreviewTextureChange: () => void = () => undefined,
     onPreviewTextureLoad: (url: string) => void = () => undefined,
+    // Woken by every visual change; the dev previews omit it and keep Pixi's own ticker.
+    private readonly renderLoop: CanvasRenderDemand = idleCanvasRenderDemand,
   ) {
     this.previewTextures = new ViewportTexturePool(
       this.refreshAfterPreviewTextureChange,
@@ -107,6 +111,7 @@ export class AlbumCanvasScene {
         projectGeneration: this.projectGeneration,
         canvasScale: this.canvasScale,
       }),
+      () => this.renderLoop.wake(),
     );
     this.frameInteractions = new FrameInteractionSession(
       app.canvas,
@@ -117,13 +122,13 @@ export class AlbumCanvasScene {
       app.canvas, () => this.input,
       (x, y) => this.resolvePhotoDropPoint(x, y),
       (delta) => this.scrollContinuousCanvas(delta),
-      () => { if (this.input) this.updateDecorations(this.input.composition.sheets); },
+      this.refreshDecorations,
     );
     this.world.label = "album-world";
     this.app.stage.addChild(this.world);
     this.frameAreaSelection = new FrameAreaSelectionSession(app, () => this.input,
       (x, y) => this.resolveEditingSheetPoint(x, y),
-      () => { if (this.input) this.updateDecorations(this.input.composition.sheets); });
+      this.refreshDecorations);
     this.app.stage.on("pointerdown", (event) => {
       if (event.target === this.app.stage || [...this.sheetNodes.values()].some((node) => node.container === event.target)) {
         this.frameAreaSelection.start(event);
@@ -152,18 +157,21 @@ export class AlbumCanvasScene {
   }
 
   handleSheetBarHover(sheetId: string, hovered: boolean, swapHovered = false) {
+    this.renderLoop.wake();
     this.hoveredBar = hovered ? { sheetId, swapHovered } : null;
     const node = this.sheetNodes.get(sheetId);
     if (node) setSheetBarOverlayHovered(node.sheetBar, hovered, swapHovered);
   }
 
   handleSheetBarActionFocus(sheetId: string, action: "swap" | "layout", focused: boolean) {
+    this.renderLoop.wake();
     this.focusedBarAction = focused ? { sheetId, action } : null;
     const node = this.sheetNodes.get(sheetId);
     if (node) setSheetBarActionFocused(node.sheetBar, action, focused);
   }
 
   update(input: AlbumCanvasProps, hostHeight: number) {
+    this.renderLoop.wake();
     const projectChanged = this.projectId !== input.projectId;
     if (projectChanged) {
       this.resetProjectScene();
@@ -316,6 +324,8 @@ export class AlbumCanvasScene {
   }
 
   resize(hostHeight: number) {
+    // Resizing clears the drawing buffer even when no input is known yet.
+    this.renderLoop.wake();
     this.app.resize();
     if (this.input) this.update(this.input, hostHeight);
   }
@@ -333,6 +343,7 @@ export class AlbumCanvasScene {
   }
 
   suspendForContextLoss() {
+    this.renderLoop.wake();
     this.resetTransientInteractions();
     this.editingNavigation.suspend();
     this.input?.onTransformPreview(null);
@@ -636,6 +647,7 @@ export class AlbumCanvasScene {
     });
     if (!this.sheetPositionTickerAttached) {
       this.sheetPositionTickerAttached = true;
+      this.releaseSheetPositionHold = this.renderLoop.hold();
       this.app.ticker.add(this.advanceSheetPositionAnimations);
     }
   }
@@ -673,6 +685,8 @@ export class AlbumCanvasScene {
     }
     this.app.ticker.remove(this.advanceSheetPositionAnimations);
     this.sheetPositionTickerAttached = false;
+    this.releaseSheetPositionHold?.();
+    this.releaseSheetPositionHold = null;
   }
 
   private stopSheetPositionAnimations() {
@@ -732,6 +746,7 @@ export class AlbumCanvasScene {
       {
         previewTextureFor: (mediaId) => this.previewTextureFor(mediaId),
         isMediaMissing: (mediaId) => this.input?.missingMediaIds?.has(mediaId) ?? false,
+        requestRender: () => this.renderLoop.wake(),
         onSheetTap: (sheetId) => {
           if (this.input?.mediaDrag) return;
           if (!this.input || this.frameInteractions.ignoresTap || this.frameAreaSelection.ignoresTap || this.frameContentDrag.ignoresTap) return;
@@ -805,10 +820,16 @@ export class AlbumCanvasScene {
   }
 
   private readonly refreshAfterPreviewTextureChange = () => {
+    this.renderLoop.wake();
     if (this.input) {
       this.update(this.input, this.app.screen.height);
     }
     this.onPreviewTextureChange();
+  };
+
+  private readonly refreshDecorations = () => {
+    this.renderLoop.wake();
+    if (this.input) this.updateDecorations(this.input.composition.sheets);
   };
 
   private updateDecorations(sheets: readonly ComposedSheet[]) {
@@ -900,6 +921,7 @@ export class AlbumCanvasScene {
     }
     event.preventDefault();
     if (event.ctrlKey) return;
+    this.renderLoop.wake();
     this.scrollContinuousCanvas((event.deltaX || event.deltaY) * 0.9);
   };
 

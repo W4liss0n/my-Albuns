@@ -102,6 +102,8 @@ export interface SheetRenderNode {
 interface SheetRenderNodeCallbacks {
   previewTextureFor: (mediaId: string) => Texture | undefined;
   isMediaMissing: (mediaId: string) => boolean;
+  /** Asks for frames while a timer-driven fade changes the Sheet Bar. */
+  requestRender: () => void;
   onSheetTap: (sheetId: string) => void;
   onSheetDoubleTap: (sheetId: string) => void;
   onFrameTap: (sheetId: string, frameId: string, toggle: boolean) => void;
@@ -522,6 +524,7 @@ export function createSheetRenderNode(
     sheetBarMetadata,
     presentation,
     viewGeometry,
+    callbacks.requestRender,
   );
   sheetBar.container.visible = modePolicy.showsSheetBar;
   sheetBar.container.on(
