@@ -800,3 +800,19 @@ test("Alt-Pan selects the Frame it moves, so later shortcuts reach it", async ()
   expect(onTransformCommit).toHaveBeenCalledOnce();
   expect(onTransformCommit.mock.calls[0][0].deltaPanX).toBeGreaterThan(0);
 });
+
+test("Alt-Pan on the selected Frame selects it again, so the contextual panel returns to it", async () => {
+  const onSelectFrame = vi.fn();
+  renderCanvas({
+    compositionPlan: interactiveComposition,
+    selectedFrameIds: ["frame-001"],
+    onSelectFrame,
+  });
+  await finishPixiInitialization();
+
+  displayWithLabel("canvas-frame-frame-001").emit("pointerdown", {
+    altKey: true, global: { x: 0, y: 0 }, stopPropagation: vi.fn(),
+  });
+  expect(onSelectFrame).toHaveBeenCalledExactlyOnceWith("frame-001");
+  pixiLifecycle.instances[0].stage.emit("pointerup", { global: { x: 0, y: 0 } });
+});

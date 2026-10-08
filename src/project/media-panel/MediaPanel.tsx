@@ -22,6 +22,7 @@ import { matchProjectCommandShortcut, projectCommandDescriptor, projectCommandLa
 import { ContextMenuSurface } from "../../ui/ContextMenuSurface";
 import { AppIcon } from "../../ui/AppIcon";
 import type { MediaPanelPersistentPreference } from "../../application/workspacePreferences";
+import type { MediaSelectionChange } from "../../application/inspectorContext";
 
 import type {
   MediaFolder,
@@ -107,6 +108,12 @@ interface MediaPanelProps {
   onFillPhoto(mediaId: string): void;
   onApplyDecorative(mediaId: string, role: import("../../domain/project").DecorativeRole): void;
   selectionRequest?: { mediaId: string } | null;
+  /**
+   * Every change of the transient selection, marked explicit when it comes
+   * from a selection gesture. A right click on an already selected image
+   * reports the unchanged selection as explicit too.
+   */
+  onSelectionChange?(change: MediaSelectionChange): void;
   importPending?: boolean;
   onImportMedia(selection: MediaImportSelection): void;
   onRemoveMedia(mediaIds: readonly string[]): void;
@@ -144,6 +151,7 @@ export function MediaPanel({
   onFillPhoto,
   onApplyDecorative,
   selectionRequest,
+  onSelectionChange,
   importPending = false,
   onImportMedia,
   onRemoveMedia,
@@ -359,12 +367,10 @@ export function MediaPanel({
   }, [controlledPersistent]);
 
   useEffect(() => {
-    setSelectedMediaIds((current) => {
-      const visibleSelection = new Set(
-        [...current].filter((mediaId) => visibleMediaIdSet.has(mediaId)),
-      );
-      return visibleSelection.size === current.size ? current : visibleSelection;
-    });
+    const visibleSelection = new Set(
+      [...selectedMediaIds].filter((mediaId) => visibleMediaIdSet.has(mediaId)),
+    );
+    if (visibleSelection.size !== selectedMediaIds.size) changeSelection(visibleSelection, false);
     setSelectionAnchorId((current) =>
       current && visibleMediaIdSet.has(current) ? current : null,
     );
@@ -374,7 +380,7 @@ export function MediaPanel({
     if (selectionRequest === handledSelectionRequest.current) return;
     handledSelectionRequest.current = selectionRequest;
     if (!selectionRequest || !visibleMediaIdSet.has(selectionRequest.mediaId)) return;
-    setSelectedMediaIds(new Set([selectionRequest.mediaId]));
+    changeSelection(new Set([selectionRequest.mediaId]), false);
     setSelectionAnchorId(selectionRequest.mediaId);
   }, [selectionRequest, visibleMediaIdSet]);
 
@@ -521,6 +527,15 @@ export function MediaPanel({
     }));
   }
 
+  /** Replaces the selection and tells the owner whether a gesture made it. */
+  function changeSelection(next: ReadonlySet<string>, explicit: boolean) {
+    setSelectedMediaIds(next);
+    onSelectionChange?.({
+      mediaIds: visibleMediaIds.filter((mediaId) => next.has(mediaId)),
+      explicit,
+    });
+  }
+
   function selectMedia(
     mediaId: string,
     event: MouseEvent<HTMLButtonElement>,
@@ -534,23 +549,22 @@ export function MediaPanel({
       const selectedIndex = visibleMediaIds.indexOf(mediaId);
       const rangeStart = Math.min(anchorIndex, selectedIndex);
       const rangeEnd = Math.max(anchorIndex, selectedIndex);
-      setSelectedMediaIds(
+      changeSelection(
         new Set(visibleMediaIds.slice(rangeStart, rangeEnd + 1)),
+        true,
       );
       return;
     }
 
     if (event.ctrlKey || event.metaKey) {
-      setSelectedMediaIds((current) => {
-        const next = new Set(current);
-        if (next.has(mediaId)) next.delete(mediaId);
-        else next.add(mediaId);
-        return next;
-      });
+      const next = new Set(selectedMediaIds);
+      if (next.has(mediaId)) next.delete(mediaId);
+      else next.add(mediaId);
+      changeSelection(next, true);
       return;
     }
 
-    setSelectedMediaIds(new Set([mediaId]));
+    changeSelection(new Set([mediaId]), true);
     setSelectionAnchorId(mediaId);
   }
 
@@ -577,7 +591,7 @@ export function MediaPanel({
       return;
     }
     event.preventDefault();
-    setSelectedMediaIds(new Set(visibleMediaIds));
+    changeSelection(new Set(visibleMediaIds), true);
     setSelectionAnchorId((current) =>
       current && visibleMediaIdSet.has(current)
         ? current
@@ -586,8 +600,11 @@ export function MediaPanel({
   }
 
   function selectMediaForContextMenu(mediaId: string) {
-    if (selectedMediaIds.has(mediaId)) return;
-    setSelectedMediaIds(new Set([mediaId]));
+    if (selectedMediaIds.has(mediaId)) {
+      changeSelection(selectedMediaIds, true);
+      return;
+    }
+    changeSelection(new Set([mediaId]), true);
     setSelectionAnchorId(mediaId);
   }
 
@@ -595,7 +612,7 @@ export function MediaPanel({
     event: MouseEvent<HTMLDivElement>,
   ) {
     if ((event.target as HTMLElement).closest("[data-media-id]")) return;
-    setSelectedMediaIds(new Set());
+    changeSelection(new Set(), true);
     setSelectionAnchorId(null);
     event.currentTarget.focus({ preventScroll: true });
   }

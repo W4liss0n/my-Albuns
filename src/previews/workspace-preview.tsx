@@ -1,6 +1,8 @@
 import { rasterLimitsAt300Dpi } from "../test/projectConfigurationFixtures";
 import React from "react";
 import retainedPhotoPreview from "../test/dev-media/serra-amanhecer.svg";
+import portraitPhotoPreview from "../test/dev-media/retrato-campo.svg";
+import beachPhotoPreview from "../test/dev-media/praia.svg";
 import ReactDOM from "react-dom/client";
 
 import App from "../project/App";
@@ -55,6 +57,13 @@ import "../ui/ui.css";
 
 const previewParameters = new URLSearchParams(window.location.search);
 const frameContext = previewParameters.get("frame");
+// Ready Cache previews for the default projection's Photos, so captures show
+// the real images in the Canvas, the media panel and the contextual panel.
+const readyPhotoPreviews: Readonly<Record<string, string>> = {
+  "media-001": retainedPhotoPreview,
+  "media-002": portraitPhotoPreview,
+  "media-003": beachPhotoPreview,
+};
 const layoutCase = layoutPanelCorpus.cases[previewParameters.get("layouts") ?? "mixed"];
 let preparedLayoutQuery: { query: LayoutQueryResult; previews: ComposedFrame[][] } | null = null;
 let layoutQuerySequence = 0;
@@ -313,7 +322,10 @@ const mediaPreviewPort: MediaPreviewPort = {
       : frameContext === "orientation" || frameContext === "style" || frameContext === "layouts" ? projection.state.album.media.map((media) => ({
       mediaId: media.id, state: "ready" as const,
       url: `data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="600" height="400" viewBox="0 0 600 400"><path fill="#e63f35" d="M0 0h300v200H0z"/><path fill="#329858" d="M300 0h300v200H300z"/><path fill="#376dcc" d="M0 200h300v200H0z"/><path fill="#e3b634" d="M300 200h300v200H300z"/><g font-family="sans-serif" font-size="80" fill="white" text-anchor="middle"><text x="150" y="130">A</text><text x="450" y="130">B</text><text x="150" y="330">C</text><text x="450" y="330">D</text></g></svg>')}`,
-    })) : decorativeContext === "unavailable"
+    })) : previewParameters.get("previews") === "ready"
+      ? projection.state.album.media.flatMap((media) => readyPhotoPreviews[media.id]
+        ? [{ mediaId: media.id, state: "ready" as const, url: readyPhotoPreviews[media.id] }] : [])
+      : decorativeContext === "unavailable"
       ? [
           {
             mediaId: unavailableDecorativeId,

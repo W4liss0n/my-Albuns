@@ -769,8 +769,8 @@ export class AlbumCanvasScene {
           if (!this.input || this.input.mediaDrag) return;
           this.photoInteractions.startPan(photoNode, event);
           // Alt-Pan works on this Frame, so the shortcuts that follow must too.
-          const selected = this.input.selectedFrameIds;
-          if (selected.length !== 1 || selected[0] !== photoNode.frameId) this.input.onSelectFrame(photoNode.frameId);
+          // Selecting it again also returns the contextual panel to the Frame.
+          this.input.onSelectFrame(photoNode.frameId);
           this.input.onFocusSheet(sheet.sheetId);
         },
         onPhotoContentDragStart: (frameId, event) => { if (!this.input?.mediaDrag) this.frameContentDrag.start(frameId, event); },

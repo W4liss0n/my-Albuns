@@ -1,0 +1,34 @@
+/* The preview block follows the context heading like the content of a
+   section: same padding and the same closing rule, with no band of its own. */
+.inspector-image-preview {
+  --inspector-image-preview-max-height: 200px;
+
+  display: grid;
+  justify-items: center;
+  padding: var(--ui-space-4) var(--inspector-gutter) var(--inspector-gutter);
+  border-bottom: 1px solid var(--ui-border);
+}
+
+/* A fixed box: the controls below keep their place whatever the photo's
+   proportion, and while a preview without known dimensions loads. */
+.inspector-image-preview__frame {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  height: var(--inspector-image-preview-max-height);
+  align-items: center;
+  justify-content: center;
+}
+
+/* The whole image keeps its proportion: as wide as the panel allows, never
+   taller than the box. The media panel thumbnail keeps its white border and
+   shadow, so the photo reads the same in both panels. */
+.inspector-image-preview__frame > .media-preview-thumbnail,
+.inspector-image-preview__frame > .media-preview-thumbnail[data-portrait="true"] {
+  width: min(
+    100%,
+    calc(var(--inspector-image-preview-max-height) * (var(--media-aspect-ratio)))
+  );
+  height: auto;
+  max-height: 100%;
+}

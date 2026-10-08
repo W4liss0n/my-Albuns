@@ -796,6 +796,58 @@ test("leaves Ctrl+A to nested editable content inside the image panel", () => {
   }
 });
 
+test("reports selection gestures as explicit and pruning or the import request as automatic", async () => {
+  const user = userEvent.setup();
+  const onSelectionChange = vi.fn();
+  const props = {
+    ...mediaPanelInteractions,
+    mediaItems,
+    mediaUsage,
+    onFillPhoto: vi.fn(),
+    onSelectionChange,
+    previewSource: { kind: "static" } as const,
+    preferences: { kind: "local" } as const,
+  };
+  const view = render(<MediaPanel {...props} />);
+  const album2 = screen.getByRole("button", { name: "album 2" });
+  const album10 = screen.getByRole("button", { name: /^Álbum 10/ });
+  const portrait = screen.getByRole("button", { name: /^Retrato/ });
+  const grid = screen.getByRole("group", { name: "Grade de fotos" });
+  expect(onSelectionChange).not.toHaveBeenCalled();
+
+  fireEvent.click(album2);
+  expect(onSelectionChange).toHaveBeenLastCalledWith({ mediaIds: ["photo-album-2"], explicit: true });
+  fireEvent.click(portrait, { ctrlKey: true });
+  expect(onSelectionChange).toHaveBeenLastCalledWith({ mediaIds: ["photo-album-2", "photo-retrato"], explicit: true });
+  fireEvent.click(album10, { shiftKey: true });
+  expect(onSelectionChange).toHaveBeenLastCalledWith({ mediaIds: ["photo-album-2", "photo-album-10"], explicit: true });
+  fireEvent.keyDown(grid, { ctrlKey: true, key: "a" });
+  expect(onSelectionChange).toHaveBeenLastCalledWith({
+    mediaIds: ["photo-album-2", "photo-album-10", "photo-retrato"], explicit: true,
+  });
+  fireEvent.click(grid);
+  expect(onSelectionChange).toHaveBeenLastCalledWith({ mediaIds: [], explicit: true });
+
+  // A right click selects, or keeps a selected group, and both are gestures.
+  fireEvent.contextMenu(album10);
+  expect(onSelectionChange).toHaveBeenLastCalledWith({ mediaIds: ["photo-album-10"], explicit: true });
+  fireEvent.keyDown(document.activeElement ?? document.body, { key: "Escape" });
+  onSelectionChange.mockClear();
+  fireEvent.contextMenu(album10);
+  expect(onSelectionChange).toHaveBeenCalledExactlyOnceWith({ mediaIds: ["photo-album-10"], explicit: true });
+  fireEvent.keyDown(document.activeElement ?? document.body, { key: "Escape" });
+
+  // A search that hides the selected image prunes it automatically.
+  await user.type(screen.getByRole("searchbox", { name: "Buscar fotos" }), "retrato");
+  expect(onSelectionChange).toHaveBeenLastCalledWith({ mediaIds: [], explicit: false });
+
+  // The image imported last is selected for the user, not by the user.
+  onSelectionChange.mockClear();
+  view.rerender(<MediaPanel {...props} selectionRequest={{ mediaId: "photo-retrato" }} />);
+  expect(onSelectionChange).toHaveBeenCalledExactlyOnceWith({ mediaIds: ["photo-retrato"], explicit: false });
+  expect(portrait).toHaveAttribute("aria-pressed", "true");
+});
+
 test("removes hidden items from the transient media selection", async () => {
   const user = userEvent.setup();
   renderPanel();

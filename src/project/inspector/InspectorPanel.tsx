@@ -16,15 +16,14 @@ import type {
   AlbumInformation,
   AlbumInformationImpact,
   AlbumInformationValidation,
-  ComposedPhoto,
   ComposedSheet,
   DisplayUnit,
   DocumentSnapshot,
-  FrameSnapshot,
   MediaCatalogItem,
   ProjectedVisualDefaults,
   SheetSnapshot,
 } from "../../domain/project";
+import type { InspectorContext } from "../../application/inspectorContext";
 import type {
   AlbumDesignProjectDraft,
   AlbumInformationProjectDraft,
@@ -38,6 +37,7 @@ import {
 import { ActionButton, AppIcon, EmptyState } from "../../ui";
 import { AlbumDesignForm } from "./AlbumDesignForm";
 import { AlbumInformationForm } from "./AlbumInformationForm";
+import { InspectorImagePreview } from "./InspectorImagePreview";
 import { SheetPreviewShell } from "../sheets/SheetPreview";
 import { PhotoZoomControl, type PhotoZoomControlActions } from "./PhotoZoomControl";
 import { PhotoOrientationControls, type PhotoOrientationControlActions } from "./PhotoOrientationControls";
@@ -62,17 +62,9 @@ import "./InspectorPanel.css";
 
 const ALBUM_INFORMATION_FORM_ID = "album-information-settings";
 const ALBUM_DESIGN_FORM_ID = "album-design-settings";
+const NO_MISSING_MEDIA: ReadonlySet<string> = new Set();
 
-export type InspectorContext =
-  | { kind: "album" }
-  | { kind: "sheet"; sheet: ComposedSheet }
-  | { kind: "multiple-frames"; frames: readonly FrameSnapshot[]; editingSheet: ComposedSheet }
-  | {
-      kind: "frame";
-      frame: FrameSnapshot;
-      composedPhoto: ComposedPhoto | null;
-      editingSheet?: ComposedSheet;
-    };
+export type { InspectorContext } from "../../application/inspectorContext";
 
 export type InspectorSectionState =
   | {
@@ -94,6 +86,8 @@ export interface InspectorPanelProps {
   document: DocumentSnapshot;
   presentationUnit: DisplayUnit;
   mediaItems: readonly MediaCatalogItem[];
+  /** Absent media without a retained preview; their preview is the missing symbol. */
+  missingMediaIds?: ReadonlySet<string>;
   sheetStates: readonly SheetSnapshot[];
   sheets: readonly ComposedSheet[];
   visualDefaults: ProjectedVisualDefaults;
@@ -143,6 +137,7 @@ export function InspectorPanel({
   document,
   presentationUnit,
   mediaItems,
+  missingMediaIds = NO_MISSING_MEDIA,
   sheetStates,
   sheets,
   visualDefaults,
@@ -341,10 +336,12 @@ export function InspectorPanel({
     event.preventDefault();
     onOpenSheetContextMenu(sheetId, { x: event.clientX, y: event.clientY });
   }
+  // Another subject only borrows the panel while a Sheet is edited, so the
+  // Sheet's scope survives it.
   const editingSheet =
     context.kind === "sheet"
       ? context.sheet
-      : context.kind === "frame" || context.kind === "multiple-frames"
+      : "editingSheet" in context
         ? context.editingSheet ?? null
         : null;
   const selectedSheetScope = editingSheet
@@ -370,6 +367,10 @@ export function InspectorPanel({
     ? Math.round(selectedZooms[0] * 100) : null;
   const groupZoomRange = context.kind === "multiple-frames"
     ? context.editingSheet.frames.find((frame) => frame.photo)?.photo?.placement.zoomRange : undefined;
+  const framePhotoId = context.kind === "frame" ? context.frame.photo?.mediaId : undefined;
+  const framePhotoMedia = framePhotoId === undefined
+    ? undefined
+    : mediaItems.find((media) => media.id === framePhotoId);
 
   return (
     <aside
@@ -378,6 +379,24 @@ export function InspectorPanel({
       aria-label="Painel contextual"
     >
       <div className="inspector-scroll">
+        {context.kind === "multiple-media" ? (
+          <div className="context-heading">
+            <span>Seleção múltipla</span>
+            <h2>{context.count} imagens selecionadas</h2>
+          </div>
+        ) : context.kind === "media" ? (
+          <>
+            <div className="context-heading">
+              <span>Imagem selecionada</span>
+              <h2>{context.media.name}</h2>
+            </div>
+            <InspectorImagePreview
+              media={context.media}
+              missing={missingMediaIds.has(context.media.id)}
+              previewUrl={mediaPreviewUrls[context.media.id]}
+            />
+          </>
+        ) : null}
         {context.kind === "multiple-frames" ? (
           <>
             <div className="context-heading">
@@ -418,6 +437,13 @@ export function InspectorPanel({
               <span>Quadro selecionado</span>
               <h2>{context.composedPhoto?.name ?? "Quadro vazio"}</h2>
             </div>
+            {framePhotoMedia && (
+              <InspectorImagePreview
+                media={framePhotoMedia}
+                missing={missingMediaIds.has(framePhotoMedia.id)}
+                previewUrl={mediaPreviewUrls[framePhotoMedia.id]}
+              />
+            )}
             <InspectorSection
               key="frame-photo-design"
               title="Design"
@@ -467,78 +493,76 @@ export function InspectorPanel({
               }
             />
           </InspectorSection>
-        ) : (
-          <>
-            <InspectorSection
-              action={
-                <ActionButton
-                  density="compact"
-                  disabled={!informationDirty}
-                  form={ALBUM_INFORMATION_FORM_ID}
-                  type="submit"
-                  variant={informationDirty ? "primary" : "quiet"}
-                >
-                  Aplicar
-                </ActionButton>
-              }
-              accessibleTitle="Informações do álbum"
-              key="album-information"
-              title="Informações do álbum"
-              preferenceKey="album.information"
-              sectionState={sectionState}
-              defaultOpen
-            >
-              <div className="inspector-subsections">
-                <AlbumInformationForm
-                  photoSources={mediaItems}
-                  document={document}
-                  formId={ALBUM_INFORMATION_FORM_ID}
-                  revision={revision}
-                  onApply={onApplyAlbumInformation}
-                  onPresentationUnitChange={onPresentationUnitChange}
-                  onReadyChange={setInformationDirty}
-                  onValidate={onValidateAlbumInformation}
-                  sheetStates={sheetStates}
-                />
-              </div>
-            </InspectorSection>
-            <InspectorSection
-              action={
-                <ActionButton
-                  density="compact"
-                  disabled={!designDirty}
-                  form={ALBUM_DESIGN_FORM_ID}
-                  type="submit"
-                  variant={designDirty ? "primary" : "quiet"}
-                >
-                  Aplicar
-                </ActionButton>
-              }
-              accessibleTitle="Design do álbum"
-              key="album-design"
-              title="Design do álbum"
-              preferenceKey="album.design"
-              sectionState={sectionState}
-              defaultOpen
-            >
-              <AlbumDesignForm
-                document={document}
-                presentationUnit={presentationUnit}
-                formId={ALBUM_DESIGN_FORM_ID}
-                mediaItems={mediaItems}
-                mediaPreviews={mediaPreviews}
-                revision={revision}
-                value={visualDefaults}
-                frameGapUm={frameGapUm}
-                onApply={onApplyAlbumDesign}
-                onReadyChange={setDesignDirty}
-              />
-            </InspectorSection>
-          </>
-        )}
-        {/* Hidden instead of unmounted: new tiles would load their Cache previews
-            again and fill in one by one. */}
+        ) : null}
+        {/* Hidden instead of unmounted while another context owns the panel: the
+            forms keep their unapplied drafts, and new Grade tiles would load their
+            Cache previews again and fill in one by one. */}
         <Activity mode={context.kind === "album" ? "visible" : "hidden"}>
+          <InspectorSection
+            action={
+              <ActionButton
+                density="compact"
+                disabled={!informationDirty}
+                form={ALBUM_INFORMATION_FORM_ID}
+                type="submit"
+                variant={informationDirty ? "primary" : "quiet"}
+              >
+                Aplicar
+              </ActionButton>
+            }
+            accessibleTitle="Informações do álbum"
+            key="album-information"
+            title="Informações do álbum"
+            preferenceKey="album.information"
+            sectionState={sectionState}
+            defaultOpen
+          >
+            <div className="inspector-subsections">
+              <AlbumInformationForm
+                photoSources={mediaItems}
+                document={document}
+                formId={ALBUM_INFORMATION_FORM_ID}
+                revision={revision}
+                onApply={onApplyAlbumInformation}
+                onPresentationUnitChange={onPresentationUnitChange}
+                onReadyChange={setInformationDirty}
+                onValidate={onValidateAlbumInformation}
+                sheetStates={sheetStates}
+              />
+            </div>
+          </InspectorSection>
+          <InspectorSection
+            action={
+              <ActionButton
+                density="compact"
+                disabled={!designDirty}
+                form={ALBUM_DESIGN_FORM_ID}
+                type="submit"
+                variant={designDirty ? "primary" : "quiet"}
+              >
+                Aplicar
+              </ActionButton>
+            }
+            accessibleTitle="Design do álbum"
+            key="album-design"
+            title="Design do álbum"
+            preferenceKey="album.design"
+            sectionState={sectionState}
+            defaultOpen
+          >
+            <AlbumDesignForm
+              document={document}
+              presentationUnit={presentationUnit}
+              formId={ALBUM_DESIGN_FORM_ID}
+              mediaItems={mediaItems}
+              mediaPreviews={mediaPreviews}
+              revision={revision}
+              value={visualDefaults}
+              frameGapUm={frameGapUm}
+              onApply={onApplyAlbumDesign}
+              onReadyChange={setDesignDirty}
+            />
+          </InspectorSection>
           <InspectorSection
             accessibleTitle="Grade de lâminas"
             key="album-sheet-grid"

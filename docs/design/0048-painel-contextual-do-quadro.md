@@ -2,7 +2,7 @@
 status: accepted
 document: design
 date: 2026-09-22
-updated: 2026-10-02
+updated: 2026-10-08
 implementation-readiness: ready-for-agent
 ---
 
@@ -13,7 +13,9 @@ de dois cliques e dos botões largos de Espelhar e Preto e branco. Esta decisão
 refina a apresentação dos designs 0021–0024 e 0047; as operações de edição
 continuam iguais.
 
-O painel começa pelos ajustes que podem ser editados. Zoom, ângulo, opacidade
+Depois do cabeçalho e da prévia da foto, acrescentada no
+[refinamento de 08/10/2026](#refinamento-de-08102026), o painel começa pelos
+ajustes que podem ser editados. Zoom, ângulo, opacidade
 e borda deixam de mostrar frases de restauração abaixo dos sliders. Os gestos
 de dois cliques permanecem disponíveis, e os limites e erros de digitação
 continuam na validação por tooltip. A origem da borda e a ação para usar o
@@ -108,3 +110,34 @@ No painel contextual, o padrão se aplica a zoom, ângulo, opacidade, borda,
 espaço entre quadros, DPI, largura e altura da lâmina, sangria e área de
 segurança. As medidas continuam exibindo a unidade dentro do campo. Botões
 de ação, alternadores e seletores mantêm suas apresentações próprias.
+
+## Refinamento de 08/10/2026
+
+O autor pediu a prévia da imagem selecionada no painel contextual. Com um
+quadro com foto selecionado, a foto inteira aparece logo abaixo do cabeçalho
+`Quadro selecionado` e acima de Design. É a mesma imagem de Cache da miniatura
+do Painel de imagens e do visualizador, sem recorte, giro, espelhamento, preto e
+branco ou opacidade: não acompanha os ajustes do painel, cujo efeito continua
+visível no Canvas.
+
+O bloco é fixo, sem título de seção nem recolhimento. A imagem ocupa a largura
+do conteúdo do painel, centralizada, com altura máxima de cerca de 200 px e a
+proporção da foto. A área da imagem tem sempre essa altura, para que Design não
+mude de lugar entre fotos horizontais e verticais. Mantém a moldura branca e a
+sombra curta das miniaturas; o bloco usa o mesmo respiro do conteúdo das seções
+e termina com a mesma linha que as fecha, sem caixa, ícone ou divisória extra.
+Quadro vazio e seleção de vários quadros não mostram prévia.
+
+O bloco mostra só a imagem. O nome já está no cabeçalho. O design 0001 previa
+também informações do arquivo para o quadro, mas o autor decidiu em 08/10/2026
+não mostrar as dimensões em pixels nem outras informações abaixo da imagem.
+
+Durante o carregamento aparece o fundo listrado da miniatura. Arquivo ausente
+sem prévia retida mostra o símbolo de imagem ausente da miniatura, sem aviso ou
+atalho; uma prévia anterior retida é exibida sem aviso. Trocar de quadro nunca
+mostra a foto anterior sob o nome do novo.
+
+O mesmo bloco forma o contexto `Imagem selecionada`, aberto por uma imagem
+selecionada no Painel de imagens. A precedência entre as seleções do Canvas e
+do Painel de imagens está no
+[design 0001](0001-estrutura-da-janela-do-projeto.md#contexto-de-imagem-selecionada).

@@ -371,6 +371,31 @@ test("the manifest covers critical integrated workspace, panel, menu, and graphi
       ready: /context-heading/u,
       actions: ["focus", "key", "click"],
     },
+    "project-workspace-photo-preview-context": {
+      path: "/previews/workspace-preview.html?frame=photo&previews=ready",
+      ready: /Zoom da foto.*context-heading \+ \.inspector-image-preview/u,
+      actions: ["focus", "key", "click"],
+    },
+    "project-workspace-media-selected-context": {
+      path: "/previews/workspace-preview.html?previews=ready",
+      ready: /context-heading:first-child \+ \.inspector-image-preview /u,
+      actions: ["click"],
+    },
+    "project-workspace-media-over-frame-context": {
+      path: "/previews/workspace-preview.html?frame=photo&previews=ready",
+      ready: /has\(\.inspector-image-preview\):not\(:has\(\[aria-label="Zoom da foto/u,
+      actions: ["focus", "key", "click", "click"],
+    },
+    "project-workspace-media-multiple-context": {
+      path: "/previews/workspace-preview.html?previews=ready",
+      ready: /not\(:has\(\.inspector-image-preview\)\).*context-heading:first-child/u,
+      actions: ["click", "click"],
+    },
+    "workspace-missing-image-inspector": {
+      path: "/previews/workspace-preview.html?frame=photo&files=missing-placeholder",
+      ready: /Arquivo ausente.*data-missing/u,
+      actions: ["click"],
+    },
     "project-workspace-menu-open": {
       path: "/previews/workspace-preview.html",
       ready: /application-menu-file/u,

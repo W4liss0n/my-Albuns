@@ -357,7 +357,7 @@ Representação resumida e ordenada das Lâminas do Álbum.
 Superfície usada para consultar e aplicar Layouts compatíveis à Lâmina em contexto. Sua abertura centraliza a Lâmina alvo e oculta temporariamente as outras Lâminas do Canvas e o Painel de imagens.
 
 **Painel contextual**:
-Superfície única e reutilizável da Janela do Projeto que apresenta as ferramentas do contexto ativo, seja o Álbum, a Lâmina ou um Frame e sua Foto.
+Superfície única e reutilizável da Janela do Projeto que apresenta as ferramentas do contexto ativo, seja o Álbum, a Lâmina, um Frame e sua Foto ou a imagem selecionada no Painel de imagens. A última ação explícita de seleção, no Canvas ou no Painel de imagens, define esse contexto.
 _Evitar_: Painel direito
 
 **Painel de imagens**:
