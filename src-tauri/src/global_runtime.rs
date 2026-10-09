@@ -2334,6 +2334,13 @@ fn on_global_window_event(window: &tauri::Window, event: &tauri::WindowEvent) {
         }
     }
     if window.label() == crate::settings_window::SETTINGS_WINDOW_LABEL
+        && let tauri::WindowEvent::CloseRequested { api, .. } = event
+    {
+        api.prevent_close();
+        let app = window.app_handle().clone();
+        tauri::async_runtime::spawn(crate::settings_window::close(app));
+    }
+    if window.label() == crate::settings_window::SETTINGS_WINDOW_LABEL
         && matches!(event, tauri::WindowEvent::Destroyed)
     {
         let app = window.app_handle().clone();
