@@ -67,9 +67,14 @@ impl ViewerStore {
     }
 }
 
+/// `held` is the presentation the viewer already shows for this session. Its
+/// URLs stay acceptable after the Cache revokes them: saving a correction
+/// replaces the photo's preview, and the presentations that report the save
+/// must still reach the viewer. They grant no access the viewer did not have.
 fn validate(
     presentation: &mut ViewerPresentation,
     previews: &CachePreviewRegistry,
+    held: Option<&ViewerPresentation>,
 ) -> Result<(), String> {
     if presentation.session_id.len() > 128
         || presentation.session_id.is_empty()
@@ -79,22 +84,26 @@ fn validate(
         return Err("invalid viewer presentation identity".into());
     }
     presentation.name = presentation.name.chars().take(512).collect();
-    if presentation
-        .url
-        .as_deref()
-        .is_some_and(|url| !previews.is_published_url(url))
-    {
+    let held_urls: Vec<&str> = held
+        .into_iter()
+        .flat_map(|held| {
+            let correction = held.correction.as_ref();
+            [
+                held.url.as_deref(),
+                correction.and_then(|correction| correction.reference_url.as_deref()),
+                correction.and_then(|correction| correction.result_url.as_deref()),
+            ]
+        })
+        .flatten()
+        .collect();
+    let refused =
+        |url: &str| !held_urls.contains(&url) && !previews.is_published_url(url);
+    if presentation.url.as_deref().is_some_and(refused) {
         return Err("the viewer URL is not a published cache preview".into());
     }
     if let Some(correction) = &presentation.correction
-        && (correction
-            .reference_url
-            .as_deref()
-            .is_some_and(|url| !previews.is_published_url(url))
-            || correction
-                .result_url
-                .as_deref()
-                .is_some_and(|url| !previews.is_published_url(url)))
+        && (correction.reference_url.as_deref().is_some_and(refused)
+            || correction.result_url.as_deref().is_some_and(refused))
     {
         return Err("a correction URL is not a published preview".into());
     }
@@ -112,7 +121,7 @@ pub(crate) async fn open_image_viewer(
     if window.label() != PROJECT_WINDOW_LABEL {
         return Err("only the Project window can open the viewer".into());
     }
-    validate(&mut presentation, &previews)?;
+    validate(&mut presentation, &previews, None)?;
     store.replace(presentation.clone())?;
     previews.set_viewer_access(true);
     let result = async {
@@ -191,12 +200,12 @@ pub(crate) fn update_image_viewer(
     if window.label() != PROJECT_WINDOW_LABEL {
         return Err("only the Project window can update the viewer".into());
     }
-    validate(&mut presentation, &previews)?;
-    if store
-        .current()?
+    let current = store.current()?;
+    let held = current
         .as_ref()
-        .is_none_or(|old| old.session_id != presentation.session_id)
-    {
+        .filter(|old| old.session_id == presentation.session_id);
+    validate(&mut presentation, &previews, held)?;
+    if held.is_none() {
         return Ok(());
     }
     store.replace(presentation.clone())?;
@@ -985,6 +994,52 @@ mod tests {
             can_next: true,
             correction: None,
         }
+    }
+
+    #[test]
+    fn a_saved_correction_reaches_the_viewer_after_the_cache_revokes_its_photo() {
+        let previews = CachePreviewRegistry::new(LABEL);
+        let original = previews.publish_viewer_preview(vec![1]);
+        let result = previews.publish_viewer_preview(vec![2]);
+        let correction = |phase| crate::ipc_contract::ViewerCorrectionPresentation {
+            phase,
+            reference_media_id: "reference".into(),
+            reference_name: "reference".into(),
+            reference_url: None,
+            reference_state: crate::ipc_contract::ViewerPreviewState::Ready,
+            can_previous_reference: false,
+            can_next_reference: false,
+            result_url: Some(result.clone()),
+            error: None,
+        };
+        let mut preview = presentation("one", 1, "a");
+        preview.url = Some(original.clone());
+        preview.correction = Some(correction(
+            crate::ipc_contract::ViewerCorrectionPhase::Preview,
+        ));
+        validate(&mut preview, &previews, None).unwrap();
+
+        // Saving replaces the photo in the Cache while the viewer still shows it.
+        previews.revoke_viewer_preview(&original);
+        let mut applying = preview.clone();
+        applying.revision = 2;
+        applying.correction = Some(correction(
+            crate::ipc_contract::ViewerCorrectionPhase::Applying,
+        ));
+        validate(&mut applying, &previews, Some(&preview)).unwrap();
+
+        // The saved result becomes the photo until the new preview is published.
+        previews.revoke_viewer_preview(&result);
+        let mut saved = presentation("one", 3, "a");
+        saved.url = Some(result.clone());
+        validate(&mut saved, &previews, Some(&applying)).unwrap();
+        assert!(validate(&mut saved.clone(), &previews, None).is_err());
+
+        let unseen = previews.publish_viewer_preview(vec![3]);
+        previews.revoke_viewer_preview(&unseen);
+        let mut unknown = presentation("one", 4, "a");
+        unknown.url = Some(unseen);
+        assert!(validate(&mut unknown, &previews, Some(&saved)).is_err());
     }
 
     #[test]
