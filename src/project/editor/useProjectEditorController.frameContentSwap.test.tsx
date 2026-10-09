@@ -82,10 +82,11 @@ test.each([false, true])("normal drop serializes Core resolution, swap and adjac
   expect(useEditorView.getState().selectedFrameIds).toEqual(["swap-frame-3"]);
 });
 
-test.each(["self", "background", "invalid", "empty-source", "blocked", "editing"])("normal drop on %s does not create a History command", async (reason) => {
+test.each(["self", "source-sheet-background", "invalid", "empty-source", "blocked", "editing"])("normal drop on %s does not create a History command", async (reason) => {
   const h = swapHarness();
+  h.port.applyWithOutcome = vi.fn<ProjectCorePort["applyWithOutcome"]>();
   h.port.resolvePhotoDropTarget = vi.fn<ProjectCorePort["resolvePhotoDropTarget"]>(async () => reason === "self" ? { kind: "frame", frameId: "swap-frame-0" }
-    : reason === "background" ? { kind: "sheet", sheetId: "sheet-002" } : { kind: "invalid" });
+    : reason === "source-sheet-background" ? { kind: "sheet", sheetId: "sheet-001" } : { kind: "invalid" });
   if (reason !== "editing") act(() => useEditorView.getState().exitSheetEdit());
   if (reason === "blocked") h.view.rerender({ blocked: true });
   await act(async () => {
@@ -93,6 +94,33 @@ test.each(["self", "background", "invalid", "empty-source", "blocked", "editing"
       { sheetId: "sheet-002", xUm: 100, yUm: 200 })).toBe(false);
   });
   expect(h.apply).not.toHaveBeenCalled();
+  expect(h.port.applyWithOutcome).not.toHaveBeenCalled();
+});
+
+test.each([true, false])("a drop on the free area of another Sheet moves the Photo in one command; source selected=%s", async (sourceSelected) => {
+  const h = swapHarness();
+  const moved = structuredClone(h.initial);
+  const [origin, destination] = moved.state.album.sheets;
+  const source = origin.frames.find((frame) => frame.id === "swap-frame-0")!;
+  origin.frames = origin.frames.filter((frame) => frame !== source);
+  destination.frames.push({ ...source, id: "moved-frame" });
+  moved.state.revision += 1;
+  h.port.resolvePhotoDropTarget = vi.fn<ProjectCorePort["resolvePhotoDropTarget"]>(async () => ({ kind: "sheet", sheetId: "sheet-002" }));
+  h.port.applyWithOutcome = vi.fn<ProjectCorePort["applyWithOutcome"]>(async () => ({
+    projection: moved, affectedFrameId: "moved-frame", affectedSheetId: "sheet-002" }));
+  act(() => {
+    useEditorView.getState().exitSheetEdit();
+    useEditorView.getState().selectFrame(sourceSelected ? "swap-frame-0" : "swap-frame-3");
+  });
+  await act(async () => {
+    expect(await h.view.result.current.canvasProps.frameContentSwap!.commit("swap-frame-0",
+      { sheetId: "sheet-002", xUm: 100, yUm: 200 })).toBe(true);
+  });
+  expect(h.port.applyWithOutcome).toHaveBeenCalledExactlyOnceWith(
+    { kind: "moveFrameToSheet", frameId: "swap-frame-0", sheetId: "sheet-002", xUm: 100, yUm: 200 }, expect.any(Function));
+  expect(h.apply).not.toHaveBeenCalled();
+  // The moved Photo keeps the selection it had; another selection stays put.
+  expect(useEditorView.getState().selectedFrameIds).toEqual([sourceSelected ? "moved-frame" : "swap-frame-3"]);
 });
 
 test("a pending command that changes the source Photo cancels the queued normal drop", async () => {

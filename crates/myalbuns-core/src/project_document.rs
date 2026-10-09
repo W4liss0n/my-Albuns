@@ -1542,6 +1542,89 @@ impl ProjectDocument {
         Ok(candidate)
     }
 
+    /// Moves the Photo of `frame_id`, with its adjustments, to the free area of
+    /// another Sheet. Both Sheets are reorganized as normal mode deletes and
+    /// drops do; a locked origin keeps the Frame as a placeholder.
+    pub(crate) fn with_frame_moved_to_sheet(
+        &self,
+        frame_id: &str,
+        sheet_id: &str,
+        (x_um, y_um): (i64, i64),
+        sources: &PhotoDimensions,
+        custom: &[crate::CustomLayout],
+    ) -> Result<(Self, Uuid), crate::CoreError> {
+        use crate::CoreError::InvalidFrameMove;
+        let frame_id = Uuid::parse_str(frame_id).map_err(|_| InvalidFrameMove)?;
+        let target_id = Uuid::parse_str(sheet_id).map_err(|_| InvalidFrameMove)?;
+        let origin_index = self
+            .sheets
+            .iter()
+            .position(|sheet| sheet.frames.iter().any(|frame| frame.id == frame_id))
+            .ok_or(InvalidFrameMove)?;
+        let target_index = self
+            .sheets
+            .iter()
+            .position(|sheet| sheet.id == target_id)
+            .ok_or(InvalidFrameMove)?;
+        // A Frame under the point swaps contents instead; a locked Sheet has no free area.
+        let target = photo_drop_target(
+            &self.sheets[target_index],
+            self.document.sheet_width_um,
+            self.document.sheet_height_um,
+            x_um,
+            y_um,
+        );
+        if origin_index == target_index || !matches!(target, PhotoDropTarget::Sheet { .. }) {
+            return Err(InvalidFrameMove);
+        }
+        let mut candidate = self.clone();
+        let origin = &mut candidate.sheets[origin_index];
+        let frame_index = origin
+            .frames
+            .iter()
+            .position(|frame| frame.id == frame_id && frame.photo.is_some())
+            .ok_or(InvalidFrameMove)?;
+        let photo = if origin.layout_locked {
+            origin.frames[frame_index].photo.take()
+        } else {
+            origin.frames.remove(frame_index).photo
+        }
+        .ok_or(InvalidFrameMove)?;
+        // The new Frame follows the orientation the Photo shows, rotation included.
+        let shown_dimensions = sources.get(&photo.media_id).map(|&(width, height)| {
+            if photo.transform.quarter_turns() % 2 == 0 {
+                (width, height)
+            } else {
+                (height, width)
+            }
+        });
+        let target_sheet = &mut candidate.sheets[target_index];
+        let moved = add_frame(
+            target_sheet,
+            self.document.sheet_width_um,
+            self.document.sheet_height_um,
+            photo.media_id,
+            shown_dimensions,
+            PhotoPlacementMode::Normal,
+            Some((x_um, y_um)),
+        )
+        .map_err(|()| InvalidFrameMove)?;
+        target_sheet
+            .frames
+            .last_mut()
+            .ok_or(InvalidFrameMove)?
+            .photo = Some(photo);
+        let origin = &candidate.sheets[origin_index];
+        if let Some(origin_id) =
+            (!origin.layout_locked && !origin.frames.is_empty()).then_some(origin.id)
+        {
+            candidate.reorganize_sheet(origin_id, custom, sources)?;
+        }
+        candidate.reorganize_sheet(target_id, custom, sources)?;
+        validate_project_state(&candidate).map_err(|()| InvalidFrameMove)?;
+        Ok((candidate, moved))
+    }
+
     pub(crate) fn with_deleted_frames(
         &self,
         frame_ids: &[String],

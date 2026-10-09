@@ -85,7 +85,10 @@ export interface CanvasFrameContentSwap {
   disabled: boolean;
   dragThreshold: PointerDragThreshold | null;
   resolveTarget(point: CanvasPhotoDropPoint): Promise<PhotoDropTarget>;
-  /** Resolves the release point and swaps in the shared mutation queue. */
+  /**
+   * Resolves the release point in the shared mutation queue: another Frame
+   * swaps contents, the free area of another Sheet receives the moved Photo.
+   */
   commit(sourceFrameId: string, point: CanvasPhotoDropPoint): Promise<boolean>;
   onError(message: string): void;
 }
