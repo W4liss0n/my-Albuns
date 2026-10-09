@@ -1,4 +1,5 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
+import { useState } from "react";
 import { expect, test, vi } from "vitest";
 import {
   AlbumCanvas,
@@ -223,6 +224,47 @@ test("resizes the Pixi renderer before fitting a taller Canvas", async () => {
     height: 700,
     scale: expectedScale,
   });
+});
+
+test("keeps what is at the Canvas center there while the window settles to its size", async () => {
+  const layout = createContinuousCanvasLayout(threeSheetComposition.sheets);
+  function SettlingCanvas() {
+    const [viewport, setViewport] = useState({ offsetX: 0 });
+    return (
+      <AlbumCanvas projectId="settling" mode={{ kind: "normal" }}
+        composition={threeSheetComposition} sheetBarMetadata={[]}
+        continuousCanvasLayout={layout} selectedFrameIds={[]}
+        focusedSheetId="sheet-001" centeredSheetId="sheet-001"
+        viewport={viewport} onViewportChange={setViewport}
+        onSelectFrame={vi.fn()} onEditSheet={vi.fn()} onFocusSheet={vi.fn()}
+        onCenteredSheetChange={vi.fn()} onTransformPreview={vi.fn()}
+        onTransformCommit={vi.fn(async () => true)} />
+    );
+  }
+  render(<SettlingCanvas />);
+  await finishPixiInitialization();
+  const app = pixiLifecycle.instances[0];
+  const world = app.stage.children[0] as {
+    position: { x: number };
+    scale: { x: number };
+  };
+  const host = document.querySelector(".canvas-host") as HTMLElement;
+  const centerPoint = () =>
+    (app.screen.width / 2 - world.position.x) / world.scale.x;
+  const initialCenter = centerPoint();
+
+  // The sizes a maximized Project went through on show, as measured natively.
+  for (const [width, height] of [[1593, 745], [1609, 761], [1609, 754], [1609, 761]]) {
+    Object.defineProperties(host, {
+      clientWidth: { configurable: true, value: width },
+      clientHeight: { configurable: true, value: height },
+    });
+    await act(async () => {
+      pixiLifecycle.resizeCallbacks[0]?.([], {} as ResizeObserver);
+    });
+    expect(world.scale.x).toBeCloseTo(continuousCanvasScale(height, 300), 4);
+    expect(centerPoint()).toBeCloseTo(initialCenter, 4);
+  }
 });
 
 test("exposes a horizontal scrollbar bound to the continuous Canvas viewport", async () => {
