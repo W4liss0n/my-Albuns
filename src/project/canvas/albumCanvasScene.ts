@@ -78,6 +78,13 @@ export class AlbumCanvasScene {
   private lastCanvasMetrics: CanvasMetrics | null = null;
   private lastMediaDemandSignature: string | null = null;
   private pendingViewportOffsetX: number | null = null;
+  // The continuous view last drawn, and the offset it was asked for.
+  private continuousView: {
+    offsetX: number;
+    requestedOffsetX: number;
+    scale: number;
+    width: number;
+  } | null = null;
   private sheetReorderPreviewActive = false;
   private sheetReorderPlaceholderSheetId: string | null = null;
   private sheetPositionTickerAttached = false;
@@ -273,6 +280,7 @@ export class AlbumCanvasScene {
     const requestedOffsetX =
       transitionOffsetX ??
       this.pendingViewportOffsetX ??
+      this.resizedViewOffsetX(input, modePolicy, scale) ??
       input.viewport.offsetX;
     const boundedOffsetX =
       modePolicy.enablesContinuousNavigation
@@ -296,6 +304,14 @@ export class AlbumCanvasScene {
       });
     }
 
+    this.continuousView = modePolicy.enablesContinuousNavigation
+      ? {
+          offsetX: boundedOffsetX,
+          requestedOffsetX: input.viewport.offsetX,
+          scale,
+          width: this.app.screen.width,
+        }
+      : null;
     if (modePolicy.enablesContinuousNavigation) {
       this.synchronizeCenteredSheet(
         navigationLayout,
@@ -329,6 +345,37 @@ export class AlbumCanvasScene {
     );
     this.updateDecorations(presentedSheets);
     this.photoInteractions.applyPreviews();
+  }
+
+  /**
+   * The viewport offset is in pixels, so a new Canvas size or scale alone
+   * moved every Sheet sideways, as the window settles after a Project opens.
+   * The content under the Canvas center stays there instead. An offset someone
+   * else set since the last draw (navigation, scrolling) wins.
+   */
+  private resizedViewOffsetX(
+    input: AlbumCanvasProps,
+    modePolicy: ReturnType<typeof albumCanvasModePolicy>,
+    scale: number,
+  ): number | null {
+    const view = this.continuousView;
+    const width = this.app.screen.width;
+    if (
+      !view ||
+      view.scale <= 0 ||
+      !modePolicy.enablesContinuousNavigation ||
+      (Math.abs(view.scale - scale) < 0.0001 &&
+        Math.abs(view.width - width) < 0.0001)
+    ) {
+      return null;
+    }
+    const offsetX = input.viewport.offsetX;
+    const unchanged =
+      Math.abs(offsetX - view.offsetX) < 0.0001 ||
+      Math.abs(offsetX - view.requestedOffsetX) < 0.0001;
+    if (!unchanged) return null;
+    const centerX = (view.width / 2 - view.offsetX) / view.scale;
+    return width / 2 - centerX * scale;
   }
 
   resize(hostHeight: number) {
@@ -441,6 +488,7 @@ export class AlbumCanvasScene {
     this.lastMediaDemandSignature = null;
     this.modeSignature = null;
     this.pendingViewportOffsetX = null;
+    this.continuousView = null;
   }
 
   private resetTransientInteractions(modeChanged = false) {

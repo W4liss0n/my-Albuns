@@ -1210,19 +1210,40 @@ impl ProjectStartupHandshake {
         let quiet_show = (!take_focus)
             .then(|| crate::opening_focus::QuietShow::begin(project_window))
             .flatten();
-        if let Some(placement) = maximized_placement {
-            #[cfg(windows)]
-            crate::project_window_placement::show_maximized(project_window, placement)?;
-            #[cfg(not(windows))]
-            {
-                let _ = placement;
-                project_window.maximize().map_err(io::Error::other)?;
-            }
-        }
-        project_window.show().map_err(io::Error::other)?;
-        if take_focus {
-            project_window.set_focus().map_err(io::Error::other)?;
-        }
+        // Tao keeps its own copy of the window state and acts on it whenever
+        // it applies one. Shown from another thread after Windows had already
+        // maximized the window, it restored it for a moment and every Sheet
+        // jumped. The whole presentation runs on the main thread instead.
+        #[cfg(windows)]
+        let cloaked = quiet_show.is_some();
+        let window = project_window.clone();
+        let (presented, presentation) = std::sync::mpsc::sync_channel(1);
+        project_window
+            .run_on_main_thread(move || {
+                let present = || -> io::Result<()> {
+                    match maximized_placement {
+                        #[cfg(windows)]
+                        Some(placement) => crate::project_window_placement::show_maximized(
+                            &window, placement, cloaked,
+                        )?,
+                        #[cfg(not(windows))]
+                        Some(_) => {
+                            window.maximize().map_err(io::Error::other)?;
+                            window.show().map_err(io::Error::other)?;
+                        }
+                        None => window.show().map_err(io::Error::other)?,
+                    }
+                    if take_focus {
+                        window.set_focus().map_err(io::Error::other)?;
+                    }
+                    Ok(())
+                };
+                let _ = presented.send(present());
+            })
+            .map_err(io::Error::other)?;
+        presentation
+            .recv()
+            .map_err(|_| io::Error::other("the Project window was not presented"))??;
         #[cfg(windows)]
         let shown_quietly = quiet_show.is_some();
         #[cfg(not(windows))]
