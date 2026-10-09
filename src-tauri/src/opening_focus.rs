@@ -197,7 +197,7 @@ impl QuietShow {
 }
 
 #[cfg(windows)]
-fn set_cloaked(window: windows::Win32::Foundation::HWND, cloaked: bool) {
+pub(crate) fn set_cloaked(window: windows::Win32::Foundation::HWND, cloaked: bool) {
     use windows::Win32::Graphics::Dwm::{DWMWA_CLOAK, DwmSetWindowAttribute};
 
     let value = windows::core::BOOL::from(cloaked);
