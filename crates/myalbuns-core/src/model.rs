@@ -953,6 +953,15 @@ pub enum ProjectIntent {
     SwapFrameContents {
         frame_ids: Vec<String>,
     },
+    /// Moves a Frame's Photo, with its adjustments, to the free area of
+    /// another Sheet as one action. Both Sheets are reorganized as in normal
+    /// mode; a locked origin keeps the Frame as a placeholder.
+    MoveFrameToSheet {
+        frame_id: String,
+        sheet_id: String,
+        x_um: i64,
+        y_um: i64,
+    },
     SwapSheetSides {
         sheet_id: String,
     },
@@ -1144,6 +1153,8 @@ pub enum CoreError {
     InvalidFrameContentSwapSelection,
     #[error("Selecione Frames distintos de uma única Lâmina para excluir")]
     InvalidFrameDeletionSelection,
+    #[error("A Foto só pode ser movida para a área livre de outra Lâmina")]
+    InvalidFrameMove,
     #[error("Selecione Frames distintos de uma única Lâmina para organizar a Pilha visual")]
     InvalidFrameStackSelection,
     #[error("Selecione Frames distintos de uma única Lâmina para editar a geometria")]

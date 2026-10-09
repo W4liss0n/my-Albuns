@@ -22,6 +22,7 @@ pub(crate) fn project_error_message(error: CoreError) -> String {
         FrameClipboardEmpty => "Copie quadros deste projeto antes de colar.".into(),
         InvalidFramePaste => "Os quadros copiados não cabem na área disponível.".into(),
         InvalidFrameContentSwapSelection => "Selecione dois quadros da mesma lâmina, com pelo menos uma foto.".into(),
+        InvalidFrameMove => "A foto não foi movida. Solte-a no espaço livre de outra lâmina.".into(),
         FrameGeometryChanged => "O quadro mudou durante o ajuste. Tente novamente.".into(),
         EditableSessionInvalidated => "O projeto não está mais disponível para edição. Reabra-o para continuar.".into(),
         InvalidDpi(dpi) => format!("A resolução de {dpi} DPI não pode ser usada com o tamanho atual do álbum."),
