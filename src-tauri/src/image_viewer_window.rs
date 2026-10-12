@@ -96,8 +96,7 @@ fn validate(
         })
         .flatten()
         .collect();
-    let refused =
-        |url: &str| !held_urls.contains(&url) && !previews.is_published_url(url);
+    let refused = |url: &str| !held_urls.contains(&url) && !previews.is_published_url(url);
     if presentation.url.as_deref().is_some_and(refused) {
         return Err("the viewer URL is not a published cache preview".into());
     }
