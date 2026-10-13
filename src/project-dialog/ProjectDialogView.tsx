@@ -1,5 +1,3 @@
-import { useLayoutEffect, useRef } from "react";
-
 import type {
   ProjectDialogAction,
   ProjectDialogState,
@@ -24,14 +22,6 @@ export function ProjectDialogView({
   onAction,
   state,
 }: ProjectDialogViewProps) {
-  const graphicsFailureActionRef = useRef<HTMLButtonElement>(null);
-
-  useLayoutEffect(() => {
-    if (state.kind === "graphicsFailure") {
-      graphicsFailureActionRef.current?.focus({ preventScroll: true });
-    }
-  }, [state.kind]);
-
   switch (state.kind) {
     case "storageFull": return <StorageFullDialog state={state} onAction={onAction} />;
     case "exportConfiguration": return <ExportConfigurationDialog state={state} onAction={onAction} />;
@@ -198,7 +188,6 @@ export function ProjectDialogView({
             label: "Fechar projeto",
             onClick: () => onAction("closeProjectAfterGraphicsFailure"),
           }}
-          secondaryButtonRef={graphicsFailureActionRef}
           title="Não foi possível iniciar o editor"
           tone="error"
         />

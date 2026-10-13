@@ -158,6 +158,7 @@ pub(crate) fn run(
         )
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_shell::init())
+        .plugin(desktop_webview_policy::plugin())
         .manage(desktop_webview_policy::WindowWebviewVisibility::default())
         .manage(project_host)
         .manage(crate::editor_project_launcher::EditorProjectLauncher::default())
