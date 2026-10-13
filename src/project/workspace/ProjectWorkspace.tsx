@@ -166,6 +166,7 @@ export function ProjectWorkspace({
   const [sessionBarrierActive, setSessionBarrierActive] = useState(false);
   const sessionBarrierRef = useRef(false);
   const [mediaDrag, setMediaDrag] = useState<import("../media-panel/useMediaDragGesture").MediaDrag | null>(null);
+  const [decorativeDropTarget, setDecorativeDropTarget] = useState<import("../media-panel/MediaDragGhost").DecorativeDropTarget | null>(null);
   const draggedPhotoId = mediaDrag?.kind === "photo" ? mediaDrag.mediaId : null;
   const [mediaSelectionRequest, setMediaSelectionRequest] = useState<{ mediaId: string } | null>(null);
   /** Mirror of the media panel's transient selection, for the contextual panel. */
@@ -903,6 +904,7 @@ export function ProjectWorkspace({
             draggedPhotoId={draggedPhotoId}
             mediaDrag={mediaDrag}
             onPhotoDragCancel={() => setMediaDrag(null)}
+            onDecorativeDropTargetChange={setDecorativeDropTarget}
             sheetReorder={{
               disabled: structuralCommandsBlocked,
               representation: sheetReorderRepresentation(
@@ -1026,6 +1028,7 @@ export function ProjectWorkspace({
           importPending={controller.importPending}
           onImportMedia={importMedia}
           onMediaDragChange={setMediaDrag}
+          decorativeDropTarget={mediaDrag ? decorativeDropTarget : null}
           dragThreshold={controller.frameStyle.dragThreshold}
           onRelinkMedia={controller.relinkMedia}
           onReplaceMedia={controller.replaceMedia}

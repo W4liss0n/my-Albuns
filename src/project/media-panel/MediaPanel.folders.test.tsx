@@ -74,6 +74,23 @@ test("the ghost reuses the thumbnail, follows the pointer beyond the panel, and 
   expect(h.props.onMediaDragChange).toHaveBeenLastCalledWith(expect.objectContaining({ phase: "drop" }));
 });
 
+test("over a Sheet the Decorative ghost becomes one card that names where it will be applied", () => {
+  const h = harness();
+  fireEvent.click(screen.getByRole("button", { name: "Decorativos" }));
+  dragHit(null); startDrag("Fundo.jpg"); moveDrag();
+  expect(dragGhost()).toHaveStyle({ transform: "translate3d(326px, 22px, 0)" });
+  expect(screen.queryByRole("status", { name: "Aplicação do decorativo" })).not.toBeInTheDocument();
+  h.view.rerender(<MediaPanel {...h.props} decorativeDropTarget={{ role: "overlay", scope: "left" }} />);
+  const card = dragGhost()!;
+  expect(screen.getByRole("status", { name: "Aplicação do decorativo" })).toHaveTextContent("SobreposiçãoLado esquerdo");
+  expect(card).toContainElement(screen.getByRole("status", { name: "Aplicação do decorativo" }));
+  // Padding and border keep the thumbnail where the bare ghost showed it.
+  expect(card).toHaveStyle({ transform: "translate3d(321px, 17px, 0)" });
+  h.view.rerender(<MediaPanel {...h.props} decorativeDropTarget={null} />);
+  expect(screen.queryByRole("status", { name: "Aplicação do decorativo" })).not.toBeInTheDocument();
+  dropDrag();
+});
+
 test("a right click during a drag opens no menu and the drag still drops", async () => {
   const h = harness(); dragHit(null); startDrag(); moveDrag();
   fireEvent.contextMenu(screen.getByRole("button", { name: "001.jpg" }), { button: 2, clientX: 320, clientY: 16 });

@@ -21,6 +21,8 @@ export function useDecorativeDropPreview(input: Input) {
   const [resolved, setResolved] = useState<{ gestureId: number; mediaId: string; preview: DecorativeDropPreview } | null>(null);
   const resolvedRef = useRef(resolved);
   resolvedRef.current = resolved;
+  /** The latest preview request settled without a preview: nothing applies at this point. */
+  const [failed, setFailed] = useState(false);
   const clear = useCallback(() => { requestId.current += 1; setResolved(null); }, []);
 
   useEffect(() => {
@@ -44,10 +46,12 @@ export function useDecorativeDropPreview(input: Input) {
       if (point.xUm >= rect.x && point.xUm < rect.x + rect.width && point.yUm >= rect.y && point.yUm < rect.y + rect.height) return;
     }
     setResolved(null);
+    setFailed(false);
     const request: DecorativeDropRequest = { ...point, mediaId: drag.mediaId, role };
     void previewPort(request).then(async (preview) => {
       if (sequence !== requestId.current) return;
       if (!preview || (latest.current.revision !== undefined && preview.revision !== latest.current.revision)) {
+        setFailed(true);
         if (drag.phase === "drop") latest.current.cancel?.();
         return;
       }
@@ -66,6 +70,7 @@ export function useDecorativeDropPreview(input: Input) {
     }).catch(() => {
       if (sequence === requestId.current) {
         setResolved(null);
+        setFailed(true);
         if (drag.phase === "drop") latest.current.cancel?.();
       }
     });
@@ -75,5 +80,5 @@ export function useDecorativeDropPreview(input: Input) {
   const preview = input.drag?.kind === "decorative" && resolved?.gestureId === input.drag.gestureId &&
     resolved.mediaId === input.drag.mediaId && resolved.preview.role === (input.drag.shiftKey ? "overlay" : "background") &&
     (input.revision === undefined || resolved.preview.revision === input.revision) ? resolved.preview : null;
-  return { preview, clear };
+  return { preview, failed, clear };
 }
