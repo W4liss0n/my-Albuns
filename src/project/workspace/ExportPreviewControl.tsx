@@ -41,7 +41,8 @@ interface ExportPreviewControlProps {
 }
 
 export interface ExportPreviewControlHandle {
-  start(scope?: "sheet" | "album"): void;
+  /** `sheetId` fills the interval with that Sheet instead of the centered one. */
+  start(scope?: "sheet" | "album", sheetId?: string): void;
 }
 
 export const ExportPreviewControl = forwardRef<
@@ -163,12 +164,13 @@ export const ExportPreviewControl = forwardRef<
     };
   }, [dialogPort, projectId]);
 
-  function startExport(scope: "sheet" | "album" = "sheet") {
+  function startExport(scope: "sheet" | "album" = "sheet", sheetId = selection?.sheetId) {
     if (disabled || !selection || phase !== "idle" || currentAttemptId.current !== null) return;
+    if (!sheetId || !sheets.some(sheet => sheet.sheetId === sheetId)) return;
     beginInteraction();
     setPhase("configuring");
     const generation = ++recoveryGeneration.current;
-    const options: NormalExportOptions = { scope: scope === "album" ? "album" : "range", sheetIds: scope === "album" ? sheets.map(sheet => sheet.sheetId) : [selection.sheetId], mode: "sheet", format: { kind: "jpeg", quality: 100 }, destination: "", conflictPolicy: "ask" as const };
+    const options: NormalExportOptions = { scope: scope === "album" ? "album" : "range", sheetIds: scope === "album" ? sheets.map(sheet => sheet.sheetId) : [sheetId], mode: "sheet", format: { kind: "jpeg", quality: 100 }, destination: "", conflictPolicy: "ask" as const };
     // Present once the initial fields are ready so opening never shrinks a busy form.
     void exportPipelinePort.defaultDestination().then(destination => {
       if (generation === recoveryGeneration.current) presentDialog({ kind: "exportConfiguration", sheets, options: { ...options, destination }, busy: false, message: "" });

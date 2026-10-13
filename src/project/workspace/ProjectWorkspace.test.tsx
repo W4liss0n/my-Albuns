@@ -7162,6 +7162,35 @@ test("starts a pointer drag for the directly pressed Photo and cancels it with E
   fireEvent.keyDown(window, { key: "Escape" });
   expect(canvasHarness.props?.draggedPhotoId).toBeNull();
 });
+test("starts Exportação for the Lâmina whose context menu was opened, not the centered one", async () => {
+  const startSheet = vi.fn<ExportPipelinePort["startSheet"]>(() => ({
+    completion: Promise.resolve({
+      status: "completed",
+      result: { widthPx: 600, heightPx: 300 },
+    }),
+    cancel: async () => "not_found",
+  }));
+  render(<ProjectWorkspace
+    exportPipelinePort={{ defaultDestination: async () => "C:/Exportados/Album", chooseDestination: async () => null, startSheet }}
+    projection={twoSheetProjection}
+    projectCorePort={projectCorePortWithApply(async () => twoSheetProjection)}
+    onProjectionChange={() => undefined} />);
+
+  act(() => canvasHarness.props?.onCenteredSheetChange?.("sheet-001"));
+  act(() => canvasHarness.props?.onOpenSheetContextMenu?.("sheet-002", { x: 240, y: 180 }));
+  const menu = screen.getByRole("menu", { name: "Ações da lâmina 02" });
+  await act(async () => { fireEvent.click(within(menu).getByRole("menuitem", { name: "Exportar lâmina…" })); });
+
+  expect(menu).not.toBeInTheDocument();
+  expect(startSheet).toHaveBeenCalledWith(
+    expect.objectContaining({
+      sheetId: "sheet-002",
+      sheetNumber: 2,
+      options: expect.objectContaining({ scope: "range", sheetIds: ["sheet-002"] }),
+    }),
+    expect.any(Function),
+  );
+});
 test("starts Exportação for the Canvas-centered Lâmina even while focus remains on another Lâmina", async () => {
   const startSheet = vi.fn<ExportPipelinePort["startSheet"]>(() => ({
     completion: Promise.resolve({

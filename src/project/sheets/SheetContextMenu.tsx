@@ -9,6 +9,7 @@ const sheetCommandLabels = {
   addAfter: projectCommandDescriptor("add-after").label,
   addBefore: projectCommandDescriptor("add-before").label,
   convertEdge: projectCommandDescriptor("convert-edge").label,
+  exportSheet: projectCommandDescriptor("export-sheet").label,
 } as const;
 
 const SINGLE_SHEET_ONLY = "Disponível somente para uma lâmina";
@@ -26,6 +27,8 @@ interface SheetContextMenuProps {
   onConvertEdge(): void;
   onDelete(): void;
   onDuplicate(): void;
+  /** Opens Export with the interval filled by this Sheet. */
+  onExport?(): void;
   onDismiss(): void;
 }
 
@@ -39,6 +42,7 @@ export function SheetContextMenu({
   onConvertEdge,
   onDelete,
   onDuplicate,
+  onExport,
   onDismiss,
 }: SheetContextMenuProps) {
   function invoke(action: () => void) {
@@ -46,8 +50,8 @@ export function SheetContextMenu({
     onDismiss();
   }
 
-  // Adding and converting need one anchor Sheet; with several Sheets only
-  // Duplicate and Delete apply, to all of them.
+  // Adding, exporting and converting need one anchor Sheet; with several
+  // Sheets only Duplicate and Delete apply, to all of them.
   const several = sheetCount > 1;
   return (
     <ContextMenuSurface
@@ -70,6 +74,12 @@ export function SheetContextMenu({
           disabled={!availability.canDelete}
           onClick={() => invoke(onDelete)} />
         <MenuSeparator />
+        {onExport ? (
+          <MenuItem label={sheetCommandLabels.exportSheet}
+            disabled={several}
+            title={several ? SINGLE_SHEET_ONLY : undefined}
+            onClick={() => invoke(onExport)} />
+        ) : null}
         <MenuItem label={sheetCommandLabels.convertEdge}
           disabled={several || !availability.canConvertEdge}
           title={
