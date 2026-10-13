@@ -1138,6 +1138,8 @@ export function ProjectWorkspace({
           onDelete={() => {
             void controller.deleteSheets(sheetContextMenu.sheetIds);
           }}
+          onExport={() =>
+            exportControlRef.current?.start("sheet", sheetContextMenu.sheetId)}
           onDismiss={() => setSheetContextMenu(null)}
         />
       ) : null}

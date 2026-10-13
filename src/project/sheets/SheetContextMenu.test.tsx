@@ -17,6 +17,19 @@ describe("SheetContextMenu", () => {
     expect(dismiss).toHaveBeenCalledOnce();
   });
 
+  test("exports the Sheet and dismisses the menu", () => {
+    const exportSheet = vi.fn();
+    const dismiss = vi.fn();
+    render(<SheetContextMenu availability={{ canAddAfter: true, canAddBefore: true,
+      canConvertEdge: false, canDelete: true, canDuplicate: true }}
+      position={{ x: 20, y: 30 }} sheetNumber={2} onAddAfter={vi.fn()}
+      onAddBefore={vi.fn()} onConvertEdge={vi.fn()} onDelete={vi.fn()}
+      onDuplicate={vi.fn()} onExport={exportSheet} onDismiss={dismiss} />);
+    fireEvent.click(screen.getByRole("menuitem", { name: "Exportar lâmina…" }));
+    expect(exportSheet).toHaveBeenCalledOnce();
+    expect(dismiss).toHaveBeenCalledOnce();
+  });
+
   test("acts on every selected Sheet and keeps single-Sheet commands disabled", () => {
     const duplicate = vi.fn();
     const deleteSheets = vi.fn();
@@ -24,10 +37,10 @@ describe("SheetContextMenu", () => {
       canConvertEdge: false, canDelete: true, canDuplicate: true }}
       position={{ x: 20, y: 30 }} sheetNumber={2} sheetCount={3} onAddAfter={vi.fn()}
       onAddBefore={vi.fn()} onConvertEdge={vi.fn()} onDelete={deleteSheets}
-      onDuplicate={duplicate} onDismiss={vi.fn()} />);
+      onDuplicate={duplicate} onExport={vi.fn()} onDismiss={vi.fn()} />);
 
     expect(screen.getByRole("menu", { name: "Ações das 3 lâminas" })).toBeInTheDocument();
-    for (const name of ["Adicionar antes", "Adicionar depois", "Converter extremidade"]) {
+    for (const name of ["Adicionar antes", "Adicionar depois", "Exportar lâmina…", "Converter extremidade"]) {
       const item = screen.getByRole("menuitem", { name });
       expect(item).toBeDisabled();
       expect(item).toHaveAttribute("title", "Disponível somente para uma lâmina");
