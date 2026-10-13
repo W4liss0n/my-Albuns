@@ -346,6 +346,42 @@ const DEFINITIONS = [
       shortcut("[", undefined, { ctrlKey: true, shiftKey: true })],
   }),
   command({
+    id: "move-frames-left",
+    label: "Mover para a esquerda",
+    description: "Move os quadros selecionados 1 mm para a esquerda; com Shift, 10 mm.",
+    kind: "domain",
+    contexts: ["frame"],
+    availability: "implemented",
+    shortcuts: [shortcut("arrowleft", "←"), shortcut("arrowleft", undefined, { shiftKey: true })],
+  }),
+  command({
+    id: "move-frames-right",
+    label: "Mover para a direita",
+    description: "Move os quadros selecionados 1 mm para a direita; com Shift, 10 mm.",
+    kind: "domain",
+    contexts: ["frame"],
+    availability: "implemented",
+    shortcuts: [shortcut("arrowright", "→"), shortcut("arrowright", undefined, { shiftKey: true })],
+  }),
+  command({
+    id: "move-frames-up",
+    label: "Mover para cima",
+    description: "Move os quadros selecionados 1 mm para cima; com Shift, 10 mm.",
+    kind: "domain",
+    contexts: ["frame"],
+    availability: "implemented",
+    shortcuts: [shortcut("arrowup", "↑"), shortcut("arrowup", undefined, { shiftKey: true })],
+  }),
+  command({
+    id: "move-frames-down",
+    label: "Mover para baixo",
+    description: "Move os quadros selecionados 1 mm para baixo; com Shift, 10 mm.",
+    kind: "domain",
+    contexts: ["frame"],
+    availability: "implemented",
+    shortcuts: [shortcut("arrowdown", "↓"), shortcut("arrowdown", undefined, { shiftKey: true })],
+  }),
+  command({
     id: "save-frame-arrangement-as-layout",
     label: "Salvar disposição como layout",
     description: "Salva a disposição atual dos quadros como layout.",
@@ -560,6 +596,16 @@ export const FRAME_STACK_COMMANDS = [
   { id: "recede-frames", action: "recede" },
   { id: "send-frames-to-back", action: "sendToBack" },
 ] as const satisfies readonly { id: ProjectCommandId; action: FrameStackAction }[];
+
+/** Unit directions on the Sheet surface; Shift multiplies the step. */
+export const FRAME_MOVE_COMMANDS = [
+  { id: "move-frames-left", x: -1, y: 0 },
+  { id: "move-frames-right", x: 1, y: 0 },
+  { id: "move-frames-up", x: 0, y: -1 },
+  { id: "move-frames-down", x: 0, y: 1 },
+] as const satisfies readonly { id: ProjectCommandId; x: number; y: number }[];
+
+export type FrameMoveDirection = Pick<(typeof FRAME_MOVE_COMMANDS)[number], "x" | "y">;
 
 export const PROJECT_COMMAND_CATALOG: readonly ProjectCommandDefinition<ProjectCommandId>[] =
   DEFINITIONS;

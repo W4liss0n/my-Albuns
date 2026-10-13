@@ -93,6 +93,9 @@ test("reserves Escape for the local owner and keeps keyboard commands in their d
   expect(matchProjectCommandShortcut(keyboardShortcut("ArrowUp"), "sheet")).toBe("next-layout");
   expect(matchProjectCommandShortcut(keyboardShortcut("ArrowDown"), "sheet")).toBe("previous-layout");
   expect(matchProjectCommandShortcut(keyboardShortcut("ArrowUp"), "media-panel")).toBeNull();
+  expect(matchProjectCommandShortcut(keyboardShortcut("ArrowLeft"), "frame")).toBe("move-frames-left");
+  expect(matchProjectCommandShortcut(keyboardShortcut("ArrowDown", { shiftKey: true }), "frame")).toBe("move-frames-down");
+  expect(matchProjectCommandShortcut(keyboardShortcut("ArrowUp", { ctrlKey: true }), "frame")).toBeNull();
   expect(projectCommandShortcutLabel("next-layout")).toBe("↑");
   expect(projectCommandShortcutLabel("previous-layout")).toBe("↓");
   expect(matchProjectCommandShortcut(keyboardShortcut("Delete"), "sheet")).toBe("delete-sheet");

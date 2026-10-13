@@ -410,6 +410,23 @@ export function useProjectMutations({
       .filter((frame) => edit.frames.some((target) => target.frameId === frame.frameId)) ?? null;
   }
 
+  /**
+   * Moves the Frames from the geometry current when the queue reaches the
+   * edit, so keys pressed before the previous move is presented still add up.
+   */
+  function moveFrames(frameIds: readonly string[], deltaXUm: number, deltaYUm: number) {
+    return runWithErrorFeedback(async (port, latestProjection) => {
+      const current = latestProjection ?? projection;
+      const frames = current.composition.sheets.flatMap((sheet) => sheet.frames)
+        .filter((frame) => frameIds.includes(frame.frameId));
+      if (frames.length === 0 || frames.length !== frameIds.length) return current;
+      return imageProcessing.run((publish) => port.apply({ kind: "editFrameGeometry", edit: {
+        frames: frames.map((frame) => ({ frameId: frame.frameId, expectedRect: frame.clipRect })),
+        gesture: { kind: "move", deltaXUm, deltaYUm },
+      } }, publish));
+    });
+  }
+
   /** Swaps with the Frame at the release point, or moves to the free area of another Sheet. */
   async function dropFrameContentAtPoint(sourceFrameId: string, point: CanvasPhotoDropPoint) {
     const result: { applied: boolean; movedFrameId: string | null } = { applied: false, movedFrameId: null };
@@ -564,6 +581,7 @@ export function useProjectMutations({
       runWithErrorFeedback((port) => port.apply({ kind: "editMediaFolder", edit }), true),
     commitInteraction,
     commitFrameGeometry,
+    moveFrames,
     dropFrameContentAtPoint,
     swapSheetSides,
     cycleLayout,

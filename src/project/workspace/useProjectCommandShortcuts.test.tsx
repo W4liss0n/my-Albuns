@@ -151,6 +151,57 @@ test("a Frame selection keeps Delete but leaves the arrows to the centered Sheet
   expect(actions.deleteSheet).not.toHaveBeenCalled();
 });
 
+test("in Sheet editing the arrows move the Frame selection, with Shift and held keys", () => {
+  const actions = { ...handlers(), moveFrames: vi.fn() };
+  renderHook(() => useProjectCommandShortcuts({
+    ...actions, frameMoveActive: true, sheetNavigationActive: false, layoutCycleActive: false,
+    canRedo: true, canUndo: true, disabled: false,
+  }));
+  for (const key of ["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"]) {
+    expect(dispatchShortcut(key, { ctrlKey: false }).defaultPrevented, key).toBe(true);
+  }
+  dispatchShortcut("ArrowRight", { ctrlKey: false, shiftKey: true });
+  dispatchShortcut("ArrowRight", { ctrlKey: false, repeat: true });
+  expect(actions.moveFrames.mock.calls).toEqual([
+    [{ id: "move-frames-left", x: -1, y: 0 }, false, false],
+    [{ id: "move-frames-right", x: 1, y: 0 }, false, false],
+    [{ id: "move-frames-up", x: 0, y: -1 }, false, false],
+    [{ id: "move-frames-down", x: 0, y: 1 }, false, false],
+    [{ id: "move-frames-right", x: 1, y: 0 }, true, false],
+    [{ id: "move-frames-right", x: 1, y: 0 }, false, true],
+  ]);
+  expect(dispatchShortcut("ArrowRight").defaultPrevented).toBe(false);
+  const thumbnail = document.createElement("div");
+  thumbnail.dataset.projectCommandContext = "media-panel";
+  document.body.appendChild(thumbnail);
+  dispatchShortcut("ArrowLeft", { ctrlKey: false }, thumbnail);
+  thumbnail.remove();
+  expect(actions.moveFrames).toHaveBeenCalledTimes(7);
+  for (const kind of ["input", "menu", "dialog"]) {
+    const target = document.createElement(kind === "input" ? kind : "div");
+    if (kind !== "input") target.setAttribute("role", kind);
+    document.body.appendChild(target);
+    expect(dispatchShortcut("ArrowLeft", { ctrlKey: false }, target).defaultPrevented, kind).toBe(false);
+    target.remove();
+  }
+  expect(actions.moveFrames).toHaveBeenCalledTimes(7);
+  expect(actions.navigateToPreviousSheet).not.toHaveBeenCalled();
+  expect(actions.cycleToNextLayout).not.toHaveBeenCalled();
+});
+
+test("the arrows move no Frame outside Sheet editing or while commands are blocked", () => {
+  const actions = { ...handlers(), moveFrames: vi.fn() };
+  const view = renderHook(({ active, disabled }) => useProjectCommandShortcuts({
+    ...actions, frameMoveActive: active, canRedo: true, canUndo: true, disabled,
+  }), { initialProps: { active: false, disabled: false } });
+  dispatchShortcut("ArrowLeft", { ctrlKey: false });
+  expect(actions.navigateToPreviousSheet).toHaveBeenCalledOnce();
+  view.rerender({ active: true, disabled: true });
+  expect(dispatchShortcut("ArrowLeft", { ctrlKey: false }).defaultPrevented).toBe(true);
+  expect(actions.moveFrames).not.toHaveBeenCalled();
+  expect(actions.navigateToPreviousSheet).toHaveBeenCalledOnce();
+});
+
 test("R rotates and V toggles black and white on the selected Frame photos, also from a thumbnail", () => {
   const actions = { ...handlers(), rotatePhotos: vi.fn(), togglePhotoBlackAndWhite: vi.fn() };
   const { rerender } = renderHook((active: boolean) => useProjectCommandShortcuts({

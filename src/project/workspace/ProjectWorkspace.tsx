@@ -806,6 +806,8 @@ export function ProjectWorkspace({
     deleteFrames: () => { void controller.deleteFrames(); },
     arrangeFrames: (action) => { void controller.arrangeFrames(action); },
     frameCommandsActive: controller.canDeleteFrames && mediaDrag === null && sheetContextMenu === null && frameContextMenu === null,
+    moveFrames: controller.moveFrames,
+    frameMoveActive: controller.canMoveFrames && mediaDrag === null && sheetContextMenu === null && frameContextMenu === null,
     canDeleteSheet: sheetCommandTargetAvailability.canDelete,
     canRedo: projection.state.canRedo,
     canUndo: projection.state.canUndo,
