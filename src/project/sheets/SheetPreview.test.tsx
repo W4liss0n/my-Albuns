@@ -168,12 +168,12 @@ test("renders the composed geometry and visual layers of each sheet", () => {
     name: "Prévia da lâmina 02",
   });
 
+  expect(firstPreview.querySelector('clipPath[id*="frame-001"] rect')).toHaveAttribute("x", "20000");
+  expect(firstPreview.querySelector('clipPath[id*="frame-001"] rect')).toHaveAttribute("width", "280000");
+  // A Photo already marks the Frame edge, so only the empty Frame gets an outline.
   expect(
     firstPreview.querySelector('[data-preview-frame-id="frame-001"]'),
-  ).toHaveAttribute("x", "20000");
-  expect(
-    firstPreview.querySelector('[data-preview-frame-id="frame-001"]'),
-  ).toHaveAttribute("width", "280000");
+  ).toBeNull();
   expect(
     firstPreview.querySelector('[data-preview-photo-id="media-001"]'),
   ).toHaveAttribute(
@@ -283,7 +283,7 @@ test("renders the persisted solid Frame border on top of Frame content", () => {
   expect(segments[3]).toHaveAttribute("width", "1250");
 });
 
-test("groups Photo and Border under one opacity while the Frame outline remains visible", () => {
+test("groups Photo and Border under one opacity without an outline around the Photo Frame", () => {
   render(<SheetPreview sheet={{ ...photoSheet, frames: photoSheet.frames.map((frame) => ({ ...frame,
     opacityByte: 128, border: { kind: "solid", rgb: "#205070", widthUm: 1_250 },
   })) }} />);
@@ -292,7 +292,7 @@ test("groups Photo and Border under one opacity while the Frame outline remains 
   expect(content).toHaveAttribute("opacity", String(128 / 255));
   expect(content?.querySelector('[data-preview-photo-id="media-001"]')).toBeInTheDocument();
   expect(content?.querySelector('[data-preview-frame-border-id="frame-001"]')).toBeInTheDocument();
-  expect(content?.querySelector('[data-preview-frame-id="frame-001"]')).toBeNull();
+  expect(svg.querySelector('[data-preview-frame-id="frame-001"]')).toBeNull();
 });
 
 test("keeps preview strokes aligned with Canvas units at other sheet heights", () => {

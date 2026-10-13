@@ -44,10 +44,7 @@ import {
   createFrameSelectionRenderNode,
   type FrameSelectionRenderNode,
 } from "./frameSelectionRenderNode";
-import {
-  frameOutlineStyle,
-  SHEET_VISUAL_STYLE,
-} from "./sheetVisualStyle";
+import { SHEET_VISUAL_STYLE } from "./sheetVisualStyle";
 import {
   createSheetBarRenderNode,
   setSheetBarSheetHovered,
@@ -350,17 +347,6 @@ export function createSheetRenderNode(
       framePlaceholders.push(emptyPlaceholder);
     }
 
-    const outlineStyle = frameOutlineStyle(frame.photo !== null);
-    const outline = new Graphics()
-      .rect(0, 0, frameWidth, frameHeight)
-      .stroke({
-        color: pixiColor(outlineStyle.outline),
-        width: outlineStyle.outlineWidthPx,
-        alpha: outlineStyle.outlineOpacity,
-        pixelLine: !frame.photo,
-      });
-    outline.label = `frame-outline-${frame.frameId}`;
-    outline.eventMode = "none";
     let persistedBorder: Graphics | null = null;
     const frameBorder = frame.border;
     if (frameBorder.kind === "solid" && frame.borderFillRects.length > 0) {
@@ -383,7 +369,21 @@ export function createSheetRenderNode(
       persistedBorder.eventMode = "none";
     }
     if (persistedBorder) frameContent.addChild(persistedBorder);
-    frameContainer.addChild(outline);
+    // Only an empty Frame needs an edge; a Photo already shows where its Frame ends.
+    if (!frame.photo) {
+      const outlineStyle = SHEET_VISUAL_STYLE.framePlaceholder;
+      const outline = new Graphics()
+        .rect(0, 0, frameWidth, frameHeight)
+        .stroke({
+          color: pixiColor(outlineStyle.outline),
+          width: outlineStyle.outlineWidthPx,
+          alpha: outlineStyle.outlineOpacity,
+          pixelLine: true,
+        });
+      outline.label = `frame-outline-${frame.frameId}`;
+      outline.eventMode = "none";
+      frameContainer.addChild(outline);
+    }
 
     const frameSelection = createFrameSelectionRenderNode(
       frame.frameId,

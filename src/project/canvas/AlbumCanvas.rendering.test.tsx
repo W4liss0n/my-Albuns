@@ -1731,7 +1731,7 @@ test("Frame opacity groups content without fading selection or disabling a trans
   const group = displayWithLabel("frame-content-frame-001");
   expect(group).toMatchObject({ filters: [expect.objectContaining({ alpha: 0 })] });
   expect(displayWithLabel("canvas-frame-frame-001")).toMatchObject({ eventMode: "static", alpha: 1 });
-  expect(displayWithLabel("frame-outline-frame-001")).toMatchObject({ alpha: 1 });
+  expect(pixiLifecycle.displays.some(({ label }) => label === "frame-outline-frame-001")).toBe(false);
   const filter = group?.filters[0] as { destroyed: boolean };
   view.unmount();
   expect(filter.destroyed).toBe(true);

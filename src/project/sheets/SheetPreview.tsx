@@ -8,7 +8,6 @@ import type {
 } from "../../domain/project";
 import { CANVAS_MICROMETERS_PER_PIXEL } from "../canvas/canvasGeometry";
 import {
-  frameOutlineStyle,
   inactiveSideCssGradient,
   SHEET_VISUAL_STYLE,
 } from "../canvas/sheetVisualStyle";
@@ -287,7 +286,6 @@ function FramePreview({
 }: FramePreviewProps) {
   const { clipRect, photo, border: frameBorder } = frame;
   const placeholderStyle = SHEET_VISUAL_STYLE.framePlaceholder;
-  const outlineStyle = frameOutlineStyle(photo !== null);
 
   return (
     <g>
@@ -329,17 +327,19 @@ function FramePreview({
         </g>
       ) : null}
       </g>
-      <rect
-        data-preview-frame-id={frame.frameId}
-        x={clipRect.x}
-        y={clipRect.y}
-        width={clipRect.width}
-        height={clipRect.height}
-        fill="none"
-        stroke={outlineStyle.outline}
-        strokeOpacity={outlineStyle.outlineOpacity}
-        strokeWidth={outlineStyle.outlineWidthPx * unit}
-      />
+      {photo ? null : (
+        <rect
+          data-preview-frame-id={frame.frameId}
+          x={clipRect.x}
+          y={clipRect.y}
+          width={clipRect.width}
+          height={clipRect.height}
+          fill="none"
+          stroke={placeholderStyle.outline}
+          strokeOpacity={placeholderStyle.outlineOpacity}
+          strokeWidth={placeholderStyle.outlineWidthPx * unit}
+        />
+      )}
     </g>
   );
 }
