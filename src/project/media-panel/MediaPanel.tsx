@@ -39,7 +39,7 @@ import {
 } from "../../state/mediaPanelPreferences";
 import { MediaPanelEmptyState } from "./MediaPanelEmptyState";
 import { MediaFolderPopover, type MediaFolderPrompt } from "./MediaFolderPopover";
-import { MediaDragGhost } from "./MediaDragGhost";
+import { MediaDragGhost, type DecorativeDropTarget } from "./MediaDragGhost";
 import { MediaPanelToolbar } from "./MediaPanelToolbar";
 import { MediaPreviewCard } from "./MediaPreviewCard";
 import { isTextEntryTarget } from "../workspace/isTextEntryTarget";
@@ -119,6 +119,8 @@ interface MediaPanelProps {
   onRemoveMedia(mediaIds: readonly string[]): void;
   dropPort?: import("../../application/projectPorts").MediaDropPort;
   onMediaDragChange(drag: MediaDrag | null): void;
+  /** Where the Canvas would apply the dragged Decorative, shown on the drag ghost. */
+  decorativeDropTarget?: DecorativeDropTarget | null;
   dragThreshold?: import("../../application/projectPorts").PointerDragThreshold | null;
   onRelinkMedia(mediaIds: readonly string[]): void;
   onReplaceMedia(mediaId: string): void;
@@ -157,6 +159,7 @@ export function MediaPanel({
   onRemoveMedia,
   dropPort,
   onMediaDragChange,
+  decorativeDropTarget = null,
   dragThreshold = { x: 5, y: 5 },
   onRelinkMedia,
   onReplaceMedia,
@@ -634,7 +637,8 @@ export function MediaPanel({
       {dragPreview && draggedMedia && !hidden && !importPending && !relinkDisabled && <MediaDragGhost
         media={draggedMedia} x={dragPreview.x} y={dragPreview.y}
         previewUrl={mediaPreviews[draggedMedia.id]?.url ?? undefined}
-        missing={fileInformation[draggedMedia.id]?.state === "absent"} />}
+        missing={fileInformation[draggedMedia.id]?.state === "absent"}
+        decorativeTarget={draggedMedia.kind === "decorative" ? decorativeDropTarget : null} />}
       {fileDrop.over && <div className="media-file-drop-hint" role="status">Solte para importar em {activeMediaKind === "photo" ? "fotos" : "decorativos"}</div>}
       {fileDrop.error && <div className="media-file-drop-error" role="status">{fileDrop.error}</div>}
       <MediaPanelToolbar

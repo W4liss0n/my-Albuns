@@ -20,6 +20,7 @@ import { AppIcon, EmptyState } from "../../ui";
 import { AlbumCanvasScene } from "./albumCanvasScene";
 import { CanvasRenderLoop, wakeOnCanvasInput } from "./canvasRenderLoop";
 import { useDecorativeDropPreview } from "./useDecorativeDropPreview";
+import type { DecorativeDropTarget } from "../media-panel/MediaDragGhost";
 import type {
   AlbumCanvasProps,
   CanvasPhotoDropPoint,
@@ -61,12 +62,28 @@ export function AlbumCanvas(props: AlbumCanvasProps) {
   const decorative = useDecorativeDropPreview({
     projectId: props.projectId, revision: props.revision, drag: props.mediaDrag,
     preview: props.onPreviewDecorativeDrop, commit: props.onDropDecorative, cancel: props.onPhotoDragCancel,
-    point: (x, y) => {
-      const bounds = hostRef.current?.querySelector("canvas")?.getBoundingClientRect();
-      if (!bounds || x < bounds.left || x >= bounds.right || y < bounds.top || y >= bounds.bottom) return null;
-      return sceneRef.current?.resolvePhotoDropPoint(x, y) ?? null;
-    },
+    point: (x, y) => decorativeDropPoint(x, y),
   });
+  function decorativeDropPoint(x: number, y: number) {
+    const bounds = hostRef.current?.querySelector("canvas")?.getBoundingClientRect();
+    if (!bounds || x < bounds.left || x >= bounds.right || y < bounds.top || y >= bounds.bottom) return null;
+    return sceneRef.current?.resolvePhotoDropPoint(x, y) ?? null;
+  }
+  // Over a Sheet the target follows Shift at once and keeps the last resolved side while the next preview
+  // resolves, so the drag ghost does not flicker between zones; a preview that settles empty clears it.
+  const decorativeTargetRef = useRef<DecorativeDropTarget | null>(null);
+  const { onDecorativeDropTargetChange } = props;
+  useEffect(() => {
+    const drag = props.mediaDrag;
+    const overSheet = drag?.kind === "decorative" && decorativeDropPoint(drag.x, drag.y) !== null;
+    const scope = !overSheet ? null : decorative.preview?.scope
+      ?? (decorative.failed ? null : decorativeTargetRef.current?.scope) ?? null;
+    const target = scope ? { role: drag!.shiftKey ? "overlay" as const : "background" as const, scope } : null;
+    const current = decorativeTargetRef.current;
+    if (target?.role === current?.role && target?.scope === current?.scope) return;
+    decorativeTargetRef.current = target;
+    onDecorativeDropTargetChange?.(target);
+  }, [decorative.preview, decorative.failed, props.mediaDrag, onDecorativeDropTargetChange]);
   const displayedComposition = useMemo(() => decorative.preview ? {
     ...props.composition,
     sheets: props.composition.sheets.map((sheet) => sheet.sheetId === decorative.preview!.sheet.sheetId ? decorative.preview!.sheet : sheet),
@@ -548,12 +565,6 @@ export function AlbumCanvas(props: AlbumCanvasProps) {
         ref={hostRef}
         onContextMenu={handleSheetContextMenu}
       >
-        {decorative.preview && props.mediaDrag && <span
-          className="canvas-decorative-drop-label" role="status" aria-label="Aplicação do decorativo"
-          style={{ left: Math.max(8, Math.min((hostRef.current?.clientWidth ?? 0) - 210, props.mediaDrag.x - (hostRef.current?.getBoundingClientRect().left ?? 0) + 14)),
-            top: Math.max(8, Math.min((hostRef.current?.clientHeight ?? 0) - 36, props.mediaDrag.y - (hostRef.current?.getBoundingClientRect().top ?? 0) + 14)) }}>
-          {decorative.preview.role === "background" ? "Fundo" : "Sobreposição"} · {decorative.preview.scope === "bothSides" ? "Ambos os lados" : decorative.preview.scope === "left" ? "Lado esquerdo" : "Lado direito"}
-        </span>}
         {graphicsState === "initializing" && (
           <span className="canvas-loading">Abrindo editor…</span>
         )}

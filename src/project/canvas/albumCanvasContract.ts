@@ -117,6 +117,8 @@ export interface AlbumCanvasProps {
   revision?: number;
   onPreviewDecorativeDrop?(request: import("../../domain/project").DecorativeDropRequest): Promise<import("../../domain/project").DecorativeDropPreview | null>;
   onDropDecorative?(request: import("../../domain/project").DecorativeDropRequest): Promise<boolean>;
+  /** Where a dragged Decorative would be applied, for the drag ghost; null off a Sheet. */
+  onDecorativeDropTargetChange?(target: import("../media-panel/MediaDragGhost").DecorativeDropTarget | null): void;
   sheetReorder?: CanvasSheetReorder;
   sheetSideSwap?: {
     disabled: boolean;

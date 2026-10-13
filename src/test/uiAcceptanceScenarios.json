@@ -11231,7 +11231,7 @@
         "width": 1440,
         "height": 900
       },
-      "readySelector": ".canvas-decorative-drop-label",
+      "readySelector": ".media-drag-ghost--target",
       "actions": [
         {
           "type": "click",
@@ -11261,7 +11261,7 @@
         "width": 1440,
         "height": 900
       },
-      "readySelector": ".canvas-decorative-drop-label",
+      "readySelector": ".media-drag-ghost--target",
       "actions": [
         {
           "type": "click",
@@ -11291,7 +11291,7 @@
         "width": 1440,
         "height": 900
       },
-      "readySelector": ".canvas-decorative-drop-label",
+      "readySelector": ".media-drag-ghost--target",
       "actions": [
         {
           "type": "click",
@@ -11321,7 +11321,7 @@
         "width": 1440,
         "height": 900
       },
-      "readySelector": ".canvas-decorative-drop-label",
+      "readySelector": ".media-drag-ghost--target",
       "actions": [
         {
           "type": "click",
@@ -11383,7 +11383,7 @@
         "width": 1440,
         "height": 900
       },
-      "readySelector": ".canvas-host:not(:has(.canvas-decorative-drop-label))",
+      "readySelector": "body:not(:has(.media-drag-ghost--target)) .canvas-host",
       "actions": [
         {
           "type": "click",
@@ -11467,7 +11467,7 @@
         "width": 1440,
         "height": 900
       },
-      "readySelector": ".canvas-decorative-drop-label",
+      "readySelector": ".media-drag-ghost--target",
       "actions": [
         {
           "type": "click",
