@@ -94,11 +94,12 @@ function find(label: string, parent: Container = app.stage): Container | undefin
 
 function sample() {
   const frame = find("canvas-frame-frame-001");
-  const rect = frame?.getBounds();
+  // The Frame origin, not its drawn bounds: a Photo without a texture draws nothing here.
+  const origin = frame?.toGlobal({ x: 0, y: 0 });
   const hitArea = frame?.hitArea instanceof Rectangle ? frame.hitArea : undefined;
   return {
     cursor: getComputedStyle(app.canvas).cursor,
-    x: rect?.x, y: rect?.y, width: hitArea?.width,
+    x: origin?.x, y: origin?.y, width: hitArea?.width,
     members: originals.map((original) => {
       const node = find(`canvas-frame-${original.frameId}`);
       return { x: node?.position.x, y: node?.position.y, width: node?.hitArea instanceof Rectangle ? node.hitArea.width : null };

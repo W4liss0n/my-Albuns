@@ -65,11 +65,6 @@ export const SHEET_VISUAL_STYLE = {
     labelText: "#655f56",
     labelFontSizePx: 10.5,
   },
-  frame: {
-    outline: "#ffffff",
-    outlineOpacity: 0.72,
-    outlineWidthPx: 1,
-  },
   technicalOutlineStroke: {
     alignment: 0.5,
     color: 0x2f7fba,
@@ -96,12 +91,6 @@ export const SHEET_VISUAL_STYLE = {
     outlineWidthPx: VISUAL_MEDIA_FALLBACK_STYLE.overlay.outlineWidthPx,
   },
 } as const;
-
-export function frameOutlineStyle(hasPhoto: boolean) {
-  return hasPhoto
-    ? SHEET_VISUAL_STYLE.frame
-    : SHEET_VISUAL_STYLE.framePlaceholder;
-}
 
 const INACTIVE_SIDE_GRADIENT_ORIENTATION = {
   left: { cssDirection: "to left", startX: 1, endX: 0 },
