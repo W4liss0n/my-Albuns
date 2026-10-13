@@ -3,6 +3,7 @@ import { useId, type ReactNode, type Ref } from "react";
 import { ActionButton } from "./ActionButton";
 import type { DialogAction } from "./DialogAction";
 import { DialogWindowFrame } from "./DialogWindowFrame";
+import { useDefaultDialogAction } from "./useDefaultDialogAction";
 
 type MessageTone = "error" | "success";
 
@@ -26,6 +27,11 @@ export function MessageDialog({
   tone,
 }: MessageDialogProps) {
   const titleId = useId();
+  // The primary action is the highlighted one; a lone action is the default.
+  const defaultActionRef = useDefaultDialogAction(
+    title,
+    primaryAction ? undefined : secondaryButtonRef,
+  );
   const actions =
     primaryAction || secondaryAction ? (
       <>
@@ -33,7 +39,7 @@ export function MessageDialog({
           <ActionButton
             disabled={secondaryAction.disabled}
             onClick={secondaryAction.onClick}
-            ref={secondaryButtonRef}
+            ref={primaryAction ? secondaryButtonRef : defaultActionRef}
           >
             {secondaryAction.label}
           </ActionButton>
@@ -42,6 +48,7 @@ export function MessageDialog({
           <ActionButton
             disabled={primaryAction.disabled}
             onClick={primaryAction.onClick}
+            ref={defaultActionRef}
             variant="primary"
           >
             {primaryAction.label}

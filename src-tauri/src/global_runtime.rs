@@ -2526,6 +2526,7 @@ pub(crate) fn run(
         )
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_shell::init())
+        .plugin(desktop_webview_policy::plugin())
         .manage(crate::batch_window::BatchWindowState::new(
             app_paths.clone(),
         ))

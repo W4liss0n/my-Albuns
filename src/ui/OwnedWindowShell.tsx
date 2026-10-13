@@ -1,4 +1,4 @@
-import { type ReactNode, useLayoutEffect, useRef } from "react";
+import { type ReactNode, useEffect, useLayoutEffect, useRef } from "react";
 
 import { ApplicationHeader } from "./ApplicationHeader";
 import { useWindowControls } from "./WindowControlsContext";
@@ -42,6 +42,23 @@ export function OwnedWindowShell({
 
     return () => observer.disconnect();
   }, [windowControls, width]);
+
+  // Escape does what the window's close button does. Listening on the window,
+  // after document listeners, leaves Escape to a surface or form that took it.
+  useEffect(() => {
+    if (controls === "none") return;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key !== "Escape" || event.defaultPrevented || event.repeat) return;
+      event.preventDefault();
+      try {
+        void Promise.resolve(windowControls.close()).catch(() => undefined);
+      } catch {
+        // Browser previews do not expose a native Tauri window.
+      }
+    };
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [controls, windowControls]);
 
   return (
     <div

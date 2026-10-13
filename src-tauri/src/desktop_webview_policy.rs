@@ -49,6 +49,117 @@ impl MinimizedWebviews {
     }
 }
 
+/// Policy that every window needs from its creation on. Registered once by
+/// each runtime; Tauri announces each new window on the main thread, which
+/// owns it.
+pub(crate) fn plugin() -> tauri::plugin::TauriPlugin<tauri::Wry> {
+    let builder = tauri::plugin::Builder::new("desktop-webview-policy");
+    #[cfg(windows)]
+    let builder = builder.on_window_ready(|window| keyboard_focus::install(&window));
+    builder.build()
+}
+
+/// Keeps the keyboard inside a window's WebView when Windows focuses the
+/// window. With Tauri's `unstable` feature every WebView is a child of its
+/// window, and Wry hands the window's focus to the WebView only for non-child
+/// WebViews. Activation (Alt+Tab, the taskbar, a closed dialog or window)
+/// therefore left the keyboard on the native window, ignoring shortcuts until
+/// a click. Microsoft's guidance is to call `MoveFocus` when the host window
+/// receives focus, as Wry does for its non-child WebViews and CEF for its
+/// browser. See `docs/research/2026-10-13-foco-de-teclado-em-webviews-filhas.md`.
+#[cfg(windows)]
+mod keyboard_focus {
+    use std::sync::OnceLock;
+
+    use windows::{
+        Win32::{
+            Foundation::{HWND, LPARAM, LRESULT, WPARAM},
+            UI::{
+                Input::KeyboardAndMouse::{GetFocus, IsWindowEnabled},
+                Shell::{DefSubclassProc, RemoveWindowSubclass, SetWindowSubclass},
+                WindowsAndMessaging::{
+                    IsIconic, PostMessageW, RegisterWindowMessageW, WM_ENABLE, WM_NCDESTROY,
+                    WM_SETFOCUS,
+                },
+            },
+        },
+        core::w,
+    };
+
+    const FOCUS_SUBCLASS_ID: usize = 1;
+
+    pub(super) fn install(window: &tauri::Window) {
+        let Ok(handle) = window.hwnd() else {
+            return;
+        };
+        let window = Box::into_raw(Box::new(window.clone()));
+        unsafe {
+            if !SetWindowSubclass(
+                handle,
+                Some(focus_window_proc),
+                FOCUS_SUBCLASS_ID,
+                window as usize,
+            )
+            .as_bool()
+            {
+                drop(Box::from_raw(window));
+            }
+        }
+    }
+
+    /// Posted to the window itself: focusing the WebView inside `WM_SETFOCUS`
+    /// would run Tauri's focus request in the middle of the message.
+    fn focus_request() -> u32 {
+        static MESSAGE: OnceLock<u32> = OnceLock::new();
+        *MESSAGE.get_or_init(|| unsafe { RegisterWindowMessageW(w!("MyAlbuns.FocusWebview")) })
+    }
+
+    unsafe extern "system" fn focus_window_proc(
+        handle: HWND,
+        message: u32,
+        wp: WPARAM,
+        lp: LPARAM,
+        id: usize,
+        window: usize,
+    ) -> LRESULT {
+        let window = window as *mut tauri::Window;
+        let returning_from_modal = message == WM_ENABLE && wp.0 != 0;
+        if message == WM_SETFOCUS || returning_from_modal {
+            let _ = unsafe { PostMessageW(Some(handle), focus_request(), WPARAM(0), LPARAM(0)) };
+        } else if message == focus_request() && message != 0 {
+            focus_webview_if_keyboard_left_outside(handle, unsafe { &*window });
+            return LRESULT(0);
+        } else if message == WM_NCDESTROY {
+            let _ = unsafe { RemoveWindowSubclass(handle, Some(focus_window_proc), id) };
+            drop(unsafe { Box::from_raw(window) });
+        }
+        unsafe { DefSubclassProc(handle, message, wp, lp) }
+    }
+
+    /// Focusing the WebView can report a new focus of the native window, so it
+    /// moves only while the native window itself still holds the keyboard;
+    /// without this check the two traded focus about 100 times a second.
+    /// `MoveFocus` fails while the window is disabled (an owned dialog is open)
+    /// or minimized.
+    fn focus_webview_if_keyboard_left_outside(handle: HWND, window: &tauri::Window) {
+        let keyboard_left_outside = unsafe {
+            IsWindowEnabled(handle).as_bool() && !IsIconic(handle).as_bool() && GetFocus() == handle
+        };
+        if !keyboard_left_outside {
+            return;
+        }
+        // Each window's content WebView carries the window's label; the editor
+        // window may also hold Save As's hidden 1x1 preflight WebView.
+        if let Some(webview) = window
+            .webviews()
+            .into_iter()
+            .find(|webview| webview.label() == window.label())
+        {
+            let _ = webview.set_focus();
+        }
+    }
+}
+
 pub(crate) fn on_window_event(window: &tauri::Window, event: &tauri::WindowEvent) {
     #[cfg(windows)]
     match event {

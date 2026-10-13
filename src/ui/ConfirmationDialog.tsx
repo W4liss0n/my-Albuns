@@ -3,6 +3,7 @@ import { useId, type ReactNode, type Ref } from "react";
 import { ActionButton } from "./ActionButton";
 import type { DialogAction } from "./DialogAction";
 import { DialogWindowFrame } from "./DialogWindowFrame";
+import { useDefaultDialogAction } from "./useDefaultDialogAction";
 import "./ConfirmationDialog.css";
 
 type ConfirmationTone = "danger" | "neutral" | "question";
@@ -31,6 +32,7 @@ export function ConfirmationDialog({
   tone = "question",
 }: ConfirmationDialogProps) {
   const titleId = useId();
+  const confirmRef = useDefaultDialogAction(title, confirmButtonRef);
 
   return (
     <DialogWindowFrame
@@ -60,7 +62,7 @@ export function ConfirmationDialog({
             }
             disabled={confirmAction.disabled}
             onClick={confirmAction.onClick}
-            ref={confirmButtonRef}
+            ref={confirmRef}
             variant={tone === "danger" ? "secondary" : "primary"}
           >
             {confirmAction.label}

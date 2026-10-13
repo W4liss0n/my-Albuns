@@ -1,4 +1,4 @@
-import { act, render } from "@testing-library/react";
+import { act, fireEvent, render } from "@testing-library/react";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 
 import { OwnedWindowShell } from "./OwnedWindowShell";
@@ -61,4 +61,29 @@ test("fits an owned window to its initial and changing content height", () => {
     resizeCallback?.([], {} as ResizeObserver);
   });
   expect(measuredHeights).toEqual([200, 266]);
+});
+
+test("Escape does what the close button does, unless the content took it", () => {
+  const close = vi.fn();
+  const controls = { close, fitContent: vi.fn(), minimize: vi.fn(), toggleMaximize: vi.fn() };
+  const view = render(
+    <WindowControlsProvider controls={controls}>
+      <OwnedWindowShell controls="close">
+        <input aria-label="Campo" onKeyDown={(event) => event.preventDefault()} />
+      </OwnedWindowShell>
+    </WindowControlsProvider>,
+  );
+
+  fireEvent.keyDown(view.getByLabelText("Campo"), { key: "Escape" });
+  expect(close).not.toHaveBeenCalled();
+  fireEvent.keyDown(document.body, { key: "Escape" });
+  expect(close).toHaveBeenCalledOnce();
+
+  view.rerender(
+    <WindowControlsProvider controls={controls}>
+      <OwnedWindowShell controls="none"><p>Sem fechar</p></OwnedWindowShell>
+    </WindowControlsProvider>,
+  );
+  fireEvent.keyDown(document.body, { key: "Escape" });
+  expect(close).toHaveBeenCalledOnce();
 });

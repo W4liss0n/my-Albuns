@@ -112,3 +112,33 @@ test("titles every export step with Exportar and never shows the brand in a dial
   expect(closeHeader.querySelector(".ui-brand")).toBeNull();
   expect(closeHeader).not.toHaveTextContent("Exportar");
 });
+
+test("Enter chooses the highlighted action and Escape does what Close does", async () => {
+  const user = userEvent.setup();
+  const submit = vi.fn(async () => undefined);
+  const client: ProjectDialogClient = {
+    onPresentation: vi.fn(async () => () => undefined),
+    submit,
+  };
+  render(
+    <ProjectDialogApplication
+      client={client}
+      initialPresentation={{
+        sessionId: "save-1",
+        windowWidth: 440,
+        state: { kind: "formatConversionSaveConfirmation" },
+      }}
+      mode="owned"
+      windowControls={{ close: vi.fn(), fitContent: vi.fn(), minimize: vi.fn(), toggleMaximize: vi.fn() }}
+    />,
+  );
+  await waitFor(() => expect(client.onPresentation).toHaveBeenCalledOnce());
+
+  expect(screen.getByRole("button", { name: "Salvar" })).toHaveFocus();
+  await user.keyboard("{Enter}");
+  await user.keyboard("{Escape}");
+  expect(submit.mock.calls).toEqual([
+    ["save-1", "confirmFormatConversionSave"],
+    ["save-1", "cancelFormatConversionSave"],
+  ]);
+});

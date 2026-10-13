@@ -407,3 +407,17 @@ test("closing an old myAlbuns Project explains that saving replaces its file", (
   expect(dialog).toHaveTextContent("ainda não foi salvo no formato novo");
   expect(dialog).not.toHaveTextContent("O projeto tem alterações que ainda não foram salvas.");
 });
+
+test.each([
+  [{ kind: "projectCloseConfirmation" as const, busy: false, formatConversion: true }, "Salvar e fechar", "saveAndClose"],
+  [{ kind: "layoutDeletionConfirmation" as const, busy: false }, "Excluir", "confirmLayoutDeletion"],
+  [{ kind: "exportSuccess" as const, message: "Pronto." }, "Fechar", "dismissExport"],
+  [{ kind: "projectOperationFailure" as const, message: "Falhou." }, "Fechar", "dismissProjectOperationFailure"],
+])("the highlighted action of %o takes the focus, so Enter chooses it", async (state, label, action) => {
+  const user = userEvent.setup();
+  const onAction = vi.fn();
+  render(<ProjectDialogView onAction={onAction} state={state} />);
+  expect(screen.getByRole("button", { name: label })).toHaveFocus();
+  await user.keyboard("{Enter}");
+  expect(onAction).toHaveBeenCalledExactlyOnceWith(action);
+});
