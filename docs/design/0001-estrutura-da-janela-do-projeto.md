@@ -1,7 +1,7 @@
 ---
 status: accepted
 document: design
-updated: 2026-10-08
+updated: 2026-10-09
 ---
 
 # Estrutura da Janela do Projeto
@@ -305,10 +305,11 @@ Quando a Lâmina alvo possui Layout travado, a preview aplicada permanece destac
 - Quando exatamente dois Frames estão selecionados e ao menos um contém Foto, `Editar > Trocar conteúdo dos Frames` e o mesmo comando no menu de contexto ficam disponíveis. Dois placeholders mantêm a ação desabilitada.
 - No Modo normal, a mesma troca começa ao arrastar uma Foto sobre outro Frame, na mesma Lâmina ou em outra Lâmina do mesmo Projeto. A seleção continua simples e não muda ao concluir o arraste.
 - O limiar de arraste vem do Windows. Ao ultrapassá-lo, uma miniatura semitransparente da imagem inteira acompanha o ponteiro, mantendo a composição confirmada no lugar. Ela preserva a proporção original, sem o recorte e os ajustes da ocorrência no Frame, cabe em 80 × 60 pixels e fica a 6 pixels do ponteiro, respeitando os limites do Canvas. O destino válido recebe contorno azul destacado e uma leve tonalidade azul; a resolução assíncrona do próximo ponto não apaga o destaque já confirmado. O cursor permanece como mão fechada, inclusive sobre áreas sem destino válido. A rolagem nas bordas permite atravessar o Álbum e `Alt` + arraste mantém o Pan existente. Soltar ou cancelar remove a miniatura e o destaque.
-- A própria origem, áreas vazias, Páginas inativas e posições fora do Canvas não recebem a troca. `Esc`, perda de foco, cancelamento do ponteiro ou mudança da composição cancelam sem alterar o Projeto ou gerar Histórico.
+- A própria origem, a área livre da própria Lâmina, Páginas inativas e posições fora do Canvas não recebem a troca. `Esc`, perda de foco, cancelamento do ponteiro ou mudança da composição cancelam sem alterar o Projeto ou gerar Histórico.
 - Com duas Fotos, suas ocorrências completas trocam de Frame. Com uma Foto e um placeholder, a Foto é movida para o Frame vazio e o Frame de origem torna-se placeholder.
 - Geometria, estilo e posição permanecem com cada Frame. A Foto leva seu Arquivo vinculado e todos os ajustes; se a nova geometria exigir, o enquadramento é limitado somente no necessário para impedir áreas vazias.
 - A troca funciona em Layout travado porque não altera quantidade, posição ou dimensões dos Frames, e constitui uma única ação de Undo/Redo.
+- Desde 09/10/2026, no Modo normal, soltar a Foto na área livre de outra Lâmina, fora de qualquer Frame, a move para lá. O Frame de origem sai e as duas Lâminas se reorganizam como em uma exclusão e em uma soltura vinda do Painel de imagens. A Foto leva seu Arquivo vinculado e todos os ajustes, e o novo Frame segue a orientação que ela mostra, giro incluído. Durante o arraste, a Lâmina de destino recebe o mesmo contorno da soltura vinda do Painel. Sobre um Frame de outra Lâmina, o gesto continua trocando. Com Layout travado, a origem mantém o Frame como placeholder; uma Lâmina de destino travada não tem área livre e não recebe a Foto. Mover é uma única ação de Undo/Redo, e a seleção acompanha a Foto quando ela estava selecionada.
 - `Copiar` captura todos os Frames selecionados com suas geometrias, ordem relativa, Fotos ou placeholders, estilos e ajustes não destrutivos. A cópia não modifica o Projeto nem cria entrada no Histórico.
 - A cópia permanece disponível ao navegar entre Lâminas e alternar entre os modos normal e de edição do mesmo Projeto. A colagem usa a Lâmina isolada no Modo de edição; no Modo normal, usa sempre a Lâmina centralizada, mesmo que um Frame de outra Lâmina continue selecionado.
 - No Modo normal, `Colar` adiciona os Frames copiados e reorganiza o Layout da Lâmina pela mesma regra da inclusão de Fotos. As posições anteriores não são mantidas.

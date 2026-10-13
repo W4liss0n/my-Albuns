@@ -900,10 +900,14 @@ export class AlbumCanvasScene {
     if (!this.input) return;
     const selectedFrameIds = this.frameAreaSelection.previewSelection ?? this.input.selectedFrameIds;
     this.frameContentDragVisual.update(this.frameContentDrag.preview);
+    const contentTarget = this.frameContentDrag.highlight;
     if (this.frameContentDrag.preview) {
-      this.app.canvas.dataset.frameContentDragTarget = this.frameContentDrag.highlight?.kind === "frame"
-        ? this.frameContentDrag.highlight.frameId : "";
-    } else delete this.app.canvas.dataset.frameContentDragTarget;
+      this.app.canvas.dataset.frameContentDragTarget = contentTarget?.kind === "frame" ? contentTarget.frameId : "";
+      this.app.canvas.dataset.frameContentDragSheet = contentTarget?.kind === "sheet" ? contentTarget.sheetId : "";
+    } else {
+      delete this.app.canvas.dataset.frameContentDragTarget;
+      delete this.app.canvas.dataset.frameContentDragSheet;
+    }
     const highlight = this.input.photoDropHighlight;
     const decorativeDragging = this.input.mediaDrag?.kind === "decorative";
     const selectedSheetIds = this.input.selectedSheetIds ?? [];
@@ -914,9 +918,8 @@ export class AlbumCanvasScene {
         (sheetId === this.input.focusedSheetId || selectedSheetIds.includes(sheetId));
       node.frameSelectionLayer.visible = !decorativeDragging;
       node.sheetBar.container.visible = !decorativeDragging && albumCanvasModePolicy(this.input.mode).showsSheetBar;
-      node.sheetDropOutline.visible =
-        this.input.photoDropHighlight?.kind === "sheet" &&
-        this.input.photoDropHighlight.sheetId === sheetId;
+      node.sheetDropOutline.visible = [highlight, contentTarget]
+        .some((target) => target?.kind === "sheet" && target.sheetId === sheetId);
       for (const [frameId, selection] of node.frameSelections) {
         selection.container.visible = selectedFrameIds.includes(frameId);
         for (const handle of selection.resizeHandles) {

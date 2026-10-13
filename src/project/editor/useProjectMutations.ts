@@ -410,26 +410,38 @@ export function useProjectMutations({
       .filter((frame) => edit.frames.some((target) => target.frameId === frame.frameId)) ?? null;
   }
 
-  async function swapFrameContentsAtPoint(sourceFrameId: string, point: CanvasPhotoDropPoint) {
-    let applied = false;
+  /** Swaps with the Frame at the release point, or moves to the free area of another Sheet. */
+  async function dropFrameContentAtPoint(sourceFrameId: string, point: CanvasPhotoDropPoint) {
+    const result: { applied: boolean; movedFrameId: string | null } = { applied: false, movedFrameId: null };
     const expectedPhoto = projection.state.album.sheets.flatMap((sheet) => sheet.frames)
       .find((frame) => frame.id === sourceFrameId)?.photo;
     // Include hit testing in the queue: a following Save/Undo must not overtake the drop.
     const completed = await runWithErrorFeedback(async (port, latestProjection) => {
       const current = latestProjection ?? projection;
-      const source = current.state.album.sheets.flatMap((sheet) => sheet.frames)
-        .find((frame) => frame.id === sourceFrameId);
-      if (!source?.photo || JSON.stringify(source.photo) !== JSON.stringify(expectedPhoto) ||
+      const sourceSheet = current.state.album.sheets
+        .find((sheet) => sheet.frames.some((frame) => frame.id === sourceFrameId));
+      const source = sourceSheet?.frames.find((frame) => frame.id === sourceFrameId);
+      if (!sourceSheet || !source?.photo || JSON.stringify(source.photo) !== JSON.stringify(expectedPhoto) ||
           !current.state.album.sheets.some((sheet) => sheet.id === point.sheetId)) return current;
       const target = await port.resolvePhotoDropTarget(point.sheetId, point.xUm, point.yUm);
-      if (target.kind !== "frame" || target.frameId === sourceFrameId) return current;
-      const swapped = await imageProcessing.run((publish) => port.apply({
-        kind: "swapFrameContents", frameIds: [sourceFrameId, target.frameId],
-      }, publish));
-      applied = true;
-      return swapped;
+      if (target.kind === "frame" && target.frameId !== sourceFrameId) {
+        const swapped = await imageProcessing.run((publish) => port.apply({
+          kind: "swapFrameContents", frameIds: [sourceFrameId, target.frameId],
+        }, publish));
+        result.applied = true;
+        return swapped;
+      }
+      if (target.kind === "sheet" && target.sheetId !== sourceSheet.id) {
+        const moved = await imageProcessing.run((publish) => port.applyWithOutcome({
+          kind: "moveFrameToSheet", frameId: sourceFrameId, sheetId: target.sheetId, xUm: point.xUm, yUm: point.yUm,
+        }, publish));
+        result.applied = true;
+        result.movedFrameId = moved.affectedFrameId;
+        return moved.projection;
+      }
+      return current;
     }, true);
-    return completed && applied;
+    return completed ? result : { applied: false, movedFrameId: null };
   }
 
   async function commitProjectSettingsDraft<Value, Delta>(
@@ -552,7 +564,7 @@ export function useProjectMutations({
       runWithErrorFeedback((port) => port.apply({ kind: "editMediaFolder", edit }), true),
     commitInteraction,
     commitFrameGeometry,
-    swapFrameContentsAtPoint,
+    dropFrameContentAtPoint,
     swapSheetSides,
     cycleLayout,
     orientPhotos,

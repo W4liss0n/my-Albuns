@@ -270,6 +270,24 @@ impl PersistentProjectSession {
                 publication = EditPublication::GuardedAlways;
                 project.with_swapped_frame_contents(&frame_ids)
             }
+            ProjectIntent::MoveFrameToSheet {
+                frame_id,
+                sheet_id,
+                x_um,
+                y_um,
+            } => {
+                publication = EditPublication::GuardedAlways;
+                let (next, moved) = project.with_frame_moved_to_sheet(
+                    &frame_id,
+                    &sheet_id,
+                    (x_um, y_um),
+                    sources,
+                    custom,
+                )?;
+                outcome.affected_frame_id = Some(moved);
+                outcome.affected_sheet_id = parse_uuid(&sheet_id).ok();
+                Ok(next)
+            }
             ProjectIntent::SetVisualDefaults { visual_defaults } => {
                 publication = EditPublication::GuardedAlways;
                 project

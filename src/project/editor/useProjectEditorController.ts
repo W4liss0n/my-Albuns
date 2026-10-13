@@ -360,8 +360,14 @@ export function useProjectEditorController({
       disabled: interactionBlocked || structuralMutationPending || canvasMode.kind !== "normal",
       dragThreshold,
       resolveTarget: (point) => projectCorePort.resolvePhotoDropTarget(point.sheetId, point.xUm, point.yUm),
-      commit: (sourceFrameId, point) => interactionBlocked || structuralMutationPending || canvasMode.kind !== "normal"
-        ? Promise.resolve(false) : mutations.swapFrameContentsAtPoint(sourceFrameId, point),
+      commit: async (sourceFrameId, point) => {
+        if (interactionBlocked || structuralMutationPending || canvasMode.kind !== "normal") return false;
+        const followsSelection = navigation.selectedFrameIds.includes(sourceFrameId);
+        const { applied, movedFrameId } = await mutations.dropFrameContentAtPoint(sourceFrameId, point);
+        // A moved Frame is a new Frame: the selection follows its Photo.
+        if (movedFrameId && followsSelection) navigation.selectFrame(movedFrameId);
+        return applied;
+      },
       onError: reportInteractionError,
     },
     onSelectFrame: navigation.selectFrame,

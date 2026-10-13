@@ -76,6 +76,22 @@ test("a Photo drag highlights the Core target and queues release independently o
   expect(h.input.onSelectFrame).not.toHaveBeenCalled();
 });
 
+test("the free area of another Sheet is a move target, but not the free area of the source Sheet", async () => {
+  const h = harness();
+  const settle = async () => { for (let step = 0; step < 6; step += 1) await Promise.resolve(); };
+  h.resolveTarget.mockResolvedValue({ kind: "sheet", sheetId: "sheet-002" });
+  h.start(); h.pointer("pointermove");
+  await settle();
+  expect(h.session.highlight).toEqual({ kind: "sheet", sheetId: "sheet-002" });
+  h.resolveTarget.mockResolvedValue({ kind: "sheet", sheetId: "sheet-001" });
+  h.pointer("pointermove", 520);
+  await settle();
+  expect(h.session.highlight).toBeNull();
+  h.pointer("pointerup", 520);
+  // The release is still queued: only the Core decides what the point receives.
+  expect(h.commit).toHaveBeenCalledWith("swap-frame-0", { sheetId: "sheet-002", xUm: 520, yUm: 150 });
+});
+
 test("a right click during a Photo drag opens no context menu and keeps the drag", async () => {
   // Earlier drags lift their own block on the next task.
   await new Promise((resolve) => setTimeout(resolve, 0));

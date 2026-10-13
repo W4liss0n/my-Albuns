@@ -7,6 +7,7 @@ import { isGestureCancelKey } from "./gestureCancelKey";
 
 interface Drag {
   sourceFrameId: string;
+  sourceSheetId: string;
   composition: AlbumCanvasProps["composition"];
   projectId: string;
   controls: CanvasFrameContentSwap;
@@ -23,6 +24,12 @@ export interface FrameContentDragPreview {
   sourceFrameId: string;
   clientX: number;
   clientY: number;
+}
+
+/** Another Frame swaps contents; the free area of another Sheet receives the moved Photo. */
+function acceptsTarget(drag: Drag, target: PhotoDropTarget) {
+  return target.kind === "frame" ? target.frameId !== drag.sourceFrameId
+    : target.kind === "sheet" && target.sheetId !== drag.sourceSheetId;
 }
 
 /** Keeps a Photo in place until an authoritative drop, without changing normal selection. */
@@ -62,12 +69,13 @@ export class FrameContentDragSession {
   start(sourceFrameId: string, event: FederatedPointerEvent) {
     const input = this.readInput();
     const controls = input?.frameContentSwap;
+    const sourceSheet = input?.composition.sheets
+      .find((sheet) => sheet.frames.some((frame) => frame.frameId === sourceFrameId && frame.photo));
     if (event.button !== 0 || event.altKey || event.ctrlKey || event.metaKey || this.spaceHeld || this.drag ||
-        input?.mode.kind !== "normal" || !controls?.dragThreshold || controls.disabled ||
-        !input.composition.sheets.some((sheet) => sheet.frames.some((frame) => frame.frameId === sourceFrameId && frame.photo))) return;
+        input?.mode.kind !== "normal" || !controls?.dragThreshold || controls.disabled || !sourceSheet) return;
     this.suppressedPointer = null;
     clearTimeout(this.tapTimer);
-    this.drag = { sourceFrameId, controls, projectId: input.projectId, composition: input.composition,
+    this.drag = { sourceFrameId, sourceSheetId: sourceSheet.sheetId, controls, projectId: input.projectId, composition: input.composition,
       pointerId: event.pointerId, origin: { clientX: event.clientX, clientY: event.clientY },
       point: { clientX: event.clientX, clientY: event.clientY }, dragging: false,
       request: 0, pending: false, desired: null };
@@ -154,7 +162,7 @@ export class FrameContentDragSession {
     drag.pending = true;
     void drag.controls.resolveTarget(drag.desired).then((target) => {
       if (this.drag !== drag || drag.request !== request) return;
-      this.target = target.kind === "frame" && target.frameId !== drag.sourceFrameId ? target : null;
+      this.target = acceptsTarget(drag, target) ? target : null;
       this.refresh();
     }).catch((error: unknown) => {
       if (this.drag !== drag || drag.request !== request) return;
