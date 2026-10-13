@@ -16180,11 +16180,11 @@
     },
     {
       "id": "image-viewer-correction-applying",
-      "title": "Correção de olhos — aplicação em andamento",
+      "title": "Correção de olhos — salvamento em andamento",
       "implementationPath": "/image-viewer.html?preview=correction-select&qa=1&fixture=faces",
       "comparison": {
         "implementationCaptureSelector": ".image-viewer-window",
-        "reason": "Design 0050: sem texto de progresso sobre as fotografias; ferramentas bloqueadas; estado alcançado pela seleção dos dois rostos com fixture visual determinística.",
+        "reason": "Design 0050: ao confirmar, o visualizador volta à foto já corrigida, sem texto de progresso e com as ferramentas bloqueadas até o fim do salvamento; estado alcançado pela seleção dos dois rostos com fixture visual determinística.",
         "kind": "implementation-only",
         "surface": "image-viewer"
       },
@@ -16192,7 +16192,7 @@
         "height": 720,
         "width": 1050
       },
-      "readySelector": ".eye-correction[aria-busy='true'] button[aria-label='Fechar correção']:disabled",
+      "readySelector": ".image-viewer[aria-busy='true'] > .image-viewer__correction-content[aria-hidden='true']",
       "actions": [
         {
           "type": "click",

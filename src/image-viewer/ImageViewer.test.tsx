@@ -517,6 +517,79 @@ test("an applying correction cannot be cancelled or navigated before commit sett
   expect(onClose).not.toHaveBeenCalled();
 });
 
+const savedCorrection: NonNullable<ViewerPresentation["correction"]> = {
+  phase: "preview", referenceMediaId: "reference", referenceName: "Outra foto.jpg",
+  referenceUrl: "data:image/png;id=reference", referenceState: "ready",
+  canPreviousReference: false, canNextReference: false, resultUrl: "data:image/png;id=corrected", error: null,
+};
+function loadStageImage(container: HTMLElement, src: string) {
+  const image = container.querySelector<HTMLImageElement>(`.image-viewer__stage img[src="${src}"]`)!;
+  Object.defineProperties(image, { naturalWidth: { configurable: true, value: 1200 }, naturalHeight: { configurable: true, value: 800 } });
+  fireEvent.load(image);
+  return image;
+}
+
+test("saving leaves the correction for the corrected photo at once and keeps it until the saved preview replaces it", () => {
+  const width = vi.spyOn(Element.prototype, "clientWidth", "get").mockReturnValue(800);
+  const height = vi.spyOn(Element.prototype, "clientHeight", "get").mockReturnValue(600);
+  const props = { onNavigate: vi.fn(), onClose: vi.fn(), onCorrection: vi.fn() };
+  try {
+    const view = render(<ImageViewer presentation={{ ...initial, correction: savedCorrection }} {...props} />);
+    view.rerender(<ImageViewer presentation={{ ...initial, revision: 2, correction: { ...savedCorrection, phase: "applying" } }} {...props} />);
+    const content = view.container.querySelector(".image-viewer__correction-content")!;
+    // The correction stays in front until the result is painted, so the original never flashes.
+    expect(content).toHaveAttribute("aria-hidden", "false");
+    const saved = loadStageImage(view.container, savedCorrection.resultUrl!);
+    expect(content).toHaveAttribute("aria-hidden", "true");
+    expect(content).toHaveStyle({ display: "none" });
+    expect(getComputedStyle(saved.closest(".image-viewer__stage")!).visibility).toBe("visible");
+    expect(screen.getByRole("img", { name: "Imagem a" })).toBe(saved);
+    expect(view.container.querySelector(".image-viewer")).toHaveAttribute("aria-busy", "true");
+    const eye = screen.getByRole("button", { name: "Abrir olhos" });
+    expect(eye).toHaveFocus();
+    expect(eye).toHaveAttribute("aria-disabled", "true");
+    fireEvent.click(eye);
+    fireEvent.click(screen.getByRole("button", { name: "Próxima imagem" }));
+    fireEvent.keyDown(window, { key: "Escape" });
+    fireEvent.keyDown(window, { key: "ArrowRight" });
+    expect(props.onCorrection).not.toHaveBeenCalled();
+    expect(props.onNavigate).not.toHaveBeenCalled();
+    expect(props.onClose).not.toHaveBeenCalled();
+
+    view.rerender(<ImageViewer presentation={{ ...initial, revision: 3, url: savedCorrection.resultUrl }} {...props} />);
+    expect(screen.getByRole("img", { name: "Imagem a" })).toBe(saved);
+    expect(view.container.querySelector(".image-viewer")).not.toHaveAttribute("aria-busy");
+    expect(screen.getByRole("button", { name: "Abrir olhos" })).not.toHaveAttribute("aria-disabled");
+    view.rerender(<ImageViewer presentation={{ ...initial, revision: 4, url: "data:image/png;id=a-saved" }} {...props} />);
+    expect(saved.isConnected).toBe(true);
+    const replaced = loadStageImage(view.container, "data:image/png;id=a-saved");
+    expect(saved.isConnected).toBe(false);
+    expect(screen.getByRole("img", { name: "Imagem a" })).toBe(replaced);
+  } finally { width.mockRestore(); height.mockRestore(); }
+});
+
+test("a failed save returns to the same correction with the error on the destination photo", async () => {
+  const width = vi.spyOn(Element.prototype, "clientWidth", "get").mockReturnValue(800);
+  const height = vi.spyOn(Element.prototype, "clientHeight", "get").mockReturnValue(600);
+  const error = "Não foi possível salvar a correção.";
+  const props = { onNavigate: vi.fn(), onClose: vi.fn(), onCorrection: vi.fn() };
+  try {
+    const view = render(<ImageViewer presentation={{ ...initial, correction: savedCorrection }} {...props} />);
+    const correction = view.container.querySelector(".eye-correction");
+    view.rerender(<ImageViewer presentation={{ ...initial, revision: 2, correction: { ...savedCorrection, phase: "applying" } }} {...props} />);
+    const saved = loadStageImage(view.container, savedCorrection.resultUrl!);
+    expect(getComputedStyle(saved.closest(".image-viewer__stage")!).visibility).toBe("visible");
+    view.rerender(<ImageViewer presentation={{ ...initial, revision: 3, correction: { ...savedCorrection, error } }} {...props} />);
+    expect(view.container.querySelector(".eye-correction")).toBe(correction);
+    expect(view.container.querySelector(".image-viewer__correction-content")).toHaveAttribute("aria-hidden", "false");
+    expect(getComputedStyle(view.container.querySelector(".image-viewer__stage")!).visibility).toBe("hidden");
+    expect(screen.getByRole("button", { name: "Fechar correção" })).toHaveFocus();
+    expect(screen.getByRole("button", { name: "Salvar correção" })).toBeEnabled();
+    screen.getByRole("group", { name: "Imagem a corrigir: aviso" }).focus();
+    await waitFor(() => expect(screen.getByRole("tooltip")).toHaveTextContent(error));
+  } finally { width.mockRestore(); height.mockRestore(); }
+});
+
 test("image tools show an accessible tooltip on keyboard focus and close on blur", async () => {
   render(<ImageViewer presentation={initial} onNavigate={vi.fn()} onClose={vi.fn()} onCorrection={vi.fn()} />);
   const image = screen.getByRole("img", { name: "Imagem a" });

@@ -23,7 +23,11 @@ function ImageViewerSession({ presentation, onNavigate, onClose, onCorrection, o
   const viewerRef = useRef<HTMLElement>(null);
   const wasCorrecting = useRef(Boolean(presentation.correction));
   const viewportRef = useRef<HTMLDivElement>(null);
-  const { mediaId, name, url, state, canPrevious, canNext } = presentation;
+  const { mediaId, name, canPrevious, canNext } = presentation;
+  // While a confirmed correction is saved, the viewer already shows its result.
+  const saving = presentation.correction?.phase === "applying" && Boolean(presentation.correction.resultUrl);
+  const url = saving ? presentation.correction!.resultUrl : presentation.url;
+  const state = saving ? "ready" : presentation.state;
   const imageKey = photoIdentity(presentation.sessionId, mediaId, url);
   const photo = usePhotoContinuity<{ width: number; height: number }>({ key: imageKey, sessionId: presentation.sessionId, url, name, state });
   const loaded = photo.visible;
@@ -40,8 +44,9 @@ function ImageViewerSession({ presentation, onNavigate, onClose, onCorrection, o
   const ready = photo.ready;
   const imagePending = photo.pending;
   const retained = photo.retained;
-  const correcting = Boolean(presentation.correction && onCorrection);
-  const targetKey = imageKey;
+  // The correction stays in front until the saved result is painted, so the original never flashes.
+  const correcting = Boolean(presentation.correction && onCorrection) && !(saving && ready);
+  const targetKey = photoIdentity(presentation.sessionId, mediaId, presentation.url);
   const markTargetSettled = useCallback(() => setSettledTarget(targetKey), [targetKey]);
   const retainPaintedImage = correcting && ready && paintedNormalImage.current === imageKey && settledTarget !== targetKey;
   useEffect(() => { if (!correcting && ready) paintedNormalImage.current = imageKey; }, [correcting, ready, imageKey]);
@@ -64,12 +69,11 @@ function ImageViewerSession({ presentation, onNavigate, onClose, onCorrection, o
   }, [confirmationOpen, presentation.correction?.phase]);
 
   useLayoutEffect(() => {
-    const correcting = Boolean(presentation.correction);
     if (wasCorrecting.current !== correcting) {
       viewerRef.current?.querySelector<HTMLButtonElement>(correcting ? ".eye-correction__close" : ".image-viewer__eye-action")?.focus();
       wasCorrecting.current = correcting;
     }
-  }, [presentation.correction]);
+  }, [correcting]);
 
   useLayoutEffect(() => {
     drag.current = null;
@@ -102,7 +106,7 @@ function ImageViewerSession({ presentation, onNavigate, onClose, onCorrection, o
     });
     observer.observe(element);
     return () => observer.disconnect();
-  }, [Boolean(presentation.correction)]);
+  }, [correcting]);
 
   const fitted = ready ? fitPhoto(loaded!.payload, { width: viewport.fitWidth, height: viewport.fitHeight }, 0, false) : { width: 0, height: 0 };
   const fittedWidth = fitted.width;
@@ -144,10 +148,10 @@ function ImageViewerSession({ presentation, onNavigate, onClose, onCorrection, o
     : photo.failed ? "Não foi possível exibir a prévia desta imagem."
     : "Carregando imagem…";
 
-  return <section ref={viewerRef} aria-label="Visualizador de imagens" className="image-viewer">
+  return <section ref={viewerRef} aria-label="Visualizador de imagens" className="image-viewer" aria-busy={saving || undefined}>
       <div className="image-viewer__stage" data-zoomed={ready && zoom > 1} data-handoff={correcting ? retainPaintedImage ? "pending" : "ready" : undefined}
         inert={correcting} aria-hidden={correcting} ref={viewportRef} style={{ visibility: correcting && !retainPaintedImage ? "hidden" : "visible" }}
-        onWheel={(event) => { event.preventDefault(); if (ready && event.deltaY) changeZoom(zoom * Math.exp(-Math.max(-600, Math.min(600, event.deltaY)) * 0.002), event.clientX, event.clientY); }}
+        onWheel={(event) => { event.preventDefault(); if (ready && !saving && event.deltaY) changeZoom(zoom * Math.exp(-Math.max(-600, Math.min(600, event.deltaY)) * 0.002), event.clientX, event.clientY); }}
         onPointerDown={(event) => { if (event.button !== 0 || zoom <= 1 || !ready || (event.target as Element).closest("button")) return; drag.current = { x: event.clientX, y: event.clientY, panX: pan.x, panY: pan.y, pointerId: event.pointerId }; event.currentTarget.setPointerCapture(event.pointerId); }}
         onPointerMove={(event) => { const current = drag.current; if (!current || event.pointerId !== current.pointerId) return; setPan(boundedPan({ x: current.panX + event.clientX - current.x, y: current.panY + event.clientY - current.y }, zoom)); }}
         onPointerUp={(event) => { if (drag.current?.pointerId === event.pointerId) { drag.current = null; event.currentTarget.releasePointerCapture(event.pointerId); } }}
@@ -160,14 +164,16 @@ function ImageViewerSession({ presentation, onNavigate, onClose, onCorrection, o
           onError={() => photo.markFailed(imageKey)} />}
         {!correcting && !ready && !retained && <p aria-live="polite" className="image-viewer__message" role="status">{message}</p>}
         {!correcting && ready && state !== "ready" && <p className="image-viewer__stale" role="status">Prévia anterior · imagem indisponível</p>}
-        {!correcting && <ImageToolButton label="Imagem anterior" icon={ChevronLeft} glyph="navigation" className="image-viewer__nav--previous" disabled={!canPrevious} onClick={() => onNavigate(-1)} />}
-        {!correcting && <ImageToolButton label="Próxima imagem" icon={ChevronRight} glyph="navigation" className="image-viewer__nav--next" disabled={!canNext} onClick={() => onNavigate(1)} />}
+        {!correcting && <ImageToolButton label="Imagem anterior" icon={ChevronLeft} glyph="navigation" className="image-viewer__nav--previous" disabled={!canPrevious} blocked={saving} onClick={() => onNavigate(-1)} />}
+        {!correcting && <ImageToolButton label="Próxima imagem" icon={ChevronRight} glyph="navigation" className="image-viewer__nav--next" disabled={!canNext} blocked={saving} onClick={() => onNavigate(1)} />}
         {!correcting && onCorrection && <ImageToolButton label="Abrir olhos" icon={Eye} tooltipPlacement="bottom" className="image-viewer__eye-action"
-          blocked={!ready || state !== "ready"} aria-busy={imagePending || undefined} onClick={() => onCorrection({ sessionId: presentation.sessionId, kind: "start" })} />}
+          blocked={saving || !ready || state !== "ready"} aria-busy={saving || imagePending || undefined} onClick={() => onCorrection({ sessionId: presentation.sessionId, kind: "start" })} />}
         {!correcting && (ready || retained) && zoom > 1 && <ImageToolButton label="Ajustar à janela" icon={Scan} className="image-viewer__fit"
           blocked={!ready} aria-busy={imagePending || undefined} onClick={() => { setZoom(1); setPan({ x: 0, y: 0 }); }} />}
       </div>
-      {presentation.correction && onCorrection && <div className="image-viewer__correction-content" inert={confirmationOpen} aria-hidden={confirmationOpen}>
+      {/* Kept mounted while saving: a failed save returns to the same selection and preview. */}
+      {presentation.correction && onCorrection && <div className="image-viewer__correction-content" inert={confirmationOpen || !correcting} aria-hidden={confirmationOpen || !correcting}
+        style={correcting ? undefined : { display: "none" }}>
         <EyeCorrectionView presentation={presentation} onNavigate={onNavigate} onTargetSettled={markTargetSettled}
           onCorrection={(action) => action.kind === "apply" ? setConfirming(correctionKey) : onCorrection(action)} />
       </div>}

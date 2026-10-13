@@ -25,6 +25,8 @@ interface ViewerSession {
   mediaIds: readonly string[];
   restoreFocus: HTMLElement | null;
   correction?: CorrectionSession;
+  /** A saved correction stays on screen until the Cache publishes the replaced photo. */
+  saved?: { mediaId: string; replacedUrl: string | null; resultUrl: string };
 }
 
 interface Options {
@@ -110,11 +112,13 @@ export function useImageViewerSession({ projectId, media, previews, previewUrls,
     if (!active) return null;
     const position = active.mediaIds.indexOf(active.mediaId);
     const item = media.find((candidate) => candidate.id === active.mediaId);
+    const saved = active.saved?.mediaId === active.mediaId
+      && (previewUrls[active.mediaId] ?? null) === active.saved.replacedUrl ? active.saved : null;
     return {
       sessionId: active.sessionId, revision: ++revision.current,
       mediaId: active.mediaId, name: item?.name ?? "Imagem",
-      url: previewUrls[active.mediaId] ?? null,
-      state: viewerPreviewState(files?.[active.mediaId], previews[active.mediaId]),
+      url: saved ? saved.resultUrl : previewUrls[active.mediaId] ?? null,
+      state: saved ? "ready" : viewerPreviewState(files?.[active.mediaId], previews[active.mediaId]),
       canPrevious: position > 0, canNext: position >= 0 && position < active.mediaIds.length - 1,
       correction: active.correction ? (() => {
         const referenceId = active.correction!.referenceMediaId;
@@ -173,7 +177,7 @@ export function useImageViewerSession({ projectId, media, previews, previewUrls,
         }
         const index = session.mediaIds.indexOf(session.mediaId);
         const mediaId = session.mediaIds[index + offset];
-        return mediaId ? { ...session, mediaId } : session;
+        return mediaId ? { ...session, mediaId, saved: undefined } : session;
       });
     }).then((stop) => { if (listening) stopNavigate = stop; else stop(); });
     void port.onClosed((sessionId) => {
@@ -195,7 +199,7 @@ export function useImageViewerSession({ projectId, media, previews, previewUrls,
         invalidatePreparation(false);
         const referenceIds = media.filter((item) => item.kind === "photo" && item.id !== session.mediaId).map((item) => item.id);
         setViewer((value) => value && value.sessionId === action.sessionId
-          ? { ...value, correction: { phase: "browse", referenceIds, referenceMediaId: referenceIds[0] ?? "", error: referenceIds.length ? undefined : "Adicione outra foto ao projeto para usar como referência." } }
+          ? { ...value, saved: undefined, correction: { phase: "browse", referenceIds, referenceMediaId: referenceIds[0] ?? "", error: referenceIds.length ? undefined : "Adicione outra foto ao projeto para usar como referência." } }
           : value);
         return;
       }
@@ -244,12 +248,15 @@ export function useImageViewerSession({ projectId, media, previews, previewUrls,
         && correction.targetVersion === (currentPreviewUrls.current[session.mediaId] ?? null)
         && correction.referenceVersion === (currentPreviewUrls.current[correction.referenceMediaId] ?? null)) {
         const token = correction.token;
+        // Saving replaces the target in the Cache, so its current URL stops showing the photo.
+        const saved = correction.resultUrl
+          ? { mediaId: session.mediaId, replacedUrl: correction.targetVersion ?? null, resultUrl: correction.resultUrl } : undefined;
         setViewer((value) => value && value.sessionId === action.sessionId && value.correction
           ? { ...value, correction: { ...value.correction, phase: "applying", error: undefined } } : value);
         void mutation.run(() => port.applyCorrection!(action.sessionId, token)).then((outcome) => {
           if (outcome.status === "completed") {
             onProjectionChange(outcome.projection);
-            setViewer((value) => value && value.sessionId === action.sessionId ? { ...value, correction: undefined } : value);
+            setViewer((value) => value && value.sessionId === action.sessionId ? { ...value, correction: undefined, saved } : value);
           } else if (outcome.status === "failed") {
             setViewer((value) => value && value.sessionId === action.sessionId && value.correction
               ? { ...value, correction: { ...value.correction, phase: "preview", error: outcome.error instanceof Error ? outcome.error.message : "Não foi possível salvar a correção." } } : value);
