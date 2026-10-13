@@ -2,7 +2,7 @@
 status: accepted
 document: design
 date: 2026-08-27
-updated: 2026-10-08
+updated: 2026-10-13
 ticket: 4-programa-05-arquitetura-de-ui-mapa-de-telas-e-interacao-do-editor
 ---
 
@@ -180,8 +180,15 @@ sem quebrar os rótulos nem alterar ordem, foco ou semântica.
   mesmo valor a todos os Frames compatíveis.
 - Um Frame selecionado destravado possui caixa e oito alças. Movimento e resize
   são prévias locais e comitam uma ação por gesto válido.
+- Para o ajuste fino, as setas movem a Seleção de Frames 1 mm na direção da
+  tecla e `Shift` + seta, 10 mm, sem snap e sem sair da superfície ativa. Cada
+  toque é uma ação de Undo/Redo; manter a tecla pressionada repete o passo, e
+  os toques que chegam enquanto um movimento é aplicado somam-se ao seguinte.
+  As setas alcançam a seleção também com o foco no Painel de imagens; campos,
+  menus e diálogos conservam as suas.
 - Em `Layout travado`, a seleção e sua caixa permanecem, as alças desaparecem e
-  mover/redimensionar não alteram geometria nem Histórico.
+  mover/redimensionar, pelo ponteiro ou pelas setas, não alteram geometria nem
+  Histórico; a tentativa mostra o aviso do layout travado.
 - Edição de Frames e criação manual pertencem ao owner #20; projeção de
   `ViewportTransform` e valores mistos pertencem ao owner #22.
 

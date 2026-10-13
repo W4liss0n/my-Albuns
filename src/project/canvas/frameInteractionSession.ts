@@ -11,6 +11,9 @@ import type { AlbumCanvasProps, CanvasFrameGeometry } from "./albumCanvasContrac
 import { MICROMETER_TO_CANVAS_PIXEL } from "./canvasGeometry";
 import { isGestureCancelKey } from "./gestureCancelKey";
 
+export const LAYOUT_LOCKED_MOVE_MESSAGE =
+  "O layout está travado. Destrave-o no painel de layouts para mover os quadros.";
+
 interface PointerPosition {
   clientX: number;
   clientY: number;
@@ -207,7 +210,7 @@ export class FrameInteractionSession {
       ) return;
       if (gesture.layoutLocked) {
         this.cancel();
-        gesture.controls.onError("O layout está travado. Destrave-o no painel de layouts para mover os quadros.");
+        gesture.controls.onError(LAYOUT_LOCKED_MOVE_MESSAGE);
         return;
       }
       gesture.phase = "dragging";

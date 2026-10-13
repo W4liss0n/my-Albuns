@@ -1,7 +1,9 @@
 import { useEffect } from "react";
 
 import {
+  FRAME_MOVE_COMMANDS,
   FRAME_STACK_COMMANDS,
+  type FrameMoveDirection,
   matchProjectCommandShortcut,
   type ProjectCommandContext,
   type ProjectCommandId,
@@ -70,6 +72,8 @@ interface ProjectCommandShortcutHandlers {
   arrangeFrames(action: FrameStackAction): void;
   deleteFrames(): void;
   frameCommandsActive: boolean;
+  moveFrames?(direction: FrameMoveDirection, large: boolean, repeat: boolean): void;
+  frameMoveActive?: boolean;
   canDeleteSheet: boolean;
   canRedo: boolean;
   canUndo: boolean;
@@ -108,6 +112,8 @@ export function useProjectCommandShortcuts({
   arrangeFrames,
   deleteFrames,
   frameCommandsActive,
+  moveFrames,
+  frameMoveActive = false,
   canDeleteSheet,
   canRedo,
   canUndo,
@@ -197,6 +203,18 @@ export function useProjectCommandShortcuts({
         if (stackCommand) {
           event.preventDefault();
           if (!event.repeat && !disabled) arrangeFrames(stackCommand.action);
+          return;
+        }
+      }
+      // In Sheet editing the arrows move the selection; held keys repeat the step.
+      // Like Delete, they reach it from a thumbnail too: the panel has no arrow keys.
+      if (frameMoveActive && !ownsEditingKeys(event.target) &&
+          (targetAllowsCommandShortcut(event.target, "frame") || targetAllowsCommandShortcut(event.target, "media-panel"))) {
+        const frameCommand = matchProjectCommandShortcut(event, "frame");
+        const move = FRAME_MOVE_COMMANDS.find(({ id }) => id === frameCommand);
+        if (move) {
+          event.preventDefault();
+          if (!disabled) moveFrames?.(move, event.shiftKey, event.repeat);
           return;
         }
       }
@@ -308,6 +326,8 @@ export function useProjectCommandShortcuts({
     arrangeFrames,
     deleteFrames,
     frameCommandsActive,
+    moveFrames,
+    frameMoveActive,
     canDeleteSheet,
     canRedo,
     canUndo,

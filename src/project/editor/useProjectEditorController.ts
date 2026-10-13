@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import type { FrameMoveDirection } from "../../application/projectCommandCatalog";
 import type { PointerDragThreshold, ProjectCorePort } from "../../application/projectPorts";
 import type { PrepareImportedMedia } from "../../application/mediaPreviews";
 import type { SheetStructureIntent } from "../../application/sheetStructure";
 import type { DecorativeScope, EditorProjection, FrameStackAction, PhotoOrientationAction, SheetVisualChange } from "../../domain/project";
 import { useEditorView } from "../../state/editorView";
 import { CANVAS_MICROMETERS_PER_PIXEL } from "../canvas/canvasGeometry";
+import { LAYOUT_LOCKED_MOVE_MESSAGE } from "../canvas/frameInteractionSession";
 import type {
   AlbumCanvasMode,
   AlbumCanvasProps,
@@ -21,6 +23,16 @@ import { useLayoutPanel } from "../layouts/useLayoutPanel";
 import { nextLayoutIndex, type LayoutCycleDirection } from "../layouts/layoutCycle";
 import { useLayoutCatalog } from "../layouts/useLayoutCatalog";
 import type { ProjectDialogPort } from "../../application/projectDialogPort";
+
+// Fine adjustment by keyboard, in physical units so a step reads the same at any Zoom.
+const FRAME_MOVE_STEP_UM = 1_000;
+const FRAME_MOVE_LARGE_STEP_UM = 10_000;
+
+interface FrameMove {
+  frameIds: readonly string[];
+  deltaXUm: number;
+  deltaYUm: number;
+}
 
 interface ProjectEditorControllerInput {
   interactionBlocked?: boolean;
@@ -232,6 +244,42 @@ export function useProjectEditorController({
   const arrangeFrames = (action: FrameStackAction) => {
     if (!canArrangeFrames) return Promise.resolve(false);
     return mutations.applyIntent({ kind: "arrangeFrames", frameIds: [...navigation.selectedFrameIds], action });
+  };
+  const canMoveFrames = canvasMode.kind === "sheet-editing" && selectedFrames.length > 0 && !interactionBlocked;
+  const pendingFrameMoveRef = useRef<FrameMove | null>(null);
+  const frameMoveRunningRef = useRef(false);
+  const moveFrames = (direction: FrameMoveDirection, large: boolean, repeat = false) => {
+    if (!canMoveFrames || canvasMode.kind !== "sheet-editing") return;
+    if (editingSheetLocked) {
+      if (!repeat) reportInteractionError(LAYOUT_LOCKED_MOVE_MESSAGE);
+      return;
+    }
+    const frameIds = projection.state.album.sheets.find((sheet) => sheet.id === canvasMode.sheetId)?.frames
+      .filter((frame) => navigation.selectedFrameIds.includes(frame.id)).map((frame) => frame.id) ?? [];
+    if (frameIds.length === 0) return;
+    flushPropertyDrafts();
+    const step = large ? FRAME_MOVE_LARGE_STEP_UM : FRAME_MOVE_STEP_UM;
+    const pending = pendingFrameMoveRef.current;
+    const continues = pending !== null && pending.frameIds.join() === frameIds.join();
+    // Keys pressed while a move runs add up into the next edit, so a held key
+    // never leaves a backlog of edits behind after it is released.
+    pendingFrameMoveRef.current = {
+      frameIds,
+      deltaXUm: (continues ? pending.deltaXUm : 0) + direction.x * step,
+      deltaYUm: (continues ? pending.deltaYUm : 0) + direction.y * step,
+    };
+    if (frameMoveRunningRef.current) return;
+    frameMoveRunningRef.current = true;
+    void (async () => {
+      try {
+        for (let move = pendingFrameMoveRef.current; move; move = pendingFrameMoveRef.current) {
+          pendingFrameMoveRef.current = null;
+          await mutations.moveFrames(move.frameIds, move.deltaXUm, move.deltaYUm);
+        }
+      } finally {
+        frameMoveRunningRef.current = false;
+      }
+    })();
   };
   const selectedComposedPhoto = useMemo(
     () =>
@@ -494,6 +542,8 @@ export function useProjectEditorController({
     swapSheetSides,
     arrangeFrames,
     canArrangeFrames,
+    moveFrames,
+    canMoveFrames,
     layoutCatalog,
     canSaveLayout,
     saveLayout,
