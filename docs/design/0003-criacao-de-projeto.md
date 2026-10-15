@@ -26,6 +26,10 @@ controles nas duas etapas, alinhada aos campos abaixo dela. Quando recebe foco,
 o controle composto usa somente uma mudança neutra de fundo; o campo e a ação de
 salvar não desenham contorno azul nem bordas de foco adicionais.
 
+Refinamento de 15/10/2026: `Salvar modelo` abre um formulário curto com o título
+em grafite, o campo integrado (sublinhado, sem rótulo visível além do nome
+acessível) e `Cancelar`/`Salvar` numa faixa de tom no rodapé, como os diálogos.
+
 #### Refinamento de 24/09/2026
 
 Decisão do autor, validada em protótipo, para usar na criação os mesmos nomes e
