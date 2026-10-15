@@ -1,4 +1,4 @@
-import { forwardRef, type ComponentPropsWithoutRef, type ReactNode } from "react";
+import { createElement, Fragment, forwardRef, type ComponentPropsWithoutRef, type ReactNode } from "react";
 import "./MenuItem.css";
 
 interface MenuItemProps extends Omit<ComponentPropsWithoutRef<"button">, "children"> {
@@ -34,4 +34,17 @@ export const MenuItem = forwardRef<HTMLButtonElement, MenuItemProps>(
 
 export function MenuSeparator() {
   return <span className="ui-menu-separator" role="separator" />;
+}
+
+/**
+ * Renders groups of related menu items with a separator between them.
+ * Hidden items (`false`, `null`, `undefined`) are dropped, and a group left
+ * empty adds no separator, so conditional items never leave a stray divider.
+ */
+export function MenuGroups({ groups }: { groups: readonly (readonly ReactNode[])[] }) {
+  const visible = groups
+    .map((group) => group.filter((item) => item !== false && item !== null && item !== undefined))
+    .filter((group) => group.length > 0);
+  return visible.map((group, index) => createElement(Fragment, { key: index },
+    ...(index > 0 ? [<MenuSeparator />] : []), ...group));
 }

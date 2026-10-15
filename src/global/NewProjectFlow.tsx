@@ -767,19 +767,22 @@ function PresetControl({
               confirmSave();
             }}
           >
-            <strong>Salvar modelo</strong>
-            <label className="ui-visually-hidden" htmlFor={presetNameId}>
-              Nome do modelo
-            </label>
-            <TextInput
-              autoFocus
-              id={presetNameId}
-              onChange={(event) => setName(event.target.value)}
-              placeholder="Nome do modelo"
-              type="text"
-              value={name}
-            />
-            <div>
+            <div className="new-project-save-preset__body">
+              <strong>Salvar modelo</strong>
+              <label className="ui-visually-hidden" htmlFor={presetNameId}>
+                Nome do modelo
+              </label>
+              <TextInput
+                appearance="integrated"
+                autoFocus
+                id={presetNameId}
+                onChange={(event) => setName(event.target.value)}
+                placeholder="Nome do modelo"
+                type="text"
+                value={name}
+              />
+            </div>
+            <div className="new-project-save-preset__footer">
               <ActionButton
                 density="compact"
                 onClick={() => {

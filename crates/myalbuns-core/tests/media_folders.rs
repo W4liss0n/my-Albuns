@@ -54,6 +54,7 @@ fn create(project: &mut EditableProject, name: &str, kind: MediaKind) -> String 
     edit(
         project,
         MediaFolderEdit::Create {
+            media_ids: None,
             name: name.into(),
             media_kind: kind,
         },
@@ -104,6 +105,7 @@ fn name_advice_and_edits_share_unicode_limits_namespaces_and_rename_rules() {
         );
         let result = project.apply(ProjectIntent::EditMediaFolder {
             edit: MediaFolderEdit::Create {
+                media_ids: None,
                 media_kind: MediaKind::Photo,
                 name,
             },
@@ -139,6 +141,7 @@ fn name_advice_and_edits_share_unicode_limits_namespaces_and_rename_rules() {
                 name: request.name,
             },
             None => MediaFolderEdit::Create {
+                media_ids: None,
                 media_kind: request.media_kind,
                 name: request.name,
             },
@@ -161,6 +164,7 @@ fn name_advice_and_edits_share_unicode_limits_namespaces_and_rename_rules() {
         project
             .apply(ProjectIntent::EditMediaFolder {
                 edit: MediaFolderEdit::Create {
+                    media_ids: None,
                     media_kind: request.media_kind,
                     name: request.name,
                 }
@@ -251,6 +255,58 @@ fn folder_operations_are_atomic_undoable_and_do_not_change_composition_or_origin
 }
 
 #[test]
+fn creating_with_a_selection_moves_it_in_one_history_entry() {
+    let root = tempfile::tempdir().unwrap();
+    let mut project = project(root.path());
+    let a = import(&mut project, root.path(), "001.jpg", MediaKind::Photo);
+    let b = import(&mut project, root.path(), "002.jpg", MediaKind::Photo);
+    let decorative = import(
+        &mut project,
+        root.path(),
+        "Fundo.jpg",
+        MediaKind::Decorative,
+    );
+    let first = create(&mut project, "Turma A", MediaKind::Photo);
+    edit(
+        &mut project,
+        MediaFolderEdit::MoveMedia {
+            media_ids: vec![a, b],
+            folder_id: Some(first),
+        },
+    );
+    let before = project.projection();
+    edit(
+        &mut project,
+        MediaFolderEdit::Create {
+            media_kind: MediaKind::Photo,
+            name: "Turma B".into(),
+            media_ids: Some(vec![b]),
+        },
+    );
+    let folders = project.project().media_folders();
+    assert_eq!(folders[0].media_ids, vec![a]);
+    assert_eq!(
+        (folders[1].name.as_str(), folders[1].media_ids.clone()),
+        ("Turma B", vec![b])
+    );
+    assert_eq!(project.revision(), before.state.revision + 1);
+    project.undo().unwrap();
+    assert_eq!(
+        project.projection().state.album.media_folders,
+        before.state.album.media_folders
+    );
+    let cross_tab = project.apply(ProjectIntent::EditMediaFolder {
+        edit: MediaFolderEdit::Create {
+            media_kind: MediaKind::Photo,
+            name: "Fundos".into(),
+            media_ids: Some(vec![decorative]),
+        },
+    });
+    assert!(cross_tab.is_err());
+    assert_eq!(project.project().media_folders().len(), 1);
+}
+
+#[test]
 fn invalid_names_members_and_cross_tab_moves_preserve_revision_and_redo() {
     let root = tempfile::tempdir().unwrap();
     let mut project = project(root.path());
@@ -293,6 +349,7 @@ fn invalid_names_members_and_cross_tab_moves_preserve_revision_and_redo() {
         &"x".repeat(81),
     ] {
         invalid.push(MediaFolderEdit::Create {
+            media_ids: None,
             name: name.into(),
             media_kind: MediaKind::Photo,
         });

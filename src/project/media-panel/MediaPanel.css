@@ -434,28 +434,39 @@
 .media-folder-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .media-folder-add:hover:not(:disabled) { border-color: var(--ui-accent-fill); color: var(--ui-accent-fill); }
 
-.media-folder-popover {
-  z-index: 60;
-  width: 280px;
-  max-width: calc(100vw - 16px);
-  padding: var(--ui-space-4);
-}
-.media-folder-dialog { outline: none; }
-.media-folder-dialog form { display: grid; gap: var(--ui-space-2); }
-.media-folder-dialog h3 { margin: 0 0 var(--ui-space-2); font-size: var(--ui-font-size-heading); font-weight: 600; }
-.media-folder-dialog label { font-size: var(--ui-font-size-support); color: var(--ui-text-secondary); }
-.media-folder-dialog .ui-field-control { width: 100%; min-width: 0; box-sizing: border-box; }
-.media-folder-dialog-actions { display: flex; justify-content: flex-end; gap: var(--ui-space-2); margin-top: var(--ui-space-3); }
-
-.media-folder-name-field { position: relative; display: block; }
-
-.media-folder-name-field .ui-field-validation-auto-tooltip {
-  top: auto;
-  bottom: calc(100% + var(--ui-space-2));
+.media-folder-chip--editing {
+  position: relative;
+  padding: 0;
+  background: var(--ui-surface-raised);
+  box-shadow: inset 0 0 0 1px var(--ui-focus-neutral);
 }
 
-.media-folder-name-field .ui-field-validation-auto-tooltip::before {
-  top: auto;
-  bottom: -5px;
-  transform: rotate(225deg);
+.media-folder-chip--editing:hover { background: var(--ui-surface-raised); }
+
+.media-folder-name-input {
+  width: auto;
+  min-width: 96px;
+  max-width: 220px;
+  height: 100%;
+  box-sizing: border-box;
+  padding: 0 10px;
+  border: 0;
+  border-radius: inherit;
+  color: var(--ui-text);
+  background: transparent;
+  font: inherit;
+  field-sizing: content;
+  outline: 0;
+}
+
+.media-folder-chip--editing:has(.media-folder-name-input[aria-invalid="true"]) {
+  box-shadow: inset 0 0 0 1px var(--ui-danger);
+}
+
+.media-folder-name-tooltip {
+  position: fixed;
+  right: auto;
+  width: max-content;
+  max-width: 260px;
+  --ui-tooltip-pointer-inline-start: 16px;
 }

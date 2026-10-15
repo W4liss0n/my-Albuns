@@ -29,6 +29,11 @@ pub enum MediaFolderEdit {
     Create {
         media_kind: MediaKind,
         name: String,
+        /// Media moved into the new folder by the same edit, so creating from
+        /// a selection is one History entry.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[ts(optional, as = "Option<Vec<String>>")]
+        media_ids: Option<Vec<MediaId>>,
     },
     Rename {
         folder_id: String,
@@ -151,19 +156,30 @@ impl ProjectDocument {
     pub(crate) fn with_media_folder_edit(&self, edit: &MediaFolderEdit) -> Result<Self, CoreError> {
         let mut next = self.clone();
         match edit {
-            MediaFolderEdit::Create { media_kind, name } => {
+            MediaFolderEdit::Create {
+                media_kind,
+                name,
+                media_ids,
+            } => {
+                let id = Uuid::new_v4().to_string();
                 next.media_folders.push(MediaFolder {
-                    id: Uuid::new_v4().to_string(),
+                    id: id.clone(),
                     kind: *media_kind,
                     name: name.trim().into(),
                     media_ids: Vec::new(),
                 });
+                if let Some(media_ids) = media_ids.as_ref().filter(|ids| !ids.is_empty()) {
+                    next = next.with_media_folder_edit(&MediaFolderEdit::MoveMedia {
+                        media_ids: media_ids.clone(),
+                        folder_id: Some(id),
+                    })?;
+                }
             }
             MediaFolderEdit::Rename { folder_id, name } => {
                 next.media_folders
                     .iter_mut()
                     .find(|folder| &folder.id == folder_id)
-                    .ok_or_else(|| invalid("A pasta não existe mais."))?
+                    .ok_or_else(|| invalid("A coleção não existe mais."))?
                     .name = name.trim().into();
             }
             MediaFolderEdit::Delete { folder_id } => {
@@ -172,7 +188,7 @@ impl ProjectDocument {
                     .iter()
                     .any(|folder| &folder.id == folder_id)
                 {
-                    return Err(invalid("A pasta não existe mais."));
+                    return Err(invalid("A coleção não existe mais."));
                 }
                 next.media_folders.retain(|folder| &folder.id != folder_id);
             }
@@ -197,9 +213,9 @@ impl ProjectDocument {
                         .media_folders
                         .iter()
                         .find(|folder| &folder.id == id)
-                        .ok_or_else(|| invalid("A pasta não existe mais."))?;
+                        .ok_or_else(|| invalid("A coleção não existe mais."))?;
                     if kind.is_some_and(|kind| kind != folder.kind) {
-                        return Err(invalid("A pasta pertence a outra aba."));
+                        return Err(invalid("A coleção pertence a outra aba."));
                     }
                 }
                 let selected = media_ids.iter().copied().collect::<HashSet<_>>();
@@ -219,7 +235,7 @@ impl ProjectDocument {
         }
         if !next.media_folders_are_valid() {
             return Err(invalid(
-                "Use um nome de até 80 caracteres, diferente de Todas, Ausentes e das outras pastas desta aba.",
+                "Use um nome de até 80 caracteres, diferente de Todas, Ausentes e das outras coleções desta aba.",
             ));
         }
         Ok(next)

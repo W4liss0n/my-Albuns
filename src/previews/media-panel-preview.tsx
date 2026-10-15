@@ -47,7 +47,12 @@ ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
         onOpenInPhotoshop={() => undefined}
         mediaFolders={folders}
         onEditMediaFolder={async () => true}
-        onValidateMediaFolderName={async () => ({ name: "", error: "empty" })}
+        onValidateMediaFolderName={async ({ name, mediaKind, folderId }) => {
+          const trimmed = name.trim();
+          const taken = ["todas", "ausentes", ...folders.filter((folder) => folder.kind === mediaKind && folder.id !== folderId)
+            .map((folder) => folder.name.toLowerCase())].includes(trimmed.toLowerCase());
+          return { name: trimmed, error: trimmed === "" ? "empty" : taken ? "nameInUse" : null };
+        }}
         mediaItems={displayedMediaItems}
         mediaUsage={mediaUsage}
         mediaFiles={mediaFiles}

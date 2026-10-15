@@ -276,26 +276,26 @@ const DEFINITIONS = [
   }),
   command({
     id: "create-media-folder",
-    label: "Nova pasta",
-    description: "Cria uma pasta de organização na aba ativa do painel de imagens.",
+    label: "Nova coleção",
+    description: "Cria uma coleção na aba ativa do painel de imagens, para organizar as imagens sem mexer nos arquivos.",
     kind: "domain", contexts: ["media-panel"], availability: "implemented", shortcuts: [],
   }),
   command({
     id: "move-media-to-folder",
-    label: "Mover para pasta…",
-    description: "Organiza as imagens selecionadas na pasta escolhida.",
+    label: "Mover para coleção",
+    description: "Coloca as imagens selecionadas na coleção escolhida, sem mover os arquivos.",
     kind: "domain", contexts: ["media-panel"], availability: "implemented", shortcuts: [],
   }),
   command({
     id: "rename-media-folder",
-    label: "Renomear…",
-    description: "Altera o nome da pasta de organização contextual.",
+    label: "Renomear",
+    description: "Edita o nome da coleção na própria barra. Também com F2 ou clique duplo.",
     kind: "domain", contexts: ["media-folder"], availability: "implemented", shortcuts: [],
   }),
   command({
     id: "delete-media-folder",
-    label: "Excluir pasta",
-    description: "Exclui a pasta de organização preservando suas imagens no projeto.",
+    label: "Excluir coleção",
+    description: "Exclui a coleção e mantém suas imagens no projeto.",
     kind: "domain", contexts: ["media-folder"], availability: "implemented", shortcuts: [],
   }),
   command({
@@ -585,6 +585,15 @@ const DEFINITIONS = [
     contexts: ["frame-photo", "media-photo"],
     availability: "implemented",
     shortcuts: [shortcut("e", "Ctrl+E", { ctrlKey: true })],
+  }),
+  command({
+    id: "show-media-in-folder",
+    label: "Mostrar na pasta",
+    description: "Abre a pasta da imagem no Explorador de Arquivos, com o arquivo já selecionado.",
+    kind: "application",
+    contexts: ["frame-photo", "media-photo"],
+    availability: "implemented",
+    shortcuts: [],
   }),
 ] as const;
 

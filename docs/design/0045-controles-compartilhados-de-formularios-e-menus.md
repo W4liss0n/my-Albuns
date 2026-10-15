@@ -39,6 +39,26 @@ monoespaçada, em cinza mais discreto que o comando. Os divisores não encostam
 nas laterais do menu. Borda, cantos, fundo e sombra continuam sendo os das
 superfícies flutuantes compartilhadas.
 
+Refinamento de 14/10/2026: os itens têm 32 px de altura, com 12 px de respiro
+à esquerda e 16 px à direita, e os divisores ficam a 12 px das laterais. Os
+menus de contexto e os da barra começam com 236 px de largura. Nos menus de
+contexto, as ações relacionadas formam grupos separados por divisor, e Remover
+ou Excluir fica sempre sozinho no fim. Um grupo cujos itens não se aplicam
+naquele estado desaparece sem deixar divisor sobrando (`MenuGroups`).
+
+Refinamento de 15/10/2026: `MenuSubmenu` é o item em cascata dos menus de
+contexto, com `›` no tom dos atalhos. Abre ao passar o ponteiro, ao clicar, com
+Enter, Espaço ou seta para a direita; seta para a esquerda ou Esc fecham só o
+submenu e devolvem o foco ao item. O submenu fica ao lado do item e troca de
+lado quando não cabe na janela.
+
+| Menu | Grupos, na ordem |
+| --- | --- |
+| Imagem no painel | Visualizar imagem · Abrir no Photoshop, Mostrar na pasta · Localizar imagem…, Substituir imagem, Mover para coleção › · Remover |
+| Quadro | Visualizar imagem · Abrir no Photoshop, Mostrar na pasta · comandos de ordem (editando a lâmina) · Trocar conteúdo dos quadros · Excluir |
+| Lâmina | Adicionar antes, Adicionar depois, Duplicar · Exportar lâmina…, Converter extremidade · Excluir |
+| Coleção do painel | Renomear · Excluir coleção |
+
 O menu Importar conserva sua apresentação compacta. Os catálogos continuam
 donos dos nomes, atalhos e identidades de comandos. Disponibilidade, execução
 e fechamento permanecem com os fluxos; o controle visual não despacha comandos.

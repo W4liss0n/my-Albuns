@@ -41,7 +41,7 @@
   left: 0;
   z-index: 30;
   display: grid;
-  min-width: 232px;
+  min-width: 236px;
   padding: var(--ui-space-1);
 }
 

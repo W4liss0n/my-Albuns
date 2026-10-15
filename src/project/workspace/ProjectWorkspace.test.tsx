@@ -981,6 +981,21 @@ test("opens the originals of every selected filled Frame and skips empty ones", 
   await waitFor(() => expect(openPhoto).toHaveBeenCalledExactlyOnceWith({ kind: "frames", frameIds: ["frame-001", "frame-002"] }));
 });
 
+test.each(["normal", "edit"])("shows the Photo of a Frame in its folder in %s mode and explains a failure", async (mode) => {
+  const apply = vi.fn(async () => projection);
+  const showInFolder = vi.fn(async () => { throw new Error("A imagem não foi encontrada."); });
+  useEditorView.setState({ editingSheetId: mode === "edit" ? "sheet-001" : null, selectedFrameIds: ["frame-001"] });
+  render(<ProjectWorkspace projection={projection} projectCorePort={projectCorePortWithApply(apply)}
+    mediaLocationPort={{ showInFolder }} onProjectionChange={vi.fn()} />);
+  act(() => canvasHarness.props?.onOpenFrameContextMenu?.("frame-001", { x: 320, y: 200 }));
+  fireEvent.click(screen.getByRole("menuitem", { name: "Mostrar na pasta" }));
+  expect(showInFolder).toHaveBeenCalledExactlyOnceWith(projection.state.album.sheets[0].frames[0].photo!.mediaId);
+  expect(await screen.findByRole("alert")).toHaveTextContent("A imagem não foi encontrada.");
+  fireEvent.click(screen.getByRole("button", { name: "Fechar aviso" }));
+  expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  expect(apply).not.toHaveBeenCalled();
+});
+
 test.each(["keyboard", "context"])("deletes the entire Frame selection via %s without confirmation", async (entry) => {
   const grouped = structuredClone(projection);
   grouped.state.album.sheets[0].frames.push({
