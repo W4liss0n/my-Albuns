@@ -593,25 +593,17 @@ async function replaceAlbumInformationDpi(driver, value, label) {
   );
 }
 
+// The journey changes only the DPI, which the panel shows and one Undo
+// reverts, so the application applies it without a confirmation.
 async function applyAlbumInformation(driver, label) {
+  const appliedCount = recordsFor("project_intent_applied").length;
   await clickWhenEnabled(
     driver,
     "css selector",
     "button[form='album-information-settings']",
     label,
   );
-
-  await clickProjectDialogAction(
-    driver,
-    "Aplicar alterações no álbum?",
-    "Aplicar",
-    `${label} confirmation`,
-  );
-  await waitForHttpUnavailable(
-    `http://127.0.0.1:${driver.projectDialogDebugPort}/json/version`,
-    `${label} confirmation dialog`,
-    timeoutMilliseconds,
-  );
+  await waitForLogEvent("project_intent_applied", appliedCount + 1, label);
 }
 
 async function doubleClick(driver, using, value, label) {
