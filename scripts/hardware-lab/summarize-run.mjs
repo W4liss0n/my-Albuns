@@ -117,7 +117,18 @@ iterations.forEach((iteration, position) => {
   if (scenario?.errors?.length) lines.push(`**Falhas do roteiro:** ${scenario.errors.join(" | ")}`);
   if (scenario?.lastAlert) lines.push(`**Alerta na tela:** ${scenario.lastAlert}`);
   const forced = iteration.forcedProcesses?.value ?? iteration.forcedProcesses;
-  if (forced) lines.push(`Processos que o roteiro encerrou à força depois de fechar o projeto: ${forced}`);
+  if (iteration.interruptedAt) {
+    lines.push(
+      `**Encerrada à força** ${seconds(Date.parse(iteration.interruptedAt) - launchedAt)} após o lançamento ` +
+        `(${forced} processos): ${iteration.indexedPreviews} prévias no índice do Cache, ` +
+        `${iteration.previewFiles} arquivos de prévia na pasta Media.`,
+    );
+  } else if (forced) lines.push(`Processos que o roteiro encerrou à força depois de fechar o projeto: ${forced}`);
+  const jobs = events.filter((entry) => entry.event === "cache_job_completed");
+  if (jobs.length) {
+    const generated = jobs.filter((entry) => entry.outcome === "generated").length;
+    lines.push(`Prévias no Processador de Imagens: ${generated} geradas, ${jobs.length - generated} reaproveitadas.`);
+  }
   lines.push("");
   lines.push("| Etapa desde o lançamento | Tempo |");
   lines.push("|---|---|");

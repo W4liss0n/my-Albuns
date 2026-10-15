@@ -31,7 +31,11 @@ param(
     # Saves a picture of the guest desktop every second for the first N
     # seconds of each opening (desktop-N\*.jpg), to see what the user sees
     # before DevTools can reach a page. Costs some guest CPU while it runs.
-    [int] $DesktopSeconds = 0
+    [int] $DesktopSeconds = 0,
+    # Ends the first opening by force this many seconds after launch, as a
+    # crash or the Task Manager would, and counts the previews the Cache index
+    # kept. The next opening shows how many the app prepares again.
+    [int] $InterruptAfterSeconds = 0
 )
 
 # One measurement: a fresh system disk, the app installed silently, the guest
@@ -245,7 +249,8 @@ try {
     }
 
     for ($iteration = 1; $iteration -le $Repeat; $iteration += 1) {
-        $kind = if ($iteration -eq 1) { 'fria' } else { 'morna' }
+        $interrupt = $iteration -eq 1 -and $InterruptAfterSeconds -gt 0
+        $kind = if ($interrupt) { 'fria, interrompida' } elseif ($iteration -eq 1) { 'fria' } elseif ($InterruptAfterSeconds -gt 0 -and $iteration -eq 2) { 'depois da interrupção' } else { 'morna' }
         Write-LabStep "Opening $iteration/$Repeat ($kind)"
         $launch = [pscustomobject] @{
             executable = $install.executable
@@ -276,6 +281,35 @@ try {
                 throw 'The launch task did not start the app within 60 s.'
             }
             Get-Content -LiteralPath $launch.markerPath -Raw -Encoding UTF8 | ConvertFrom-Json
+        }
+        if ($interrupt) {
+            Write-LabStep "Ending the opening by force $InterruptAfterSeconds s after launch"
+            $interruption = Invoke-Command -Session $session -ArgumentList $launched.launchedAtIso, $InterruptAfterSeconds, $install.stateRoot -ScriptBlock {
+                param($launchedAt, $seconds, $stateRoot)
+                $wait = ([datetime]::Parse($launchedAt).AddSeconds($seconds) - (Get-Date)).TotalMilliseconds
+                if ($wait -gt 0) {
+                    Start-Sleep -Milliseconds $wait
+                }
+                $processes = @(Get-Process -Name 'myalbuns-desktop', 'myalbuns-imaging', 'msedgewebview2' -ErrorAction SilentlyContinue)
+                $processes | Stop-Process -Force -ErrorAction SilentlyContinue
+                $endedAt = (Get-Date).ToString('o')
+                Start-Sleep -Seconds 2
+                $cache = Join-Path $stateRoot 'Cache'
+                $indexed = 0
+                foreach ($index in @(Get-ChildItem -LiteralPath $cache -Recurse -Filter 'metadata.json' -File -ErrorAction SilentlyContinue)) {
+                    $indexed += @((Get-Content -LiteralPath $index.FullName -Raw | ConvertFrom-Json).entries).Count
+                }
+                $files = @(Get-ChildItem -LiteralPath $cache -Recurse -File -ErrorAction SilentlyContinue |
+                        Where-Object { $_.Directory.Name -eq 'Media' }).Count
+                [pscustomobject] @{ endedAt = $endedAt; forcedProcesses = $processes.Count; indexedPreviews = $indexed; previewFiles = $files }
+            }
+            $run.iterations += [ordered] @{
+                index = $iteration; kind = $kind; launchedAt = $launched.launchedAtIso
+                interruptedAt = $interruption.endedAt; forcedProcesses = [int] $interruption.forcedProcesses
+                indexedPreviews = [int] $interruption.indexedPreviews; previewFiles = [int] $interruption.previewFiles
+            }
+            Start-Sleep -Seconds 5
+            continue
         }
         if ($RecordEtw) {
             Invoke-Command -Session $session -ScriptBlock {
