@@ -75,11 +75,13 @@ user decisions refine them.
 
 ### User-facing copy
 
-Before adding or changing user-facing text, read
-`docs/research/2026-09-18-padroes-de-escrita-para-interfaces.md` and the accepted
-writing guide in `docs/design/0043-plano-de-simplificacao-dos-textos.md`.
-Apply the guide to new features as well as existing flows, including tooltips,
-accessible names, confirmations, and Rust errors forwarded to the UI. Verify
+Before adding or changing user-facing text, read the accepted writing guide in
+`docs/design/0043-plano-de-simplificacao-dos-textos.md`: the sections
+"Vocabulário aceito", "Guia curto de escrita" (with "Aplicação contínua") and
+"Critérios de aceite da implementação". The rest of that document records the
+September review, and the research it cites is background only. Apply the
+guide to new features as well as existing flows, including tooltips, accessible
+names, confirmations, and Rust errors forwarded to the UI. Verify
 the actual outcome and available next action before choosing the wording;
 keep support diagnostics in the existing diagnostic channel.
 

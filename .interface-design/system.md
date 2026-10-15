@@ -47,8 +47,7 @@ e a lâmina são o foco; os controles ajudam a trabalhar sem disputar atenção.
   cabeçalho e os controles já são os da nova seleção, e só a área da prévia
   ainda mostra a anterior.
 - **Escrever pouco e com clareza.** Preferir português simples e orientações
-  úteis, seguindo o [guia de escrita aceito](../docs/design/0043-plano-de-simplificacao-dos-textos.md#guia-curto-de-escrita)
-  e sua [pesquisa](../docs/research/2026-09-18-padroes-de-escrita-para-interfaces.md).
+  úteis, seguindo o [guia de escrita aceito](../docs/design/0043-plano-de-simplificacao-dos-textos.md#guia-curto-de-escrita).
   O padrão vale também para funcionalidades novas, tooltips, nomes acessíveis
   e erros recebidos do Rust. Orientar apenas ações disponíveis e descrever a
   consequência real, sem expor diagnóstico técnico bruto.
