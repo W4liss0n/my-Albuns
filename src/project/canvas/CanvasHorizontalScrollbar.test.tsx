@@ -1,5 +1,5 @@
-import { render } from "@testing-library/react";
-import { describe, expect, test, vi } from "vitest";
+import { fireEvent, render, screen } from "@testing-library/react";
+import { afterEach, describe, expect, test, vi } from "vitest";
 
 import type { ContinuousCanvasLayout } from "./canvasGeometry";
 import { CanvasHorizontalScrollbar } from "./CanvasHorizontalScrollbar";
@@ -39,5 +39,50 @@ describe("CanvasHorizontalScrollbar", () => {
       left: "200px",
       width: "200px",
     });
+  });
+  afterEach(() => vi.restoreAllMocks());
+
+  test("follows wheel steps once per frame and ignores the echo of its own write", () => {
+    const frames: FrameRequestCallback[] = [];
+    vi.spyOn(window, "requestAnimationFrame")
+      .mockImplementation((callback) => frames.push(callback));
+    const onViewportChange = vi.fn();
+    const scrollbar = (offsetX: number) => (
+      <CanvasHorizontalScrollbar
+        centeredSheetId="sheet-2"
+        layout={layout}
+        metrics={{ scale: 1, width: 600, height: 500 }}
+        mode={{ kind: "normal" }}
+        viewport={{ offsetX }}
+        onCenteredSheetChange={vi.fn()}
+        onViewportChange={onViewportChange}
+      />
+    );
+    const view = render(scrollbar(0));
+    const scroller = screen.getByRole("scrollbar");
+    let scrollLeft = 0;
+    const writes: number[] = [];
+    Object.defineProperty(scroller, "scrollLeft", {
+      configurable: true,
+      get: () => scrollLeft,
+      set: (value: number) => { writes.push(value); scrollLeft = value; },
+    });
+    frames.splice(0).forEach((frame) => frame(0));
+    expect(writes).toEqual([600]);
+
+    view.rerender(scrollbar(-100));
+    view.rerender(scrollbar(-200));
+    expect(writes).toEqual([600]);
+    // The scroll event of the first write lands after the newer steps.
+    fireEvent.scroll(scroller);
+    expect(onViewportChange).not.toHaveBeenCalled();
+
+    expect(frames).toHaveLength(1);
+    frames.splice(0).forEach((frame) => frame(0));
+    expect(writes).toEqual([600, 800]);
+
+    scrollLeft = 700;
+    fireEvent.scroll(scroller);
+    expect(onViewportChange).toHaveBeenCalledExactlyOnceWith({ offsetX: -100 });
   });
 });

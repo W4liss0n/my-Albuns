@@ -39,7 +39,6 @@ export function useProjectNavigation(projection: EditorProjection) {
     (state) => state.centeredSheetId,
   );
   const editingSheetId = useEditorView((state) => state.editingSheetId);
-  const viewport = useEditorView((state) => state.viewport);
   const selectFrame = useEditorView((state) => state.selectFrame);
   const focusSheet = useEditorView((state) => state.focusSheet);
   const selectSheets = useEditorView((state) => state.selectSheets);
@@ -215,7 +214,6 @@ export function useProjectNavigation(projection: EditorProjection) {
     sheetSelectionSource,
     centeredSheetId,
     editingSheetId,
-    viewport,
     canvasLayout,
     implicitSheetId,
     inspectorSubject,

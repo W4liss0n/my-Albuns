@@ -184,6 +184,25 @@ test("routes editor changes through the shared Project mutation runner", async (
   }, expect.any(Function));
 });
 
+test("scrolling the Canvas does not re-render the editor", () => {
+  let renders = 0;
+  const view = renderHook(() => {
+    renders += 1;
+    return useProjectEditorController({ projectDialogPort: unusedLayoutDialogPort,
+      projection: representativeProjection,
+      projectCorePort: projectCorePort(),
+      runProjectMutation: { run: vi.fn(), waitForIdle: async () => null },
+      onProjectionChange: vi.fn(),
+    });
+  });
+  const before = renders;
+
+  act(() => view.result.current.canvasProps.onViewportChange({ offsetX: -320 }));
+
+  expect(useEditorView.getState().viewport).toEqual({ offsetX: -320 });
+  expect(renders).toBe(before);
+});
+
 test("enters the centered Sheet Edit Mode with Enter and returns to normal mode with Escape", () => {
   const port = projectCorePort();
   const view = renderHook(() =>

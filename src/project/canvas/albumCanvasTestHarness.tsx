@@ -417,6 +417,7 @@ vi.mock("pixi.js", () => {
     stage = new Container();
     renderer = {
       resolution: 1,
+      texture: { initSource: vi.fn() },
       generateTexture: (options: Record<string, unknown>) => {
         const texture = { options, destroy: vi.fn() };
         pixiLifecycle.generatedTextures.push(texture);

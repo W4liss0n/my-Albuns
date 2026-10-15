@@ -114,6 +114,7 @@ export class AlbumCanvasScene {
       this.refreshAfterPreviewTextureChange,
       onPreviewTextureError,
       onPreviewTextureLoad,
+      (texture) => app.renderer.texture.initSource(texture.source),
     );
     this.editingNavigation = new EditingCanvasNavigation(app.canvas, () => this.input,
       () => { this.frameInteractions.reset(); this.frameAreaSelection.reset(); },
@@ -575,12 +576,15 @@ export class AlbumCanvasScene {
       (residentIndexes[residentIndexes.length - 1] ?? 0) + PRELOAD_MARGIN,
     );
     const desiredSheets = sheets.slice(firstVisible, lastVisible + 1);
-    this.reportMediaDemand(
-      visibleIndexes.map((index) => sheets[index]),
-      desiredSheets,
-    );
+    const visibleSheets = visibleIndexes.map((index) => sheets[index]);
+    this.reportMediaDemand(visibleSheets, desiredSheets);
     const desiredIds = new Set(desiredSheets.map((sheet) => sheet.sheetId));
-    const desiredPreviewUrls = this.preparePreviewTextures(desiredSheets);
+    // Visible Sheets first: their textures reach the GPU before the preload's.
+    const visibleIds = new Set(visibleSheets.map((sheet) => sheet.sheetId));
+    const desiredPreviewUrls = this.preparePreviewTextures([
+      ...visibleSheets,
+      ...desiredSheets.filter((sheet) => !visibleIds.has(sheet.sheetId)),
+    ]);
     const signatures = new Map<string, string>();
     const sheetBarMetadata = new Map(
       this.input.sheetBarMetadata.map((metadata) => [
