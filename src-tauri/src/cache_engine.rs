@@ -3,7 +3,7 @@ mod index;
 mod publication;
 pub(crate) use import::{CacheImportStage, ImportCacheFailure};
 use index::CacheIndex;
-pub(crate) use publication::PendingCachePublication;
+pub(crate) use publication::{PendingCachePublication, prepare_and_publish_batches};
 
 use std::{
     collections::{HashMap, HashSet},
@@ -3632,6 +3632,150 @@ mod tests {
                 1
             );
             drop(owners);
+        });
+    }
+
+    #[test]
+    fn an_interrupted_preparation_keeps_each_finished_batch_for_the_next_opening() {
+        use futures_util::StreamExt;
+        tauri::async_runtime::block_on(async {
+            let fixture = fixture();
+            let sources = || {
+                (0..6).map(|id| {
+                    CacheMediaSource::new(
+                        format!("photo-{id}"),
+                        MediaKind::Photo,
+                        fixture.work.source.source_path().to_path_buf(),
+                    )
+                    .unwrap()
+                })
+            };
+            let plan = |engine: &CacheEngine| {
+                engine
+                    .plan_works(
+                        &fixture.app_paths,
+                        &fixture.work.namespace,
+                        &fixture.work.root_bindings,
+                        sources(),
+                    )
+                    .unwrap()
+            };
+            let engine = CacheEngine::default();
+            let mut members = plan(&engine).into_iter().map(|work| {
+                let CacheFlightClaim::Owner(owner) = engine.claim_for_processing(&work) else {
+                    panic!("new owner")
+                };
+                (work, owner)
+            });
+            let batches = (0..3)
+                .map(|_| members.by_ref().take(2).collect::<Vec<_>>())
+                .collect::<Vec<_>>();
+            let started = std::cell::Cell::new(0);
+            let prepare = |request_id: String, members: &[(CacheWork, super::CacheFlightOwner)]| {
+                let batch = super::CacheBatch {
+                    request_id,
+                    members: members
+                        .iter()
+                        .map(|(work, owner)| super::CacheBatchMember {
+                            work: work.clone(),
+                            cancellation: owner.cancellation(),
+                        })
+                        .collect(),
+                };
+                started.set(started.get() + 1);
+                let interrupted = started.get() == 3;
+                let (engine, app_paths) = (&engine, &fixture.app_paths);
+                async move {
+                    if interrupted {
+                        // The app ends while the third Processor still runs.
+                        std::future::pending::<()>().await;
+                    }
+                    let mut transport = ScriptedTransport {
+                        app_paths: app_paths.clone(),
+                        scripts: VecDeque::from([Script::CompleteBatch {
+                            failed: &[],
+                            obsolete: None,
+                            mutate: |_| {},
+                        }]),
+                        attempts: Vec::new(),
+                    };
+                    let not_cancelled = std::sync::atomic::AtomicBool::new(false);
+                    let context = InvocationContext::new(
+                        &batch.request_id,
+                        Some(batch.members[0].work.namespace.project_id()),
+                    );
+                    engine
+                        .prepare_batch(
+                            &mut transport,
+                            app_paths,
+                            batch,
+                            &context,
+                            InvocationControl::controlled(&not_cancelled, &|_| {}),
+                        )
+                        .await
+                }
+            };
+            let publish = |publications| {
+                let engine = &engine;
+                async move { engine.publish_prepared_batch(publications) }
+            };
+            let storage = fixture
+                .app_paths
+                .prepare_cache_storage(fixture.work.namespace.paths())
+                .unwrap();
+            let indexed = || {
+                super::load_metadata(&storage, fixture.work.namespace.paths())
+                    .map_or(0, |metadata| metadata.entries.len())
+            };
+            super::INDEX_IO.set((0, 0));
+            {
+                let preparation =
+                    super::prepare_and_publish_batches(batches, 1, &prepare, &publish);
+                let mut preparation = std::pin::pin!(preparation);
+                for finished in 1..=2 {
+                    let (_, members, published) =
+                        preparation.next().await.expect("a finished batch");
+                    assert!(published.iter().all(|member| member.prepared));
+                    for ((_, owner), member) in members.into_iter().zip(published) {
+                        owner
+                            .complete(member.result)
+                            .expect("the member is published");
+                    }
+                    assert_eq!(
+                        indexed(),
+                        2 * finished,
+                        "a batch reaches the index before the next one finishes"
+                    );
+                }
+                assert!(
+                    std::future::Future::poll(
+                        std::pin::pin!(preparation.next()),
+                        &mut std::task::Context::from_waker(std::task::Waker::noop())
+                    )
+                    .is_pending()
+                );
+            }
+            assert_eq!(
+                super::INDEX_IO.get().1,
+                2,
+                "one index write per finished batch"
+            );
+            drop(engine);
+
+            let reusable = plan(&CacheEngine::default())
+                .into_iter()
+                .filter(|work| {
+                    work.planned_index
+                        .as_ref()
+                        .is_some_and(|index| index.reusable(&work.source).is_some())
+                })
+                .map(|work| work.source.media_id().to_owned())
+                .collect::<Vec<_>>();
+            assert_eq!(
+                reusable,
+                ["photo-0", "photo-1", "photo-2", "photo-3"],
+                "the next opening prepares only the interrupted batch again"
+            );
         });
     }
 

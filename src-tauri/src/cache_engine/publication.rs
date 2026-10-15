@@ -24,6 +24,81 @@ impl Drop for PendingCachePublication {
     }
 }
 
+/// What became of one batch member: whether its Processor prepared it and the
+/// result its flight completes with.
+pub(crate) struct PublishedMember {
+    pub(crate) prepared: bool,
+    pub(crate) result: FlightResult,
+}
+
+/// Runs `capacity` batches at a time and publishes each batch's previews in the
+/// index as soon as that batch finishes, in one atomic publication. A
+/// preparation interrupted afterwards, even by the end of the process, keeps
+/// every finished batch for the next attempt. The caller still awaits the whole
+/// stream before it reports the operation as done.
+pub(crate) fn prepare_and_publish_batches<'a, M, P, F, Q, G>(
+    batches: Vec<Vec<M>>,
+    capacity: usize,
+    prepare: &'a P,
+    publish: &'a Q,
+) -> impl futures_util::Stream<Item = (String, Vec<M>, Vec<PublishedMember>)> + 'a
+where
+    M: 'a,
+    P: Fn(String, &[M]) -> F,
+    F: std::future::Future<Output = Vec<Result<PendingCachePublication, CacheFailure>>> + 'a,
+    Q: Fn(Vec<PendingCachePublication>) -> G,
+    G: std::future::Future<Output = Vec<FlightResult>> + 'a,
+{
+    use futures_util::StreamExt;
+    futures_util::stream::iter(batches)
+        .map(move |members| {
+            let request_id = format!("cache-batch-{}", uuid::Uuid::new_v4().simple());
+            let preparation = prepare(request_id.clone(), &members);
+            async move {
+                let mut publications = Vec::new();
+                let failures = preparation
+                    .await
+                    .into_iter()
+                    .map(|result| match result {
+                        Ok(pending) => {
+                            publications.push(pending);
+                            None
+                        }
+                        Err(failure) => Some(failure),
+                    })
+                    .collect::<Vec<_>>();
+                let mut published = if publications.is_empty() {
+                    Vec::new()
+                } else {
+                    publish(publications).await
+                }
+                .into_iter();
+                let outcomes = failures
+                    .into_iter()
+                    .map(|failure| match failure {
+                        Some(failure) => PublishedMember {
+                            prepared: false,
+                            result: Err(failure),
+                        },
+                        None => PublishedMember {
+                            prepared: true,
+                            result: published.next().unwrap_or_else(|| {
+                                Err(CacheFailure::new(
+                                    CacheFailureStage::PublishIndex,
+                                    "Não foi possível publicar o lote de prévias temporárias.",
+                                ))
+                            }),
+                        },
+                    })
+                    .collect();
+                (request_id, members, outcomes)
+            }
+        })
+        // Admission and the machine-wide slots decide how many run: work for
+        // an unfocused Project may use every core.
+        .buffer_unordered(capacity)
+}
+
 impl CacheEngine {
     pub(crate) fn plan_works(
         &self,

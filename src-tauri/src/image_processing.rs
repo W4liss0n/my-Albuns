@@ -1,11 +1,11 @@
-use futures_util::{StreamExt, stream};
+use futures_util::StreamExt;
 use tauri::{AppHandle, Manager};
 
 use crate::{
     cache_activity_gate::{CacheCancellation, CacheCancellationReason},
     cache_engine::{
         self, CacheBatch, CacheBatchMember, CacheEngine, CacheFailure, CacheFailureStage,
-        CacheFlightClaim, CacheWork, PendingCachePublication,
+        CacheFlightClaim, CacheFlightOwner, CacheWork, PendingCachePublication,
     },
     cache_service::ActiveCacheNamespace,
     imaging_processor::{
@@ -182,16 +182,26 @@ impl<F: FnMut(crate::ipc_contract::ImageProcessingProgress)> ImageProcessingBatc
             .into_iter()
             .map(|size| owners.by_ref().take(size).collect::<Vec<_>>())
             .collect::<Vec<_>>();
-        let preparation = stream::iter(batches)
-            .map(|members| {
+        let prepare =
+            |request_id: String, members: &[(MediaBinding, CacheWork, CacheFlightOwner)]| {
                 let resource_interrupted = &resource_interrupted;
                 let storage_interrupted = &storage_interrupted;
                 let report = &report;
+                let batch = CacheBatch {
+                    request_id,
+                    members: members
+                        .iter()
+                        .map(|(_, work, owner)| CacheBatchMember {
+                            work: work.clone(),
+                            cancellation: owner.cancellation(),
+                        })
+                        .collect(),
+                };
                 async move {
-                    let request_id = format!("cache-batch-{}", uuid::Uuid::new_v4().simple());
                     let results = if storage_interrupted.load(std::sync::atomic::Ordering::Acquire)
                     {
-                        members
+                        batch
+                            .members
                             .iter()
                             .map(|_| {
                                 Err(CacheFailure::new(
@@ -201,7 +211,8 @@ impl<F: FnMut(crate::ipc_contract::ImageProcessingProgress)> ImageProcessingBatc
                             })
                             .collect()
                     } else if resource_interrupted.load(std::sync::atomic::Ordering::Acquire) {
-                        members
+                        batch
+                            .members
                             .iter()
                             .map(|_| {
                                 Err(CacheFailure::new(
@@ -217,16 +228,7 @@ impl<F: FnMut(crate::ipc_contract::ImageProcessingProgress)> ImageProcessingBatc
                             app.state::<AppPaths>().inner(),
                             app.state::<CacheEngine>().inner(),
                             app.state::<ImagingProcessor>().inner(),
-                            CacheBatch {
-                                request_id: request_id.clone(),
-                                members: members
-                                    .iter()
-                                    .map(|(_, work, owner)| CacheBatchMember {
-                                        work: work.clone(),
-                                        cancellation: owner.cancellation(),
-                                    })
-                                    .collect(),
-                            },
+                            batch,
                             None,
                             report,
                         )
@@ -245,17 +247,20 @@ impl<F: FnMut(crate::ipc_contract::ImageProcessingProgress)> ImageProcessingBatc
                     if failed_with(CacheFailureStage::StorageFull) {
                         storage_interrupted.store(true, std::sync::atomic::Ordering::Release);
                     }
-                    (request_id, members, results)
+                    results
                 }
-            })
-            // Admission and the machine-wide slots decide how many run: work
-            // for an unfocused Project may use every core.
-            .buffer_unordered(capacity);
+            };
+        // Owners exist only for works of a captured attempt.
+        let project_id = attempt
+            .as_ref()
+            .map(|attempt| attempt.project_id.clone())
+            .unwrap_or_default();
+        let publish = |publications| publish_preparations(app, project_id.clone(), publications);
+        let preparation =
+            cache_engine::prepare_and_publish_batches(batches, capacity, &prepare, &publish);
         tokio::pin!(preparation);
-        let mut prepared = Vec::new();
-        let mut publications = Vec::new();
         loop {
-            let (request_id, members, results) = tokio::select! {
+            let (request_id, members, published) = tokio::select! {
                 biased;
                 Some(finished) = progress_receiver.recv() => {
                     // Each image counts as soon as its Processor finishes it.
@@ -270,84 +275,25 @@ impl<F: FnMut(crate::ipc_contract::ImageProcessingProgress)> ImageProcessingBatc
                 },
             };
             let mut counted = progress.counted(&request_id);
-            for ((binding, _, owner), result) in members.into_iter().zip(results) {
+            for ((binding, _, owner), member) in members.into_iter().zip(published) {
                 let already_counted = counted > 0;
                 counted = counted.saturating_sub(1);
-                match result {
-                    Ok(pending) => {
-                        // The reduced image is validated now. Publishing the
-                        // shared index still belongs to this awaited operation
-                        // and must not count the image twice.
-                        if !already_counted {
-                            self.complete(None);
-                        }
-                        prepared.push((binding, owner));
-                        publications.push(pending);
-                    }
-                    Err(failure) => {
-                        let result = owner.complete(Err(failure));
-                        self.record_result(
-                            &binding,
-                            processing_result_for_app(app, result),
-                            already_counted,
-                        );
-                    }
+                // A validated reduced image counts once, even when publishing
+                // the index fails afterwards.
+                if member.prepared && !already_counted {
+                    self.complete(None);
                 }
+                self.record_result(
+                    &binding,
+                    processing_result_for_app(app, owner.complete(member.result)),
+                    already_counted || member.prepared,
+                );
             }
         }
         // Progress a finished batch reported in its last poll.
         while let Ok(finished) = progress_receiver.try_recv() {
             for _ in 0..finished {
                 self.complete(None);
-            }
-        }
-        if !publications.is_empty() {
-            let _permit = engine
-                .begin_cancellable_work(CacheCancellation::default())
-                .await;
-            let publish_app = app.clone();
-            let project_id = attempt
-                .as_ref()
-                .expect("prepared work belongs to a captured attempt")
-                .project_id
-                .clone();
-            let results = tauri::async_runtime::spawn_blocking(move || {
-                if !publish_app
-                    .state::<ProjectHost>()
-                    .is_current_project(&project_id)
-                {
-                    return publications
-                        .iter()
-                        .map(|_| {
-                            Err(CacheFailure::new(
-                                CacheFailureStage::Cancelled,
-                                "O projeto mudou antes da publicação das prévias temporárias.",
-                            ))
-                        })
-                        .collect();
-                }
-                publish_app
-                    .state::<CacheEngine>()
-                    .publish_prepared_batch(publications)
-            })
-            .await;
-            let results = results.unwrap_or_else(|_| {
-                prepared
-                    .iter()
-                    .map(|_| {
-                        Err(CacheFailure::new(
-                            CacheFailureStage::PublishIndex,
-                            "Não foi possível publicar o lote de prévias temporárias.",
-                        ))
-                    })
-                    .collect()
-            });
-            for ((binding, owner), result) in prepared.into_iter().zip(results) {
-                self.record_result(
-                    &binding,
-                    processing_result_for_app(app, owner.complete(result)),
-                    true,
-                );
             }
         }
         // Publish our owners before joining foreign flights, preventing cycles
@@ -367,7 +313,7 @@ impl<F: FnMut(crate::ipc_contract::ImageProcessingProgress)> ImageProcessingBatc
         concurrency: usize,
         preparation: impl Fn(MediaBinding) -> Fut,
     ) {
-        let pending = stream::iter(bindings)
+        let pending = futures_util::stream::iter(bindings)
             .map(|binding| {
                 let future = preparation(binding.clone());
                 async move { (binding, future.await) }
@@ -605,6 +551,52 @@ async fn synchronize_processing_sources(
     })
     .await
     .map_err(|_| "Não foi possível inspecionar as imagens do projeto.".to_string())?
+}
+
+/// Publishes one batch's prepared previews in the index, unless the Project
+/// changed meanwhile. The caller keeps the batch's flight owners until this
+/// returns.
+async fn publish_preparations(
+    app: &AppHandle,
+    project_id: String,
+    publications: Vec<PendingCachePublication>,
+) -> Vec<Result<cache_engine::CacheExecution, CacheFailure>> {
+    let count = publications.len();
+    let _permit = app
+        .state::<CacheEngine>()
+        .begin_cancellable_work(CacheCancellation::default())
+        .await;
+    let publish_app = app.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        if !publish_app
+            .state::<ProjectHost>()
+            .is_current_project(&project_id)
+        {
+            return publications
+                .iter()
+                .map(|_| {
+                    Err(CacheFailure::new(
+                        CacheFailureStage::Cancelled,
+                        "O projeto mudou antes da publicação das prévias temporárias.",
+                    ))
+                })
+                .collect();
+        }
+        publish_app
+            .state::<CacheEngine>()
+            .publish_prepared_batch(publications)
+    })
+    .await
+    .unwrap_or_else(|_| {
+        (0..count)
+            .map(|_| {
+                Err(CacheFailure::new(
+                    CacheFailureStage::PublishIndex,
+                    "Não foi possível publicar o lote de prévias temporárias.",
+                ))
+            })
+            .collect()
+    })
 }
 
 fn processing_result_for_app(

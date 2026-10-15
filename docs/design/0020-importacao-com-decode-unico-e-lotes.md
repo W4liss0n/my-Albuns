@@ -64,7 +64,11 @@ modelo, com lotes de até 16 imagens divididos por igual entre as vagas. A
 conclusão traz o artefato ou a falha de cada mídia; só a falta de espaço ou uma
 falha do próprio pedido encerra o lote inteiro. Cada mídia continua com o seu
 voo: uma que fica obsoleta durante o lote não é publicada, e o processo só é
-cancelado quando todas ficam obsoletas ou quando há pausa. A medição que motivou
+cancelado quando todas ficam obsoletas ou quando há pausa. Cada lote publica no
+índice as prévias que preparou assim que termina, numa publicação atômica: uma
+preparação interrompida, mesmo pelo fim do processo, conserva os lotes
+concluídos, e a tentativa seguinte prepara só o restante. A ação continua
+aguardando todos os lotes antes de terminar. A medição que motivou
 o lote e o ganho medido estão em
 [lotes no Processador de Imagens](../research/2026-10-15-lotes-no-processador-de-imagens.md).
 
@@ -108,8 +112,9 @@ em memória é reutilizado entre operações apenas por tamanho ou data do arqui
 A entrega de prévias e o commit observam o índice atual; corrupção, ausência e
 substituição continuam impedindo o reaproveitamento de evidência antiga.
 
-Uma ação comum prepara suas gerações, publica as entradas em conjunto e só
-então conclui os trabalhos compartilhados. Os consumidores que aguardam uma
+Uma ação comum prepara suas gerações, publica as entradas de cada lote em
+conjunto, assim que o lote termina, e só então conclui os trabalhos
+compartilhados desse lote. Os consumidores que aguardam uma
 geração não recebem sucesso antes do índice. A primeira demanda consulta em
 conjunto os recibos de preparação; uma demanda que precise gerar uma nova
 prévia continua podendo publicá-la individualmente, conforme sua conclusão.
