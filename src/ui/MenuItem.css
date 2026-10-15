@@ -1,10 +1,10 @@
 .ui-menu-item {
   display: flex;
   width: 100%;
-  min-height: var(--ui-compact-control-height);
+  min-height: var(--ui-menu-item-height);
   align-items: center;
   justify-content: space-between;
-  padding: 0 var(--ui-space-3) 0 var(--ui-space-2);
+  padding: 0 var(--ui-space-4) 0 var(--ui-space-3);
   border: 0;
   border-radius: var(--ui-radius);
   color: var(--ui-text);
@@ -49,6 +49,7 @@
 }
 
 .ui-menu-item--compact {
+  min-height: var(--ui-compact-control-height);
   padding: 0 8px;
   border-radius: var(--ui-radius-small);
   font-size: var(--ui-font-size-support);
@@ -59,6 +60,6 @@
 .ui-menu-separator {
   display: block;
   height: 1px;
-  margin: var(--ui-space-1) var(--ui-space-2);
+  margin: var(--ui-space-1) var(--ui-space-3);
   background: var(--ui-border);
 }

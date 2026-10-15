@@ -1,4 +1,4 @@
-import { MenuItem } from "../../ui/MenuItem";
+import { MenuGroups, MenuItem, MenuSeparator } from "../../ui/MenuItem";
 import {
   useEffect,
   useImperativeHandle,
@@ -774,47 +774,47 @@ export function MediaPanel({
       </div>
       {contextMenu && <ContextMenuSurface label="Ações das imagens" position={contextMenu}
         onDismiss={() => { setContextMenu(null); panelHostRef.current?.focus({ preventScroll: true }); }}>
-        {activeMediaKind === "photo" && onViewPhoto && <MenuItem label={projectCommandDescriptor("view-image").label} shortcut={projectCommandShortcutLabel("view-image")}
-          onClick={() => {
-            const id = contextMenu.mediaId;
-            const trigger = panelHostRef.current?.querySelector<HTMLElement>(`[data-media-id="${CSS.escape(id)}"]`) ?? panelHostRef.current;
-            setContextMenu(null);
-            onViewPhoto(id, visibleMediaIds, trigger ?? null);
-          }} />}
-        {selectedAbsentIds.length > 0 && (
-          <MenuItem label={projectCommandLabel("relink-media", selectedAbsentIds.length)}
-          disabled={relinkDisabled || importPending}
-          onClick={() => {
+        <MenuGroups groups={[
+          [activeMediaKind === "photo" && onViewPhoto && <MenuItem label={projectCommandDescriptor("view-image").label} shortcut={projectCommandShortcutLabel("view-image")}
+            onClick={() => {
+              const id = contextMenu.mediaId;
+              const trigger = panelHostRef.current?.querySelector<HTMLElement>(`[data-media-id="${CSS.escape(id)}"]`) ?? panelHostRef.current;
+              setContextMenu(null);
+              onViewPhoto(id, visibleMediaIds, trigger ?? null);
+            }} />],
+          [selectedPhotoIds.length > 0 && <MenuItem label={projectCommandDescriptor("open-in-photoshop").label} shortcut={projectCommandShortcutLabel("open-in-photoshop")}
+            disabled={!photoshopAvailable || relinkDisabled || importPending}
+            onClick={() => { onOpenInPhotoshop?.(selectedPhotoIds); setContextMenu(null); panelHostRef.current?.focus({ preventScroll: true }); }} />,
+          onShowInFolder && <MenuItem label={projectCommandDescriptor("show-media-in-folder").label}
+            onClick={() => { const mediaId = contextMenu.mediaId; setContextMenu(null); panelHostRef.current?.focus({ preventScroll: true }); onShowInFolder(mediaId); }} />],
+          [selectedAbsentIds.length > 0 && <MenuItem label={projectCommandLabel("relink-media", selectedAbsentIds.length)}
+            disabled={relinkDisabled || importPending}
+            onClick={() => {
               setContextMenu(null);
               panelHostRef.current?.focus({ preventScroll: true });
               onRelinkMedia(selectedAbsentIds);
-            }} />
-        )}
-        <MenuItem label={projectCommandDescriptor("replace-media").label}
-          disabled={relinkDisabled || importPending || selectedMediaIds.size > 1}
-          onClick={() => {
-            const mediaId = contextMenu.mediaId;
-            setContextMenu(null);
-            panelHostRef.current?.focus({ preventScroll: true });
-            onReplaceMedia(mediaId);
-          }} />
-        {selectedPhotoIds.length > 0 && <MenuItem label={projectCommandDescriptor("open-in-photoshop").label} shortcut={projectCommandShortcutLabel("open-in-photoshop")}
-          disabled={!photoshopAvailable || relinkDisabled || importPending}
-          onClick={() => { onOpenInPhotoshop?.(selectedPhotoIds); setContextMenu(null); panelHostRef.current?.focus({ preventScroll: true }); }} />}
-        {onShowInFolder && <MenuItem label={projectCommandDescriptor("show-media-in-folder").label}
-          onClick={() => { const mediaId = contextMenu.mediaId; setContextMenu(null); panelHostRef.current?.focus({ preventScroll: true }); onShowInFolder(mediaId); }} />}
-        {onEditMediaFolder && <MenuItem label={projectCommandDescriptor("move-media-to-folder").label}
-          disabled={foldersDisabled || selectedMediaIds.size === 0}
-          onClick={() => {
-            const anchor = panelHostRef.current?.querySelector<HTMLElement>(`[data-media-id="${contextMenu.mediaId}"]`) ?? panelHostRef.current;
-            const currentFolder = activeFolders.find((folder) => folder.mediaIds.includes(contextMenu.mediaId));
-            if (anchor) setFolderPrompt({ kind: "move", mediaKind: activeMediaKind, anchor,
-              mediaIds: [...selectedMediaIds], folderId: currentFolder?.id ?? activeFolders[0]?.id ?? null });
-            setContextMenu(null);
-          }} />}
-        <MenuItem label={projectCommandDescriptor("remove-media").label} shortcut={projectCommandShortcutLabel("remove-media")}
-          disabled={relinkDisabled || importPending || selectedMediaIds.size === 0}
-          onClick={() => { setContextMenu(null); onRemoveMedia([...selectedMediaIds]); panelHostRef.current?.focus({ preventScroll: true }); }} />
+            }} />,
+          <MenuItem label={projectCommandDescriptor("replace-media").label}
+            disabled={relinkDisabled || importPending || selectedMediaIds.size > 1}
+            onClick={() => {
+              const mediaId = contextMenu.mediaId;
+              setContextMenu(null);
+              panelHostRef.current?.focus({ preventScroll: true });
+              onReplaceMedia(mediaId);
+            }} />,
+          onEditMediaFolder && <MenuItem label={projectCommandDescriptor("move-media-to-folder").label}
+            disabled={foldersDisabled || selectedMediaIds.size === 0}
+            onClick={() => {
+              const anchor = panelHostRef.current?.querySelector<HTMLElement>(`[data-media-id="${contextMenu.mediaId}"]`) ?? panelHostRef.current;
+              const currentFolder = activeFolders.find((folder) => folder.mediaIds.includes(contextMenu.mediaId));
+              if (anchor) setFolderPrompt({ kind: "move", mediaKind: activeMediaKind, anchor,
+                mediaIds: [...selectedMediaIds], folderId: currentFolder?.id ?? activeFolders[0]?.id ?? null });
+              setContextMenu(null);
+            }} />],
+          [<MenuItem label={projectCommandDescriptor("remove-media").label} shortcut={projectCommandShortcutLabel("remove-media")}
+            disabled={relinkDisabled || importPending || selectedMediaIds.size === 0}
+            onClick={() => { setContextMenu(null); onRemoveMedia([...selectedMediaIds]); panelHostRef.current?.focus({ preventScroll: true }); }} />],
+        ]} />
       </ContextMenuSurface>}
       {folderMenu && <ContextMenuSurface label={`Ações da pasta ${folderMenu.folder.name}`} position={folderMenu}
         onDismiss={() => { folderMenu.anchor.focus({ preventScroll: true }); setFolderMenu(null); }}>
@@ -824,6 +824,7 @@ export function MediaPanel({
           setFolderPrompt({ kind: "rename", folder: folderMenu.folder, anchor: folderMenu.anchor, mediaKind: activeMediaKind });
           setFolderMenu(null);
         }} />
+        <MenuSeparator />
         <MenuItem label={projectCommandDescriptor("delete-media-folder").label}
           disabled={foldersDisabled}
           onClick={() => {

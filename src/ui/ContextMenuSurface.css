@@ -10,7 +10,7 @@
   z-index: 50;
   display: grid;
   box-sizing: border-box;
-  min-width: min(220px, calc(100vw - 16px));
+  min-width: min(236px, calc(100vw - 16px));
   max-width: calc(100vw - 16px);
   max-height: calc(100vh - 16px);
   padding: var(--ui-space-1);

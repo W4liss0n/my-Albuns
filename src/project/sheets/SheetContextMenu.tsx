@@ -70,9 +70,6 @@ export function SheetContextMenu({
         <MenuItem label={sheetSelectionCommandLabel("duplicate-sheet", sheetCount)}
           disabled={!availability.canDuplicate}
           onClick={() => invoke(onDuplicate)} />
-        <MenuItem label={sheetSelectionCommandLabel("delete-sheet", sheetCount)}
-          disabled={!availability.canDelete}
-          onClick={() => invoke(onDelete)} />
         <MenuSeparator />
         {onExport ? (
           <MenuItem label={sheetCommandLabels.exportSheet}
@@ -90,6 +87,10 @@ export function SheetContextMenu({
                 : "Disponível somente para uma extremidade"
           }
           onClick={() => invoke(onConvertEdge)} />
+        <MenuSeparator />
+        <MenuItem label={sheetSelectionCommandLabel("delete-sheet", sheetCount)}
+          disabled={!availability.canDelete}
+          onClick={() => invoke(onDelete)} />
     </ContextMenuSurface>
   );
 }
