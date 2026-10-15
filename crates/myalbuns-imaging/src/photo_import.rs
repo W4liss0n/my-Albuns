@@ -83,7 +83,9 @@ fn prepare_photo(
     let exif_orientation = opened.exif_orientation();
     let source_page_count = opened.source_page_count();
     let basic_color_profile = opened.basic_color_profile();
-    let decoded = opened.decode_preview().map_err(|failure| failure.message)?;
+    let decoded = opened
+        .decode_preview(request.policy.max_edge_px)
+        .map_err(|failure| failure.message)?;
     let (width_px, height_px) = decoded.oriented_dimensions();
     let dimensions = ImportedPhotoDimensions {
         width_px,

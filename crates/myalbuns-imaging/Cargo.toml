@@ -17,6 +17,8 @@ sha2.workspace = true
 tracing.workspace = true
 image = { workspace = true, features = ["jpeg", "png", "tiff"] }
 fast_image_resize = "=5.5.0"
+# Scaled IDCT for previews of sequential YCbCr JPEG; one thread, no rayon.
+jpeg-decoder = { version = "=0.3.2", default-features = false }
 tiff.workspace = true
 png = "=0.18.1"
 flate2 = "=1.1.9"

@@ -1,5 +1,5 @@
 use futures_util::{StreamExt, stream};
-use tauri::{AppHandle, Emitter, Manager};
+use tauri::{AppHandle, Manager};
 
 use crate::{
     cache_activity_gate::{CacheCancellation, CacheCancellationReason},
@@ -213,7 +213,9 @@ impl<F: FnMut(crate::ipc_contract::ImageProcessingProgress)> ImageProcessingBatc
                     (binding, owner, result)
                 }
             })
-            .buffer_unordered(app.state::<ImagingProcessor>().cache_capacity());
+            // Admission and the machine-wide slots decide how many run: work
+            // for an unfocused Project may use every core.
+            .buffer_unordered(app.state::<ImagingProcessor>().background_cache_capacity());
         tokio::pin!(preparation);
         let mut prepared = Vec::new();
         let mut publications = Vec::new();
@@ -436,15 +438,8 @@ async fn synchronize_processing_sources(
         .await?;
     if let Some(update) = confirmed.poll.update()
         && !update.changed_media_ids().is_empty()
-        && let Some(window) = app.get_webview_window(crate::product_runtime::PROJECT_WINDOW_LABEL)
     {
-        window
-            .emit(
-                crate::product_runtime::LINKED_MEDIA_CHANGED_EVENT,
-                crate::ipc_contract::LinkedMediaChanged {
-                    media_ids: update.changed_media_ids().to_vec(),
-                },
-            )
+        crate::product_runtime::emit_linked_media_changed(app, update.changed_media_ids().to_vec())
             .map_err(|_| "Não foi possível atualizar as imagens do projeto.".to_string())?;
     }
     drop(confirmed);

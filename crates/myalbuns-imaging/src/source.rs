@@ -278,7 +278,10 @@ impl OpenRenderSource {
         }
     }
 
-    pub(crate) fn decode_preview(self) -> Result<PreviewRaster, SourceFailure> {
+    /// Decodes for a preview whose longer edge is at most `max_edge`. The
+    /// raster may be smaller than the Original, but never smaller than the
+    /// preview; `PreviewRaster` keeps the Original's dimensions.
+    pub(crate) fn decode_preview(mut self, max_edge: u32) -> Result<PreviewRaster, SourceFailure> {
         // Progressive JPEG keeps its bounded worker and RGBA transport. Other
         // formats keep the canonical normalization, including alpha and 16-bit.
         match self.preflight {
@@ -286,15 +289,30 @@ impl OpenRenderSource {
                 if !preflight.is_progressive
                     && preflight.color_model != JpegColorModel::Grayscale =>
             {
+                let source = (preflight.width, preflight.height);
+                if preflight.color_model == JpegColorModel::YCbCr
+                    && let Some(image) = decode_scaled_jpeg(&mut self.reader, &preflight, max_edge)
+                {
+                    return Ok(PreviewRaster {
+                        image: DynamicImage::ImageRgb8(image),
+                        pending: preflight.orientation,
+                        source,
+                    });
+                }
+                self.reader.rewind().map_err(|error| {
+                    SourceFailure::path(ImagingPathCode::from_io_error(&error), error.to_string())
+                })?;
                 let raw = decode_jpeg_raw(self.reader, &preflight)?;
                 let image = RgbImage::from_raw(preflight.width, preflight.height, raw)
                     .ok_or_else(decoded_size_failure)?;
                 Ok(PreviewRaster {
                     image: DynamicImage::ImageRgb8(image),
                     pending: preflight.orientation,
+                    source,
                 })
             }
             _ => self.decode().map(|image| PreviewRaster {
+                source: image.dimensions(),
                 image: DynamicImage::ImageRgba8(image),
                 pending: Orientation::NoTransforms,
             }),
@@ -324,11 +342,15 @@ impl OpenRenderSource {
 pub(crate) struct PreviewRaster {
     pub(crate) image: DynamicImage,
     pub(crate) pending: Orientation,
+    /// The Original's dimensions before orientation. A JPEG decoded at a
+    /// reduced scale has a smaller `image`.
+    pub(crate) source: (u32, u32),
 }
 
 impl PreviewRaster {
+    /// The Original's dimensions once oriented, whatever scale was decoded.
     pub(crate) fn oriented_dimensions(&self) -> (u32, u32) {
-        let (width, height) = (self.image.width(), self.image.height());
+        let (width, height) = self.source;
         if transposes(self.pending) {
             (height, width)
         } else {
@@ -1383,11 +1405,18 @@ fn jpeg_color_type(preflight: &JpegPreflight) -> ColorType {
 #[cfg(test)]
 std::thread_local! {
     static JPEG_DECODES: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+    static SCALED_JPEG_DECODES: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
 }
 
+/// Every JPEG decode, at full size or scaled.
 #[cfg(test)]
 pub(crate) fn jpeg_decode_count() -> usize {
     JPEG_DECODES.get()
+}
+
+#[cfg(test)]
+fn scaled_jpeg_decode_count() -> usize {
+    SCALED_JPEG_DECODES.get()
 }
 
 fn decode_jpeg_raw<R: BufRead + Seek>(
@@ -1428,6 +1457,95 @@ fn decode_jpeg_raw<R: BufRead + Seek>(
     #[cfg(test)]
     JPEG_DECODES.set(JPEG_DECODES.get() + 1);
     decode_raw(decoder)
+}
+
+/// The preview of a sequential YCbCr JPEG from the smallest scaled IDCT
+/// (1/8, 1/4 or 1/2) that still covers it: decoding fewer pixels saves about
+/// a quarter of the preview's time and most of its memory. `None` leaves the
+/// Original to the full-size decoder, also for any file this decoder rejects.
+fn decode_scaled_jpeg(
+    reader: &mut SourceReader,
+    preflight: &JpegPreflight,
+    max_edge: u32,
+) -> Option<RgbImage> {
+    if preflight.width <= max_edge && preflight.height <= max_edge {
+        return None;
+    }
+    let (target_width, target_height) =
+        preview_dimensions(preflight.width, preflight.height, max_edge);
+    let full_size_bytes = u64::from(preflight.width) * u64::from(preflight.height) * 3;
+    let limit = usize::try_from(checked_decoder_allocation(full_size_bytes, "").ok()?).ok()?;
+    let target = (target_width, target_height);
+    // The decoder reads almost byte by byte: it gets the concrete reader, not
+    // the dispatching `SourceReader`, which made it slower than a full decode.
+    // It asserts on some malformed input; a panic leaves the image to the
+    // full-size decoder, as the progressive worker does.
+    std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| match reader {
+        SourceReader::Memory(bytes) => scaled_jpeg_pixels(
+            Cursor::new(bytes.get_ref().as_slice()),
+            preflight,
+            target,
+            limit,
+        ),
+        SourceReader::File(file) => {
+            file.rewind().ok()?;
+            scaled_jpeg_pixels(file, preflight, target, limit)
+        }
+    }))
+    .ok()
+    .flatten()
+}
+
+fn scaled_jpeg_pixels(
+    reader: impl Read,
+    preflight: &JpegPreflight,
+    (target_width, target_height): (u32, u32),
+    limit: usize,
+) -> Option<RgbImage> {
+    let mut decoder = jpeg_decoder::Decoder::new(reader);
+    decoder.set_max_decoding_buffer_size(limit);
+    // The preflight already chose the colour model from the markers.
+    decoder.set_color_transform(jpeg_decoder::ColorTransform::YCbCr);
+    decoder.read_info().ok()?;
+    let info = decoder.info()?;
+    if (u32::from(info.width), u32::from(info.height)) != (preflight.width, preflight.height)
+        || info.pixel_format != jpeg_decoder::PixelFormat::RGB24
+    {
+        return None;
+    }
+    let (width, height) = decoder
+        .scale(
+            u16::try_from(target_width).ok()?,
+            u16::try_from(target_height).ok()?,
+        )
+        .ok()?;
+    let (width, height) = (u32::from(width), u32::from(height));
+    // The decoder covers the request in one axis; the preview needs both, and
+    // a full-size decode is faster through the default decoder.
+    if width < target_width
+        || height < target_height
+        || (width, height) == (preflight.width, preflight.height)
+    {
+        return None;
+    }
+    let pixels = decoder.decode().ok()?;
+    #[cfg(test)]
+    {
+        JPEG_DECODES.set(JPEG_DECODES.get() + 1);
+        SCALED_JPEG_DECODES.set(SCALED_JPEG_DECODES.get() + 1);
+    }
+    RgbImage::from_raw(width, height, pixels)
+}
+
+/// Preserves the aspect ratio and fits both edges within `max_edge`, as
+/// `DynamicImage::thumbnail` does for representation 1.
+pub(crate) fn preview_dimensions(width: u32, height: u32, max_edge: u32) -> (u32, u32) {
+    let ratio = f64::min(
+        f64::from(max_edge) / f64::from(width),
+        f64::from(max_edge) / f64::from(height),
+    );
+    let edge = |value: u32| ((f64::from(value) * ratio).round() as u32).max(1);
+    (edge(width), edge(height))
 }
 
 fn decode_render_png(
@@ -1807,7 +1925,7 @@ mod render_source_tests {
     use image::{
         ExtendedColorType, ImageEncoder, ImageError, Rgb, RgbImage, codecs::jpeg::JpegEncoder,
     };
-    use myalbuns_imaging_protocol::{ImagingFailureCode, ImagingPathCode};
+    use myalbuns_imaging_protocol::{CACHE_MAX_EDGE_PX, ImagingFailureCode, ImagingPathCode};
     use myalbuns_paths::{ExpectedObject, OperationPathContext};
     use sha2::{Digest, Sha256};
 
@@ -1826,7 +1944,16 @@ mod render_source_tests {
             let mut bytes = jpeg.clone();
             insert_exif_orientation(&mut bytes, orientation);
             let canonical = decode_fixture(&bytes).unwrap();
-            let preview = open_fixture(&bytes).unwrap().decode_preview().unwrap();
+            let scaled = super::scaled_jpeg_decode_count();
+            let preview = open_fixture(&bytes)
+                .unwrap()
+                .decode_preview(CACHE_MAX_EDGE_PX)
+                .unwrap();
+            assert_eq!(
+                super::scaled_jpeg_decode_count(),
+                scaled,
+                "an Original within the preview is decoded at full size"
+            );
             assert!(preview.image.as_rgb8().is_some());
             assert_eq!(preview.pending.to_exif(), orientation as u8);
             assert_eq!(
@@ -1848,10 +1975,52 @@ mod render_source_tests {
             assert_eq!(actual, expected);
         }
         let gray = jpeg_fixture(None, ExtendedColorType::L8, &[73]);
-        let preview = open_fixture(&gray).unwrap().decode_preview().unwrap();
+        let preview = open_fixture(&gray)
+            .unwrap()
+            .decode_preview(CACHE_MAX_EDGE_PX)
+            .unwrap();
         assert!(preview.image.as_rgba8().is_some());
         assert_eq!(preview.pending, image::metadata::Orientation::NoTransforms);
         assert_eq!(preview.image.into_rgba8(), decode_fixture(&gray).unwrap());
+    }
+
+    #[test]
+    fn a_large_jpeg_preview_decodes_at_a_reduced_scale_and_keeps_the_original_size() {
+        let source = RgbImage::from_fn(3400, 2200, |x, y| {
+            Rgb([(x / 14) as u8, (y / 9) as u8, ((x + y) / 22) as u8])
+        });
+        let mut jpeg = Vec::new();
+        JpegEncoder::new_with_quality(&mut jpeg, 95)
+            .encode_image(&source)
+            .unwrap();
+        let full = decode_fixture(&jpeg).unwrap();
+        let mut rotated = jpeg.clone();
+        insert_exif_orientation(&mut rotated, 6);
+        let scaled = super::scaled_jpeg_decode_count();
+        let preview = open_fixture(&rotated)
+            .unwrap()
+            .decode_preview(CACHE_MAX_EDGE_PX)
+            .unwrap();
+        assert_eq!(super::scaled_jpeg_decode_count(), scaled + 1);
+        // The Original's size, oriented, still decides the preview's size.
+        assert_eq!(preview.oriented_dimensions(), (2200, 3400));
+        assert_eq!(preview.pending.to_exif(), 6);
+        // Half is the smallest scale that still covers a 1600-pixel preview.
+        let image = preview.image.as_rgb8().unwrap();
+        assert_eq!(image.dimensions(), (1700, 1100));
+        // Each pixel is close to the average of the 2×2 full-size pixels.
+        let mut largest = 0;
+        for (x, y, pixel) in image.enumerate_pixels() {
+            for channel in 0..3 {
+                let average = [(0, 0), (1, 0), (0, 1), (1, 1)]
+                    .iter()
+                    .map(|(dx, dy)| u32::from(full.get_pixel(x * 2 + dx, y * 2 + dy)[channel]))
+                    .sum::<u32>()
+                    / 4;
+                largest = largest.max(average.abs_diff(u32::from(pixel[channel])));
+            }
+        }
+        assert!(largest <= 8, "largest difference {largest}");
     }
 
     #[test]

@@ -1,0 +1,52 @@
+{
+  "profiles": {
+    "fraco": {
+      "description": "2 núcleos lentos, 4 GB, disco de notebook antigo",
+      "processorCount": 2,
+      "processorLimitPercent": 40,
+      "memoryMB": 4096,
+      "systemDiskMaximumIops": 5000,
+      "dataDiskMaximumIops": 5000
+    },
+    "muito-fraco": {
+      "description": "2 núcleos muito lentos, 3 GB, disco lento",
+      "processorCount": 2,
+      "processorLimitPercent": 25,
+      "memoryMB": 3072,
+      "systemDiskMaximumIops": 2500,
+      "dataDiskMaximumIops": 2500
+    },
+    "cliente-estimado": {
+      "description": "Dual-core antigo sem hyper-threading, 4 GB, HD mecânico",
+      "processorCount": 2,
+      "processorLimitPercent": 25,
+      "memoryMB": 4096,
+      "systemDiskMaximumIops": 3000,
+      "dataDiskMaximumIops": 3000
+    },
+    "cliente-ssd": {
+      "description": "Dual-core antigo sem hyper-threading, 4 GB, SSD SATA",
+      "processorCount": 2,
+      "processorLimitPercent": 25,
+      "memoryMB": 4096,
+      "systemDiskMaximumIops": 64000,
+      "dataDiskMaximumIops": 64000
+    },
+    "medio": {
+      "description": "4 núcleos, 8 GB, SSD SATA",
+      "processorCount": 4,
+      "processorLimitPercent": 60,
+      "memoryMB": 8192,
+      "systemDiskMaximumIops": 0,
+      "dataDiskMaximumIops": 0
+    },
+    "referencia": {
+      "description": "4 núcleos sem limite, 8 GB, disco sem limite",
+      "processorCount": 4,
+      "processorLimitPercent": 100,
+      "memoryMB": 8192,
+      "systemDiskMaximumIops": 0,
+      "dataDiskMaximumIops": 0
+    }
+  }
+}

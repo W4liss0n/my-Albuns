@@ -17,10 +17,15 @@ The existing ignored Rust test
 The gate isolates application data, retains exact process identities and only
 terminates its own application tree. The failure case additionally terminates
 the hidden Global WebView2 browser after checking both its parent process and
-isolated user-data directory. The Project Host and progress browser must survive.
-Global and opening-dialog debugging use separate ports, through
-`MYALBUNS_DEV_GLOBAL_WEBVIEW_DEBUG_PORT` and
-`MYALBUNS_DEV_OPENING_DIALOG_WEBVIEW_DEBUG_PORT`.
+isolated user-data directory, found through
+`MYALBUNS_DEV_GLOBAL_WEBVIEW_DEBUG_PORT`. The Project Host and the progress
+window must survive.
+
+Since 2026-10-14 the opening progress is a native Win32 window
+(`src-tauri/src/native_progress_window.rs`) with no WebView2 browser, so the
+former `--fail-progress-browser` case no longer exists. Recovery and
+External-copy decisions open as pages in the Global browser; the native gates
+that drive them reach them through the Global debugging port.
 
 Keep the Windows desktop available while running. The observer places only its
 temporary progress dialog above other windows once, without taking focus. It
@@ -39,4 +44,5 @@ Isolation alone also encountered an independent progress-browser access
 violation. With GPU composition disabled only for the dedicated progress
 environment, repeated fault-injection runs remained painted through `60 de 60`.
 This proves failure containment; it does not identify the internal WebView2
-instruction that caused the access violation.
+instruction that caused the access violation. The native progress window
+replaced that dedicated progress browser on 2026-10-14.

@@ -2,6 +2,7 @@
 status: accepted
 document: design
 date: 2026-09-13
+updated: 2026-10-14
 platform: windows
 ---
 
@@ -21,8 +22,11 @@ interna do Runtime.
 
 ## Comportamento
 
-- O diálogo de abertura recupera o estado atual de `Preparando imagens`, com
-  contagem determinada, e permanece aberto até a preparação completa.
+- Desde 2026-10-14, o progresso de abertura é uma janela nativa, sem WebView2,
+  e não depende de recuperação. As decisões de Recuperação e de Cópia externa
+  abrem como páginas no navegador da janela inicial. Antes, o diálogo de
+  abertura recuperava o estado atual de `Preparando imagens`, com contagem
+  determinada, e permanecia aberto até a preparação completa.
 - A janela conserva seu proprietário, tamanho e posição. A recuperação usa a
   cor de fundo do programa, sem adicionar linha temporária de estado.
 - O editor reconstitui sua apresentação a partir do Host existente. Avisos da
@@ -115,10 +119,11 @@ A falha acrescenta tipo, motivo e código de saída. A existência desse caminho
 não garante que o Runtime tenha criado um dump.
 
 O teste `scripts/Run-OpeningProgressPaintGate.mjs`, com
-`--fail-progress-browser`, encerra somente o navegador do diálogo pertencente
-à instância de teste. A observação usa pixels nativos e exige progresso pintado,
-menos de 500 ms de tela preta contínua e todos os artefatos de Cache prontos
-antes da liberação do editor.
+`--fail-owner-browser`, encerra somente o navegador da janela inicial
+pertencente à instância de teste. A observação usa pixels nativos e exige
+progresso pintado, menos de 500 ms de tela preta contínua e todos os artefatos
+de Cache prontos antes da liberação do editor. O caso que encerrava o navegador
+do diálogo de abertura deixou de existir com a janela nativa.
 
 O teste `scripts/Run-WebviewRecoveryGate.mjs` altera o DPI sem salvar e provoca
 duas quedas separadas do navegador do editor por `Browser.crash`. Depois de cada
