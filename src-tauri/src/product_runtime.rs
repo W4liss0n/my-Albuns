@@ -17,7 +17,7 @@ use crate::{
     cache_service::{ActiveCacheNamespace, CacheService},
     desktop_webview_policy,
     export_attempts::ExportAttempts,
-    imaging_processor::{HostWindowFocus, ImagingProcessor},
+    imaging_processor::{HostWindowFocus, ImagingProcessor, OpeningTurn},
     ipc_contract::{LinkedMediaChanged, ProjectRecoveryDecision as IpcProjectRecoveryDecision},
     logging,
     media_confirmation::MediaConfirmation,
@@ -168,6 +168,7 @@ pub(crate) fn run(
         .manage(crate::media_file_drop::NativeMediaDrops::default())
         .manage(startup_handshake)
         .manage(initial_image_processing)
+        .manage(StartupMediaChanges::default())
         .manage(cache_previews)
         .manage(ActiveCacheNamespace::new(cache_namespace_owner))
         .manage(cache_service)
@@ -187,6 +188,7 @@ pub(crate) fn run(
         .manage(layout_catalog)
         .manage(crate::workspace_preferences::WorkspacePreferencesStore::new(&app_paths))
         .manage(HostWindowFocus::default())
+        .manage(OpeningTurn::default())
         .on_window_event(|window, event| {
             // Before any handler that may consume the event: Cache work for a
             // Host none of whose windows is focused runs in the background.
@@ -557,6 +559,15 @@ fn setup_host(
     project_window.set_title(&initial_window_title)?;
     app.manage(register_open_project(&app_paths));
     app.manage(app_paths);
+    // The images do not need the page: they are prepared while WebView2
+    // starts, and the page's request joins this preparation.
+    let preparing = app.handle().clone();
+    tauri::async_runtime::spawn(async move {
+        let _ = preparing
+            .state::<InitialImageProcessing>()
+            .run(&preparing)
+            .await;
+    });
     let app_handle = app.handle().clone();
     let startup_handshake = app.state::<ProjectStartupHandshake>().inner().clone();
     tauri::async_runtime::spawn(async move {
@@ -658,6 +669,86 @@ struct InitialImageProcessing {
     problems: tokio::sync::OnceCell<Mutex<Vec<crate::ipc_contract::ImageProcessingProblem>>>,
 }
 
+/// Media changes found by the startup preparation before the page listens.
+/// The page asks for the preparation once it listens; the changes held until
+/// then reach it in one event.
+#[derive(Default)]
+pub(crate) struct StartupMediaChanges(Mutex<StartupMediaChangesState>);
+
+#[derive(Default)]
+struct StartupMediaChangesState {
+    page_listens: bool,
+    held: Vec<String>,
+}
+
+impl StartupMediaChanges {
+    /// Holds the change while the page cannot receive it yet.
+    fn hold(&self, media_ids: &[String]) -> bool {
+        let mut state = self
+            .0
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        if state.page_listens {
+            return false;
+        }
+        for media_id in media_ids {
+            if !state.held.contains(media_id) {
+                state.held.push(media_id.clone());
+            }
+        }
+        true
+    }
+
+    /// The changes held until now; later ones go straight to the page.
+    fn release(&self) -> Vec<String> {
+        let mut state = self
+            .0
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        state.page_listens = true;
+        std::mem::take(&mut state.held)
+    }
+
+    fn page_listens(&self, app: &tauri::AppHandle) {
+        let held = self.release();
+        if held.is_empty() {
+            return;
+        }
+        if let Err(error) = emit_linked_media_changed_now(app, held) {
+            tracing::warn!(
+                target: "myalbuns.desktop",
+                error = %error,
+                event = "linked_media_change_emit_failed",
+            );
+        }
+    }
+}
+
+/// Tells the Project page that these media changed, or holds the change
+/// until the page listens.
+pub(crate) fn emit_linked_media_changed(
+    app: &tauri::AppHandle,
+    media_ids: Vec<String>,
+) -> tauri::Result<()> {
+    if app
+        .try_state::<StartupMediaChanges>()
+        .is_some_and(|changes| changes.hold(&media_ids))
+    {
+        return Ok(());
+    }
+    emit_linked_media_changed_now(app, media_ids)
+}
+
+fn emit_linked_media_changed_now(
+    app: &tauri::AppHandle,
+    media_ids: Vec<String>,
+) -> tauri::Result<()> {
+    match app.get_webview_window(PROJECT_WINDOW_LABEL) {
+        Some(window) => window.emit(LINKED_MEDIA_CHANGED_EVENT, LinkedMediaChanged { media_ids }),
+        None => Ok(()),
+    }
+}
+
 fn images_requiring_startup_preparation(
     bindings: &[MediaBinding],
     recovered_sources: &[crate::media_runtime::MediaObservation],
@@ -687,38 +778,64 @@ fn images_requiring_startup_preparation(
 }
 
 impl InitialImageProcessing {
+    /// Prepares the images once. Their problems wait for the page.
+    async fn run(&self, app: &tauri::AppHandle) -> Result<(), String> {
+        self.run_with(self.preparation(app)).await.map(|_| ())
+    }
+
+    /// The problems of the preparation, delivered once, to the page that
+    /// asks first.
     async fn prepare(
         &self,
         app: &tauri::AppHandle,
     ) -> Result<Vec<crate::ipc_contract::ImageProcessingProblem>, String> {
-        self.prepare_with(async {
-            let mut problems = Vec::new();
-            let mut operation_problem = None;
-            if !self.bindings.is_empty() {
-                let mut batch = crate::image_processing::ImageProcessingBatch::new(
-                    self.bindings.len() as u32,
-                    |progress| {
-                        app.state::<ProjectStartupHandshake>()
-                            .report_image_progress(crate::ipc_contract::StartupImageProgress {
-                                completed_files: progress.completed_files,
-                                total_files: progress.total_files,
-                            });
-                        if let Some(reason) = progress.operation_problem {
-                            operation_problem = Some(reason);
-                        }
-                        if let Some(problem) = progress.problem {
-                            problems.push(problem);
-                        }
-                    },
-                );
-                batch.prepare_all(app, self.bindings.clone()).await;
-            }
-            if let Some(reason) = operation_problem {
-                return Err(reason);
-            }
-            Ok::<_, String>(problems)
-        })
-        .await
+        self.prepare_with(self.preparation(app)).await
+    }
+
+    async fn preparation(
+        &self,
+        app: &tauri::AppHandle,
+    ) -> Result<Vec<crate::ipc_contract::ImageProcessingProblem>, String> {
+        let mut problems = Vec::new();
+        let mut operation_problem = None;
+        if !self.bindings.is_empty() {
+            let mut batch = crate::image_processing::ImageProcessingBatch::new(
+                self.bindings.len() as u32,
+                |progress| {
+                    app.state::<ProjectStartupHandshake>()
+                        .report_image_progress(crate::ipc_contract::StartupImageProgress {
+                            completed_files: progress.completed_files,
+                            total_files: progress.total_files,
+                        });
+                    if let Some(reason) = progress.operation_problem {
+                        operation_problem = Some(reason);
+                    }
+                    if let Some(problem) = progress.problem {
+                        problems.push(problem);
+                    }
+                },
+            );
+            // Projects opened together prepare their images one after the other.
+            let _turn = app
+                .try_state::<OpeningTurn>()
+                .map(|turn| turn.inner().want());
+            batch.prepare_all(app, self.bindings.clone()).await;
+        }
+        if let Some(reason) = operation_problem {
+            return Err(reason);
+        }
+        Ok(problems)
+    }
+
+    async fn run_with(
+        &self,
+        preparation: impl std::future::Future<
+            Output = Result<Vec<crate::ipc_contract::ImageProcessingProblem>, String>,
+        >,
+    ) -> Result<&Mutex<Vec<crate::ipc_contract::ImageProcessingProblem>>, String> {
+        self.problems
+            .get_or_try_init(|| async { preparation.await.map(Mutex::new) })
+            .await
     }
 
     async fn prepare_with(
@@ -727,10 +844,7 @@ impl InitialImageProcessing {
             Output = Result<Vec<crate::ipc_contract::ImageProcessingProblem>, String>,
         >,
     ) -> Result<Vec<crate::ipc_contract::ImageProcessingProblem>, String> {
-        let problems = self
-            .problems
-            .get_or_try_init(|| async { preparation.await.map(Mutex::new) })
-            .await?;
+        let problems = self.run_with(preparation).await?;
         // Replacement WebViews share the Host state, but must not replay a
         // warning already delivered to the initial Project window.
         problems
@@ -749,6 +863,10 @@ async fn prepare_project_startup_images(
     if window.label() != PROJECT_WINDOW_LABEL {
         return Err("Image preparation belongs only to the Project window".into());
     }
+    // The page asks only once it listens for media changes.
+    window
+        .state::<StartupMediaChanges>()
+        .page_listens(window.app_handle());
     image_processing
         .prepare(window.app_handle())
         .await
@@ -1293,7 +1411,7 @@ mod tests {
     use myalbuns_paths::OperationPathContext;
 
     use super::{
-        InitialImageProcessing, StartupReadiness, StartupSignal,
+        InitialImageProcessing, StartupMediaChanges, StartupReadiness, StartupSignal,
         hydrate_project_from_recovered_cache, project_window_title,
         rebind_media_by_project_structure, refresh_changed_photo_sources,
         refresh_project_photos_for_media_update,
@@ -1351,6 +1469,41 @@ mod tests {
             SaveProjectOutcome::Saved { .. }
         ));
         println!("{}", project_path.display());
+    }
+
+    #[test]
+    fn media_changes_found_before_the_page_listens_reach_it_once_it_does() {
+        let changes = StartupMediaChanges::default();
+        assert!(changes.hold(&["a".into(), "b".into()]));
+        assert!(changes.hold(&["b".into(), "c".into()]));
+        assert_eq!(changes.release(), ["a", "b", "c"]);
+        assert!(!changes.hold(&["d".into()]));
+        assert!(changes.release().is_empty());
+    }
+
+    #[test]
+    fn an_early_preparation_keeps_its_problems_for_the_page() {
+        tauri::async_runtime::block_on(async {
+            let processing = InitialImageProcessing {
+                bindings: Vec::new(),
+                problems: tokio::sync::OnceCell::new(),
+            };
+            processing
+                .run_with(async {
+                    Ok(vec![crate::ipc_contract::ImageProcessingProblem {
+                        file_name: "fundo.jpg".into(),
+                        reason: "Cache indisponível".into(),
+                    }])
+                })
+                .await
+                .unwrap();
+            let delivered = processing
+                .prepare_with(async { panic!("the page joins the early preparation") })
+                .await
+                .unwrap();
+            assert_eq!(delivered.len(), 1);
+            assert_eq!(delivered[0].file_name, "fundo.jpg");
+        });
     }
 
     #[test]

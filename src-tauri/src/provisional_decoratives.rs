@@ -8,9 +8,7 @@ use myalbuns_paths::{
     ExpectedObject, NativePathDto, OperationPathContext, ResolveError, RootBindingPlan,
 };
 use serde::{Deserialize, Serialize};
-use tauri::{
-    AppHandle, Manager, Runtime, State, UriSchemeContext, UriSchemeResponder, WebviewWindow,
-};
+use tauri::{AppHandle, Runtime, State, UriSchemeContext, UriSchemeResponder, WebviewWindow};
 use tauri_plugin_dialog::{DialogExt, FilePath};
 
 use crate::{
@@ -418,15 +416,11 @@ pub(crate) async fn choose_provisional_decorative(
     let FilePath::Path(path) = selection else {
         return Err(ProvisionalDecorativeFailure::invalid_selection());
     };
-    let profile = app
-        .state::<myalbuns_paths::AppPaths>()
-        .webview_data_directory(crate::native_dialog_window::PROGRESS_WEBVIEW_NAMESPACE)
-        .map_err(|_| ProvisionalDecorativeFailure::dialog_unavailable())?;
     let progress = crate::native_dialog_window::show_native_progress(
         &app,
         GLOBAL_WINDOW_LABEL,
         crate::native_dialog_window::NativeProgressKind::ProcessingImages,
-        &profile,
+        None,
         None,
     )
     .await

@@ -2,18 +2,16 @@ use std::{
     collections::HashMap,
     fmt::Write as _,
     io,
-    path::Path,
+    path::{Path, PathBuf},
     sync::{
-        Arc, Mutex, OnceLock,
+        Arc, Mutex, MutexGuard, OnceLock, PoisonError,
         atomic::{AtomicU64, Ordering},
     },
     time::Duration,
 };
 
 use serde::Deserialize;
-use tauri::{
-    AppHandle, Emitter, Manager, WebviewUrl, WebviewWindow, WebviewWindowBuilder, WindowEvent,
-};
+use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindow, WebviewWindowBuilder, WindowEvent};
 
 #[cfg(windows)]
 use windows::Win32::UI::Input::KeyboardAndMouse::IsWindowEnabled;
@@ -23,9 +21,17 @@ use crate::{
     global_opening_burst::OpeningProgressBoard,
     global_runtime::{GLOBAL_WINDOW_LABEL, ProjectFailureDetail},
     ipc_contract::{OpeningExternalCopyDecision, OpeningProgress, ProjectRecoveryDecision},
+    native_progress_window::{
+        self, ProgressSubject, ProgressWindow, ProgressWindowOptions, progress_view,
+    },
 };
 
 const DIALOG_LOAD_TIMEOUT: Duration = Duration::from_secs(5);
+/// A decision page opens in the Welcome's browser, already running. The limit
+/// only ends a page that never answers; a slow computer still gets the page.
+const DECISION_LOAD_TIMEOUT: Duration = Duration::from_secs(60);
+/// The decision page fits its content after loading.
+const DECISION_INITIAL_HEIGHT: f64 = 220.0;
 const DIALOG_WIDTH: f64 = 380.0;
 const EXTERNAL_COPY_DIALOG_WIDTH: f64 = 440.0;
 const PROJECT_RECOVERY_DIALOG_WIDTH: f64 = 492.0;
@@ -33,7 +39,6 @@ const OWNED_WINDOW_READY_PARAMETER: &str = "ownedReadyToken";
 pub(crate) const OWNED_WINDOW_TITLEBAR_HEIGHT: f64 = 36.0;
 const OPENING_PROGRESS_LABEL: &str = "dialog-opening-progress";
 pub(crate) const PROGRESS_WEBVIEW_NAMESPACE: &str = "global-progress";
-const OPENING_PROGRESS_EVENT: &str = "myalbuns://opening-progress";
 const PROJECT_FAILURE_LABEL: &str = "dialog-project-failure";
 static NEXT_OWNED_WINDOW_READY_TOKEN: AtomicU64 = AtomicU64::new(1);
 static OWNED_WINDOW_READINESS: OnceLock<Mutex<OwnedWindowReadinessRegistry>> = OnceLock::new();
@@ -328,11 +333,11 @@ pub(crate) enum NativeProgressKind {
 }
 
 impl NativeProgressKind {
-    fn url(self) -> &'static str {
+    fn subject(self) -> ProgressSubject {
         match self {
-            Self::Creating => "dialog.html?kind=creating-project",
-            Self::Opening => "dialog.html?kind=opening-project",
-            Self::ProcessingImages => "dialog.html?kind=processing-images",
+            Self::Creating => ProgressSubject::Creating,
+            Self::Opening => ProgressSubject::Opening,
+            Self::ProcessingImages => ProgressSubject::ProcessingImages,
         }
     }
 
@@ -406,13 +411,44 @@ pub(crate) fn opening_progress(
     Ok(board.and_then(|board| board.window_snapshot()))
 }
 
+/// The browser of the decision pages: the Welcome's own, with its exact
+/// options, so a decision never starts another WebView2 browser.
+#[derive(Clone)]
+pub(crate) struct DecisionBrowser {
+    pub(crate) data_directory: PathBuf,
+    pub(crate) arguments: Option<String>,
+}
+
+/// The decision page shown in place of the progress. The progress rows bring
+/// the progress back once the decision leaves the screen.
+#[derive(Default)]
+struct DecisionPresentation {
+    page: Option<WebviewWindow>,
+    pending: bool,
+    finished: bool,
+    /// Several Projects are opening, so the decision stays above the editors
+    /// that become ready; a page built later takes it on too.
+    in_front: bool,
+}
+
+type SharedDecision = Arc<Mutex<DecisionPresentation>>;
+
+fn decision_presentation(decision: &SharedDecision) -> MutexGuard<'_, DecisionPresentation> {
+    decision.lock().unwrap_or_else(PoisonError::into_inner)
+}
+
+/// The progress of a launch: a native window, so it is on screen before any
+/// WebView2 browser starts. Recovery and External-copy decisions replace it
+/// with a WebView page while they are pending.
 pub(crate) struct NativeProgressDialog {
     closed: bool,
+    decision: SharedDecision,
     decision_attempt: Option<OpeningDecisionAttempt>,
+    decision_browser: Option<DecisionBrowser>,
     owner: WebviewWindow,
     owner_presentation: OwnerPresentation,
     progress: Option<OpeningProgressBoard>,
-    window: WebviewWindow,
+    surface: ProgressWindow,
 }
 
 impl NativeProgressDialog {
@@ -424,17 +460,19 @@ impl NativeProgressDialog {
         project_name: Option<&str>,
     ) -> io::Result<OpeningExternalCopyDecision> {
         self.ensure_opening_decision_available("the external-copy decision")?;
-        resize_owned_window_width(&self.window, EXTERNAL_COPY_DIALOG_WIDTH)?;
         let decision_receiver = external_copy_decisions()
             .lock()
             .map_err(|_| io::Error::other("the external-copy decision registry is unavailable"))?
             .register(attempt_id)?;
         self.request_opening_decision(
             OpeningDecisionAttempt::ExternalCopy(attempt_id.to_owned()),
-            "external-copy",
-            project_name,
+            DecisionPage {
+                kind: "external-copy",
+                width: EXTERNAL_COPY_DIALOG_WIDTH,
+                project_name,
+                name: "the external-copy decision",
+            },
             decision_receiver,
-            "the external-copy decision",
         )
         .await
     }
@@ -445,23 +483,27 @@ impl NativeProgressDialog {
         project_name: Option<&str>,
     ) -> io::Result<ProjectRecoveryDecision> {
         self.ensure_opening_decision_available("Recovery")?;
-        resize_owned_window_width(&self.window, PROJECT_RECOVERY_DIALOG_WIDTH)?;
         let decision_receiver = project_recovery_decisions()
             .lock()
             .map_err(|_| io::Error::other("the Recovery decision registry is unavailable"))?
             .register(attempt_id)?;
         self.request_opening_decision(
             OpeningDecisionAttempt::Recovery(attempt_id.to_owned()),
-            "project-recovery",
-            project_name,
+            DecisionPage {
+                kind: "project-recovery",
+                width: PROJECT_RECOVERY_DIALOG_WIDTH,
+                project_name,
+                name: "the Recovery decision",
+            },
             decision_receiver,
-            "the Recovery decision",
         )
         .await
     }
 
     fn ensure_opening_decision_available(&self, name: &str) -> io::Result<()> {
-        if self.owner_presentation != OwnerPresentation::Replace || self.decision_attempt.is_some()
+        if self.owner_presentation != OwnerPresentation::Replace
+            || self.decision_attempt.is_some()
+            || self.decision_browser.is_none()
         {
             return Err(io::Error::other(format!(
                 "{name} is unavailable on this launch dialog"
@@ -473,69 +515,134 @@ impl NativeProgressDialog {
     async fn request_opening_decision<T>(
         &mut self,
         attempt: OpeningDecisionAttempt,
-        kind: &str,
-        project_name: Option<&str>,
+        page: DecisionPage<'_>,
         decision_receiver: tokio::sync::oneshot::Receiver<T>,
-        name: &str,
     ) -> io::Result<T> {
         self.decision_attempt = Some(attempt.clone());
+        let attempt_id = match &attempt {
+            OpeningDecisionAttempt::ExternalCopy(attempt_id)
+            | OpeningDecisionAttempt::Recovery(attempt_id) => attempt_id.clone(),
+        };
+        // The same decision asked again, after a cancelled Save picker, reuses
+        // the page on screen.
+        let current = decision_presentation(&self.decision).page.clone();
+        let window = match current {
+            Some(window) => self
+                .reload_decision_page(&window, &page, &attempt_id)
+                .await
+                .map(|()| window),
+            None => self.build_decision_page(&page, &attempt_id).await,
+        };
+        let window = match window {
+            Ok(window) => window,
+            Err(error) => {
+                self.cancel_opening_decision();
+                return Err(error);
+            }
+        };
         let destroyed_attempt = attempt.clone();
-        self.window.on_window_event(move |event| {
+        window.on_window_event(move |event| {
             if matches!(event, WindowEvent::Destroyed) {
                 destroyed_attempt.cancel();
             }
         });
+        {
+            let mut presentation = decision_presentation(&self.decision);
+            presentation.page = Some(window.clone());
+            presentation.pending = true;
+            if presentation.in_front {
+                let _ = window.set_always_on_top(true);
+            }
+        }
+        if let Err(error) = display_dialog(&self.owner, &window, OwnerPresentation::Replace, true) {
+            decision_presentation(&self.decision).page = None;
+            self.cancel_opening_decision();
+            return Err(error);
+        }
+        // The page is on screen before the progress leaves it.
+        self.surface.hide();
 
+        let decision = decision_receiver.await.map_err(|_| {
+            io::Error::other(format!(
+                "{} dialog closed without a terminal decision",
+                page.name
+            ))
+        });
+        decision_presentation(&self.decision).pending = false;
+        self.decision_attempt = None;
+        decision
+    }
+
+    async fn build_decision_page(
+        &self,
+        page: &DecisionPage<'_>,
+        attempt_id: &str,
+    ) -> io::Result<WebviewWindow> {
+        let browser = self
+            .decision_browser
+            .as_ref()
+            .ok_or_else(|| io::Error::other(format!("{} has no browser", page.name)))?;
+        let url = format!(
+            "dialog.html?{}",
+            decision_query(page.kind, attempt_id, page.project_name, None)
+        );
+        build_hidden_owned_window_within(
+            self.owner.app_handle(),
+            &self.owner,
+            HiddenOwnedWindowConfig {
+                label: OPENING_PROGRESS_LABEL,
+                url: &url,
+                width: page.width,
+                height: DECISION_INITIAL_HEIGHT + OWNED_WINDOW_TITLEBAR_HEIGHT,
+                browser_arguments: browser.arguments.as_deref(),
+                browser_data_directory: Some(&browser.data_directory),
+            },
+            false,
+            DECISION_LOAD_TIMEOUT,
+        )
+        .await
+    }
+
+    async fn reload_decision_page(
+        &self,
+        window: &WebviewWindow,
+        page: &DecisionPage<'_>,
+        attempt_id: &str,
+    ) -> io::Result<()> {
+        resize_owned_window_width(window, page.width)?;
         let (ready_token, ready_receiver) = owned_window_readiness()
             .lock()
             .map_err(|_| io::Error::other("the owned window readiness registry is unavailable"))?
-            .register(self.window.label());
-        let current_webview = self
-            .window
+            .register(window.label());
+        let current_webview = window
             .app_handle()
-            .get_webview(self.window.label())
-            .ok_or_else(|| io::Error::other("the opening presentation is unavailable"))?;
+            .get_webview(window.label())
+            .ok_or_else(|| io::Error::other("the decision page is unavailable"))?;
         let mut url = current_webview.url().map_err(io::Error::other)?;
         url.set_path("/dialog.html");
         url.set_query(Some(&decision_query(
-            kind,
-            match &attempt {
-                OpeningDecisionAttempt::ExternalCopy(attempt_id)
-                | OpeningDecisionAttempt::Recovery(attempt_id) => attempt_id,
-            },
-            project_name,
-            ready_token,
+            page.kind,
+            attempt_id,
+            page.project_name,
+            Some(ready_token),
         )));
         if let Err(error) = current_webview.navigate(url) {
-            cancel_owned_window_readiness(self.window.label(), ready_token);
-            self.cancel_opening_decision();
+            cancel_owned_window_readiness(window.label(), ready_token);
             return Err(io::Error::other(error));
         }
-
-        let ready = tokio::time::timeout(DIALOG_LOAD_TIMEOUT, ready_receiver).await;
-        cancel_owned_window_readiness(self.window.label(), ready_token);
+        let ready = tokio::time::timeout(DECISION_LOAD_TIMEOUT, ready_receiver).await;
+        cancel_owned_window_readiness(window.label(), ready_token);
         match ready {
-            Ok(Ok(())) => {}
-            Ok(Err(_)) => {
-                self.cancel_opening_decision();
-                return Err(io::Error::other(format!(
-                    "{name} dialog readiness became unavailable"
-                )));
-            }
-            Err(_) => {
-                self.cancel_opening_decision();
-                return Err(io::Error::new(
-                    io::ErrorKind::TimedOut,
-                    format!("{name} dialog did not become ready"),
-                ));
-            }
+            Ok(Ok(())) => Ok(()),
+            Ok(Err(_)) => Err(io::Error::other(format!(
+                "{} dialog readiness became unavailable",
+                page.name
+            ))),
+            Err(_) => Err(io::Error::new(
+                io::ErrorKind::TimedOut,
+                format!("{} dialog did not become ready", page.name),
+            )),
         }
-
-        let decision = decision_receiver.await.map_err(|_| {
-            io::Error::other(format!("{name} dialog closed without a terminal decision"))
-        });
-        self.decision_attempt = None;
-        decision
     }
 
     fn cancel_opening_decision(&mut self) {
@@ -544,33 +651,44 @@ impl NativeProgressDialog {
         }
     }
 
-    pub(crate) fn decision_window(&self) -> WebviewWindow {
-        self.window.clone()
+    /// The page of the decision on screen, which owns the Save picker.
+    pub(crate) fn decision_window(&self) -> Option<WebviewWindow> {
+        decision_presentation(&self.decision).page.clone()
     }
 
     /// Raises (`true`) or lowers (`false`) the window above other windows,
     /// so that an editor of another Project that becomes ready cannot cover
     /// a pending decision.
     pub(crate) fn front_control(&self) -> impl Fn(bool) + Send + Sync + 'static {
-        let window = self.window.clone();
+        let surface = self.surface.clone();
+        let decision = Arc::clone(&self.decision);
         move |front| {
-            let _ = window.set_always_on_top(front);
+            surface.set_topmost(front);
+            let page = {
+                let mut presentation = decision_presentation(&decision);
+                presentation.in_front = front;
+                presentation.page.clone()
+            };
+            if let Some(page) = page {
+                let _ = page.set_always_on_top(front);
+            }
         }
     }
 
     pub(crate) fn finish(mut self, restore_owner_window: bool) {
         self.cancel_opening_decision();
         self.stop_progress();
+        self.close_decision_page();
         match self.owner_presentation {
             OwnerPresentation::Replace if restore_owner_window => {
-                let _ = self.window.destroy_dialog();
+                let _ = self.surface.destroy_dialog();
                 restore_owner(&self.owner);
             }
             OwnerPresentation::BlockedBehindDialog => {
-                let _ = dismiss_blocked_dialog(&self.owner, &self.window, restore_owner_window);
+                let _ = dismiss_blocked_dialog(&self.owner, &self.surface, restore_owner_window);
             }
             OwnerPresentation::Replace => {
-                let _ = self.window.destroy_dialog();
+                let _ = self.surface.destroy_dialog();
             }
         }
         self.closed = true;
@@ -581,24 +699,46 @@ impl NativeProgressDialog {
             board.detach();
         }
     }
+
+    fn close_decision_page(&self) {
+        let page = {
+            let mut presentation = decision_presentation(&self.decision);
+            presentation.finished = true;
+            presentation.page.take()
+        };
+        if let Some(page) = page {
+            let _ = page.destroy_dialog();
+        }
+    }
+}
+
+/// One decision page of the opening window.
+struct DecisionPage<'a> {
+    kind: &'a str,
+    width: f64,
+    project_name: Option<&'a str>,
+    name: &'a str,
 }
 
 /// The address of a decision page. The Project's name is present only when
-/// the window lists several Projects.
+/// the window lists several Projects. `openingOwner` tells the page that it
+/// takes the place of an opening. A new window adds its own ready token.
 fn decision_query(
     kind: &str,
     attempt_id: &str,
     project_name: Option<&str>,
-    ready_token: u64,
+    ready_token: Option<u64>,
 ) -> String {
     let mut query = format!(
-        "kind={kind}&attemptId={}",
+        "kind={kind}&attemptId={}&openingOwner=1",
         encode_unbounded_component(attempt_id)
     );
     if let Some(name) = project_name.filter(|name| !name.is_empty()) {
         let _ = write!(query, "&projectName={}", encode_component(name));
     }
-    let _ = write!(query, "&{OWNED_WINDOW_READY_PARAMETER}={ready_token}");
+    if let Some(ready_token) = ready_token {
+        let _ = write!(query, "&{OWNED_WINDOW_READY_PARAMETER}={ready_token}");
+    }
     query
 }
 
@@ -616,12 +756,13 @@ impl Drop for NativeProgressDialog {
         self.cancel_opening_decision();
         self.stop_progress();
         if !self.closed {
+            self.close_decision_page();
             match self.owner_presentation {
                 OwnerPresentation::BlockedBehindDialog => {
-                    let _ = dismiss_blocked_dialog(&self.owner, &self.window, true);
+                    let _ = dismiss_blocked_dialog(&self.owner, &self.surface, true);
                 }
                 OwnerPresentation::Replace => {
-                    let _ = self.window.destroy_dialog();
+                    let _ = self.surface.destroy_dialog();
                     release_owner(&self.owner, self.owner_presentation, true);
                 }
             }
@@ -630,67 +771,96 @@ impl Drop for NativeProgressDialog {
 }
 
 /// Shows the progress window. `progress` holds the rows an opening window
-/// lists; the window reads them when it starts and receives every change.
+/// lists; the window shows them and every change. The opening of a launch
+/// that started with files adopts the window shown before WebView2.
 pub(crate) async fn show_native_progress(
     app: &AppHandle,
     owner_label: &str,
     kind: NativeProgressKind,
-    progress_webview_data_directory: &Path,
+    decision_browser: Option<DecisionBrowser>,
     progress: Option<&OpeningProgressBoard>,
 ) -> io::Result<NativeProgressDialog> {
     if let Some(state) = app.try_state::<OpeningProgressState>() {
         state.present(progress.cloned());
     }
     let owner = owned_window(app, owner_label)?;
-    #[cfg(debug_assertions)]
-    let browser_arguments = desktop_webview_policy::replacement_webview_debug_arguments(
-        std::env::var_os(desktop_webview_policy::OPENING_DIALOG_WEBVIEW_DEBUG_PORT_ENV),
-    )?;
-    #[cfg(not(debug_assertions))]
-    let browser_arguments: Option<String> = None;
-    // Temporary rendering mitigation for the small progress surface. It does
-    // not establish a GPU root cause and leaves the Canvas GPU intact.
-    let browser_arguments = format!(
-        "{} --disable-gpu",
-        browser_arguments
-            .unwrap_or_else(|| desktop_webview_policy::WRY_DEFAULT_DISABLED_FEATURES.to_owned())
+    let owner_presentation = kind.owner_presentation();
+    let subject = kind.subject();
+    let initial = progress_view(
+        subject,
+        progress
+            .and_then(OpeningProgressBoard::window_snapshot)
+            .as_ref(),
     );
-    let window = build_hidden_owned_window(
-        app,
-        &owner,
-        HiddenOwnedWindowConfig {
-            label: OPENING_PROGRESS_LABEL,
-            url: kind.url(),
-            width: DIALOG_WIDTH,
-            height: 126.0 + OWNED_WINDOW_TITLEBAR_HEIGHT,
-            browser_arguments: Some(&browser_arguments),
-            // A failure in the hidden Global browser must not blank the progress
-            // dialog while the independent Project Host is still preparing images.
-            browser_data_directory: Some(progress_webview_data_directory),
-        },
-    )
-    .await?;
+    let adopted = if kind == NativeProgressKind::Opening {
+        native_progress_window::take_early_opening()
+    } else {
+        None
+    };
+    let surface = match adopted {
+        Some(surface) => {
+            surface.set_view(initial);
+            surface
+        }
+        None => {
+            let owner_handle = owner.hwnd().map_err(io::Error::other)?.0 as isize;
+            native_progress_window::create_on_main_thread(
+                app,
+                ProgressWindowOptions {
+                    owner: (owner_presentation == OwnerPresentation::BlockedBehindDialog)
+                        .then_some(owner_handle),
+                    near: Some(owner_handle),
+                    in_taskbar: owner_presentation == OwnerPresentation::Replace,
+                    view: initial,
+                },
+            )
+            .await?
+        }
+    };
 
+    let decision = SharedDecision::default();
     if let Some(board) = progress {
-        let target = window.clone();
+        let target = surface.clone();
+        let decision = Arc::clone(&decision);
         board.attach(move |snapshot| {
-            let _ = target.emit_to(target.label(), OPENING_PROGRESS_EVENT, snapshot);
+            target.set_view(progress_view(subject, Some(snapshot)));
+            // A decision that left the screen gives its place back.
+            let page = {
+                let mut presentation = decision_presentation(&decision);
+                if presentation.pending || presentation.finished {
+                    None
+                } else {
+                    presentation.page.take()
+                }
+            };
+            if let Some(page) = page {
+                target.show(true);
+                let _ = page.destroy_dialog();
+            }
         });
     }
-    let owner_presentation = kind.owner_presentation();
-    if let Err(error) = display_progress_dialog(&owner, &window, kind) {
+    // A window shown before WebView2 is already on screen and in the taskbar.
+    let presented = if surface.is_visible() {
+        prepare_owner(&owner, owner_presentation)
+    } else {
+        display_progress_dialog(&owner, &surface, kind)
+    };
+    if let Err(error) = presented {
         if let Some(board) = progress {
             board.detach();
         }
+        let _ = surface.destroy_dialog();
         return Err(error);
     }
     Ok(NativeProgressDialog {
         closed: false,
+        decision,
         decision_attempt: None,
+        decision_browser,
         owner,
         owner_presentation,
         progress: progress.cloned(),
-        window,
+        surface,
     })
 }
 
@@ -805,7 +975,7 @@ pub(crate) async fn build_hidden_owned_window(
     owner: &WebviewWindow,
     config: HiddenOwnedWindowConfig<'_>,
 ) -> io::Result<WebviewWindow> {
-    build_hidden_owned_window_with_profile(app, owner, config, false).await
+    build_hidden_owned_window_within(app, owner, config, false, DIALOG_LOAD_TIMEOUT).await
 }
 
 pub(crate) async fn build_hidden_owned_viewer_window(
@@ -813,14 +983,15 @@ pub(crate) async fn build_hidden_owned_viewer_window(
     owner: &WebviewWindow,
     config: HiddenOwnedWindowConfig<'_>,
 ) -> io::Result<WebviewWindow> {
-    build_hidden_owned_window_with_profile(app, owner, config, true).await
+    build_hidden_owned_window_within(app, owner, config, true, DIALOG_LOAD_TIMEOUT).await
 }
 
-async fn build_hidden_owned_window_with_profile(
+async fn build_hidden_owned_window_within(
     app: &AppHandle,
     owner: &WebviewWindow,
     config: HiddenOwnedWindowConfig<'_>,
     resizable: bool,
+    load_timeout: Duration,
 ) -> io::Result<WebviewWindow> {
     let HiddenOwnedWindowConfig {
         label,
@@ -902,7 +1073,7 @@ async fn build_hidden_owned_window_with_profile(
         })?;
         Ok::<(), io::Error>(())
     };
-    let readiness_result = tokio::time::timeout(DIALOG_LOAD_TIMEOUT, readiness).await;
+    let readiness_result = tokio::time::timeout(load_timeout, readiness).await;
     cancel_owned_window_readiness(label, ready_token);
     match readiness_result {
         Ok(Ok(())) => Ok(window),
@@ -1015,6 +1186,32 @@ trait DialogSurface {
     fn focus_dialog(&self) -> io::Result<()>;
     fn set_dialog_taskbar_visible(&self, visible: bool) -> io::Result<()>;
     fn destroy_dialog(&self) -> io::Result<()>;
+}
+
+impl DialogSurface for ProgressWindow {
+    fn is_dialog_visible(&self) -> io::Result<bool> {
+        Ok(self.is_visible())
+    }
+
+    fn show_dialog(&self) -> io::Result<()> {
+        self.show(false);
+        Ok(())
+    }
+
+    fn focus_dialog(&self) -> io::Result<()> {
+        self.show(true);
+        Ok(())
+    }
+
+    /// An opening window has its own taskbar entry from creation.
+    fn set_dialog_taskbar_visible(&self, _visible: bool) -> io::Result<()> {
+        Ok(())
+    }
+
+    fn destroy_dialog(&self) -> io::Result<()> {
+        self.close();
+        Ok(())
+    }
 }
 
 impl DialogOwner for WebviewWindow {
@@ -1365,21 +1562,26 @@ mod tests {
     #[test]
     fn a_decision_page_names_its_project_only_when_given_a_name() {
         assert_eq!(
-            decision_query("project-recovery", "attempt-42", None, 7),
-            "kind=project-recovery&attemptId=attempt-42&ownedReadyToken=7"
+            decision_query("project-recovery", "attempt-42", None, Some(7)),
+            "kind=project-recovery&attemptId=attempt-42&openingOwner=1&ownedReadyToken=7"
         );
         assert_eq!(
-            decision_query("project-recovery", "attempt-42", Some(""), 7),
-            "kind=project-recovery&attemptId=attempt-42&ownedReadyToken=7"
+            decision_query("project-recovery", "attempt-42", Some(""), Some(7)),
+            "kind=project-recovery&attemptId=attempt-42&openingOwner=1&ownedReadyToken=7"
         );
         assert_eq!(
             decision_query(
                 "external-copy",
                 "attempt 9",
                 Some("SARAH DA SILVA & Cia"),
-                8
+                Some(8)
             ),
-            "kind=external-copy&attemptId=attempt%209&projectName=SARAH%20DA%20SILVA%20%26%20Cia&ownedReadyToken=8"
+            "kind=external-copy&attemptId=attempt%209&openingOwner=1&projectName=SARAH%20DA%20SILVA%20%26%20Cia&ownedReadyToken=8"
+        );
+        // A new window adds its own token.
+        assert_eq!(
+            decision_query("project-recovery", "attempt-42", None, None),
+            "kind=project-recovery&attemptId=attempt-42&openingOwner=1"
         );
     }
 

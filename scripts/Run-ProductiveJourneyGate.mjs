@@ -968,7 +968,6 @@ async function waitForHostUiReady(instance, label) {
 }
 
 const globalDebugPort = await findFreeTcpPortInRange(40_000, 44_999);
-const openingDebugPort = await findFreeTcpPortInRange(40_000, 44_999);
 const hostDebugPort = await findFreeTcpPortInRange(40_000, 44_999);
 const reopenedHostDebugPort = await findFreeTcpPortInRange(40_000, 44_999);
 const projectDialogDebugPort = await findFreeTcpPortInRange(40_000, 44_999);
@@ -977,7 +976,6 @@ const applicationEnvironment = {
   ...process.env,
   MYALBUNS_PROCESS_GATE_DATA_ROOT: processDataRoot,
   MYALBUNS_DEV_GLOBAL_WEBVIEW_DEBUG_PORT: String(globalDebugPort),
-  MYALBUNS_DEV_OPENING_DIALOG_WEBVIEW_DEBUG_PORT: String(openingDebugPort),
   MYALBUNS_DEV_HOST_WEBVIEW_DEBUG_PORT: String(hostDebugPort),
   MYALBUNS_DEV_ALTERNATE_HOST_WEBVIEW_DEBUG_PORT: String(reopenedHostDebugPort),
   MYALBUNS_DEV_PROJECT_DIALOG_WEBVIEW_DEBUG_PORT: String(
@@ -1571,7 +1569,6 @@ try {
   }
 
   const recoveryGlobalDebugPort = await findFreeTcpPortInRange(40_000, 44_999);
-  const recoveryOpeningDebugPort = await findFreeTcpPortInRange(40_000, 44_999);
   const recoveryHostDebugPort = await findFreeTcpPortInRange(40_000, 44_999);
   const recoveryProjectDialogDebugPort = await findFreeTcpPortInRange(
     40_000,
@@ -1581,7 +1578,6 @@ try {
     ...process.env,
     MYALBUNS_PROCESS_GATE_DATA_ROOT: processDataRoot,
     MYALBUNS_DEV_GLOBAL_WEBVIEW_DEBUG_PORT: String(recoveryGlobalDebugPort),
-    MYALBUNS_DEV_OPENING_DIALOG_WEBVIEW_DEBUG_PORT: String(recoveryOpeningDebugPort),
     MYALBUNS_DEV_HOST_WEBVIEW_DEBUG_PORT: String(recoveryHostDebugPort),
     MYALBUNS_DEV_PROJECT_DIALOG_WEBVIEW_DEBUG_PORT: String(
       recoveryProjectDialogDebugPort,
@@ -1617,8 +1613,7 @@ try {
       const globalTargets = ownerTargets
         .filter((target) => target.type === "page")
         .filter((target) => target.url.includes("global.html"));
-      const openingTargets = await devToolsTargets(recoveryOpeningDebugPort, "recovery opening dialog");
-      const recoveryTargets = openingTargets
+      const recoveryTargets = ownerTargets
         .filter((target) => target.type === "page")
         .filter((target) => {
           try {
@@ -1638,7 +1633,7 @@ try {
     timeoutMilliseconds,
   );
   recoveryDialogDriver = await startAttachedWebDriver(
-    recoveryOpeningDebugPort,
+    recoveryGlobalDebugPort,
     "external recovery opening dialog",
   );
   await switchToWebDriverWindow(
@@ -1789,7 +1784,7 @@ try {
   );
   await delay(300);
   const targetsWithQueuedActivation = await devToolsTargets(
-    recoveryOpeningDebugPort,
+    recoveryGlobalDebugPort,
     "Recovery owner with queued activation",
   );
   const recoveryTargetWithQueuedActivation = targetsWithQueuedActivation.find(
@@ -2263,7 +2258,6 @@ try {
   const historyPreservedAfterSaveAs = true;
 
   const originalGlobalDebugPort = await findFreeTcpPortInRange(40_000, 44_999);
-  const originalOpeningDebugPort = await findFreeTcpPortInRange(40_000, 44_999);
   const originalHostDebugPort = await findFreeTcpPortInRange(40_000, 44_999);
   const originalProjectDialogDebugPort = await findFreeTcpPortInRange(
     40_000,
@@ -2273,7 +2267,6 @@ try {
     ...process.env,
     MYALBUNS_PROCESS_GATE_DATA_ROOT: processDataRoot,
     MYALBUNS_DEV_GLOBAL_WEBVIEW_DEBUG_PORT: String(originalGlobalDebugPort),
-    MYALBUNS_DEV_OPENING_DIALOG_WEBVIEW_DEBUG_PORT: String(originalOpeningDebugPort),
     MYALBUNS_DEV_HOST_WEBVIEW_DEBUG_PORT: String(originalHostDebugPort),
     MYALBUNS_DEV_PROJECT_DIALOG_WEBVIEW_DEBUG_PORT: String(
       originalProjectDialogDebugPort,
@@ -2974,7 +2967,6 @@ try {
     externalSourceBytes.toString("utf8"),
   );
   const externalGlobalDebugPort = await findFreeTcpPortInRange(40_000, 44_999);
-  const externalOpeningDebugPort = await findFreeTcpPortInRange(40_000, 44_999);
   const externalHostDebugPort = await findFreeTcpPortInRange(40_000, 44_999);
   const externalProjectDialogDebugPort = await findFreeTcpPortInRange(
     40_000,
@@ -2984,7 +2976,6 @@ try {
     ...process.env,
     MYALBUNS_PROCESS_GATE_DATA_ROOT: processDataRoot,
     MYALBUNS_DEV_GLOBAL_WEBVIEW_DEBUG_PORT: String(externalGlobalDebugPort),
-    MYALBUNS_DEV_OPENING_DIALOG_WEBVIEW_DEBUG_PORT: String(externalOpeningDebugPort),
     MYALBUNS_DEV_HOST_WEBVIEW_DEBUG_PORT: String(externalHostDebugPort),
     MYALBUNS_DEV_PROJECT_DIALOG_WEBVIEW_DEBUG_PORT: String(
       externalProjectDialogDebugPort,
@@ -3021,8 +3012,7 @@ try {
       const globalTargets = ownerTargets
         .filter((target) => target.type === "page")
         .filter((target) => target.url.includes("global.html"));
-      const openingTargets = await devToolsTargets(externalOpeningDebugPort, "external-copy opening dialog");
-      const decisionTargets = openingTargets
+      const decisionTargets = ownerTargets
         .filter((target) => target.type === "page")
         .filter((target) => {
           try {
@@ -3042,7 +3032,7 @@ try {
     timeoutMilliseconds,
   );
   externalCopyDialogDriver = await startAttachedWebDriver(
-    externalOpeningDebugPort,
+    externalGlobalDebugPort,
     "external-copy opening dialog",
   );
   await switchToWebDriverWindow(
@@ -3226,7 +3216,7 @@ try {
     "queued external-copy opening dialog target",
     async () => {
       const targets = await devToolsTargets(
-        externalOpeningDebugPort,
+        externalGlobalDebugPort,
         "queued external-copy opening owner",
       );
       const decisionTargets = targets.filter((target) => {
@@ -3246,7 +3236,7 @@ try {
     timeoutMilliseconds,
   );
   externalCopyDialogDriver = await startAttachedWebDriver(
-    externalOpeningDebugPort,
+    externalGlobalDebugPort,
     "queued external-copy opening dialog",
   );
   await switchToWebDriverWindow(
@@ -3289,7 +3279,7 @@ try {
   );
   await delay(300);
   const targetsWithQueuedExternalActivation = await devToolsTargets(
-    externalOpeningDebugPort,
+    externalGlobalDebugPort,
     "external-copy owner with queued path activation",
   );
   const queuedExternalTarget = targetsWithQueuedExternalActivation.find(
@@ -3369,7 +3359,7 @@ try {
     "serial external-copy retry dialog target",
     async () => {
       const targets = await devToolsTargets(
-        externalOpeningDebugPort,
+        externalGlobalDebugPort,
         "serial external-copy retry owner",
       );
       const decisionTargets = targets.filter((target) => {
@@ -3389,7 +3379,7 @@ try {
     timeoutMilliseconds,
   );
   externalCopyDialogDriver = await startAttachedWebDriver(
-    externalOpeningDebugPort,
+    externalGlobalDebugPort,
     "serial external-copy retry dialog",
   );
   await switchToWebDriverWindow(

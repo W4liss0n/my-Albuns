@@ -2,7 +2,11 @@ use std::{
     io::{BufReader, Read, Write},
     path::{Path, PathBuf},
     process::{Child, ChildStdin, Command, Stdio},
-    sync::{Arc, Mutex, mpsc},
+    sync::{
+        Arc, Mutex,
+        atomic::{AtomicBool, Ordering},
+        mpsc,
+    },
     thread,
     time::{Duration, Instant},
 };
@@ -18,6 +22,8 @@ use super::{
 };
 
 const MAX_TERMINAL_BYTES: usize = 32 * 1024;
+/// How often a wait for the Host's first terminal looks at its cancellation.
+const CANCELLATION_POLL_INTERVAL: Duration = Duration::from_millis(100);
 /// A Host that keeps reporting progress is never stopped by the silence limit,
 /// but no single opening may last longer than this.
 const HOST_STARTUP_CEILING: Duration = Duration::from_secs(2 * 60 * 60);
@@ -100,6 +106,22 @@ impl StartupProgressReporter {
         (self.0)(progress);
     }
 }
+
+/// Stops a Host that has not reported its first terminal yet. A Host that is
+/// ready, or that waits for a decision, is not affected.
+#[derive(Clone, Debug, Default)]
+pub(crate) struct LaunchCancellation(Arc<AtomicBool>);
+
+impl LaunchCancellation {
+    pub(crate) fn cancel(&self) {
+        self.0.store(true, Ordering::Release);
+    }
+
+    pub(crate) fn is_cancelled(&self) -> bool {
+        self.0.load(Ordering::Acquire)
+    }
+}
+
 #[cfg(debug_assertions)]
 const HOST_WEBVIEW_DEBUG_PORT_ENV: &str = "MYALBUNS_DEV_HOST_WEBVIEW_DEBUG_PORT";
 
@@ -110,6 +132,7 @@ pub(crate) struct ProjectHostBootstrap {
     creation_timeout: Duration,
     progress: Option<StartupProgressReporter>,
     focus_claim: Option<String>,
+    cancellation: Option<LaunchCancellation>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -188,6 +211,8 @@ pub(crate) enum BootstrapFailureKind {
     InvalidTerminal,
     CorrelationMismatch,
     HostFailed,
+    /// The launch was cancelled before the Host reported; the Host was stopped.
+    Cancelled,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -205,7 +230,13 @@ impl ProjectHostBootstrap {
             creation_timeout: terminal_timeout,
             progress: None,
             focus_claim: None,
+            cancellation: None,
         }
+    }
+
+    pub(crate) fn with_cancellation(mut self, cancellation: LaunchCancellation) -> Self {
+        self.cancellation = Some(cancellation);
+        self
     }
 
     /// Projects opened together share one claim: only the first editor that
@@ -268,7 +299,13 @@ impl ProjectHostBootstrap {
             BootstrapIntent::CreateNew { .. } => self.creation_timeout,
             BootstrapIntent::OpenExisting => self.terminal_timeout,
         };
-        supervise_child_with_progress(child, request, timeout, self.progress.clone())
+        supervise_child_with_progress(
+            child,
+            request,
+            timeout,
+            self.progress.clone(),
+            self.cancellation.as_ref(),
+        )
     }
 }
 
@@ -371,7 +408,7 @@ fn supervise_child(
     request: BootstrapRequest,
     terminal_timeout: Duration,
 ) -> Result<BootstrapOutcome, BootstrapFailure> {
-    supervise_child_with_progress(child, request, terminal_timeout, None)
+    supervise_child_with_progress(child, request, terminal_timeout, None, None)
 }
 
 fn supervise_child_with_progress(
@@ -379,6 +416,7 @@ fn supervise_child_with_progress(
     request: BootstrapRequest,
     terminal_timeout: Duration,
     progress: Option<StartupProgressReporter>,
+    cancellation: Option<&LaunchCancellation>,
 ) -> Result<BootstrapOutcome, BootstrapFailure> {
     let mut pending = PendingChild::new(child);
     let mut stdin = pending
@@ -424,7 +462,8 @@ fn supervise_child_with_progress(
         }
     });
 
-    let terminal = receive_terminal(&terminal_receiver, terminal_timeout, &clock)?;
+    let terminal =
+        receive_terminal_unless(&terminal_receiver, terminal_timeout, &clock, cancellation)?;
 
     match validate_terminal(&request, pending.child_mut().id(), terminal) {
         Ok(ValidatedTerminal::Ready {
@@ -626,7 +665,25 @@ fn receive_terminal(
     silence: Duration,
     clock: &StartupClock,
 ) -> Result<HostTerminal, BootstrapFailure> {
+    receive_terminal_unless(receiver, silence, clock, None)
+}
+
+/// [`receive_terminal`] that gives up once `cancellation` is set; dropping
+/// the pending Host then stops it.
+fn receive_terminal_unless(
+    receiver: &mpsc::Receiver<Result<HostTerminal, BootstrapFailure>>,
+    silence: Duration,
+    clock: &StartupClock,
+    cancellation: Option<&LaunchCancellation>,
+) -> Result<HostTerminal, BootstrapFailure> {
     loop {
+        if cancellation.is_some_and(LaunchCancellation::is_cancelled) {
+            return Err(BootstrapFailure {
+                kind: BootstrapFailureKind::Cancelled,
+                stage: None,
+                code: None,
+            });
+        }
         let remaining = clock
             .deadline(silence)
             .saturating_duration_since(Instant::now());
@@ -637,7 +694,11 @@ fn receive_terminal(
                 code: Some(super::FailureCode::HostExitedBeforeReady),
             });
         }
-        match receiver.recv_timeout(remaining) {
+        let wait = match cancellation {
+            Some(_) => remaining.min(CANCELLATION_POLL_INTERVAL),
+            None => remaining,
+        };
+        match receiver.recv_timeout(wait) {
             Ok(result) => return result,
             // Progress may have moved the deadline while this wait slept.
             Err(mpsc::RecvTimeoutError::Timeout) => {}
@@ -1419,6 +1480,31 @@ mod tests {
         reap(&mut host);
         assert!(!process_is_alive(pid));
         assert!(matches!(host.try_wait(), Ok(Some(_))));
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn a_cancelled_launch_stops_the_host_before_its_deadline() {
+        let host = silent_host();
+        let pid = host.id();
+        let cancellation = LaunchCancellation::default();
+        let cancel_later = cancellation.clone();
+        thread::spawn(move || {
+            thread::sleep(Duration::from_millis(150));
+            cancel_later.cancel();
+        });
+        let started = Instant::now();
+        let failure = supervise_child_with_progress(
+            host,
+            fixture_request(),
+            Duration::from_secs(30),
+            None,
+            Some(&cancellation),
+        )
+        .expect_err("a cancelled launch does not wait for its terminal");
+        assert_eq!(failure.kind, BootstrapFailureKind::Cancelled);
+        assert!(started.elapsed() < Duration::from_secs(5));
+        assert!(!process_is_alive(pid));
     }
 
     #[cfg(windows)]
