@@ -11,8 +11,8 @@ use image::{ImageFormat, Rgb, RgbImage, Rgba, RgbaImage};
 use myalbuns_core::MediaKind;
 use myalbuns_imaging_protocol::{
     CacheArtifact, CacheArtifactFormat, CacheArtifactProperties, CacheBasicColorProfile, CacheJob,
-    CacheMediaSource, CacheRepresentationPolicy, CacheRequest, CacheReusableGeneration,
-    ImagingCommand, ImagingFailureStage, decode_event_stream,
+    CacheJobFailure, CacheMediaSource, CacheRepresentationPolicy, CacheRequest,
+    CacheReusableGeneration, ImagingCommand, ImagingProgressStage, decode_event_stream,
 };
 use myalbuns_paths::{
     AppPaths, CachePathPlan, OperationPathContext, RootBindingPlan, project_data_namespace,
@@ -205,12 +205,15 @@ fn real_processor_rejects_multi_page_tiff_without_publishing_a_generation() {
         None,
     );
 
-    let output = invoke(&command, log_root.path());
+    let completion = run(&command, log_root.path());
 
-    assert!(!output.status.success());
+    assert!(completion.artifacts.is_empty());
     assert_eq!(
-        output.status.code(),
-        Some(ImagingFailureStage::CacheProcessing.exit_code().into())
+        completion.failures,
+        [CacheJobFailure {
+            media_id: "background-pages".into()
+        }],
+        "the rejection belongs to this media, not to the Processor"
     );
     for format in [CacheArtifactFormat::Jpeg, CacheArtifactFormat::Png] {
         let artifact = cache
@@ -260,8 +263,9 @@ fn terminal_fingerprint_reopens_the_frozen_path_after_atomic_replacement() {
     let output = process
         .wait_with_output()
         .expect("the Processador reaches a typed terminal");
+    let completion = completion_for(&command, &output);
     assert!(
-        !output.status.success(),
+        completion.artifacts.is_empty() && completion.failures.len() == 1,
         "a preview decoded from the displaced handle cannot be published for the new pathname"
     );
     for format in [CacheArtifactFormat::Jpeg, CacheArtifactFormat::Png] {
@@ -272,6 +276,108 @@ fn terminal_fingerprint_reopens_the_frozen_path_after_atomic_replacement() {
                 .expect("the candidate path is valid")
                 .exists(),
             "the stale candidate generation is never published"
+        );
+    }
+}
+
+#[test]
+fn real_processor_prepares_a_batch_and_isolates_the_media_that_fails() {
+    let source_root = tempfile::tempdir().expect("temporary batch source root");
+    let log_root = tempfile::tempdir().expect("temporary batch log root");
+    let cache = IsolatedCache::new("batch");
+    let first = source_root.path().join("first.jpg");
+    let damaged = source_root.path().join("damaged.jpg");
+    let last = source_root.path().join("last.png");
+    RgbImage::from_pixel(2_000, 1_000, Rgb([10, 120, 200]))
+        .save_with_format(&first, ImageFormat::Jpeg)
+        .expect("the first Photo is written");
+    fs::write(&damaged, b"not a JPEG").expect("the damaged Photo is written");
+    RgbaImage::from_pixel(64, 32, Rgba([200, 40, 10, 128]))
+        .save_with_format(&last, ImageFormat::Png)
+        .expect("the last Decorative is written");
+    let sources = [
+        ("photo-first", MediaKind::Photo, &first),
+        ("photo-damaged", MediaKind::Photo, &damaged),
+        ("decorative-last", MediaKind::Decorative, &last),
+    ];
+    let jobs = sources
+        .iter()
+        .map(|(media_id, kind, path)| {
+            CacheJob::new(
+                CacheMediaSource::new(*media_id, *kind, path.to_path_buf())
+                    .expect("the Cache source is valid"),
+                format!("candidate-{media_id}"),
+                None,
+            )
+            .expect("the Cache job is valid")
+        })
+        .collect();
+    let command = ImagingCommand::build_cache(
+        CacheRequest::new(
+            "cache-batch",
+            cache.project_id.clone(),
+            cache.paths.clone(),
+            jobs,
+            CacheRepresentationPolicy::measured_v1(),
+            root_bindings(&[cache.paths.root(), source_root.path()]),
+        )
+        .expect("the Cache request is valid"),
+    );
+
+    let output = invoke(&command, log_root.path());
+    let (progress, _) =
+        decode_event_stream(&output.stdout).expect("the Processador event stream is valid");
+    let completion = completion_for(&command, &output);
+
+    assert_eq!(
+        progress
+            .iter()
+            .map(|event| (event.stage, event.completed_units, event.total_units))
+            .collect::<Vec<_>>(),
+        (0..=3)
+            .map(|completed| (ImagingProgressStage::PreparingPhotos, completed, 3))
+            .collect::<Vec<_>>(),
+        "each finished media advances the progress, failed ones included"
+    );
+    assert_eq!(
+        completion
+            .artifacts
+            .iter()
+            .map(|artifact| artifact.media_id.as_str())
+            .collect::<Vec<_>>(),
+        ["photo-first", "decorative-last"]
+    );
+    assert_eq!(
+        completion.failures,
+        [CacheJobFailure {
+            media_id: "photo-damaged".into()
+        }]
+    );
+    assert_eq!(
+        (completion.generated_count, completion.reused_count),
+        (2, 0)
+    );
+    assert_eq!(
+        completion.artifacts[1].format,
+        CacheArtifactFormat::Png,
+        "the media after a failure keeps its own representation"
+    );
+    for artifact in &completion.artifacts {
+        assert!(
+            cache
+                .paths
+                .preview_file(&artifact.media_id, &artifact.generation_id, artifact.format)
+                .expect("the artifact path is valid")
+                .exists()
+        );
+    }
+    for format in [CacheArtifactFormat::Jpeg, CacheArtifactFormat::Png] {
+        assert!(
+            !cache
+                .paths
+                .preview_file("photo-damaged", "candidate-photo-damaged", format)
+                .expect("the candidate path is valid")
+                .exists()
         );
     }
 }
@@ -332,7 +438,13 @@ fn root_bindings(paths: &[&Path]) -> RootBindingPlan {
 }
 
 fn run(command: &ImagingCommand, log_root: &Path) -> myalbuns_imaging_protocol::CacheCompletion {
-    let output = invoke(command, log_root);
+    completion_for(command, &invoke(command, log_root))
+}
+
+fn completion_for(
+    command: &ImagingCommand,
+    output: &std::process::Output,
+) -> myalbuns_imaging_protocol::CacheCompletion {
     assert!(
         output.status.success(),
         "Processador failed: {}",

@@ -2,7 +2,7 @@
 status: accepted
 document: design
 date: 2026-09-06
-updated: 2026-10-07
+updated: 2026-10-15
 platform: windows
 implementation-readiness: ready-for-agent
 ---
@@ -58,6 +58,15 @@ Um processo recebe um lote limitado e processa uma imagem por vez. O limite de
 Job do Windows, registro durável antes do primeiro item, cancelamento e saída
 confirmada antes de liberar a reserva. Não existe um segundo controlador de
 processos paralelo ao `ImagingProcessor`.
+
+Desde o protocolo 28, a preparação do Cache de mídias já vinculadas usa o mesmo
+modelo, com lotes de até 16 imagens divididos por igual entre as vagas. A
+conclusão traz o artefato ou a falha de cada mídia; só a falta de espaço ou uma
+falha do próprio pedido encerra o lote inteiro. Cada mídia continua com o seu
+voo: uma que fica obsoleta durante o lote não é publicada, e o processo só é
+cancelado quando todas ficam obsoletas ou quando há pausa. A medição que motivou
+o lote e o ganho medido estão em
+[lotes no Processador de Imagens](../research/2026-10-15-lotes-no-processador-de-imagens.md).
 
 `ImagingProcessor` possui os limites de trabalhadores e de memória para todas
 as ações e demandas de Cache do seu processo. Entre processos, cada Processador
@@ -118,7 +127,8 @@ reconstrução no Processador, rejeição e digest no Host.
 ## Progresso durante os lotes
 
 O protocolo 19 acrescenta a etapa `preparingPhotos` ao fluxo de eventos do
-Processador. Cada lote informa seu total e avança assim que um Original tem sua
+Processador; no protocolo 28, os lotes de Cache também a usam e contam cada
+mídia concluída, com ou sem prévia. Cada lote informa seu total e avança assim que um Original tem sua
 validação e preparação de Cache concluídas, inclusive quando a prévia termina
 indisponível. Fontes que ainda exigem inspeção alternativa não entram nessa
 contagem antecipadamente.

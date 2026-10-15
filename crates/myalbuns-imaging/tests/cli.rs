@@ -2073,15 +2073,18 @@ fn processor_rejects_a_same_length_change_before_reusing_a_preview() {
     );
     let changed = invoke_imaging_command(&changed_command, Some(log_dir.path()));
 
+    assert!(changed.status.success());
+    let changed_completion = processor_response(&changed.stdout)
+        .cache_completed_for("cache-integrity-changed")
+        .expect("the changed response is correlated")
+        .clone();
     assert!(
-        !changed.status.success(),
+        changed_completion.artifacts.is_empty()
+            && changed_completion.failures.len() == 1
+            && changed_completion.failures[0].media_id == "benchmark-a-001",
         "a stale generation must not be reused for changed source bytes"
     );
-    assert_eq!(
-        changed.status.code(),
-        Some(ImagingFailureStage::CacheProcessing.exit_code().into())
-    );
-    assert!(read_logs(log_dir.path()).contains("\"stage\":\"cache_processing\""));
+    assert!(read_logs(log_dir.path()).contains("\"event\":\"cache_job_failed\""));
 }
 
 #[test]

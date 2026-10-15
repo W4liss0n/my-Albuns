@@ -23,6 +23,7 @@ fn empty_cache_response(request_id: &str) -> ImagingResponse {
         request_id,
         CacheCompletion {
             artifacts: vec![],
+            failures: vec![],
             generated_count: 0,
             reused_count: 0,
             source_bytes: 0,
@@ -616,6 +617,7 @@ fn cache_command_keeps_project_identity_opaque_and_source_paths_native() {
         "cache-42",
         CacheCompletion {
             artifacts: vec![],
+            failures: vec![],
             generated_count: 0,
             reused_count: 1,
             source_bytes: 1024,

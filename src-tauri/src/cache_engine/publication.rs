@@ -3,7 +3,7 @@
 use super::*;
 
 pub(crate) struct PendingCachePublication {
-    pub(super) storage: PreparedCacheStorage,
+    pub(super) storage: Arc<PreparedCacheStorage>,
     pub(super) request: CacheRequest,
     pub(super) work: CacheWork,
     pub(super) execution: CacheExecution,

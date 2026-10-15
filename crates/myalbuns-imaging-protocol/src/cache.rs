@@ -370,14 +370,32 @@ impl CacheJob {
     }
 }
 
+/// A request may carry several media. Each job ends either as an artifact or
+/// as a failure of that media alone; only storage exhaustion or a failure of
+/// the request itself ends the whole process without a completion.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CacheCompletion {
     pub artifacts: Vec<CacheArtifact>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub failures: Vec<CacheJobFailure>,
     pub generated_count: usize,
     pub reused_count: usize,
     pub source_bytes: u64,
     pub preview_bytes: u64,
+}
+
+impl CacheCompletion {
+    /// Media the Processor finished, with or without an artifact.
+    pub fn finished_count(&self) -> usize {
+        self.artifacts.len() + self.failures.len()
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CacheJobFailure {
+    pub media_id: String,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]

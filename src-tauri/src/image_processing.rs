@@ -4,19 +4,21 @@ use tauri::{AppHandle, Manager};
 use crate::{
     cache_activity_gate::{CacheCancellation, CacheCancellationReason},
     cache_engine::{
-        self, CacheEngine, CacheFailure, CacheFailureStage, CacheFlightClaim, CacheWork,
-        PendingCachePublication,
+        self, CacheBatch, CacheBatchMember, CacheEngine, CacheFailure, CacheFailureStage,
+        CacheFlightClaim, CacheWork, PendingCachePublication,
     },
     cache_service::ActiveCacheNamespace,
     imaging_processor::{
-        ImageMemoryEstimate, ImagingProcessor, InvocationContext, InvocationFailureStage,
-        ProcessorAdmissionFailure, TauriImagingTransport,
+        ImageMemoryEstimate, ImagingProcessor, InvocationContext, InvocationControl,
+        InvocationFailureStage, ProcessorAdmissionFailure, TauriImagingTransport,
     },
     logging::LoggingState,
     media_runtime::MediaBinding,
     project_host::ProjectHost,
 };
-use myalbuns_imaging_protocol::CacheMediaSource;
+use std::path::PathBuf;
+
+use myalbuns_imaging_protocol::{CacheMediaSource, ImagingProgress, ImagingProgressStage};
 use myalbuns_paths::{AppPaths, OperationPathContext, RootBindingPlan};
 
 /// Before a Project identity exists, a selected decorative keeps its validated
@@ -171,72 +173,132 @@ impl<F: FnMut(crate::ipc_contract::ImageProcessingProgress)> ImageProcessingBatc
         drop(permit);
         let resource_interrupted = std::sync::atomic::AtomicBool::new(false);
         let storage_interrupted = std::sync::atomic::AtomicBool::new(false);
-        let preparation = stream::iter(owners)
-            .map(|(binding, work, owner)| {
+        let (progress_sender, mut progress_receiver) = tokio::sync::mpsc::unbounded_channel();
+        let progress = BatchProgress::new(progress_sender);
+        let report = |event| progress.report(event);
+        let capacity = app.state::<ImagingProcessor>().background_cache_capacity();
+        let mut owners = owners.into_iter();
+        let batches = cache_batch_sizes(owners.len(), capacity)
+            .into_iter()
+            .map(|size| owners.by_ref().take(size).collect::<Vec<_>>())
+            .collect::<Vec<_>>();
+        let preparation = stream::iter(batches)
+            .map(|members| {
                 let resource_interrupted = &resource_interrupted;
                 let storage_interrupted = &storage_interrupted;
+                let report = &report;
                 async move {
-                    let result = if storage_interrupted.load(std::sync::atomic::Ordering::Acquire) {
-                        Err(CacheFailure::new(
-                            CacheFailureStage::StorageFull,
-                            "Espaço insuficiente.",
-                        ))
+                    let request_id = format!("cache-batch-{}", uuid::Uuid::new_v4().simple());
+                    let results = if storage_interrupted.load(std::sync::atomic::Ordering::Acquire)
+                    {
+                        members
+                            .iter()
+                            .map(|_| {
+                                Err(CacheFailure::new(
+                                    CacheFailureStage::StorageFull,
+                                    "Espaço insuficiente.",
+                                ))
+                            })
+                            .collect()
                     } else if resource_interrupted.load(std::sync::atomic::Ordering::Acquire) {
-                        Err(CacheFailure::new(
-                            CacheFailureStage::MemoryPressure,
-                            ProcessorAdmissionFailure::MemoryPressure.to_string(),
-                        ))
+                        members
+                            .iter()
+                            .map(|_| {
+                                Err(CacheFailure::new(
+                                    CacheFailureStage::MemoryPressure,
+                                    ProcessorAdmissionFailure::MemoryPressure.to_string(),
+                                ))
+                            })
+                            .collect()
                     } else {
-                        prepare_owned_cache(
+                        prepare_owned_cache_batch(
                             app,
                             app.state::<LoggingState>().inner(),
                             app.state::<AppPaths>().inner(),
                             app.state::<CacheEngine>().inner(),
                             app.state::<ImagingProcessor>().inner(),
-                            work,
-                            owner.cancellation(),
+                            CacheBatch {
+                                request_id: request_id.clone(),
+                                members: members
+                                    .iter()
+                                    .map(|(_, work, owner)| CacheBatchMember {
+                                        work: work.clone(),
+                                        cancellation: owner.cancellation(),
+                                    })
+                                    .collect(),
+                            },
+                            None,
+                            report,
                         )
                         .await
                     };
-                    if result
-                        .as_ref()
-                        .is_err_and(|failure| failure.stage == CacheFailureStage::MemoryPressure)
-                    {
+                    let failed_with = |stage| {
+                        results.iter().any(|result| {
+                            result
+                                .as_ref()
+                                .is_err_and(|failure: &CacheFailure| failure.stage == stage)
+                        })
+                    };
+                    if failed_with(CacheFailureStage::MemoryPressure) {
                         resource_interrupted.store(true, std::sync::atomic::Ordering::Release);
                     }
-                    if result
-                        .as_ref()
-                        .is_err_and(|failure| failure.stage == CacheFailureStage::StorageFull)
-                    {
+                    if failed_with(CacheFailureStage::StorageFull) {
                         storage_interrupted.store(true, std::sync::atomic::Ordering::Release);
                     }
-                    (binding, owner, result)
+                    (request_id, members, results)
                 }
             })
             // Admission and the machine-wide slots decide how many run: work
             // for an unfocused Project may use every core.
-            .buffer_unordered(app.state::<ImagingProcessor>().background_cache_capacity());
+            .buffer_unordered(capacity);
         tokio::pin!(preparation);
         let mut prepared = Vec::new();
         let mut publications = Vec::new();
-        while let Some((binding, owner, result)) = preparation.next().await {
-            match result {
-                Ok(pending) => {
-                    // The reduced image is validated now. Report preparation as
-                    // it completes; publishing the shared index still belongs to
-                    // this awaited operation and must not count the image twice.
-                    self.complete(None);
-                    prepared.push((binding, owner));
-                    publications.push(pending);
+        loop {
+            let (request_id, members, results) = tokio::select! {
+                biased;
+                Some(finished) = progress_receiver.recv() => {
+                    // Each image counts as soon as its Processor finishes it.
+                    for _ in 0..finished {
+                        self.complete(None);
+                    }
+                    continue;
                 }
-                Err(failure) => {
-                    let result = owner.complete(Err(failure));
-                    self.prepare_with(
-                        &binding,
-                        std::future::ready(processing_result_for_app(app, result)),
-                    )
-                    .await;
+                batch = preparation.next() => match batch {
+                    Some(batch) => batch,
+                    None => break,
+                },
+            };
+            let mut counted = progress.counted(&request_id);
+            for ((binding, _, owner), result) in members.into_iter().zip(results) {
+                let already_counted = counted > 0;
+                counted = counted.saturating_sub(1);
+                match result {
+                    Ok(pending) => {
+                        // The reduced image is validated now. Publishing the
+                        // shared index still belongs to this awaited operation
+                        // and must not count the image twice.
+                        if !already_counted {
+                            self.complete(None);
+                        }
+                        prepared.push((binding, owner));
+                        publications.push(pending);
+                    }
+                    Err(failure) => {
+                        let result = owner.complete(Err(failure));
+                        self.record_result(
+                            &binding,
+                            processing_result_for_app(app, result),
+                            already_counted,
+                        );
+                    }
                 }
+            }
+        }
+        // Progress a finished batch reported in its last poll.
+        while let Ok(finished) = progress_receiver.try_recv() {
+            for _ in 0..finished {
+                self.complete(None);
             }
         }
         if !publications.is_empty() {
@@ -383,6 +445,66 @@ impl<F: FnMut(crate::ipc_contract::ImageProcessingProgress)> ImageProcessingBatc
             problem,
             operation_problem: self.operation_problem.clone(),
         });
+    }
+}
+
+/// Media one Processor prepares in a row. Starting a Processor costs about as
+/// much as preparing a fifth of an image on a slow computer, while a batch
+/// holds its machine slot until its last image.
+const CACHE_PROCESS_BATCH: usize = 16;
+
+/// Sizes of the batches, in order. Every wave of `capacity` batches stays
+/// busy until the end: the batches differ by at most one image.
+fn cache_batch_sizes(count: usize, capacity: usize) -> Vec<usize> {
+    if count == 0 {
+        return Vec::new();
+    }
+    let capacity = capacity.max(1);
+    let waves = count.div_ceil(capacity.saturating_mul(CACHE_PROCESS_BATCH));
+    let batches = capacity.saturating_mul(waves).min(count);
+    (0..batches)
+        .map(|index| count / batches + usize::from(index < count % batches))
+        .collect()
+}
+
+/// Images the Processors reported as finished, per batch request. A recovery
+/// retry starts its stream at zero, so only progress above the request's
+/// previous high-water mark counts.
+struct BatchProgress {
+    reported: std::sync::Mutex<std::collections::HashMap<String, u32>>,
+    finished: tokio::sync::mpsc::UnboundedSender<u32>,
+}
+
+impl BatchProgress {
+    fn new(finished: tokio::sync::mpsc::UnboundedSender<u32>) -> Self {
+        Self {
+            reported: std::sync::Mutex::default(),
+            finished,
+        }
+    }
+
+    fn report(&self, event: ImagingProgress) {
+        if event.stage != ImagingProgressStage::PreparingPhotos {
+            return;
+        }
+        let mut reported = self
+            .reported
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let previous = reported.entry(event.request_id).or_default();
+        if event.completed_units > *previous {
+            let _ = self.finished.send(event.completed_units - *previous);
+            *previous = event.completed_units;
+        }
+    }
+
+    fn counted(&self, request_id: &str) -> u32 {
+        self.reported
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .get(request_id)
+            .copied()
+            .unwrap_or_default()
     }
 }
 
@@ -564,90 +686,183 @@ async fn prepare_owned_cache(
     work: CacheWork,
     cancellation: CacheCancellation,
 ) -> Result<PendingCachePublication, CacheFailure> {
-    let estimated_work = work.clone();
-    let estimate = tauri::async_runtime::spawn_blocking(move || {
+    let batch = CacheBatch {
+        request_id: work.request_id.clone(),
+        members: vec![CacheBatchMember {
+            work,
+            cancellation: cancellation.clone(),
+        }],
+    };
+    prepare_owned_cache_batch(
+        app,
+        logging,
+        app_paths,
+        engine,
+        processor,
+        batch,
+        Some(cancellation),
+        &|_| {},
+    )
+    .await
+    .remove(0)
+}
+
+/// Admits and runs one Processor for the batch. Without a `cancellation` of
+/// its own, the batch stops only once every member is obsolete; a pause stops
+/// it and admits it again once the pause ends.
+#[allow(clippy::too_many_arguments)]
+async fn prepare_owned_cache_batch(
+    app: &AppHandle,
+    logging: &LoggingState,
+    app_paths: &AppPaths,
+    engine: &CacheEngine,
+    processor: &ImagingProcessor,
+    batch: CacheBatch,
+    cancellation: Option<CacheCancellation>,
+    progress: &(dyn Fn(ImagingProgress) + Send + Sync),
+) -> Vec<Result<PendingCachePublication, CacheFailure>> {
+    let failed = |members: usize, failure: CacheFailure| {
+        (0..members)
+            .map(|_| Err(failure.clone()))
+            .collect::<Vec<_>>()
+    };
+    let cancellation = cancellation.unwrap_or_default();
+    let member_cancellations = batch
+        .members
+        .iter()
+        .map(|member| member.cancellation.clone())
+        .collect::<Vec<_>>();
+    let obsolete = || {
+        member_cancellations
+            .iter()
+            .all(|member| member.reason() == Some(CacheCancellationReason::Obsolete))
+    };
+    let Some(first) = batch.members.first() else {
+        return Vec::new();
+    };
+    let roots = first.work.root_bindings.clone();
+    let paths = batch
+        .members
+        .iter()
+        .map(|member| member.work.source.source_path().to_path_buf())
+        .collect::<Vec<_>>();
+    let estimated_roots = roots.clone();
+    let estimated_paths = paths.clone();
+    let Ok(estimate) = tauri::async_runtime::spawn_blocking(move || {
         ImageMemoryEstimate::from_headers(&crate::linked_files::LinkedFiles::new().headers(
-            &estimated_work.root_bindings,
-            [estimated_work.source.source_path()],
+            &estimated_roots,
+            estimated_paths.iter().map(PathBuf::as_path),
         ))
     })
     .await
-    .map_err(|_| {
-        CacheFailure::new(
-            CacheFailureStage::Plan,
-            "Não foi possível estimar os recursos da imagem.",
-        )
-    })?;
-    // Before any Processor capacity: a job waiting for its turn on a share
-    // holds nothing another job could use.
-    let Some(_remote_turn) = crate::linked_files::LinkedFiles::new()
-        .remote_read_turn(&work.root_bindings, [work.source.source_path()], || {
-            cancellation.reason() == Some(CacheCancellationReason::Obsolete)
-        })
-        .await
     else {
-        return Err(CacheFailure::new(
-            CacheFailureStage::Cancelled,
-            "A demanda de prévias temporárias ficou obsoleta.",
-        ));
-    };
-    loop {
-        let admission =
-            crate::image_work_admission::ImageWorkAdmission::begin(engine, &cancellation)
-                .await
-                .map_err(|_| {
-                    CacheFailure::new(
-                        CacheFailureStage::Cancelled,
-                        "A demanda de prévias temporárias ficou obsoleta.",
-                    )
-                })?;
-        let lease = match admission
-            .reserve(
-                processor,
-                estimate,
-                crate::image_work_admission::ImageWorkKind::Cache,
-            )
-            .await
-        {
-            Ok(lease) => lease,
-            Err(ProcessorAdmissionFailure::Cancelled) => continue,
-            Err(error) => {
-                return Err(CacheFailure::new(
-                    if error == ProcessorAdmissionFailure::MemoryPressure {
-                        CacheFailureStage::MemoryPressure
-                    } else {
-                        CacheFailureStage::Plan
-                    },
-                    error.to_string(),
-                ));
-            }
-        };
-        let context = InvocationContext::new(
-            work.request_id.clone(),
-            Some(work.namespace.project_id().to_owned()),
+        return failed(
+            batch.members.len(),
+            CacheFailure::new(
+                CacheFailureStage::Plan,
+                "Não foi possível estimar os recursos da imagem.",
+            ),
         );
-        let mut transport = TauriImagingTransport::new(app, logging, lease.reservation());
-        let result = engine
-            .prepare(
-                &mut transport,
-                app_paths,
-                work.clone(),
-                &context,
-                &cancellation,
-            )
-            .await;
-        drop(lease);
-        if result.as_ref().is_err_and(|failure| {
-            matches!(
-                failure.stage,
-                CacheFailureStage::Cancelled
-                    | CacheFailureStage::Processor(InvocationFailureStage::Cancelled)
-            ) && cancellation.reason() == Some(CacheCancellationReason::Paused)
-        }) {
-            continue;
+    };
+    let preparation = async {
+        // Before any Processor capacity: a job waiting for its turn on a
+        // share holds nothing another job could use.
+        let Some(_remote_turn) = crate::linked_files::LinkedFiles::new()
+            .remote_read_turn(&roots, paths.iter().map(PathBuf::as_path), || {
+                cancellation.reason() == Some(CacheCancellationReason::Obsolete) || obsolete()
+            })
+            .await
+        else {
+            return Err(obsolete_demand());
+        };
+        loop {
+            let admission =
+                crate::image_work_admission::ImageWorkAdmission::begin(engine, &cancellation)
+                    .await
+                    .map_err(|_| obsolete_demand())?;
+            let lease = match admission
+                .reserve(
+                    processor,
+                    estimate,
+                    crate::image_work_admission::ImageWorkKind::Cache,
+                )
+                .await
+            {
+                Ok(lease) => lease,
+                Err(ProcessorAdmissionFailure::Cancelled) => continue,
+                Err(error) => {
+                    return Err(CacheFailure::new(
+                        if error == ProcessorAdmissionFailure::MemoryPressure {
+                            CacheFailureStage::MemoryPressure
+                        } else {
+                            CacheFailureStage::Plan
+                        },
+                        error.to_string(),
+                    ));
+                }
+            };
+            let context = InvocationContext::new(
+                batch.request_id.clone(),
+                Some(first.work.namespace.project_id().to_owned()),
+            );
+            let mut transport = TauriImagingTransport::new(app, logging, lease.reservation());
+            let results = engine
+                .prepare_batch(
+                    &mut transport,
+                    app_paths,
+                    CacheBatch {
+                        request_id: batch.request_id.clone(),
+                        members: batch
+                            .members
+                            .iter()
+                            .map(|member| CacheBatchMember {
+                                work: member.work.clone(),
+                                cancellation: member.cancellation.clone(),
+                            })
+                            .collect(),
+                    },
+                    &context,
+                    InvocationControl::controlled(cancellation.flag(), progress),
+                )
+                .await;
+            drop(lease);
+            if cancellation.reason() == Some(CacheCancellationReason::Paused)
+                && results.iter().any(|result| {
+                    result.as_ref().is_err_and(|failure| {
+                        matches!(
+                            failure.stage,
+                            CacheFailureStage::Cancelled
+                                | CacheFailureStage::Processor(InvocationFailureStage::Cancelled)
+                        )
+                    })
+                })
+            {
+                continue;
+            }
+            return Ok(results);
         }
-        return result;
-    }
+    };
+    // Members of a batch belong to separate flights. Their own cancellation
+    // only withholds their publication, unless all of them become obsolete.
+    let watch = async {
+        while !obsolete() {
+            tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+        }
+        cancellation.cancel_obsolete();
+        std::future::pending::<()>().await;
+    };
+    let result = tokio::select! {
+        result = preparation => result,
+        () = watch => unreachable!("the watch never ends"),
+    };
+    result.unwrap_or_else(|failure| failed(batch.members.len(), failure))
+}
+
+fn obsolete_demand() -> CacheFailure {
+    CacheFailure::new(
+        CacheFailureStage::Cancelled,
+        "A demanda de prévias temporárias ficou obsoleta.",
+    )
 }
 
 #[cfg(test)]
@@ -861,6 +1076,56 @@ mod tests {
                 [0, 1, 2, 3, 4]
             );
         });
+    }
+
+    #[test]
+    fn batches_cover_each_image_once_and_keep_every_slot_busy_until_the_end() {
+        assert!(cache_batch_sizes(0, 2).is_empty());
+        assert_eq!(cache_batch_sizes(1, 2), [1]);
+        assert_eq!(cache_batch_sizes(5, 2), [3, 2]);
+        assert_eq!(cache_batch_sizes(300, 2), [15; 20]);
+        for count in 1..=200 {
+            for capacity in 1..=8 {
+                let sizes = cache_batch_sizes(count, capacity);
+                assert_eq!(sizes.iter().sum::<usize>(), count);
+                assert!(
+                    sizes
+                        .iter()
+                        .all(|size| (1..=CACHE_PROCESS_BATCH).contains(size))
+                );
+                assert!(sizes.len().is_multiple_of(capacity) || sizes.len() == count);
+                assert!(sizes.iter().max().unwrap() - sizes.iter().min().unwrap() <= 1);
+            }
+        }
+    }
+
+    #[test]
+    fn batch_progress_counts_each_finished_image_once_across_a_retry() {
+        let (sender, mut receiver) = tokio::sync::mpsc::unbounded_channel();
+        let progress = BatchProgress::new(sender);
+        let event = |request: &str, completed| {
+            ImagingProgress::new(request, ImagingProgressStage::PreparingPhotos, completed, 4)
+                .unwrap()
+        };
+        for completed in [0, 1, 2] {
+            progress.report(event("cache-batch-a", completed));
+        }
+        progress.report(event("cache-batch-b", 1));
+        // The recovery retry of batch a starts again from zero.
+        for completed in [0, 1, 2, 3, 4] {
+            progress.report(event("cache-batch-a", completed));
+        }
+        progress.report(
+            ImagingProgress::new("cache-batch-b", ImagingProgressStage::Composing, 4, 4).unwrap(),
+        );
+        let mut finished = 0;
+        while let Ok(units) = receiver.try_recv() {
+            finished += units;
+        }
+        assert_eq!(finished, 5);
+        assert_eq!(progress.counted("cache-batch-a"), 4);
+        assert_eq!(progress.counted("cache-batch-b"), 1);
+        assert_eq!(progress.counted("cache-batch-c"), 0);
     }
 
     #[test]
