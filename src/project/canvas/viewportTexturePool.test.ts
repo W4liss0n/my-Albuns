@@ -134,3 +134,70 @@ test("reports a desired texture failure without discarding loaded textures", asy
     "asset://cache/photo-b.jpg",
   ]);
 });
+
+test("spreads slow GPU uploads over frames, visible textures first", () => {
+  const frames: FrameRequestCallback[] = [];
+  const requestFrame = vi.spyOn(window, "requestAnimationFrame")
+    .mockImplementation((callback) => frames.push(callback));
+  let clock = 0;
+  const now = vi.spyOn(performance, "now").mockImplementation(() => clock);
+  const uploaded: string[] = [];
+  const onChange = vi.fn();
+  const pool = new ViewportTexturePool(onChange, vi.fn(), vi.fn(), (texture) => {
+    uploaded.push((texture.source.resource as HTMLImageElement).currentSrc);
+    clock += 70;
+  });
+  const urls = ["visible", "preload-a", "preload-b"].map(
+    (name) => `http://myalbuns-cache.localhost/${name}.jpg`);
+  const releases = urls.map(registerLoadedPanelImage);
+  try {
+    pool.sync(urls);
+    expect(uploaded).toEqual([urls[0]]);
+    expect(pool.get(urls[0])).toBeDefined();
+    expect(pool.get(urls[1])).toBeUndefined();
+
+    pool.sync(urls);
+    expect(uploaded).toHaveLength(1);
+
+    frames.shift()!(0);
+    expect(uploaded).toEqual(urls.slice(0, 2));
+    expect(pool.get(urls[1])).toBeDefined();
+    expect(onChange).toHaveBeenCalledOnce();
+
+    pool.sync([urls[0], urls[1]]);
+    frames.shift()!(0);
+    expect(uploaded).toHaveLength(2);
+    expect(pool.get(urls[2])).toBeUndefined();
+  } finally {
+    releases.forEach((release) => release());
+    pool.destroy();
+    requestFrame.mockRestore();
+    now.mockRestore();
+  }
+});
+
+test("uploads every texture in the same update while the budget allows", () => {
+  const upload = vi.fn();
+  const pool = new ViewportTexturePool(vi.fn(), vi.fn(), vi.fn(), upload);
+  const urls = ["a", "b", "c"].map((name) => `http://myalbuns-cache.localhost/${name}.jpg`);
+  const releases = urls.map(registerLoadedPanelImage);
+  try {
+    pool.sync(urls);
+    expect(upload).toHaveBeenCalledTimes(3);
+    for (const url of urls) expect(pool.get(url)).toBeDefined();
+  } finally {
+    releases.forEach((release) => release());
+    pool.destroy();
+  }
+});
+
+function registerLoadedPanelImage(url: string) {
+  const image = document.createElement("img");
+  image.crossOrigin = "anonymous";
+  image.src = url;
+  Object.defineProperties(image, {
+    complete: { value: true }, naturalWidth: { value: 1_600 },
+    naturalHeight: { value: 1_067 }, currentSrc: { value: url },
+  });
+  return registerMediaPreviewImage(url, image);
+}

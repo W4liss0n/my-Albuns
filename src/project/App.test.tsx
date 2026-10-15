@@ -734,7 +734,7 @@ test("shows a ready preview while the remaining previews are still being prepare
 
   act(() => publish?.(preview));
 
-  expect(document.querySelector('[data-media-id="media-001"] img')).toHaveAttribute("src", preview.url);
+  await waitFor(() => expect(document.querySelector('[data-media-id="media-001"] img')).toHaveAttribute("src", preview.url));
   expect(screen.getByTestId("album-canvas")).toHaveAttribute("data-media-preview", preview.url);
   await act(async () => finish([preview]));
 });
@@ -769,7 +769,7 @@ test("shows warm Fotos immediately after returning from Decorativos while the ne
   try {
     await waitFor(() => expect(requests[requests.length - 1]?.demand.visibleMediaIds).toContain("media-002"));
     act(() => requests[requests.length - 1].publish(preview));
-    expect(document.querySelector('[data-media-id="media-002"] img')).toHaveAttribute("src", preview.url);
+    await waitFor(() => expect(document.querySelector('[data-media-id="media-002"] img')).toHaveAttribute("src", preview.url));
     fireEvent.click(screen.getByRole("button", { name: "Decorativos" }));
     await waitFor(() => expect(requests[requests.length - 1]?.demand.preloadMediaIds).toContain("media-002"));
     await act(async () => requests[requests.length - 1].finish([preview]));
@@ -879,9 +879,11 @@ test("ignores preview events and completion from a demand superseded by a Monito
     requests[0].publish(stale);
     requests[0].finish([stale]);
   });
-  expect(document.querySelector('[data-media-id="media-001"] img')).toHaveAttribute("src", preview.url);
+  await waitFor(() => expect(document.querySelector('[data-media-id="media-001"] img')).toHaveAttribute("src", preview.url));
   await act(async () => requests[1].finish([preview]));
   act(() => requests[1].publish(stale));
+  // Longer than the interval that groups published previews.
+  await act(() => new Promise((resolve) => setTimeout(resolve, 100)));
   expect(document.querySelector('[data-media-id="media-001"] img')).toHaveAttribute("src", preview.url);
 });
 

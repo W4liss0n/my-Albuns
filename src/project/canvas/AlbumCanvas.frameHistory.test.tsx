@@ -66,10 +66,11 @@ test.each([1, 2])("releasing %i Frames and immediately undoing presents the late
     const controller = useProjectEditorController({ projectDialogPort: unusedLayoutDialogPort,
       projection, projectCorePort: port, runProjectMutation, onProjectionChange: setProjection,
     });
+    const viewport = useEditorView((state) => state.viewport);
     useLayoutEffect(() => { presentedRevisions.push(projection.state.revision); }, [projection]);
     return <>
       <button onClick={controller.undo}>Desfazer</button>
-      <AlbumCanvas {...controller.canvasProps} />
+      <AlbumCanvas {...controller.canvasProps} viewport={viewport} />
     </>;
   }
   const view = render(<Editor />);

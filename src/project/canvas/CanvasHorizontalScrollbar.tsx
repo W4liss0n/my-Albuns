@@ -51,17 +51,40 @@ export function CanvasHorizontalScrollbar({
   );
   const thumbLeft = scrollProgress * (trackWidth - thumbWidth);
 
+  // Reading or writing scrollLeft forces a layout. Wheel steps arrive faster
+  // than frames on a slow PC, so the native scroller follows the viewport once
+  // per frame, when the frame lays out anyway.
+  const targetScrollLeftRef = useRef(scrollLeft);
+  const writtenScrollLeftRef = useRef<number | null>(null);
+  const writeFrameRef = useRef(0);
   useLayoutEffect(() => {
-    const scrollbar = scrollbarRef.current;
-    if (!scrollbar || Math.abs(scrollbar.scrollLeft - scrollLeft) < 0.5) {
-      return;
-    }
-    scrollbar.scrollLeft = scrollLeft;
+    targetScrollLeftRef.current = scrollLeft;
+    if (writeFrameRef.current !== 0) return;
+    writeFrameRef.current = requestAnimationFrame(() => {
+      writeFrameRef.current = 0;
+      const scrollbar = scrollbarRef.current;
+      if (!scrollbar) return;
+      const target = targetScrollLeftRef.current;
+      writtenScrollLeftRef.current = target;
+      if (Math.abs(scrollbar.scrollLeft - target) >= 0.5) {
+        scrollbar.scrollLeft = target;
+      }
+    });
   }, [scrollLeft]);
+  useLayoutEffect(() => () => {
+    cancelAnimationFrame(writeFrameRef.current);
+    writeFrameRef.current = 0;
+  }, []);
 
   const handleScroll = () => {
     const scrollbar = scrollbarRef.current;
     if (!scrollbar || !bounds || !metrics) return;
+    // The echo of a write above may arrive after newer wheel steps; it must
+    // not pull the Canvas back to where the scroller was.
+    const written = writtenScrollLeftRef.current;
+    if (written !== null && Math.abs(scrollbar.scrollLeft - written) < 0.5) {
+      return;
+    }
     const offsetX = Math.min(
       bounds.maximum,
       Math.max(bounds.minimum, bounds.maximum - scrollbar.scrollLeft),

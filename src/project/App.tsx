@@ -677,15 +677,33 @@ function App({
       operationId,
       projectId,
     });
+    // Each preview arrives in its own message and re-renders the whole editor.
+    // Reaching a far Sheet brings dozens at once, so they are published together.
+    let publishedPreviews: Record<string, MediaPreview> = {};
+    let publishTimer: number | null = null;
+    const takePublishedPreviews = () => {
+      if (publishTimer !== null) window.clearTimeout(publishTimer);
+      publishTimer = null;
+      const next = publishedPreviews;
+      publishedPreviews = {};
+      return next;
+    };
+    const publishPreviews = () => {
+      const next = takePublishedPreviews();
+      if (Object.keys(next).length === 0 || !active || completed ||
+        demand.revision !== mediaDemandSequence.current.revision) return;
+      setMediaPreviews((current) => (active ? { ...current, ...next } : current));
+    };
     mediaPreviewPort
       .prepareMediaPreviews(demand, (preview) => {
         if (!active || completed || demand.revision !== mediaDemandSequence.current.revision) return;
-        setMediaPreviews((current) =>
-          active ? { ...current, [preview.mediaId]: preview } : current,
-        );
+        publishedPreviews[preview.mediaId] = preview;
+        publishTimer ??= window.setTimeout(publishPreviews, MEDIA_PREVIEW_PUBLISH_INTERVAL_MS);
       })
       .then(async (previews) => {
         if (!active || demand.revision !== mediaDemandSequence.current.revision) return;
+        // The startup path below may wait for decoding before the complete list.
+        publishPreviews();
         completed = true;
         if (projectStartupPort.prepareImages && uiReadyProject.current !== projectId) {
           await Promise.all((previews ?? []).map((preview) => {
@@ -710,6 +728,7 @@ function App({
       })
       .catch((error: unknown) => {
         if (!active) return;
+        publishPreviews();
         completed = true;
         logger.write({
           level: "warn",
@@ -723,6 +742,7 @@ function App({
       });
     return () => {
       active = false;
+      takePublishedPreviews();
     };
   }, [
     cacheWarningListenerReady,
@@ -812,6 +832,9 @@ function App({
     </LoggingProvider>
   );
 }
+
+// About two frames: previews still appear as they arrive, without one render each.
+const MEDIA_PREVIEW_PUBLISH_INTERVAL_MS = 32;
 
 const noPendingProjectMutations = async () => null;
 

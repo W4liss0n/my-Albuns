@@ -36,7 +36,7 @@ import {
 } from "../../application/inspectorContext";
 import type { DisplayUnit, EditorProjection } from "../../domain/project";
 import { ApplicationHeader } from "../../ui";
-import { AlbumCanvas } from "../canvas/AlbumCanvas";
+import { EditorAlbumCanvas } from "../canvas/EditorAlbumCanvas";
 import { LayoutPanel } from "../layouts/LayoutPanel";
 import { LayoutCatalogNotice } from "../layouts/LayoutCatalogNotice";
 import { ApplicationMenuBar } from "./ApplicationMenuBar";
@@ -908,7 +908,7 @@ export function ProjectWorkspace({
           {controller.layoutPanel.visible && <LayoutPanel controller={controller.layoutPanel}
             catalog={controller.layoutCatalog}
             sheet={projection.composition.sheets.find((sheet) => sheet.sheetId === controller.layoutPanel.sheetId)!} />}
-          <AlbumCanvas
+          <EditorAlbumCanvas
             {...controller.canvasProps}
             editingNavigation={{ disabled: canvasNavigationBlocked, fitRequest: fitSheetRequest,
               onPanGesture: () => { if (spaceCandidate.current) spaceCandidate.current.cancelled = true; } }}

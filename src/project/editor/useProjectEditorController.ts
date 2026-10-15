@@ -367,7 +367,9 @@ export function useProjectEditorController({
     return applied;
   };
 
-  const canvasProps: AlbumCanvasProps = {
+  // The viewport changes on every wheel step, so the Canvas reads it from the
+  // store itself: scrolling must not re-render the whole editor.
+  const canvasProps: Omit<AlbumCanvasProps, "viewport"> = {
     frameGapUm: projection.state.layoutSettings.gapUm,
     displayUnit: projection.state.document.displayUnit,
     revision: projection.state.revision,
@@ -386,7 +388,6 @@ export function useProjectEditorController({
     focusedSheetId: navigation.focusedSheetId,
     selectedSheetIds: navigation.selectedSheetIds,
     centeredSheetId: navigation.centeredSheetId,
-    viewport: navigation.viewport,
     photoZoomPreview: properties.singleZoom.preview,
     sheetSideSwap: {
       disabled: structuralCommandsDisabled || structuralMutationPending,
