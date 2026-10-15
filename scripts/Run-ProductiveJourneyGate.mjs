@@ -1010,7 +1010,6 @@ let recoveryGlobal;
 let crashedHost;
 let originalGlobal;
 let originalHost;
-let originalReplacementGlobal;
 let finalGlobal;
 let externalCopyDialogDriver;
 let externalCopyHostDriver;
@@ -2433,6 +2432,10 @@ try {
     );
   }
 
+  // The copy stays open, so closing the original does not return to Welcome.
+  const welcomeKeptClosedCount = recordsFor(
+    "welcome_kept_closed_for_open_projects",
+  ).length;
   await selectApplicationMenuCommandUntilLogEvent(
     originalDriver,
     "Arquivo",
@@ -2442,16 +2445,23 @@ try {
   );
   originalDriver = await disposeConfirmedWebDriver(originalDriver);
   await waitForExit(originalHost, "simultaneous original Project Host close");
-  originalReplacementGlobal = await waitForNewApplication(
-    (instance) => !isHost(instance),
-    [firstGlobal, secondGlobal, originalGlobal],
-    "simultaneous original replacement Global",
+  await waitForLogEvent(
+    "welcome_kept_closed_for_open_projects",
+    welcomeKeptClosedCount + 1,
+    "Welcome kept closed while the copy is open",
   );
-  terminateProcessInstance(originalReplacementGlobal);
-  await waitForExit(
-    originalReplacementGlobal,
-    "simultaneous original replacement Global cleanup",
+  const globalsAfterOriginalClose = applicationProcesses().filter(
+    (instance) =>
+      !isHost(instance) &&
+      ![firstGlobal, secondGlobal, originalGlobal].some((known) =>
+        sameProcessInstance(instance, known),
+      ),
   );
+  if (globalsAfterOriginalClose.length !== 0) {
+    throw new Error(
+      `Closing the original while its copy is open returned to Welcome: ${JSON.stringify(globalsAfterOriginalClose)}`,
+    );
+  }
 
   await replaceAlbumInformationDpi(
     hostDriver,
@@ -2936,7 +2946,6 @@ try {
       secondGlobal,
       recoveryGlobal,
       originalGlobal,
-      originalReplacementGlobal,
     ],
     "final Global",
   );
@@ -3809,7 +3818,6 @@ try {
       secondGlobal,
       recoveryGlobal,
       originalGlobal,
-      originalReplacementGlobal,
       finalGlobal,
       externalCopyGlobal,
     ],
