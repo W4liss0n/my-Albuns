@@ -586,6 +586,15 @@ const DEFINITIONS = [
     availability: "implemented",
     shortcuts: [shortcut("e", "Ctrl+E", { ctrlKey: true })],
   }),
+  command({
+    id: "show-media-in-folder",
+    label: "Mostrar na pasta",
+    description: "Abre a pasta da imagem no Explorador de Arquivos, com o arquivo já selecionado.",
+    kind: "application",
+    contexts: ["frame-photo", "media-photo"],
+    availability: "implemented",
+    shortcuts: [],
+  }),
 ] as const;
 
 export type ProjectCommandId = (typeof DEFINITIONS)[number]["id"];

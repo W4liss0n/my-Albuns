@@ -99,6 +99,7 @@ interface MediaPanelProps {
   onEditMediaFolder?(edit: MediaFolderEdit): Promise<boolean>;
   photoshopAvailable?: boolean;
   onOpenInPhotoshop?(mediaIds: readonly string[]): void;
+  onShowInFolder?(mediaId: string): void;
   onViewPhoto?(mediaId: string, mediaIds: readonly string[], trigger: HTMLElement | null): void;
   ref?: Ref<MediaPanelHandle>;
   hidden?: boolean;
@@ -144,6 +145,7 @@ export function MediaPanel({
   onEditMediaFolder,
   photoshopAvailable = false,
   onOpenInPhotoshop,
+  onShowInFolder,
   onViewPhoto,
   ref,
   hidden = false,
@@ -799,6 +801,8 @@ export function MediaPanel({
         {selectedPhotoIds.length > 0 && <MenuItem label={projectCommandDescriptor("open-in-photoshop").label} shortcut={projectCommandShortcutLabel("open-in-photoshop")}
           disabled={!photoshopAvailable || relinkDisabled || importPending}
           onClick={() => { onOpenInPhotoshop?.(selectedPhotoIds); setContextMenu(null); panelHostRef.current?.focus({ preventScroll: true }); }} />}
+        {onShowInFolder && <MenuItem label={projectCommandDescriptor("show-media-in-folder").label}
+          onClick={() => { const mediaId = contextMenu.mediaId; setContextMenu(null); panelHostRef.current?.focus({ preventScroll: true }); onShowInFolder(mediaId); }} />}
         {onEditMediaFolder && <MenuItem label={projectCommandDescriptor("move-media-to-folder").label}
           disabled={foldersDisabled || selectedMediaIds.size === 0}
           onClick={() => {

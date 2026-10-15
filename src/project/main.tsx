@@ -21,6 +21,7 @@ import { tauriProjectWindowPort } from "../platform/tauriProjectWindowPort";
 import { tauriMediaDropPort } from "../platform/tauriMediaDropPort";
 import { tauriProjectDialogPort } from "../platform/tauriProjectDialogPort";
 import { tauriPhotoshopPort } from "../platform/tauriPhotoshopPort";
+import { tauriMediaLocationPort } from "../platform/tauriMediaLocationPort";
 import {
   tauriWindowControls,
   withLoggedProjectClose,
@@ -41,6 +42,7 @@ ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
         exportMediaPort={tauriExportMediaPort}
         exportPipelinePort={tauriExportPipelinePort}
         photoshopPort={tauriPhotoshopPort}
+        mediaLocationPort={tauriMediaLocationPort}
         mediaPreviewPort={tauriMediaPreviewPort}
         mediaDropPort={tauriMediaDropPort}
         projectStartupPort={tauriProjectStartupPort}

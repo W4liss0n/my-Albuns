@@ -63,6 +63,7 @@
           "application_settings",
           "photoshop_status",
           "open_in_photoshop",
+          "show_media_in_folder",
           "open_application_settings",
           "update_application_setting"
         ],

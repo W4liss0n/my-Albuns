@@ -8,6 +8,7 @@ interface FrameContextMenuProps {
   hasPhoto?: boolean;
   canOpenInPhotoshop?: boolean;
   onOpenInPhotoshop?(): void;
+  onShowInFolder?(): void;
   onViewPhoto?(): void;
   position: { x: number; y: number };
   onArrange(action: FrameStackAction): void;
@@ -17,7 +18,7 @@ interface FrameContextMenuProps {
   onDismiss(): void;
 }
 
-export function FrameContextMenu({ editing = true, hasPhoto = false, canOpenInPhotoshop = false, onOpenInPhotoshop, onViewPhoto, position, onArrange, onDelete, onSwapContents, canSwapContents, onDismiss }: FrameContextMenuProps) {
+export function FrameContextMenu({ editing = true, hasPhoto = false, canOpenInPhotoshop = false, onOpenInPhotoshop, onShowInFolder, onViewPhoto, position, onArrange, onDelete, onSwapContents, canSwapContents, onDismiss }: FrameContextMenuProps) {
   return (
     <ContextMenuSurface label={editing ? "Organizar quadros" : "Ações da foto"} position={position} onDismiss={onDismiss}>
       {hasPhoto && <>
@@ -25,6 +26,8 @@ export function FrameContextMenu({ editing = true, hasPhoto = false, canOpenInPh
         <MenuItem label={projectCommandDescriptor("open-in-photoshop").label} shortcut={projectCommandShortcutLabel("open-in-photoshop")}
           disabled={!canOpenInPhotoshop}
           onClick={() => { onOpenInPhotoshop?.(); onDismiss(); }} />
+        {onShowInFolder && <MenuItem label={projectCommandDescriptor("show-media-in-folder").label}
+          onClick={() => { onShowInFolder(); onDismiss(); }} />}
         {editing && <MenuSeparator />}
       </>}
       {editing && <>

@@ -46,6 +46,7 @@ mod media_by_structure;
 mod media_confirmation;
 mod media_file_drop;
 mod media_import_selection;
+mod media_location;
 mod media_preview_commands;
 mod media_runtime;
 mod named_mutex;

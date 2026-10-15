@@ -347,6 +347,7 @@ pub(crate) fn run(
             crate::settings_preferences::application_settings,
             crate::photoshop::commands::photoshop_status,
             crate::photoshop::commands::open_in_photoshop,
+            crate::media_location::show_media_in_folder,
             crate::settings_window::open_application_settings,
             crate::settings_preferences::update_application_setting,
         ])

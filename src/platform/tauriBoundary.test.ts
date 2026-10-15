@@ -45,6 +45,7 @@ const tauriCommandSources = {
     "./tauriProjectPorts.ts",
     "./tauriProjectWindowPort.ts",
     "./tauriImageViewerWindow.ts",
+    "./tauriMediaLocationPort.ts",
   ],
   imageViewer: ["../image-viewer/platform/tauriImageViewerClient.ts"],
   projectDialog: [

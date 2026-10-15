@@ -965,6 +965,20 @@ test("Photoshop opens every selected Photo and never a Decorative", () => {
   expect(open).toHaveBeenCalledTimes(3);
 });
 
+test("shows only the right-clicked image in its folder", () => {
+  const show = vi.fn();
+  render(<MediaPanel {...mediaPanelInteractions} mediaItems={mediaItems} mediaUsage={mediaUsage}
+    onFillPhoto={vi.fn()} previewSource={{ kind: "static" }} preferences={{ kind: "local" }}
+    onShowInFolder={show} />);
+  fireEvent.click(screen.getByRole("button", { name: /Álbum 10/ }));
+  const photo = screen.getByRole("button", { name: /Retrato/ });
+  fireEvent.click(photo, { ctrlKey: true });
+  fireEvent.contextMenu(photo);
+  fireEvent.click(within(screen.getByRole("menu", { name: "Ações das imagens" })).getByRole("menuitem", { name: "Mostrar na pasta" }));
+  expect(show).toHaveBeenCalledExactlyOnceWith("photo-retrato");
+  expect(screen.queryByRole("menu", { name: "Ações das imagens" })).not.toBeInTheDocument();
+});
+
 test.each([
   ["photo", null], ["photo", "asset://localhost/cache/retained.jpg"],
   ["decorative", null], ["decorative", "asset://localhost/cache/retained.jpg"],

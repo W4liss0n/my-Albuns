@@ -52,6 +52,7 @@ type AppProps = {
   generationLauncher?: import("../application/projectGeneration").ProjectGenerationLauncher;
   exportMediaPort?: import("../application/exportMedia").ExportMediaPort;
   photoshopPort?: import("../application/photoshop").PhotoshopPort;
+  mediaLocationPort?: import("../application/mediaLocation").MediaLocationPort;
   exportPipelinePort: ExportPipelinePort;
   mediaPreviewPort: MediaPreviewPort;
   mediaDropPort?: MediaDropPort;
@@ -91,6 +92,7 @@ function App({
   generationLauncher,
   exportMediaPort,
   photoshopPort,
+  mediaLocationPort,
   exportPipelinePort,
   mediaPreviewPort,
   mediaDropPort,
@@ -780,6 +782,7 @@ function App({
         <ProjectWorkspace
           imageViewerWindowPort={imageViewerWindowPort}
           photoshopPort={photoshopPort}
+          mediaLocationPort={mediaLocationPort}
           projectLauncher={projectLauncher}
           generationLauncher={generationLauncher}
           mediaDropPort={mediaDropPort}

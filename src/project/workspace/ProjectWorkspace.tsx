@@ -74,6 +74,7 @@ import { openProjectGeneration } from "./openProjectGeneration";
 import type { ProjectMutationRunner } from "../editor/useProjectMutationRunner";
 import { useWorkspacePreferences } from "../../state/useWorkspacePreferences";
 import { usePhotoshop } from "../../state/usePhotoshop";
+import { mediaLocationErrorMessage } from "../../application/mediaLocation";
 import "./PhotoshopNotice.css";
 import { InlineNotice } from "../../ui/InlineNotice";
 import { ActionButton } from "../../ui/ActionButton";
@@ -85,6 +86,7 @@ import {
 interface ProjectWorkspaceProps {
   exportMediaPort?: import("../../application/exportMedia").ExportMediaPort;
   photoshopPort?: import("../../application/photoshop").PhotoshopPort;
+  mediaLocationPort?: import("../../application/mediaLocation").MediaLocationPort;
   projectLauncher?: import("../../application/projectLauncher").ProjectLauncher;
   generationLauncher?: import("../../application/projectGeneration").ProjectGenerationLauncher;
   mediaDropPort?: import("../../application/projectPorts").MediaDropPort;
@@ -116,6 +118,7 @@ export function ProjectWorkspace({
   generationLauncher,
   exportMediaPort,
   photoshopPort,
+  mediaLocationPort,
   mediaDropPort,
   projection,
   projectDialogPort,
@@ -185,6 +188,14 @@ export function ProjectWorkspace({
     sheetId?: string;
   } | null>(null);
   const photoshop = usePhotoshop(photoshopPort);
+  const [mediaLocationError, setMediaLocationError] = useState<string | null>(null);
+  // Only the latest operation keeps its notice.
+  useEffect(() => { if (photoshop.error) setMediaLocationError(null); }, [photoshop.error]);
+  const showMediaInFolder = mediaLocationPort ? (mediaId: string) => {
+    setMediaLocationError(null);
+    photoshop.dismissError();
+    mediaLocationPort.showInFolder(mediaId).catch((error: unknown) => setMediaLocationError(mediaLocationErrorMessage(error)));
+  } : undefined;
   const [presentationUnitOverride, setPresentationUnitOverride] = useState<{
     projectId: string;
     unit: DisplayUnit;
@@ -1011,6 +1022,7 @@ export function ProjectWorkspace({
           onViewPhoto={imageViewerWindowPort ? (mediaId, mediaIds, trigger) => openViewer("panel", mediaId, mediaIds, trigger) : undefined}
           photoshopAvailable={photoshop.available && !photoshop.opening && !commandsBlocked}
           onOpenInPhotoshop={(mediaIds) => { if (!commandsBlocked) void photoshop.open({ kind: "panel", mediaIds }); }}
+          onShowInFolder={showMediaInFolder}
           dropPort={mediaDropPort}
           key={`media-${projectId}`}
           mediaFiles={mediaFiles}
@@ -1077,6 +1089,10 @@ export function ProjectWorkspace({
         {photoshop.error.configure && <ActionButton onClick={() => void photoshop.openSettings()}>Configurar Photoshop…</ActionButton>}
         <ActionButton onClick={photoshop.dismissError}>Fechar aviso</ActionButton>
       </InlineNotice></div>}
+      {mediaLocationError && !photoshop.error && <div className="media-location-notice"><InlineNotice role="alert" tone="error">
+        <p>{mediaLocationError}</p>
+        <ActionButton onClick={() => setMediaLocationError(null)}>Fechar aviso</ActionButton>
+      </InlineNotice></div>}
       {frameContextMenu?.kind === "frames" || frameContextMenu?.kind === "photo" ? <FrameContextMenu position={frameContextMenu.position}
         editing={frameContextMenu.kind === "frames"}
         hasPhoto={controller.selectedFrames.some((frame) => frame.photo !== null)}
@@ -1086,6 +1102,7 @@ export function ProjectWorkspace({
         } : undefined}
         canOpenInPhotoshop={canOpenFrameInPhotoshop}
         onOpenInPhotoshop={openFrameInPhotoshop}
+        onShowInFolder={showMediaInFolder && frameContextMenu.mediaId ? () => showMediaInFolder(frameContextMenu.mediaId!) : undefined}
         onSwapContents={() => { void controller.swapFrameContents(); }}
         canSwapContents={controller.canSwapFrameContents}
         onDelete={() => { void controller.deleteFrames(); }}
