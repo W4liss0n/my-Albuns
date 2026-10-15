@@ -282,14 +282,14 @@ const DEFINITIONS = [
   }),
   command({
     id: "move-media-to-folder",
-    label: "Mover para coleção…",
+    label: "Mover para coleção",
     description: "Coloca as imagens selecionadas na coleção escolhida, sem mover os arquivos.",
     kind: "domain", contexts: ["media-panel"], availability: "implemented", shortcuts: [],
   }),
   command({
     id: "rename-media-folder",
-    label: "Renomear…",
-    description: "Altera o nome da coleção.",
+    label: "Renomear",
+    description: "Edita o nome da coleção na própria barra. Também com F2 ou clique duplo.",
     kind: "domain", contexts: ["media-folder"], availability: "implemented", shortcuts: [],
   }),
   command({

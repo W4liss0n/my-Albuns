@@ -63,3 +63,9 @@
   margin: var(--ui-space-1) var(--ui-space-3);
   background: var(--ui-border);
 }
+
+.ui-menu-item__cascade {
+  color: var(--ui-text-muted);
+  font-size: var(--ui-font-size-heading);
+  line-height: 1;
+}

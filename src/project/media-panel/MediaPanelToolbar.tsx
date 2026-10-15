@@ -1,5 +1,5 @@
 import { MenuItem } from "../../ui/MenuItem";
-import { useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState, type ReactNode } from "react";
 import {
   ChevronDown,
   Image as ImageIcon,
@@ -29,7 +29,10 @@ interface MediaPanelToolbarProps {
   dropFolderId: string | null;
   foldersDisabled: boolean;
   onFolderChange(id: string | null): void;
-  onCreateFolder(anchor: HTMLElement): void;
+  onCreateFolder(): void;
+  onRenameFolder(folder: MediaFolder): void;
+  /** Name field shown in place of a collection's chip, or after the chips for a new one. */
+  folderEditor?: { folderId: string | null; node: ReactNode } | null;
   onFolderMenu(folder: MediaFolder, anchor: HTMLElement, position: { x: number; y: number }): void;
   missingCounts: Readonly<Record<MediaKind, number>>;
   missingOnly: boolean;
@@ -48,7 +51,7 @@ interface MediaPanelToolbarProps {
 type OpenPopup = "import" | "options" | null;
 
 export function MediaPanelToolbar({
-  activeMediaKind, folders, activeFolderId, dropFolderId, foldersDisabled, onFolderChange, onCreateFolder, onFolderMenu,
+  activeMediaKind, folders, activeFolderId, dropFolderId, foldersDisabled, onFolderChange, onCreateFolder, onRenameFolder, folderEditor, onFolderMenu,
   missingCounts,
   missingOnly,
   onMissingOnlyChange,
@@ -182,32 +185,36 @@ export function MediaPanelToolbar({
               Ausentes<small>{missingCounts[activeMediaKind]}</small>
             </button>
           )}
-          {folders.map((folder) => <button key={folder.id} type="button"
+          {folders.map((folder) => folderEditor?.folderId === folder.id ? <Fragment key={folder.id}>{folderEditor.node}</Fragment> : <button key={folder.id} type="button"
             className={`media-folder-chip${activeFolderId === folder.id ? " active" : ""}${dropFolderId === folder.id ? " media-folder-chip--drop" : ""}`}
             data-media-folder-id={folder.id}
             aria-label={`Coleção ${folder.name}, ${folder.mediaIds.length} imagens`}
             aria-pressed={activeFolderId === folder.id} title={folder.name}
             onFocus={(event) => event.currentTarget.scrollIntoView?.({ block: "nearest", inline: "nearest" })}
             onClick={() => { setOpenPopup(null); onFolderChange(folder.id); }}
+            onDoubleClick={() => { if (!foldersDisabled) onRenameFolder(folder); }}
             onContextMenu={(event) => {
               event.preventDefault(); setOpenPopup(null);
               if (!foldersDisabled) onFolderMenu(folder, event.currentTarget, { x: event.clientX, y: event.clientY });
             }}
             onKeyDown={(event) => {
-              if (event.key === "ContextMenu" || event.shiftKey && event.key === "F10") {
+              if (event.key === "F2" && !event.shiftKey && !event.ctrlKey && !event.altKey) {
+                event.preventDefault(); event.stopPropagation();
+                if (!foldersDisabled) onRenameFolder(folder);
+              } else if (event.key === "ContextMenu" || event.shiftKey && event.key === "F10") {
                 event.preventDefault(); setOpenPopup(null);
                 const rect = event.currentTarget.getBoundingClientRect();
                 if (!foldersDisabled) onFolderMenu(folder, event.currentTarget, { x: rect.left, y: rect.top });
               }
             }}><span className="media-folder-name">{folder.name}</span><small>{folder.mediaIds.length}</small></button>)}
+          {folderEditor?.folderId === null && folderEditor.node}
         </div>
         <button
           aria-label={projectCommandDescriptor("create-media-folder").label}
           className="media-folder-add"
-          disabled={foldersDisabled}
+          disabled={foldersDisabled || folderEditor?.folderId === null}
           title={projectCommandDescriptor("create-media-folder").label}
-          aria-haspopup="dialog"
-          onClick={(event) => { setOpenPopup(null); onCreateFolder(event.currentTarget); }}
+          onClick={() => { setOpenPopup(null); onCreateFolder(); }}
           type="button"
         >
           <AppIcon icon={Plus} size={12} />

@@ -16,3 +16,12 @@
   padding: var(--ui-space-1);
   overflow-y: auto;
 }
+
+.ui-context-submenu {
+  z-index: 51;
+}
+
+/* Actions beside checkable choices keep their text on the same column. */
+.ui-context-submenu:has([role="menuitemcheckbox"]) .ui-menu-item[role="menuitem"] > span:first-child {
+  padding-inline-start: var(--ui-space-4);
+}

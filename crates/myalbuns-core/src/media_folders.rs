@@ -29,6 +29,11 @@ pub enum MediaFolderEdit {
     Create {
         media_kind: MediaKind,
         name: String,
+        /// Media moved into the new folder by the same edit, so creating from
+        /// a selection is one History entry.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[ts(optional, as = "Option<Vec<String>>")]
+        media_ids: Option<Vec<MediaId>>,
     },
     Rename {
         folder_id: String,
@@ -151,13 +156,24 @@ impl ProjectDocument {
     pub(crate) fn with_media_folder_edit(&self, edit: &MediaFolderEdit) -> Result<Self, CoreError> {
         let mut next = self.clone();
         match edit {
-            MediaFolderEdit::Create { media_kind, name } => {
+            MediaFolderEdit::Create {
+                media_kind,
+                name,
+                media_ids,
+            } => {
+                let id = Uuid::new_v4().to_string();
                 next.media_folders.push(MediaFolder {
-                    id: Uuid::new_v4().to_string(),
+                    id: id.clone(),
                     kind: *media_kind,
                     name: name.trim().into(),
                     media_ids: Vec::new(),
                 });
+                if let Some(media_ids) = media_ids.as_ref().filter(|ids| !ids.is_empty()) {
+                    next = next.with_media_folder_edit(&MediaFolderEdit::MoveMedia {
+                        media_ids: media_ids.clone(),
+                        folder_id: Some(id),
+                    })?;
+                }
             }
             MediaFolderEdit::Rename { folder_id, name } => {
                 next.media_folders

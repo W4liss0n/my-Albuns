@@ -46,12 +46,18 @@ contexto, as ações relacionadas formam grupos separados por divisor, e Remover
 ou Excluir fica sempre sozinho no fim. Um grupo cujos itens não se aplicam
 naquele estado desaparece sem deixar divisor sobrando (`MenuGroups`).
 
+Refinamento de 15/10/2026: `MenuSubmenu` é o item em cascata dos menus de
+contexto, com `›` no tom dos atalhos. Abre ao passar o ponteiro, ao clicar, com
+Enter, Espaço ou seta para a direita; seta para a esquerda ou Esc fecham só o
+submenu e devolvem o foco ao item. O submenu fica ao lado do item e troca de
+lado quando não cabe na janela.
+
 | Menu | Grupos, na ordem |
 | --- | --- |
-| Imagem no painel | Visualizar imagem · Abrir no Photoshop, Mostrar na pasta · Localizar imagem…, Substituir imagem, Mover para coleção… · Remover |
+| Imagem no painel | Visualizar imagem · Abrir no Photoshop, Mostrar na pasta · Localizar imagem…, Substituir imagem, Mover para coleção › · Remover |
 | Quadro | Visualizar imagem · Abrir no Photoshop, Mostrar na pasta · comandos de ordem (editando a lâmina) · Trocar conteúdo dos quadros · Excluir |
 | Lâmina | Adicionar antes, Adicionar depois, Duplicar · Exportar lâmina…, Converter extremidade · Excluir |
-| Coleção do painel | Renomear… · Excluir coleção |
+| Coleção do painel | Renomear · Excluir coleção |
 
 O menu Importar conserva sua apresentação compacta. Os catálogos continuam
 donos dos nomes, atalhos e identidades de comandos. Disponibilidade, execução

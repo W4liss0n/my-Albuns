@@ -1,4 +1,5 @@
 import { MenuGroups, MenuItem, MenuSeparator } from "../../ui/MenuItem";
+import { MenuSubmenu } from "../../ui/MenuSubmenu";
 import {
   useEffect,
   useImperativeHandle,
@@ -38,7 +39,7 @@ import {
   type MediaUsageFilter,
 } from "../../state/mediaPanelPreferences";
 import { MediaPanelEmptyState } from "./MediaPanelEmptyState";
-import { MediaFolderPopover, type MediaFolderPrompt } from "./MediaFolderPopover";
+import { MediaFolderNameEditor, nextCollectionName } from "./MediaFolderNameEditor";
 import { MediaDragGhost, type DecorativeDropTarget } from "./MediaDragGhost";
 import { MediaPanelToolbar } from "./MediaPanelToolbar";
 import { MediaPreviewCard } from "./MediaPreviewCard";
@@ -172,7 +173,7 @@ export function MediaPanel({
 }: MediaPanelProps) {
   const mediaPreviews = previewSource.previews ?? {};
   const [folderIds, setFolderIds] = useState<Record<MediaKind, string | null>>({ photo: null, decorative: null });
-  const [folderPrompt, setFolderPrompt] = useState<MediaFolderPrompt | null>(null);
+  const [folderEditor, setFolderEditor] = useState<{ kind: "create"; mediaIds?: string[] } | { kind: "rename"; folder: MediaFolder } | null>(null);
   const [folderMenu, setFolderMenu] = useState<{ folder: MediaFolder; anchor: HTMLElement; x: number; y: number } | null>(null);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; mediaId: string } | null>(null);
   const onMediaDemandChange =
@@ -187,7 +188,7 @@ export function MediaPanel({
   const [localActiveMediaKind, setLocalActiveMediaKind] =
     useState<MediaKind>("photo");
   const activeMediaKind = preferenceMode.kind === "controlled" ? preferenceMode.activeKind : localActiveMediaKind;
-  useEffect(() => { setContextMenu(null); setFolderMenu(null); setFolderPrompt(null); }, [activeMediaKind, hidden]);
+  useEffect(() => { setContextMenu(null); setFolderMenu(null); setFolderEditor(null); }, [activeMediaKind, hidden]);
   const activeFolders = useMemo(() => mediaFolders.filter((folder) => folder.kind === activeMediaKind), [mediaFolders, activeMediaKind]);
   const activeFolder = activeFolders.find((folder) => folder.id === folderIds[activeMediaKind]);
   const activeFolderMembers = useMemo(() => activeFolder ? new Set(activeFolder.mediaIds) : null, [activeFolder]);
@@ -198,17 +199,33 @@ export function MediaPanel({
     setFolderIds((current) => ({ ...current, ...Object.fromEntries(removed.map((kind) => [kind, null])) }));
     setMissingOnlyByKind((current) => ({ ...current, ...Object.fromEntries(removed.map((kind) => [kind, false])) }));
   }, [mediaFolders, folderIds]);
-  const restoreFolderFocus = useRef<HTMLElement | null>(null);
+  // After naming, focus returns to the collection's chip; a new chip may
+  // render only once the project projection includes it.
+  const restoreFolderFocus = useRef<{ folderId: string } | { previousIds: ReadonlySet<string> } | null>(null);
   useLayoutEffect(() => {
-    if (folderPrompt || !restoreFolderFocus.current) return;
-    const anchor = restoreFolderFocus.current;
+    const target = restoreFolderFocus.current;
+    if (folderEditor || !target) return;
+    const id = "folderId" in target ? target.folderId
+      : mediaFolders.find((folder) => !target.previousIds.has(folder.id))?.id;
+    if (!id) return;
     restoreFolderFocus.current = null;
-    (anchor.isConnected ? anchor : panelHostRef.current)?.focus({ preventScroll: true });
-  }, [folderPrompt, mediaFolders]);
+    panelHostRef.current?.querySelector<HTMLElement>(`[data-media-folder-id="${CSS.escape(id)}"]`)?.focus({ preventScroll: true });
+  }, [folderEditor, mediaFolders]);
   const foldersDisabled = relinkDisabled || importPending || !onEditMediaFolder || !onValidateMediaFolderName;
-  function closeFolderPrompt() {
-    restoreFolderFocus.current = folderPrompt?.anchor ?? panelHostRef.current;
-    setFolderPrompt(null);
+  function closeFolderEditor(focusChip: boolean) {
+    if (!folderEditor) return;
+    restoreFolderFocus.current = !focusChip ? null : folderEditor.kind === "rename"
+      ? { folderId: folderEditor.folder.id } : { previousIds: new Set(mediaFolders.map((folder) => folder.id)) };
+    setFolderEditor(null);
+    if (!focusChip) panelHostRef.current?.focus({ preventScroll: true });
+  }
+  async function commitFolderName(name: string) {
+    if (!folderEditor || !onEditMediaFolder || foldersDisabled) return false;
+    const saved = await onEditMediaFolder(folderEditor.kind === "create"
+      ? { kind: "create", mediaKind: activeMediaKind, name, ...(folderEditor.mediaIds?.length ? { mediaIds: folderEditor.mediaIds } : {}) }
+      : { kind: "rename", folderId: folderEditor.folder.id, name });
+    if (saved) closeFolderEditor(true);
+    return saved;
   }
   function setActiveMediaKind(activeKind: MediaKind) {
     if (preferenceMode.kind === "controlled") preferenceMode.onActiveKindChange(activeKind);
@@ -580,7 +597,7 @@ export function MediaPanel({
       event.stopPropagation();
       return;
     }
-    if (event.defaultPrevented || folderPrompt || folderMenu || contextMenu || ownsEditingKeys(event.target)) return;
+    if (event.defaultPrevented || folderEditor || folderMenu || contextMenu || ownsEditingKeys(event.target)) return;
     if (matchProjectCommandShortcut(event, "media-photo") === "open-in-photoshop") {
       event.preventDefault(); event.stopPropagation();
       if (!event.repeat && !relinkDisabled && !importPending && photoshopAvailable && selectedPhotoIds.length > 0) {
@@ -650,7 +667,16 @@ export function MediaPanel({
         dropFolderId={dropFolderId}
         foldersDisabled={foldersDisabled}
         onFolderChange={(id) => { setContextMenu(null); setFolderIds((current) => ({ ...current, [activeMediaKind]: id })); }}
-        onCreateFolder={(anchor) => { setContextMenu(null); setFolderPrompt({ kind: "create", mediaKind: activeMediaKind, anchor }); }}
+        onCreateFolder={() => { setContextMenu(null); setFolderEditor({ kind: "create" }); }}
+        onRenameFolder={(folder) => { setContextMenu(null); setFolderEditor({ kind: "rename", folder }); }}
+        folderEditor={folderEditor && onValidateMediaFolderName ? {
+          folderId: folderEditor.kind === "rename" ? folderEditor.folder.id : null,
+          node: <MediaFolderNameEditor key={folderEditor.kind === "rename" ? folderEditor.folder.id : "new"}
+            mediaKind={activeMediaKind} folder={folderEditor.kind === "rename" ? folderEditor.folder : null}
+            defaultName={nextCollectionName(activeFolders)} validationKey={folderValidationKey}
+            onValidate={onValidateMediaFolderName} onCommit={commitFolderName}
+            onCancel={() => closeFolderEditor(true)} />,
+        } : null}
         onFolderMenu={(folder, anchor, position) => { setContextMenu(null); setFolderMenu({ folder, anchor, ...position }); }}
         missingCounts={missingCounts}
         missingOnly={missingOnly}
@@ -802,15 +828,22 @@ export function MediaPanel({
               panelHostRef.current?.focus({ preventScroll: true });
               onReplaceMedia(mediaId);
             }} />,
-          onEditMediaFolder && <MenuItem label={projectCommandDescriptor("move-media-to-folder").label}
-            disabled={foldersDisabled || selectedMediaIds.size === 0}
-            onClick={() => {
-              const anchor = panelHostRef.current?.querySelector<HTMLElement>(`[data-media-id="${contextMenu.mediaId}"]`) ?? panelHostRef.current;
-              const currentFolder = activeFolders.find((folder) => folder.mediaIds.includes(contextMenu.mediaId));
-              if (anchor) setFolderPrompt({ kind: "move", mediaKind: activeMediaKind, anchor,
-                mediaIds: [...selectedMediaIds], folderId: currentFolder?.id ?? activeFolders[0]?.id ?? null });
-              setContextMenu(null);
-            }} />],
+          onEditMediaFolder && <MenuSubmenu label={projectCommandDescriptor("move-media-to-folder").label}
+            disabled={foldersDisabled || selectedMediaIds.size === 0}>
+            <MenuGroups groups={[
+              [null, ...activeFolders].map((folder) => {
+                const current = activeFolders.find((candidate) => candidate.mediaIds.includes(contextMenu.mediaId)) ?? null;
+                return <MenuItem key={folder?.id ?? "none"} label={folder?.name ?? "Sem coleção"} checked={folder?.id === current?.id}
+                  onClick={() => {
+                    setContextMenu(null);
+                    panelHostRef.current?.focus({ preventScroll: true });
+                    void onEditMediaFolder({ kind: "moveMedia", mediaIds: [...selectedMediaIds], folderId: folder?.id ?? null });
+                  }} />;
+              }),
+              [<MenuItem label={projectCommandDescriptor("create-media-folder").label}
+                onClick={() => { setContextMenu(null); setFolderEditor({ kind: "create", mediaIds: [...selectedMediaIds] }); }} />],
+            ]} />
+          </MenuSubmenu>],
           [<MenuItem label={projectCommandDescriptor("remove-media").label} shortcut={projectCommandShortcutLabel("remove-media")}
             disabled={relinkDisabled || importPending || selectedMediaIds.size === 0}
             onClick={() => { setContextMenu(null); onRemoveMedia([...selectedMediaIds]); panelHostRef.current?.focus({ preventScroll: true }); }} />],
@@ -820,10 +853,7 @@ export function MediaPanel({
         onDismiss={() => { folderMenu.anchor.focus({ preventScroll: true }); setFolderMenu(null); }}>
         <MenuItem label={projectCommandDescriptor("rename-media-folder").label}
           disabled={foldersDisabled}
-          onClick={() => {
-          setFolderPrompt({ kind: "rename", folder: folderMenu.folder, anchor: folderMenu.anchor, mediaKind: activeMediaKind });
-          setFolderMenu(null);
-        }} />
+          onClick={() => { setFolderEditor({ kind: "rename", folder: folderMenu.folder }); setFolderMenu(null); }} />
         <MenuSeparator />
         <MenuItem label={projectCommandDescriptor("delete-media-folder").label}
           disabled={foldersDisabled}
@@ -832,9 +862,6 @@ export function MediaPanel({
           setFolderMenu(null); panelHostRef.current?.focus({ preventScroll: true });
         }} />
       </ContextMenuSurface>}
-      {folderPrompt && onEditMediaFolder && onValidateMediaFolderName && <MediaFolderPopover prompt={folderPrompt} folders={mediaFolders}
-        validationKey={folderValidationKey} onValidate={onValidateMediaFolderName}
-        onSubmit={(edit) => foldersDisabled ? Promise.resolve(false) : onEditMediaFolder(edit)} onClose={closeFolderPrompt} />}
     </section>
   );
 }

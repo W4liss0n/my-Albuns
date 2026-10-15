@@ -32,7 +32,7 @@ export function MediaPanelEmptyState({
   reason,
 }: MediaPanelEmptyStateProps) {
   const content = reason === "catalog" ? catalogContent[kind] : reason === "folder"
-    ? { title: "Coleção vazia", description: "Use Mover para coleção… no menu das imagens." } : filteredContent;
+    ? { title: "Coleção vazia", description: "Use Mover para coleção no menu das imagens." } : filteredContent;
 
   return (
     <EmptyState

@@ -278,44 +278,94 @@ test("folders filter each tab independently and intersect search and absence", a
   expect(h.edit).not.toHaveBeenCalled();
 });
 
-test("create and rename use compact forms; invalid names never submit", async () => {
+test("+ names a new collection in place; invalid names stay open with the tooltip", async () => {
   const h = harness(); const user = userEvent.setup();
   await user.click(screen.getByRole("button", { name: "Nova coleção" }));
-  const dialog = screen.getByRole("dialog", { name: "Nova coleção" });
-  const input = within(dialog).getByRole("textbox", { name: "Nome" });
-  expect(input).not.toHaveAttribute("aria-invalid");
-  await user.click(within(dialog).getByRole("button", { name: "Criar" }));
+  const input = screen.getByRole("textbox", { name: "Nome da nova coleção" });
+  expect(input).toHaveValue("Nova coleção");
+  expect(input).toHaveFocus();
+  await user.keyboard("turma a{Enter}");
+  expect(await screen.findByRole("tooltip")).toHaveTextContent("Esse nome já está em uso nesta aba.");
   expect(input).toHaveAttribute("aria-invalid", "true");
   expect(h.edit).not.toHaveBeenCalled();
-  await user.type(input, "turma a");
-  await user.click(within(dialog).getByRole("button", { name: "Criar" }));
-  expect(h.edit).not.toHaveBeenCalled();
-  await user.clear(input); await user.type(input, "Retratos");
-  await user.keyboard("{Enter}");
+  await user.clear(input); await user.type(input, "Retratos{Enter}");
   expect(h.edit).toHaveBeenLastCalledWith({ kind: "create", mediaKind: "photo", name: "Retratos" });
-  await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
-  fireEvent.contextMenu(screen.getByRole("button", { name: /Coleção Turma A/ }));
-  await user.click(screen.getByRole("menuitem", { name: "Renomear…" }));
-  const rename = screen.getByRole("textbox", { name: "Nome" });
-  await user.clear(rename); await user.type(rename, "Cerimônia{Enter}");
-  expect(h.edit).toHaveBeenLastCalledWith({ kind: "rename", folderId: "a", name: "Cerimônia" });
+  await waitFor(() => expect(screen.queryByRole("textbox", { name: "Nome da nova coleção" })).not.toBeInTheDocument());
 });
 
-test("move acts on selected images and can remove the folder association", async () => {
+test("an unnamed new collection keeps the next free default name", async () => {
+  const h = harness(); const user = userEvent.setup();
+  await user.click(screen.getByRole("button", { name: "Nova coleção" }));
+  await user.keyboard("{Escape}");
+  expect(h.edit).toHaveBeenLastCalledWith({ kind: "create", mediaKind: "photo", name: "Nova coleção" });
+  h.view.rerender(<MediaPanel {...h.props} mediaFolders={[...folders, { id: "n", kind: "photo", name: "Nova coleção", mediaIds: [] }]} />);
+  await user.click(screen.getByRole("button", { name: "Nova coleção" }));
+  const input = screen.getByRole("textbox", { name: "Nome da nova coleção" });
+  expect(input).toHaveValue("Nova coleção (2)");
+  await user.clear(input);
+  fireEvent.blur(input);
+  await waitFor(() => expect(h.edit).toHaveBeenLastCalledWith({ kind: "create", mediaKind: "photo", name: "Nova coleção (2)" }));
+});
+
+test("renaming happens on the chip from the menu, F2 or double click; Esc and invalid names restore it", async () => {
+  const h = harness(); const user = userEvent.setup();
+  fireEvent.contextMenu(screen.getByRole("button", { name: /Coleção Turma A/ }));
+  await user.click(screen.getByRole("menuitem", { name: "Renomear" }));
+  const rename = screen.getByRole("textbox", { name: "Nome da coleção Turma A" });
+  expect(rename).toHaveValue("Turma A");
+  await user.keyboard("{Escape}");
+  expect(screen.getByRole("button", { name: /Coleção Turma A/ })).toHaveFocus();
+  const chipB = screen.getByRole("button", { name: /Coleção Turma B/ });
+  chipB.focus(); await user.keyboard("{F2}");
+  await user.keyboard("Cerimônia{Enter}");
+  expect(h.edit).toHaveBeenLastCalledWith({ kind: "rename", folderId: "b", name: "Cerimônia" });
+  await user.dblClick(screen.getByRole("button", { name: /Coleção Turma A/ }));
+  const again = screen.getByRole("textbox", { name: "Nome da coleção Turma A" });
+  await user.clear(again); await user.type(again, "turma a");
+  fireEvent.blur(again);
+  await waitFor(() => expect(screen.queryByRole("textbox", { name: "Nome da coleção Turma A" })).not.toBeInTheDocument());
+  expect(h.edit).toHaveBeenCalledTimes(1);
+});
+
+test("the move submenu acts on the selection, marks the current collection and can create one", async () => {
   const h = harness(); const user = userEvent.setup();
   await user.click(screen.getByRole("button", { name: "001.jpg" }));
   fireEvent.click(screen.getByRole("button", { name: "002.jpg" }), { ctrlKey: true });
-  fireEvent.contextMenu(screen.getByRole("button", { name: "001.jpg" }));
-  await user.click(screen.getByRole("menuitem", { name: "Mover para coleção…" }));
-  await user.selectOptions(screen.getByRole("combobox", { name: "Destino" }), "b");
-  await user.click(screen.getByRole("button", { name: "Mover" }));
+  const openSubmenu = async () => {
+    fireEvent.contextMenu(screen.getByRole("button", { name: "001.jpg" }));
+    await user.click(screen.getByRole("menuitem", { name: "Mover para coleção" }));
+    return screen.getByRole("menu", { name: "Mover para coleção" });
+  };
+  let submenu = await openSubmenu();
+  expect(within(submenu).getByRole("menuitemcheckbox", { name: "Turma A" })).toHaveAttribute("aria-checked", "true");
+  expect(within(submenu).getByRole("menuitemcheckbox", { name: "Sem coleção" })).toHaveAttribute("aria-checked", "false");
+  await user.click(within(submenu).getByRole("menuitemcheckbox", { name: "Turma B" }));
   expect(h.edit).toHaveBeenLastCalledWith({ kind: "moveMedia", mediaIds: ["p1", "p2"], folderId: "b" });
-  fireEvent.contextMenu(screen.getByRole("button", { name: "001.jpg" }));
-  await user.click(screen.getByRole("menuitem", { name: "Mover para coleção…" }));
-  await user.selectOptions(screen.getByRole("combobox", { name: "Destino" }), "");
-  await user.click(screen.getByRole("button", { name: "Mover" }));
+  submenu = await openSubmenu();
+  await user.click(within(submenu).getByRole("menuitemcheckbox", { name: "Sem coleção" }));
   expect(h.edit).toHaveBeenLastCalledWith({ kind: "moveMedia", mediaIds: ["p1", "p2"], folderId: null });
+  submenu = await openSubmenu();
+  await user.click(within(submenu).getByRole("menuitem", { name: "Nova coleção" }));
+  expect(screen.getByRole("textbox", { name: "Nome da nova coleção" })).toHaveFocus();
+  await user.keyboard("{Enter}");
+  expect(h.edit).toHaveBeenLastCalledWith({ kind: "create", mediaKind: "photo", name: "Nova coleção", mediaIds: ["p1", "p2"] });
   expect(h.remove).not.toHaveBeenCalled();
+});
+
+test("the move submenu opens and closes from the keyboard", async () => {
+  harness(); const user = userEvent.setup();
+  fireEvent.contextMenu(screen.getByRole("button", { name: "001.jpg" }));
+  const trigger = screen.getByRole("menuitem", { name: "Mover para coleção" });
+  await act(async () => {}); // the menu focuses its first item first
+  trigger.focus(); await user.keyboard("{ArrowRight}");
+  const submenu = screen.getByRole("menu", { name: "Mover para coleção" });
+  expect(within(submenu).getByRole("menuitemcheckbox", { name: "Sem coleção" })).toHaveFocus();
+  await user.keyboard("{ArrowDown}");
+  expect(within(submenu).getByRole("menuitemcheckbox", { name: "Turma A" })).toHaveFocus();
+  await user.keyboard("{ArrowLeft}");
+  expect(screen.queryByRole("menu", { name: "Mover para coleção" })).not.toBeInTheDocument();
+  expect(trigger).toHaveFocus();
+  expect(trigger).toHaveAttribute("aria-expanded", "false");
 });
 
 test("deleting an active folder returns to All; undo does not revive the stale filter", async () => {
@@ -341,23 +391,19 @@ test("folder change discards hidden selection and catalog planning uses new memb
   expect(plan.demand.visibleMediaIds).not.toContain("p1");
 });
 
-test("Escape and Cancel close without edits; pending submission is not duplicated", async () => {
+test("a pending name is sent once and the field waits for the result", async () => {
   const h = harness(); const user = userEvent.setup();
-  const trigger = screen.getByRole("button", { name: "Nova coleção" });
-  await user.click(trigger); await user.keyboard("{Escape}");
-  await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
-  await user.click(trigger); await user.click(screen.getByRole("button", { name: "Cancelar" }));
-  expect(h.edit).not.toHaveBeenCalled();
   let finish!: (result: boolean) => void;
   h.edit.mockImplementation(() => new Promise((resolve) => { finish = resolve; }));
-  await user.click(trigger); await user.type(screen.getByRole("textbox"), "Retratos");
-  await user.dblClick(screen.getByRole("button", { name: "Criar" }));
+  await user.click(screen.getByRole("button", { name: "Nova coleção" }));
+  const input = screen.getByRole("textbox", { name: "Nome da nova coleção" });
+  await user.keyboard("Retratos{Enter}");
+  fireEvent.keyDown(input, { key: "Enter" }); fireEvent.blur(input);
+  await waitFor(() => expect(input).toBeDisabled());
   expect(h.edit).toHaveBeenCalledTimes(1);
-  expect(screen.getByRole("button", { name: "Cancelar" })).toBeDisabled();
-  finish(true);
-  await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+  await act(async () => finish(true));
+  await waitFor(() => expect(screen.queryByRole("textbox", { name: "Nome da nova coleção" })).not.toBeInTheDocument());
 });
-
 
 test("losing an active folder clears its Ausentes filter and returns to All", async () => {
   const h = harness(); const user = userEvent.setup();
@@ -397,61 +443,50 @@ test("moving the focused thumbnail out of the active folder restores connected p
   render(<UpdatingPanel />);
   await user.click(screen.getByRole("button", { name: /Coleção Turma A/ }));
   fireEvent.contextMenu(screen.getByRole("button", { name: "001.jpg" }));
-  await user.click(screen.getByRole("menuitem", { name: "Mover para coleção…" }));
-  await user.selectOptions(screen.getByRole("combobox", { name: "Destino" }), "b");
-  await user.click(screen.getByRole("button", { name: "Mover" }));
-  await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+  await user.click(screen.getByRole("menuitem", { name: "Mover para coleção" }));
+  await user.click(screen.getByRole("menuitemcheckbox", { name: "Turma B" }));
   expect(gridItems()).toEqual([]);
   await waitFor(() => expect(screen.getByRole("region", { name: "Painel de imagens" })).toHaveFocus());
 });
 
-test("folder submission uses the Core normalized name and cannot submit twice during validation", async () => {
+test("a refused save keeps the name open and focused", async () => {
   const h = harness(); const user = userEvent.setup();
-  let resolve!: (result: MediaFolderNameValidation) => void;
-  h.validate.mockImplementationOnce(() => new Promise((done) => { resolve = done; }));
+  h.edit.mockResolvedValueOnce(false);
   await user.click(screen.getByRole("button", { name: "Nova coleção" }));
-  const input = screen.getByRole("textbox", { name: "Nome" });
-  await user.type(input, "  Nome enviado  ");
-  const form = input.closest("form")!;
-  fireEvent.submit(form); fireEvent.submit(form);
-  expect(h.validate).toHaveBeenCalledOnce();
-  expect(h.validate).toHaveBeenCalledWith({ name: "  Nome enviado  ", mediaKind: "photo", folderId: null });
-  expect(h.edit).not.toHaveBeenCalled();
-  await act(async () => resolve({ name: "Nome normalizado pelo Core", error: null }));
-  expect(h.edit).toHaveBeenCalledExactlyOnceWith({ kind: "create", mediaKind: "photo", name: "Nome normalizado pelo Core" });
+  const input = screen.getByRole("textbox", { name: "Nome da nova coleção" });
+  await user.keyboard("Retratos{Enter}");
+  await waitFor(() => expect(input).toBeEnabled());
+  expect(input).toHaveFocus();
+  await user.keyboard("{Enter}");
+  await waitFor(() => expect(h.edit).toHaveBeenCalledTimes(2));
 });
 
-test("a validation response from an older document cannot submit; a failed lookup stays in the tooltip", async () => {
+test("the Core normalized name is the one saved", async () => {
+  const h = harness(); const user = userEvent.setup();
+  h.validate.mockResolvedValueOnce({ name: "Nome normalizado pelo Core", error: null });
+  await user.click(screen.getByRole("button", { name: "Nova coleção" }));
+  await user.keyboard("  Nome enviado  {Enter}");
+  expect(h.validate).toHaveBeenCalledExactlyOnceWith({ name: "Nome enviado", mediaKind: "photo", folderId: null });
+  await waitFor(() => expect(h.edit).toHaveBeenCalledExactlyOnceWith({ kind: "create", mediaKind: "photo", name: "Nome normalizado pelo Core" }));
+});
+
+test("advice from an older document is asked again; a failed lookup stays in the tooltip", async () => {
   const h = harness(); const user = userEvent.setup();
   let resolve!: (result: MediaFolderNameValidation) => void;
   h.validate.mockImplementationOnce(() => new Promise((done) => { resolve = done; }));
   await user.click(screen.getByRole("button", { name: "Nova coleção" }));
-  const input = screen.getByRole("textbox", { name: "Nome" });
-  await user.type(input, "Nova");
-  fireEvent.submit(input.closest("form")!);
+  const input = screen.getByRole("textbox", { name: "Nome da nova coleção" });
+  await user.keyboard("Nova{Enter}");
   h.view.rerender(<MediaPanel {...h.props} folderValidationKey="next-revision" />);
+  h.validate.mockResolvedValueOnce({ name: "Nova", error: "nameInUse" });
   await act(async () => resolve({ name: "Nova", error: null }));
+  expect(h.validate).toHaveBeenCalledTimes(2);
+  expect(await screen.findByRole("tooltip")).toHaveTextContent("Esse nome já está em uso nesta aba.");
   expect(h.edit).not.toHaveBeenCalled();
   h.validate.mockRejectedValueOnce(new Error("offline"));
-  await user.click(screen.getByRole("button", { name: "Criar" }));
-  expect(await screen.findByRole("tooltip")).toHaveTextContent("Não foi possível validar o nome");
+  fireEvent.keyDown(input, { key: "Enter" });
+  await waitFor(() => expect(screen.getByRole("tooltip")).toHaveTextContent("Não foi possível validar o nome"));
   expect(input).toHaveAttribute("aria-invalid", "true");
   expect(input).toHaveFocus();
-  expect(h.edit).not.toHaveBeenCalled();
-});
-
-test("late name advice cannot replace the error for the current draft", async () => {
-  const h = harness(); const user = userEvent.setup();
-  await user.click(screen.getByRole("button", { name: "Nova coleção" }));
-  await user.click(screen.getByRole("button", { name: "Criar" }));
-  const input = screen.getByRole("textbox", { name: "Nome" });
-  let resolve!: (result: MediaFolderNameValidation) => void;
-  h.validate.mockImplementationOnce(() => new Promise((done) => { resolve = done; }));
-  fireEvent.change(input, { target: { value: "Anterior" } });
-  h.validate.mockResolvedValueOnce({ name: "Atual", error: "nameInUse" });
-  fireEvent.change(input, { target: { value: "Atual" } });
-  await waitFor(() => expect(screen.getByRole("tooltip")).toHaveTextContent("Esse nome já está em uso nesta aba."));
-  await act(async () => resolve({ name: "Anterior", error: null }));
-  expect(screen.getByRole("tooltip")).toHaveTextContent("Esse nome já está em uso nesta aba.");
   expect(h.edit).not.toHaveBeenCalled();
 });

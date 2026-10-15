@@ -13910,7 +13910,7 @@
         "kind": "implementation-only",
         "surface": "media-panel-folders",
         "implementationCaptureSelector": "body",
-        "reason": "Design 0035 e barra da referência vigente: chips, menus e formulário compacto ancorado com controles do programa."
+        "reason": "Design 0035 e barra da referência vigente: chips, menus e nome editado na própria chip e submenu Mover para coleção."
       },
       "viewport": {
         "width": 760,
@@ -13927,7 +13927,7 @@
         "kind": "implementation-only",
         "surface": "media-panel-folders",
         "implementationCaptureSelector": "body",
-        "reason": "Design 0035 e barra da referência vigente: chips, menus e formulário compacto ancorado com controles do programa."
+        "reason": "Design 0035 e barra da referência vigente: chips, menus e nome editado na própria chip e submenu Mover para coleção."
       },
       "viewport": {
         "width": 1100,
@@ -13949,7 +13949,7 @@
         "kind": "implementation-only",
         "surface": "media-panel-folders",
         "implementationCaptureSelector": "body",
-        "reason": "Design 0035 e barra da referência vigente: chips, menus e formulário compacto ancorado com controles do programa."
+        "reason": "Design 0035 e barra da referência vigente: chips, menus e nome editado na própria chip e submenu Mover para coleção."
       },
       "viewport": {
         "width": 1100,
@@ -13971,13 +13971,13 @@
         "kind": "implementation-only",
         "surface": "media-panel-folders",
         "implementationCaptureSelector": "body",
-        "reason": "Design 0035 e barra da referência vigente: chips, menus e formulário compacto ancorado com controles do programa."
+        "reason": "Design 0035 e barra da referência vigente: chips, menus e nome editado na própria chip e submenu Mover para coleção."
       },
       "viewport": {
         "width": 1100,
         "height": 400
       },
-      "readySelector": ".media-folder-popover input",
+      "readySelector": ".media-folder-chip--editing input",
       "actions": [
         {
           "type": "click",
@@ -13993,21 +13993,26 @@
         "kind": "implementation-only",
         "surface": "media-panel-folders",
         "implementationCaptureSelector": "body",
-        "reason": "Design 0035 e barra da referência vigente: chips, menus e formulário compacto ancorado com controles do programa."
+        "reason": "Design 0035 e barra da referência vigente: chips, menus e nome editado na própria chip e submenu Mover para coleção."
       },
       "viewport": {
         "width": 1100,
         "height": 400
       },
-      "readySelector": ".media-folder-popover [role=\"tooltip\"]",
+      "readySelector": ".media-folder-name-tooltip[role=\"tooltip\"]",
       "actions": [
         {
           "type": "click",
           "selector": "[aria-label=\"Nova coleção\"]"
         },
         {
-          "type": "click",
-          "selector": ".media-folder-popover button[type=\"submit\"]"
+          "type": "input",
+          "selector": ".media-folder-chip--editing input",
+          "value": "Todas"
+        },
+        {
+          "type": "key",
+          "key": "Enter"
         }
       ]
     },
@@ -14019,7 +14024,7 @@
         "kind": "implementation-only",
         "surface": "media-panel-folders",
         "implementationCaptureSelector": "body",
-        "reason": "Design 0035 e barra da referência vigente: chips, menus e formulário compacto ancorado com controles do programa."
+        "reason": "Design 0035 e barra da referência vigente: chips, menus e nome editado na própria chip e submenu Mover para coleção."
       },
       "viewport": {
         "width": 1100,
@@ -14041,13 +14046,13 @@
         "kind": "implementation-only",
         "surface": "media-panel-folders",
         "implementationCaptureSelector": "body",
-        "reason": "Design 0035 e barra da referência vigente: chips, menus e formulário compacto ancorado com controles do programa."
+        "reason": "Design 0035 e barra da referência vigente: chips, menus e nome editado na própria chip e submenu Mover para coleção."
       },
       "viewport": {
         "width": 1100,
         "height": 400
       },
-      "readySelector": ".media-folder-popover input",
+      "readySelector": ".media-folder-chip--editing input",
       "actions": [
         {
           "type": "context-click",
@@ -14055,7 +14060,7 @@
         },
         {
           "type": "click",
-          "selector": "[role=\"menuitem\"]:first-child"
+          "selector": "[role=\"menuitem\"][aria-label=\"Renomear\"]"
         }
       ]
     },
@@ -14067,13 +14072,13 @@
         "kind": "implementation-only",
         "surface": "media-panel-folders",
         "implementationCaptureSelector": "body",
-        "reason": "Design 0035 e barra da referência vigente: chips, menus e formulário compacto ancorado com controles do programa."
+        "reason": "Design 0035 e barra da referência vigente: chips, menus e nome editado na própria chip e submenu Mover para coleção."
       },
       "viewport": {
         "width": 1100,
         "height": 400
       },
-      "readySelector": ".media-folder-popover select",
+      "readySelector": "[role=\"menu\"][aria-label=\"Mover para coleção\"]",
       "actions": [
         {
           "type": "click",
@@ -14085,7 +14090,7 @@
         },
         {
           "type": "click",
-          "selector": "[role=\"menuitem\"]:nth-last-child(2)"
+          "selector": "[role=\"menuitem\"][aria-haspopup=\"menu\"]"
         }
       ]
     },
@@ -14097,7 +14102,7 @@
         "kind": "implementation-only",
         "surface": "media-panel-folders",
         "implementationCaptureSelector": "body",
-        "reason": "Design 0035 e barra da referência vigente: chips, menus e formulário compacto ancorado com controles do programa."
+        "reason": "Design 0035 e barra da referência vigente: chips, menus e nome editado na própria chip e submenu Mover para coleção."
       },
       "viewport": {
         "width": 1100,

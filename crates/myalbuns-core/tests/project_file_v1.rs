@@ -332,6 +332,7 @@ fn complete_project(root: &Path) -> (EditableProject, PathBuf) {
         project
             .apply(ProjectIntent::EditMediaFolder {
                 edit: MediaFolderEdit::Create {
+                    media_ids: None,
                     media_kind: kind,
                     name: name.into(),
                 },
