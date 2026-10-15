@@ -59,15 +59,19 @@ struct Resources {
 }
 
 impl Resources {
+    /// The fixed share of the RAM our own reservations may add up to, as
+    /// image programs budget by total memory rather than by free memory.
     fn ceiling(self) -> u64 {
         (self.physical_total / 4).min(4 * GIB)
     }
 
-    fn available(self) -> u64 {
+    /// Whether the system is far enough from pressure for one more job: it
+    /// must fit above the headroom in free RAM and in free commit. Running
+    /// jobs count through the memory they already hold, not their reservation.
+    fn admits_another(self, estimate: u64) -> bool {
         let headroom = (self.physical_total / 8).clamp(512 * MIB, 2 * GIB);
-        self.ceiling()
-            .min(self.physical_available.saturating_sub(headroom) / 2)
-            .min(self.commit_available.saturating_sub(headroom) / 2)
+        let needed = headroom.saturating_add(estimate);
+        self.physical_available >= needed && self.commit_available >= needed
     }
 
     fn serial_available(self) -> u64 {
@@ -212,9 +216,9 @@ impl ResourceBudget {
                     .usage
                     .lock()
                     .unwrap_or_else(std::sync::PoisonError::into_inner);
-                let available = resources.map_or(GIB, Resources::available);
                 let serial_available = resources.map_or(GIB, Resources::serial_available);
-                let parallel_admission = estimate.0 <= available.saturating_sub(usage.bytes);
+                let parallel_admission = usage.bytes.saturating_add(estimate.0) <= ceiling
+                    && resources.is_none_or(|resources| resources.admits_another(estimate.0));
                 let serial_admission = usage.active == 0 && estimate.0 <= serial_available;
                 // Missing telemetry admits one conservative reservation. Never
                 // invent free RAM or use an earlier successful observation.
@@ -392,6 +396,74 @@ mod tests {
                     .await
                     .unwrap()
                     .unwrap(),
+            );
+        });
+    }
+
+    #[test]
+    fn a_running_job_counts_once_and_low_free_memory_stops_parallel_work() {
+        tauri::async_runtime::block_on(async {
+            // A 4 GB computer with an editor open, as measured in the lab.
+            let current = Arc::new(Mutex::new(Resources {
+                physical_total: 4 * GIB,
+                physical_available: 1250 * MIB,
+                commit_available: 2 * GIB,
+            }));
+            let probe = Arc::clone(&current);
+            let budget = Arc::new(ResourceBudget::with_probe(move || {
+                Some(*probe.lock().unwrap())
+            }));
+            let permits = Semaphore::new(8);
+            let cancelled = AtomicBool::new(false);
+            let first = budget
+                .reserve(ImageMemoryEstimate(230 * MIB), &cancelled, &permits)
+                .await
+                .unwrap();
+            let second = tokio::time::timeout(
+                Duration::from_millis(200),
+                budget.reserve(ImageMemoryEstimate(230 * MIB), &cancelled, &permits),
+            )
+            .await
+            .expect("free memory already excludes what the first job holds")
+            .unwrap();
+            assert!(!second.is_serial());
+            drop(second);
+            // 512 MiB of headroom plus the estimate no longer fit in free RAM.
+            current.lock().unwrap().physical_available = 700 * MIB;
+            let mut third =
+                Box::pin(budget.reserve(ImageMemoryEstimate(230 * MIB), &cancelled, &permits));
+            assert!(
+                tokio::time::timeout(Duration::from_millis(20), &mut third)
+                    .await
+                    .is_err(),
+                "under pressure, a second job waits for the running one"
+            );
+            drop(first);
+            let alone = tokio::time::timeout(Duration::from_millis(200), third)
+                .await
+                .unwrap()
+                .unwrap();
+            assert!(alone.is_serial(), "under pressure, images go one at a time");
+            drop(alone);
+            // Our reservations never pass a quarter of the RAM.
+            current.lock().unwrap().physical_available = 3 * GIB;
+            let _reservations = [
+                budget
+                    .reserve(ImageMemoryEstimate(500 * MIB), &cancelled, &permits)
+                    .await
+                    .unwrap(),
+                budget
+                    .reserve(ImageMemoryEstimate(500 * MIB), &cancelled, &permits)
+                    .await
+                    .unwrap(),
+            ];
+            assert!(
+                tokio::time::timeout(
+                    Duration::from_millis(20),
+                    budget.reserve(ImageMemoryEstimate(230 * MIB), &cancelled, &permits),
+                )
+                .await
+                .is_err()
             );
         });
     }

@@ -1,5 +1,6 @@
 mod machine_slots;
 mod resources;
+pub(crate) use machine_slots::OpeningTurn;
 use machine_slots::{MachineSlotGrant, MachineSlots, SlotWaitEnd};
 pub(crate) use resources::{ImageMemoryEstimate, ProcessorAdmissionFailure};
 use resources::{MemoryReservation, ResourceBudget, cancellable_reservation};
@@ -47,21 +48,32 @@ pub(crate) struct ImagingProcessor {
     permits: Arc<Semaphore>,
     occupied: Arc<Mutex<[bool; IMAGE_PROCESSING_CONCURRENCY]>>,
     capacity: usize,
+    background_capacity: usize,
     resources: Arc<ResourceBudget>,
 }
 
 /// One core stays free for the editor. The same value bounds the sidecars of
 /// one process and, through machine-wide slots, of every process together.
 fn default_capacity() -> usize {
-    std::thread::available_parallelism()
-        .map_or(1, usize::from)
+    available_cores()
         .saturating_sub(1)
         .clamp(1, IMAGE_PROCESSING_CONCURRENCY)
 }
 
+/// Work for a Project none of whose windows is focused, such as an opening,
+/// runs below normal priority and may also use the core kept for the editor:
+/// the window in use takes the processor back whenever it needs it.
+fn background_capacity() -> usize {
+    available_cores().clamp(1, IMAGE_PROCESSING_CONCURRENCY)
+}
+
+fn available_cores() -> usize {
+    std::thread::available_parallelism().map_or(1, usize::from)
+}
+
 impl Default for ImagingProcessor {
     fn default() -> Self {
-        Self::with_capacity(default_capacity())
+        Self::with_capacities(default_capacity(), background_capacity())
     }
 }
 
@@ -124,12 +136,19 @@ impl ImagingProcessor {
         }
     }
 
+    #[cfg(test)]
     fn with_capacity(capacity: usize) -> Self {
+        Self::with_capacities(capacity, capacity)
+    }
+
+    fn with_capacities(capacity: usize, background_capacity: usize) -> Self {
         assert!((1..=IMAGE_PROCESSING_CONCURRENCY).contains(&capacity));
+        assert!((capacity..=IMAGE_PROCESSING_CONCURRENCY).contains(&background_capacity));
         Self {
-            permits: Arc::new(Semaphore::new(capacity)),
+            permits: Arc::new(Semaphore::new(background_capacity)),
             occupied: Arc::new(Mutex::new([false; IMAGE_PROCESSING_CONCURRENCY])),
             capacity,
+            background_capacity,
             resources: Arc::new(ResourceBudget::default()),
         }
     }
@@ -159,6 +178,13 @@ impl ImagingProcessor {
 
     pub(crate) fn cache_capacity(&self) -> usize {
         self.capacity
+    }
+
+    /// How many images work below normal priority may prepare at once. The
+    /// machine-wide slots still keep work for the window in use to
+    /// `cache_capacity`.
+    pub(crate) fn background_cache_capacity(&self) -> usize {
+        self.background_capacity
     }
 
     pub(crate) async fn reserve_cache_for(
@@ -194,7 +220,12 @@ impl ImagingProcessor {
     }
 
     async fn acquire(&self, cache: bool) -> Result<ProcessorReservation, ProcessorUnavailable> {
-        let count = if cache { 1 } else { self.capacity as u32 };
+        // Export takes every permit: nothing else runs beside it.
+        let count = if cache {
+            1
+        } else {
+            self.background_capacity as u32
+        };
         let permit = self
             .permits
             .clone()
@@ -582,8 +613,9 @@ async fn invoke_once(
                 format!("A correlação da solicitação é inválida: {error}"),
             )
         })?;
+    let priority = sidecar_priority(host_focus(app));
     // Held until this function returns, which is after the sidecar ended.
-    let _machine_slots = acquire_machine_slots(app, reservation, control).await?;
+    let _machine_slots = acquire_machine_slots(app, reservation, priority, control).await?;
     let handshake_challenge = uuid::Uuid::new_v4().simple().to_string();
     let sidecar = app
         .shell()
@@ -633,7 +665,6 @@ async fn invoke_once(
             }
         }
     };
-    let priority = sidecar_priority(host_focus(app));
     let attached = ProcessorChildLifetime::attach_with_priority(process_instance, priority);
     let mut processor_lifetime = match attached {
         Ok(lifetime) => lifetime,
@@ -735,6 +766,7 @@ async fn invoke_once(
 async fn acquire_machine_slots(
     app: &AppHandle,
     reservation: &ProcessorReservation,
+    priority: ProcessorPriority,
     control: InvocationControl<'_>,
 ) -> Result<Option<MachineSlotGrant>, InvocationFailure> {
     let Some(app_paths) = machine_slot_paths(app) else {
@@ -749,17 +781,29 @@ async fn acquire_machine_slots(
         ._memory
         .as_ref()
         .is_some_and(MemoryReservation::is_serial);
-    MachineSlots::new(&app_paths, default_capacity())
-        .acquire(low_memory, || {
-            if control.is_cancelled() {
-                Some(SlotWaitEnd::Cancelled)
-            } else if reservation.permits.is_closed() {
-                Some(SlotWaitEnd::Unavailable)
-            } else {
-                None
-            }
-        })
-        .await
+    let stop = || {
+        if control.is_cancelled() {
+            Some(SlotWaitEnd::Cancelled)
+        } else if reservation.permits.is_closed() {
+            Some(SlotWaitEnd::Unavailable)
+        } else {
+            None
+        }
+    };
+    // The turn comes before any slot, so a Host waiting for it holds none.
+    let turn = match app.try_state::<OpeningTurn>() {
+        Some(turn) => turn.take(&app_paths, stop).await,
+        None => Ok(()),
+    };
+    let slots = match turn {
+        Ok(()) => {
+            MachineSlots::new(&app_paths, default_capacity(), background_capacity())
+                .acquire(low_memory, priority == ProcessorPriority::BelowNormal, stop)
+                .await
+        }
+        Err(end) => Err(end),
+    };
+    slots
         .map_err(|end| match end {
             SlotWaitEnd::Cancelled => InvocationFailure::at_stage(
                 InvocationFailureStage::Cancelled,

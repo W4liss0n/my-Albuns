@@ -53,8 +53,13 @@ function failedProjects() {
   }
 }
 
+/**
+ * Decision pages take the place of the native opening window, which says so
+ * in the address; pages reloaded after an opening page keep the marker.
+ */
 function openedFromLoadingOwner() {
-  return window.sessionStorage.getItem(OPENING_OWNER_MARKER) === "loading";
+  return parameters.get("openingOwner") === "1" ||
+    window.sessionStorage.getItem(OPENING_OWNER_MARKER) === "loading";
 }
 
 const openingKinds = ["opening-project", "creating-project", "project-recovery", "external-copy"];

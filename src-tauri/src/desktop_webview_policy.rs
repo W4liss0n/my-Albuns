@@ -283,9 +283,6 @@ pub(crate) const PROJECT_DIALOG_WEBVIEW_DEBUG_PORT_ENV: &str =
 #[cfg(debug_assertions)]
 pub(crate) const PROJECT_DIALOG_WEBVIEW_DATA_DIRECTORY_ENV: &str =
     "MYALBUNS_DEV_PROJECT_DIALOG_WEBVIEW_DATA_DIRECTORY";
-#[cfg(debug_assertions)]
-pub(crate) const OPENING_DIALOG_WEBVIEW_DEBUG_PORT_ENV: &str =
-    "MYALBUNS_DEV_OPENING_DIALOG_WEBVIEW_DEBUG_PORT";
 
 pub(crate) const WRY_DEFAULT_DISABLED_FEATURES: &str =
     "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection";
@@ -477,7 +474,6 @@ pub(crate) fn project_dialog_debug_data_directory(
 pub(crate) fn retire_inherited_debug_arguments_before_replacement() -> io::Result<()> {
     if std::env::var_os(SAVE_AS_WEBVIEW_DEBUG_PORT_ENV).is_none()
         && std::env::var_os(PROJECT_DIALOG_WEBVIEW_DEBUG_PORT_ENV).is_none()
-        && std::env::var_os(OPENING_DIALOG_WEBVIEW_DEBUG_PORT_ENV).is_none()
     {
         return Ok(());
     }

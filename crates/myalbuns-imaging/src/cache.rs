@@ -19,7 +19,7 @@ use crate::{
     cache_error::{CacheError, CacheWriteMonitor},
     source::{
         MAX_DECODED_SOURCE_PIXELS_TOTAL, PreviewRaster, confirm_source_unchanged, open_cache_bytes,
-        read_fingerprinted_source, transposes,
+        preview_dimensions, read_fingerprinted_source, transposes,
     },
     write_response,
 };
@@ -214,7 +214,9 @@ fn generate_preview(
     let exif_orientation = opened.exif_orientation();
     let source_page_count = opened.source_page_count();
     let basic_color_profile = opened.basic_color_profile();
-    let decoded = opened.decode_preview().map_err(|failure| failure.message)?;
+    let decoded = opened
+        .decode_preview(request.policy.max_edge_px)
+        .map_err(|failure| failure.message)?;
     let output = write_preview(
         storage,
         request.policy,
@@ -278,7 +280,7 @@ pub(crate) fn write_preview(
 ) -> Result<PreviewOutput, CacheError> {
     let (width, height) = decoded.oriented_dimensions();
     let preview = if width > policy.max_edge_px || height > policy.max_edge_px {
-        let (width, height) = reduced_dimensions(width, height, policy.max_edge_px);
+        let (width, height) = preview_dimensions(width, height, policy.max_edge_px);
         // Reduce the raster as decoded, then orient only the reduced pixels.
         let (width, height) = if transposes(decoded.pending) {
             (height, width)
@@ -375,20 +377,13 @@ pub(crate) fn write_preview(
     })
 }
 
-/// The size rule of `DynamicImage::thumbnail` used by representation 1:
-/// preserve the aspect ratio and fit both edges within `max_edge`.
-fn reduced_dimensions(width: u32, height: u32, max_edge: u32) -> (u32, u32) {
-    let ratio = f64::min(
-        f64::from(max_edge) / f64::from(width),
-        f64::from(max_edge) / f64::from(height),
-    );
-    let edge = |value: u32| ((f64::from(value) * ratio).round() as u32).max(1);
-    (edge(width), edge(height))
-}
-
 /// Area-averaging reduction. Transparent pixels are weighted by alpha, so
-/// their hidden colour does not bleed into visible neighbours.
+/// their hidden colour does not bleed into visible neighbours. A raster
+/// decoded at a reduced scale may already have the preview's size.
 fn reduce(image: DynamicImage, width: u32, height: u32) -> Result<DynamicImage, CacheError> {
+    if (image.width(), image.height()) == (width, height) {
+        return Ok(image);
+    }
     let image = match image {
         DynamicImage::ImageRgb8(_) | DynamicImage::ImageRgba8(_) => image,
         other => DynamicImage::ImageRgba8(other.into_rgba8()),

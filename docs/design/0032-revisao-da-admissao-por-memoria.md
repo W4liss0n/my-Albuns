@@ -2,7 +2,7 @@
 status: accepted
 document: design
 date: 2026-09-10
-updated: 2026-10-07
+updated: 2026-10-14
 platform: windows
 implementation-readiness: ready-for-agent
 ---
@@ -60,12 +60,30 @@ estimativa geral. A [medição de 2026-09-25](../research/2026-09-25-memoria-do-
 encontrou picos de 4,3 bytes por pixel nesse caminho e de 9,6 a 24 nos demais.
 Um lote mantém um Original por vez e reserva o máximo de suas estimativas.
 
-Para iniciar trabalhos simultâneos, preserva-se a margem anterior de um
-oitavo da RAM total, limitada entre 512 MiB e 2 GiB, usando somente metade
-da RAM e do commit restantes. As reservas ativas são descontadas desse
-orçamento: um trabalho admitido pode ainda não ter alocado seus buffers.
+Para iniciar trabalhos simultâneos, valem duas condições:
 
-Quando essa folga não permite paralelismo e não existe reserva ativa, admite-se
+- **Orçamento fixo.** A soma das reservas ativas com a estimativa do novo
+  trabalho cabe no teto agregado. É a forma usada por darktable, ImageMagick e
+  Chromium: as próprias reservas contra uma fração da RAM total
+  ([pesquisa de 2026-10-14](../research/2026-10-14-admissao-por-memoria-em-programas-consolidados.md)).
+- **Freio de pressão.** A estimativa do novo trabalho cabe acima da margem de
+  um oitavo da RAM total, limitada entre 512 MiB e 2 GiB, tanto na RAM física
+  livre quanto no commit livre. Os trabalhos em execução entram nessa leitura
+  pela memória que já ocupam, e não de novo pela reserva.
+
+Até 14/10/2026, o paralelismo usava só metade da RAM e do commit acima da
+margem e descontava dessa metade as reservas ativas inteiras. Como a RAM livre
+já exclui a memória que o trabalho em execução ocupa, ele contava duas vezes.
+Num computador de 4 GB, dois Processadores de Imagens, que usam juntos cerca
+de 250 MiB, exigiam de 1268 a 1432 MiB livres
+([medição](../research/2026-10-13-progresso-de-abertura-em-pc-fraco.md)).
+Com a regra atual, o segundo começa com 701 a 742 MiB livres, conforme a foto.
+
+Um trabalho admitido ainda pode não ter alocado seus buffers quando o próximo
+lê a RAM livre. Esse intervalo é limitado pelo teto agregado e pelas vagas da
+máquina, e a estimativa tem folga de cerca de 1,8 vez sobre o pico medido.
+
+Quando essas condições não permitem paralelismo e não existe reserva ativa, admite-se
 um único trabalho se sua estimativa couber no commit disponível e no teto
 agregado, sem margem fixa adicional nem divisão por dois. RAM física livre
 não veta essa execução, inclusive quando a leitura é zero. O Windows pode
@@ -112,6 +130,9 @@ seleção de arquivos depois do término.
 
 - Admitir uma imagem estimada em 236 MiB com 350 MiB físicos e 7 GiB de
   commit disponíveis; manter o próximo trabalhador em espera até a liberação.
+- Num computador de 4 GB com 1250 MiB livres, admitir dois trabalhos de
+  230 MiB em paralelo; com 700 MiB livres, manter o segundo em espera; nunca
+  passar do teto agregado com as próprias reservas.
 - Admitir um trabalho individual também com zero de RAM física livre e commit
   suficiente; manter a recusa por falta de commit e o teto por trabalho.
 - Concluir a importação real por arquivos e por pasta com um trabalhador sob

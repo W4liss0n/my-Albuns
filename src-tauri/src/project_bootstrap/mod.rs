@@ -25,7 +25,7 @@ pub(crate) use protocol::{
 #[cfg(debug_assertions)]
 pub(crate) use supervisor::new_open_request;
 pub(crate) use supervisor::{
-    BootstrapFailure, BootstrapFailureKind, BootstrapOutcome, PendingExternalCopyProcess,
-    PendingRecoveryProcess, ProjectHostBootstrap, RecoveryContinuationOutcome,
-    StartupProgressReporter,
+    BootstrapFailure, BootstrapFailureKind, BootstrapOutcome, LaunchCancellation,
+    PendingExternalCopyProcess, PendingRecoveryProcess, ProjectHostBootstrap,
+    RecoveryContinuationOutcome, StartupProgressReporter,
 };

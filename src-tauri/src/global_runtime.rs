@@ -187,7 +187,8 @@ const TAURI_WEBVIEW_AUTOMATION_ENV: &str = "TAURI_WEBVIEW_AUTOMATION";
 struct GlobalRuntimeState {
     bootstrap: ProjectHostBootstrap,
     global_webview_data_directory: PathBuf,
-    progress_webview_data_directory: PathBuf,
+    /// Decision pages of an opening share the Welcome's browser.
+    decision_browser: native_dialog_window::DecisionBrowser,
     graphics_gate: GraphicsLaunchGate,
     recent_projects: RecentProjectsStore,
     recent_preview_paths: AppPaths,
@@ -208,15 +209,17 @@ impl GlobalRuntimeState {
         activation_projects: Vec<PathBuf>,
         global_activation: Option<Arc<PrimaryGlobalActivation>>,
     ) -> Result<Self, std::io::Error> {
+        let global_webview_data_directory = app_paths
+            .webview_data_directory(GLOBAL_WEBVIEW_NAMESPACE)
+            .map_err(|error| std::io::Error::other(error.to_string()))?;
         Ok(Self {
             bootstrap: ProjectHostBootstrap::new(std::env::current_exe()?, HOST_TERMINAL_TIMEOUT)
                 .with_creation_timeout(HOST_CREATION_TIMEOUT),
-            global_webview_data_directory: app_paths
-                .webview_data_directory(GLOBAL_WEBVIEW_NAMESPACE)
-                .map_err(|error| std::io::Error::other(error.to_string()))?,
-            progress_webview_data_directory: app_paths
-                .webview_data_directory(native_dialog_window::PROGRESS_WEBVIEW_NAMESPACE)
-                .map_err(|error| std::io::Error::other(error.to_string()))?,
+            decision_browser: native_dialog_window::DecisionBrowser {
+                data_directory: global_webview_data_directory.clone(),
+                arguments: decision_browser_arguments()?,
+            },
+            global_webview_data_directory,
             graphics_gate: GraphicsLaunchGate::new(activation_projects),
             recent_projects: RecentProjectsStore::new(app_paths),
             recent_preview_paths: app_paths.clone(),
@@ -248,6 +251,14 @@ impl GlobalRuntimeState {
 
     fn project_host_gate_rejection(&self) -> Option<ProjectLaunchOutcome> {
         (!self.graphics_gate.allows_project_host()).then(|| ProjectLaunchOutcome::Failed {
+            error: graphics_gate_failure(),
+        })
+    }
+
+    /// Files opened by Windows may also start while the check runs, once
+    /// the launch's own files started early.
+    fn activation_gate_rejection(&self) -> Option<ProjectLaunchOutcome> {
+        (!self.graphics_gate.admits_activation()).then(|| ProjectLaunchOutcome::Failed {
             error: graphics_gate_failure(),
         })
     }
@@ -410,6 +421,7 @@ async fn complete_graphics_gate(
 ) -> Option<ProjectLaunchOutcome> {
     let state = app.state::<GlobalRuntimeState>().inner().clone();
     if let Some(error) = state.scheduled_cleanup_failure().await {
+        crate::native_progress_window::close_early_opening();
         return Some(ProjectLaunchOutcome::Failed { error });
     }
     // Forwarded activations wait for the gate. Joining the opening burst
@@ -440,6 +452,38 @@ async fn complete_graphics_gate(
                 show_existing_global_window(&app);
             }
             None
+        }
+    }
+}
+
+/// The files of the launch start while the Welcome's WebView2 starts and
+/// checks the graphics, which takes many seconds on a slow computer. Their
+/// Hosts prepare the images meanwhile. See `GraphicsLaunchGate::begin_early_launch`.
+async fn launch_initial_projects(app: AppHandle, state: GlobalRuntimeState) {
+    if !state.graphics_gate.has_pending_activation()
+        || state.scheduled_cleanup_failure().await.is_some()
+    {
+        // The graphics check presents a cleanup failure.
+        return;
+    }
+    // As in `complete_graphics_gate`, the batch joins the burst before it
+    // takes the files, so the check's own batch never ends a burst alone.
+    let launch_permit = state.project_launches.enter_activation().await;
+    let batch = opening_bursts(&app).join_batch();
+    match state.graphics_gate.begin_early_launch() {
+        Some(projects) => {
+            tracing::info!(
+                target: "myalbuns.desktop",
+                process_role = ProcessRole::Global.as_str(),
+                project_count = projects.len(),
+                event = "opening_started_before_graphics_check",
+            );
+            launch_activation_batch(&app, state.clone(), batch, projects, &launch_permit).await;
+        }
+        None => {
+            if let Some(finished) = batch.finish(None) {
+                finalize_opening_burst(&app, &state, finished).await;
+            }
         }
     }
 }
@@ -991,7 +1035,7 @@ async fn show_opening_dialog(
         app,
         owner_label,
         kind,
-        &state.progress_webview_data_directory,
+        Some(state.decision_browser.clone()),
         Some(board),
     )
     .await
@@ -1147,7 +1191,11 @@ async fn resolve_external_copy_decision(
                 return (ProjectLaunchOutcome::Cancelled, true);
             }
             OpeningExternalCopyDecision::SaveCopyAs => {
-                let decision_window = dialog.decision_window();
+                let Some(decision_window) = dialog.decision_window() else {
+                    drop(on_screen);
+                    drop(pending);
+                    return (external_copy_dialog_failure(), true);
+                };
                 match choose_external_copy_destination(&decision_window).await {
                     Ok(None) => continue,
                     Err(outcome) => {
@@ -1368,6 +1416,12 @@ async fn launch_confirmed_project_with_bindings(
                 recent_path,
             }
         }
+        // The graphics check rejected while the Host was starting: the
+        // Welcome presents the check's own message.
+        Ok(Err(BootstrapFailure {
+            kind: BootstrapFailureKind::Cancelled,
+            ..
+        })) => ConfirmedProjectLaunch::Completed(ProjectLaunchOutcome::Cancelled),
         Ok(Err(failure)) => ConfirmedProjectLaunch::Completed(ProjectLaunchOutcome::Failed {
             error: bootstrap_failure(failure),
         }),
@@ -1447,7 +1501,7 @@ async fn activation_batch_bindings(
     if let Some(error) = state.scheduled_cleanup_failure().await {
         return Err(ProjectLaunchOutcome::Failed { error });
     }
-    if let Some(rejection) = state.project_host_gate_rejection() {
+    if let Some(rejection) = state.activation_gate_rejection() {
         return Err(rejection);
     }
     path_io::capture_root_bindings(projects.to_vec())
@@ -1498,6 +1552,9 @@ async fn launch_burst_project(
         break {
             let burst = Arc::clone(ticket.burst());
             state.bootstrap = state.bootstrap.with_progress(row.reporter());
+            if let Some(cancellation) = state.graphics_gate.early_launch_cancellation() {
+                state.bootstrap = state.bootstrap.with_cancellation(cancellation);
+            }
             if let Some(claim) = ticket.focus_claim_id() {
                 state.bootstrap = state.bootstrap.with_focus_claim(claim);
             }
@@ -1623,10 +1680,13 @@ async fn finalize_opening_burst(
     finished: FinishedBurst<NativeProgressDialog>,
 ) {
     let ending = burst_ending(finished.terminal.as_ref());
+    // A burst that never presented its window leaves no early window behind.
+    crate::native_progress_window::close_early_opening();
     if let Some(dialog) = finished.burst.lane().lock().await.take() {
         dialog.finish(ending.restore_owner);
     }
     if ending.hand_off {
+        state.graphics_gate.confirm_by_editor();
         exit_global_after_handoff(app);
     }
     if ending.restore_global {
@@ -1969,10 +2029,7 @@ fn build_global_window(
     if new_project {
         config.url = tauri::WebviewUrl::App("global.html?surface=newProject".into());
     }
-    #[cfg(debug_assertions)]
-    let arguments = desktop_webview_policy::global_webview_debug_arguments()?;
-    #[cfg(not(debug_assertions))]
-    let arguments: Option<String> = None;
+    let arguments = global_webview_arguments()?;
     let (policy_signal, policy_readiness) =
         desktop_webview_policy::page_load_handshake(arguments.as_deref());
     let builder = WebviewWindowBuilder::from_config(app, &config)
@@ -1992,7 +2049,39 @@ fn build_global_window(
     Ok((window, policy_readiness))
 }
 
+/// The browser options of the Welcome. Decision pages pass the same ones:
+/// WebView2 refuses different options on the same data folder.
+fn global_webview_arguments() -> std::io::Result<Option<String>> {
+    #[cfg(debug_assertions)]
+    {
+        desktop_webview_policy::global_webview_debug_arguments()
+    }
+    #[cfg(not(debug_assertions))]
+    {
+        Ok(None)
+    }
+}
+
+/// The Welcome's options as WebView2 receives them. A debug launch may hand
+/// them partly through the inherited `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS`,
+/// which is cleared once the Welcome exists, so they are read at startup and
+/// decision pages pass them explicitly.
+fn decision_browser_arguments() -> std::io::Result<Option<String>> {
+    #[cfg(debug_assertions)]
+    {
+        let arguments = global_webview_arguments()?;
+        Ok(Some(desktop_webview_policy::browser_arguments(
+            arguments.as_deref(),
+        )))
+    }
+    #[cfg(not(debug_assertions))]
+    {
+        Ok(None)
+    }
+}
+
 fn show_existing_global_window(app: &AppHandle) {
+    crate::native_progress_window::close_early_opening();
     if let Some(window) = app.get_webview_window(GLOBAL_WINDOW_LABEL) {
         let _ = window.unminimize();
         let _ = window.show();
@@ -2206,6 +2295,7 @@ async fn initialize_global_window(
     tokio::time::sleep(GRAPHICS_GATE_TIMEOUT).await;
     if state.graphics_gate.expire() {
         state.record_startup_failure(graphics_gate_timeout_failure());
+        crate::native_progress_window::close_early_opening();
         let _ = window.show();
         let _ = window.set_focus();
     }
@@ -2494,6 +2584,9 @@ pub(crate) fn run(
         GlobalActivationEntry::Primary(primary) => Arc::new(primary),
     };
     let initial_projects = primary_activation.initial_projects().to_vec();
+    let opens_files = !initial_projects.is_empty()
+        && primary_activation.initial_settings().is_none()
+        && !primary_activation.initial_new_project();
     let state = GlobalRuntimeState::new(&app_paths, initial_projects, Some(primary_activation))?;
     let cache_service = CacheService::new(app_paths.clone());
     let setup_state = state.clone();
@@ -2549,6 +2642,11 @@ pub(crate) fn run(
             logging::initialize(app, &app_paths, ProcessRole::Global);
             crate::application_modality::install(app.handle(), &app_paths);
             let app_handle = app.handle().clone();
+            // Starting the first WebView2 browser can take many seconds on a
+            // slow computer. A launch that opens files shows its progress first.
+            if opens_files {
+                crate::native_progress_window::show_early_opening();
+            }
             // Both configured windows use `create: false`. Install the first
             // owned WebView before setup returns; the page-load terminal then
             // proves that Wry registered it before native policy is applied.
@@ -2569,6 +2667,10 @@ pub(crate) fn run(
                 window,
                 policy_readiness,
                 managed_cache_service,
+            ));
+            tauri::async_runtime::spawn(launch_initial_projects(
+                app_handle.clone(),
+                setup_state.clone(),
             ));
             tauri::async_runtime::spawn(listen_for_forwarded_activations(
                 app_handle,
@@ -3536,6 +3638,8 @@ public static class MyAlbunsFocusFixture
         InvalidTerminal => "host_protocol_error",
         CorrelationMismatch => "host_protocol_error",
         HostFailed => GENERIC_OPENING_FAILURE,
+        // A cancelled launch ends quietly before it reaches this table.
+        Cancelled => GENERIC_OPENING_FAILURE,
     });
 
     exhaustive_table!(failure_stage_table: FailureStage => () {
