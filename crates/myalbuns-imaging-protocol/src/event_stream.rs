@@ -242,6 +242,12 @@ impl ProgressCursor {
             self.stage == ImagingProgressStage::PreparingPhotos
                 && self.total_units == completion.photos.len() as u32
                 && self.completed_units == validated
+        } else if let ImagingResponse::CacheCompleted { completion, .. } = response {
+            // Cache batches count every finished media, failed ones included.
+            let finished = completion.finished_count() as u32;
+            self.stage == ImagingProgressStage::PreparingPhotos
+                && self.total_units == finished
+                && self.completed_units == finished
         } else {
             self.stage == ImagingProgressStage::EncodingOutput
                 && self.completed_units == self.total_units

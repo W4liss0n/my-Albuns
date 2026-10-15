@@ -14,7 +14,8 @@ pub use cache::{
     CACHE_FINGERPRINT_VERSION, CACHE_JPEG_QUALITY, CACHE_MAX_DECODED_PIXELS,
     CACHE_MAX_DECODER_ALLOC_BYTES, CACHE_MAX_EDGE_PX, CACHE_REPRESENTATION_VERSION, CacheArtifact,
     CacheArtifactProperties, CacheBasicColorProfile, CacheCompletion, CacheFingerprint, CacheJob,
-    CacheMediaSource, CacheRepresentationPolicy, CacheRequest, CacheReusableGeneration,
+    CacheJobFailure, CacheMediaSource, CacheRepresentationPolicy, CacheRequest,
+    CacheReusableGeneration,
 };
 pub use command::{
     ImagingCommand, ImagingFailure, ImagingFailureCode, ImagingFailureStage, ImagingPathCode,
@@ -37,7 +38,7 @@ pub use processor_handshake::{
 pub use render::{MediaSource, RenderCompletion, RenderSource};
 pub use response::ImagingResponse;
 
-pub const IMAGING_PROTOCOL_VERSION: u32 = 27;
+pub const IMAGING_PROTOCOL_VERSION: u32 = 28;
 
 pub(crate) fn is_safe_identifier(value: &str) -> bool {
     !value.is_empty()

@@ -265,6 +265,20 @@ impl CacheWork {
     }
 }
 
+/// Media prepared by one Processor. Members share the namespace and root
+/// bindings of one attempt.
+pub(crate) struct CacheBatch {
+    pub(crate) request_id: String,
+    pub(crate) members: Vec<CacheBatchMember>,
+}
+
+pub(crate) struct CacheBatchMember {
+    pub(crate) work: CacheWork,
+    /// The member's own flight: an obsolete member is not published, while
+    /// the rest of the batch continues.
+    pub(crate) cancellation: CacheCancellation,
+}
+
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 struct CacheFlightKey {
     project_id: String,
@@ -650,6 +664,7 @@ impl CacheEngine {
         self.publish_prepared_batch(vec![pending]).remove(0)
     }
 
+    #[cfg(test)]
     pub(crate) async fn prepare<T: ImagingTransport>(
         &self,
         transport: &mut T,
@@ -658,7 +673,37 @@ impl CacheEngine {
         context: &InvocationContext,
         cancellation: &CacheCancellation,
     ) -> Result<PendingCachePublication, CacheFailure> {
-        prepare_cache(self, transport, app_paths, work, context, cancellation).await
+        let request_id = work.request_id.clone();
+        prepare_cache_batch(
+            self,
+            transport,
+            app_paths,
+            CacheBatch {
+                request_id,
+                members: vec![CacheBatchMember {
+                    work,
+                    cancellation: cancellation.clone(),
+                }],
+            },
+            context,
+            InvocationControl::controlled(cancellation.flag(), &|_| {}),
+        )
+        .await
+        .remove(0)
+    }
+
+    /// Prepares several media in one Processor. Each member keeps its own
+    /// result: a media the Processor cannot prepare, or whose flight became
+    /// obsolete, fails alone. `control` cancels the whole request.
+    pub(crate) async fn prepare_batch<T: ImagingTransport>(
+        &self,
+        transport: &mut T,
+        app_paths: &AppPaths,
+        batch: CacheBatch,
+        context: &InvocationContext,
+        control: InvocationControl<'_>,
+    ) -> Vec<Result<PendingCachePublication, CacheFailure>> {
+        prepare_cache_batch(self, transport, app_paths, batch, context, control).await
     }
 
     pub(crate) async fn invoke_cache_command<T: ImagingTransport>(
@@ -1454,45 +1499,123 @@ impl CacheFlightWaiter {
     }
 }
 
-async fn prepare_cache<T: ImagingTransport>(
+type MemberPreparation = Result<PendingCachePublication, CacheFailure>;
+
+async fn prepare_cache_batch<T: ImagingTransport>(
     engine: &CacheEngine,
     transport: &mut T,
     app_paths: &AppPaths,
-    work: CacheWork,
+    batch: CacheBatch,
     context: &InvocationContext,
-    cancellation: &CacheCancellation,
-) -> Result<PendingCachePublication, CacheFailure> {
+    control: InvocationControl<'_>,
+) -> Vec<MemberPreparation> {
+    let mut results = batch.members.iter().map(|_| None).collect::<Vec<_>>();
+    if let Err(failure) = prepare_planned_batch(
+        engine,
+        transport,
+        app_paths,
+        batch,
+        context,
+        control,
+        &mut results,
+    )
+    .await
+    {
+        for result in results.iter_mut().filter(|result| result.is_none()) {
+            *result = Some(Err(failure.clone()));
+        }
+    }
+    results
+        .into_iter()
+        .map(|result| result.expect("every member of the batch has a result"))
+        .collect()
+}
+
+/// Fills `results` for the members it settles; an error settles the rest.
+async fn prepare_planned_batch<T: ImagingTransport>(
+    engine: &CacheEngine,
+    transport: &mut T,
+    app_paths: &AppPaths,
+    batch: CacheBatch,
+    context: &InvocationContext,
+    control: InvocationControl<'_>,
+    results: &mut [Option<MemberPreparation>],
+) -> Result<(), CacheFailure> {
     if engine.processor_status() == CacheProcessorStatus::Suspended {
         return Err(CacheFailure::new(
             CacheFailureStage::ProcessorSuspended,
             CACHE_PROCESSOR_SUSPENDED_MESSAGE,
         ));
     }
-    if cancellation
-        .flag()
-        .load(std::sync::atomic::Ordering::Acquire)
-    {
+    if control.is_cancelled() {
         return Err(cancelled_before_publication());
     }
-    let source_binding = cache_source_binding(&work.source);
-    let observed_source =
-        crate::linked_files::LinkedFiles::new().observe_one(&work.root_bindings, &source_binding);
-    let request = {
+    let Some(first) = batch.members.first() else {
+        return Ok(());
+    };
+    let namespace = first.work.namespace.clone();
+    let roots = first.work.root_bindings.clone();
+    let mut active = Vec::with_capacity(batch.members.len());
+    for (index, member) in batch.members.into_iter().enumerate() {
+        if member.cancellation.flag().load(Ordering::Acquire) {
+            results[index] = Some(Err(cancelled_before_publication()));
+        } else if member.work.namespace.project_id() != namespace.project_id()
+            || member.work.namespace.paths() != namespace.paths()
+            || member.work.root_bindings != roots
+        {
+            results[index] = Some(Err(CacheFailure::new(
+                CacheFailureStage::Plan,
+                "O lote de Cache mistura tentativas diferentes.",
+            )));
+        } else {
+            active.push((index, member));
+        }
+    }
+    if active.is_empty() {
+        return Ok(());
+    }
+    let sources = active
+        .iter()
+        .map(|(_, member)| cache_source_binding(&member.work.source))
+        .collect::<Vec<_>>();
+    let observed_sources = crate::linked_files::LinkedFiles::new().observe(&roots, &sources);
+    let jobs = {
         let _transition_and_publication_guard = engine
             .transition_and_publication_gate
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
-        plan_request(app_paths, &work)?
+        active
+            .iter()
+            .map(|(_, member)| plan_job(app_paths, &member.work))
+            .collect::<Vec<_>>()
     };
-    let storage = app_paths
-        .prepare_cache_storage(work.namespace.paths())
-        .map_err(|error| {
-            cache_storage_failure(
-                CacheFailureStage::VerifyArtifacts,
-                "Não foi possível verificar o Cache",
-                error,
-            )
-        })?;
+    let mut planned = Vec::with_capacity(active.len());
+    for (((index, member), observed_source), job) in
+        active.into_iter().zip(observed_sources).zip(jobs)
+    {
+        match job {
+            Ok(job) => planned.push((index, member, observed_source, job)),
+            Err(failure) => results[index] = Some(Err(failure)),
+        }
+    }
+    if planned.is_empty() {
+        return Ok(());
+    }
+    let request = CacheRequest::new(
+        batch.request_id,
+        namespace.project_id().to_owned(),
+        namespace.paths().clone(),
+        planned.iter().map(|(_, _, _, job)| job.clone()).collect(),
+        CacheRepresentationPolicy::measured_v1(),
+        roots,
+    )
+    .map_err(|error| {
+        CacheFailure::new(
+            CacheFailureStage::Plan,
+            format!("Não foi possível planejar o Cache: {error}"),
+        )
+    })?;
+    let storage = Arc::new(prepare_verification_storage(app_paths, &namespace)?);
     let (response, recovery) = invoke_with_recovery(
         engine,
         transport,
@@ -1500,57 +1623,105 @@ async fn prepare_cache<T: ImagingTransport>(
         &storage,
         &ImagingCommand::build_cache(request.clone()),
         context,
-        InvocationControl::controlled(cancellation.flag(), &|_| {}),
+        control,
     )
     .await?;
-    if let Some(failure) = response.failure_for(&work.request_id) {
-        discard_candidate_generation(&storage, &request)?;
-        return Err(CacheFailure::new(
-            CacheFailureStage::Processor(InvocationFailureStage::Processor(failure.code.stage())),
-            "O Processador recusou o trabalho de Cache.",
-        ));
-    }
-    let Some(completion) = response.cache_completed_for(&work.request_id).cloned() else {
-        discard_candidate_generation(&storage, &request)?;
-        return Err(CacheFailure::new(
-            CacheFailureStage::ValidateResponse,
-            "O Processador devolveu uma resposta de Cache inesperada.",
-        ));
-    };
-    if cancellation
-        .flag()
-        .load(std::sync::atomic::Ordering::Acquire)
-    {
-        discard_candidate_generation(&storage, &request)?;
-        return Err(cancelled_before_publication());
-    }
-    let preview_sha256 = match verify_completion(&storage, &request, &completion) {
-        Ok(digest) => digest,
-        Err(failure) => {
-            discard_candidate_generation(&storage, &request)?;
-            return Err(failure);
+    let artifacts = (|| {
+        if response.failure_for(&request.request_id).is_some() {
+            return Err(CacheFailure::new(
+                CacheFailureStage::Processor(InvocationFailureStage::Processor(
+                    ImagingFailureStage::CacheProcessing,
+                )),
+                "O Processador recusou o trabalho de Cache.",
+            ));
         }
-    };
-    if cancellation
-        .flag()
-        .load(std::sync::atomic::Ordering::Acquire)
-    {
+        let Some(completion) = response.cache_completed_for(&request.request_id) else {
+            return Err(CacheFailure::new(
+                CacheFailureStage::ValidateResponse,
+                "O Processador devolveu uma resposta de Cache inesperada.",
+            ));
+        };
+        if control.is_cancelled() {
+            return Err(cancelled_before_publication());
+        }
+        verify_completion(&request, completion)
+    })()
+    .or_else(|failure| {
         discard_candidate_generation(&storage, &request)?;
-        return Err(cancelled_before_publication());
+        Err(failure)
+    })?;
+
+    let view = CacheRequest {
+        jobs: Vec::new(),
+        ..request
+    };
+    for ((index, member, observed_source, job), artifact) in planned.into_iter().zip(artifacts) {
+        let request = CacheRequest {
+            jobs: vec![job],
+            ..view.clone()
+        };
+        let cancelled =
+            || control.is_cancelled() || member.cancellation.flag().load(Ordering::Acquire);
+        // A rejected member discards only its own candidate generation; a
+        // pending publication discards it when dropped.
+        let rejected = |failure, request: &CacheRequest| {
+            discard_candidate_generation(&storage, request).and(Err(failure))
+        };
+        results[index] = Some(match artifact {
+            None => rejected(
+                CacheFailure::new(
+                    CacheFailureStage::Processor(InvocationFailureStage::Processor(
+                        ImagingFailureStage::CacheProcessing,
+                    )),
+                    "O Processador de Imagens não conseguiu preparar esta imagem.",
+                ),
+                &request,
+            ),
+            Some(_) if cancelled() => rejected(cancelled_before_publication(), &request),
+            Some((artifact, generated)) => {
+                match verify_cached_artifact(&storage, &request.cache_paths, &artifact) {
+                    Ok(_) if cancelled() => rejected(cancelled_before_publication(), &request),
+                    Ok(preview_sha256) => Ok(PendingCachePublication {
+                        storage: Arc::clone(&storage),
+                        request,
+                        work: member.work,
+                        execution: CacheExecution {
+                            completion: CacheCompletion {
+                                source_bytes: artifact.fingerprint.source_bytes,
+                                preview_bytes: artifact.preview_bytes,
+                                artifacts: vec![artifact],
+                                failures: Vec::new(),
+                                generated_count: usize::from(generated),
+                                reused_count: usize::from(!generated),
+                            },
+                            recovery,
+                        },
+                        observed_source,
+                        preview_sha256,
+                        cancellation: member.cancellation,
+                        published: false,
+                    }),
+                    Err(failure) => rejected(failure, &request),
+                }
+            }
+        });
     }
-    Ok(PendingCachePublication {
-        storage,
-        request,
-        work,
-        execution: CacheExecution {
-            completion,
-            recovery,
-        },
-        observed_source,
-        preview_sha256,
-        cancellation: cancellation.clone(),
-        published: false,
-    })
+    Ok(())
+}
+
+fn prepare_verification_storage(
+    app_paths: &AppPaths,
+    namespace: &AuthorizedCacheNamespace,
+) -> Result<PreparedCacheStorage, CacheFailure> {
+    app_paths
+        .prepare_cache_storage(namespace.paths())
+        .map_err(|error| {
+            cache_storage_failure(
+                CacheFailureStage::VerifyArtifacts,
+                "Não foi possível verificar o Cache",
+                error,
+            )
+        })
 }
 
 fn cache_source_binding(source: &CacheMediaSource) -> MediaBinding {
@@ -1572,27 +1743,41 @@ fn discard_candidate_generation(
     storage: &PreparedCacheStorage,
     request: &CacheRequest,
 ) -> Result<usize, CacheFailure> {
-    let job = &request.jobs[0];
     let mut removed = 0;
-    for format in [CacheArtifactFormat::Jpeg, CacheArtifactFormat::Png] {
-        let Ok(path) = request.cache_paths.preview_file(
-            job.source.media_id(),
-            &job.candidate_generation_id,
-            format,
-        ) else {
-            continue;
-        };
-        removed += usize::from(storage.remove_existing_file(&path).map_err(|error| {
-            CacheFailure::new(
-                CacheFailureStage::RecoveryCleanup,
-                format!("Não foi possível descartar a geração candidata do Cache: {error}"),
-            )
-        })?);
+    for job in &request.jobs {
+        for format in [CacheArtifactFormat::Jpeg, CacheArtifactFormat::Png] {
+            let Ok(path) = request.cache_paths.preview_file(
+                job.source.media_id(),
+                &job.candidate_generation_id,
+                format,
+            ) else {
+                continue;
+            };
+            removed += usize::from(storage.remove_existing_file(&path).map_err(|error| {
+                CacheFailure::new(
+                    CacheFailureStage::RecoveryCleanup,
+                    format!("Não foi possível descartar a geração candidata do Cache: {error}"),
+                )
+            })?);
+        }
     }
     Ok(removed)
 }
 
+#[cfg(test)]
 fn plan_request(app_paths: &AppPaths, work: &CacheWork) -> Result<CacheRequest, CacheFailure> {
+    CacheRequest::new(
+        work.request_id.clone(),
+        work.namespace.project_id().to_owned(),
+        work.namespace.paths().clone(),
+        vec![plan_job(app_paths, work)?],
+        CacheRepresentationPolicy::measured_v1(),
+        work.root_bindings.clone(),
+    )
+    .map_err(|error| CacheFailure::new(CacheFailureStage::Plan, error))
+}
+
+fn plan_job(app_paths: &AppPaths, work: &CacheWork) -> Result<CacheJob, CacheFailure> {
     let reusable = if let Some(index) = &work.planned_index {
         index.reusable(&work.source)
     } else {
@@ -1613,22 +1798,7 @@ fn plan_request(app_paths: &AppPaths, work: &CacheWork) -> Result<CacheRequest, 
         .and_then(|index| index.reusable(&work.source))
     };
     let candidate_generation_id = format!("g-{}", uuid::Uuid::new_v4().simple());
-    let job =
-        CacheJob::new(work.source.clone(), candidate_generation_id, reusable).map_err(|error| {
-            CacheFailure::new(
-                CacheFailureStage::Plan,
-                format!("Não foi possível planejar o Cache: {error}"),
-            )
-        })?;
-    CacheRequest::new(
-        work.request_id.clone(),
-        work.namespace.project_id().to_owned(),
-        work.namespace.paths().clone(),
-        vec![job],
-        CacheRepresentationPolicy::measured_v1(),
-        work.root_bindings.clone(),
-    )
-    .map_err(|error| {
+    CacheJob::new(work.source.clone(), candidate_generation_id, reusable).map_err(|error| {
         CacheFailure::new(
             CacheFailureStage::Plan,
             format!("Não foi possível planejar o Cache: {error}"),
@@ -1796,57 +1966,107 @@ fn discard_command_candidates(
     }
 }
 
+/// Checks the completion as a whole against the request and returns, in job
+/// order, each artifact with whether it is a new generation, or `None` for a
+/// media the Processor reported as failed. Any disagreement rejects the whole
+/// completion; the preview bytes are verified per media afterwards.
 fn verify_completion(
-    storage: &PreparedCacheStorage,
     request: &CacheRequest,
     completion: &CacheCompletion,
-) -> Result<[u8; 32], CacheFailure> {
-    if completion.artifacts.len() != 1
-        || completion.preview_bytes != completion.artifacts[0].preview_bytes
-        || completion.source_bytes != completion.artifacts[0].fingerprint.source_bytes
-    {
-        return Err(CacheFailure::new(
-            CacheFailureStage::ValidateResponse,
-            "A conclusão do Cache não corresponde ao trabalho solicitado.",
-        ));
-    }
-
-    let job = &request.jobs[0];
-    let artifact = &completion.artifacts[0];
-    artifact.fingerprint.validate().map_err(|error| {
+) -> Result<Vec<Option<(CacheArtifact, bool)>>, CacheFailure> {
+    let mismatch = || {
         CacheFailure::new(
             CacheFailureStage::ValidateResponse,
-            format!("O Processador devolveu um fingerprint inválido: {error}"),
+            "A conclusão do Cache não corresponde ao trabalho solicitado.",
         )
-    })?;
-    let generated = artifact.generation_id == job.candidate_generation_id;
-    let reused = job.reusable.as_ref().is_some_and(|reusable| {
-        artifact.generation_id == reusable.generation_id
-            && artifact.fingerprint == reusable.fingerprint
-            && artifact.format == reusable.format
-    });
-    if artifact.media_id != job.source.media_id()
-        || (!generated && !reused)
-        || completion.generated_count != usize::from(generated)
-        || completion.reused_count != usize::from(reused)
-        || artifact.width_px == 0
-        || artifact.height_px == 0
-        || artifact.width_px > request.policy.max_edge_px
-        || artifact.height_px > request.policy.max_edge_px
-        || artifact.preview_bytes == 0
-        || artifact
-            .exif_orientation
-            .is_some_and(|orientation| !(1..=8).contains(&orientation))
-        || artifact
-            .source_page_count
-            .is_some_and(|page_count| page_count != 1)
-    {
-        return Err(CacheFailure::new(
+    };
+    let unexpected = || {
+        CacheFailure::new(
             CacheFailureStage::ValidateResponse,
             "A conclusão contém um artefato de Cache inesperado.",
-        ));
+        )
+    };
+    if completion.finished_count() != request.jobs.len() {
+        return Err(mismatch());
     }
-    verify_cached_artifact(storage, &request.cache_paths, artifact)
+    let mut outcomes = request
+        .jobs
+        .iter()
+        .map(|job| (job.source.media_id(), None::<Option<(CacheArtifact, bool)>>))
+        .collect::<HashMap<_, _>>();
+    let (mut source_bytes, mut preview_bytes) = (0_u64, 0_u64);
+    let (mut generated_count, mut reused_count) = (0_usize, 0_usize);
+    for failure in &completion.failures {
+        match outcomes.get_mut(failure.media_id.as_str()) {
+            Some(outcome @ None) => *outcome = Some(None),
+            _ => return Err(mismatch()),
+        }
+    }
+    for artifact in &completion.artifacts {
+        artifact.fingerprint.validate().map_err(|error| {
+            CacheFailure::new(
+                CacheFailureStage::ValidateResponse,
+                format!("O Processador devolveu um fingerprint inválido: {error}"),
+            )
+        })?;
+        let Some(job) = request
+            .jobs
+            .iter()
+            .find(|job| job.source.media_id() == artifact.media_id)
+        else {
+            return Err(unexpected());
+        };
+        let generated = artifact.generation_id == job.candidate_generation_id;
+        let reused = job.reusable.as_ref().is_some_and(|reusable| {
+            artifact.generation_id == reusable.generation_id
+                && artifact.fingerprint == reusable.fingerprint
+                && artifact.format == reusable.format
+        });
+        if (!generated && !reused)
+            || artifact.width_px == 0
+            || artifact.height_px == 0
+            || artifact.width_px > request.policy.max_edge_px
+            || artifact.height_px > request.policy.max_edge_px
+            || artifact.preview_bytes == 0
+            || artifact
+                .exif_orientation
+                .is_some_and(|orientation| !(1..=8).contains(&orientation))
+            || artifact
+                .source_page_count
+                .is_some_and(|page_count| page_count != 1)
+        {
+            return Err(unexpected());
+        }
+        match outcomes.get_mut(artifact.media_id.as_str()) {
+            Some(outcome @ None) => *outcome = Some(Some((artifact.clone(), generated))),
+            _ => return Err(unexpected()),
+        }
+        generated_count += usize::from(generated);
+        reused_count += usize::from(reused);
+        source_bytes = source_bytes
+            .checked_add(artifact.fingerprint.source_bytes)
+            .ok_or_else(mismatch)?;
+        preview_bytes = preview_bytes
+            .checked_add(artifact.preview_bytes)
+            .ok_or_else(mismatch)?;
+    }
+    if completion.generated_count != generated_count
+        || completion.reused_count != reused_count
+        || completion.source_bytes != source_bytes
+        || completion.preview_bytes != preview_bytes
+    {
+        return Err(mismatch());
+    }
+    request
+        .jobs
+        .iter()
+        .map(|job| {
+            outcomes
+                .remove(job.source.media_id())
+                .flatten()
+                .ok_or_else(mismatch)
+        })
+        .collect()
 }
 
 /// Most Hosts spare this many cores while their window is being created.
@@ -2212,7 +2432,8 @@ mod tests {
     };
     use myalbuns_imaging_protocol::{
         CacheArtifact, CacheArtifactFormat, CacheBasicColorProfile, CacheCompletion,
-        CacheFingerprint, CacheMediaSource, ImagingCommand, ImagingFailureStage, ImagingResponse,
+        CacheFingerprint, CacheJobFailure, CacheMediaSource, CacheRequest, ImagingCommand,
+        ImagingFailureStage, ImagingResponse,
     };
     use myalbuns_paths::{AppPaths, OperationPathContext};
     use sha2::{Digest, Sha256};
@@ -2227,7 +2448,7 @@ mod tests {
         cache_previews::CachePreviewRegistry,
         imaging_processor::{
             ImagingOperation, ImagingTransport, InvocationContext, InvocationControl,
-            InvocationFailure, InvocationFuture,
+            InvocationFailure, InvocationFailureStage, InvocationFuture,
         },
         media_runtime::MediaRuntimeUpdate,
     };
@@ -2241,6 +2462,13 @@ mod tests {
         MalformedOrientation,
         MalformedPageCount,
         Malformed(fn(&mut CacheCompletion)),
+        /// Completes every job except `failed`, whose candidate stays on
+        /// disk for the Host to discard, and makes `obsolete` stale meanwhile.
+        CompleteBatch {
+            failed: &'static [&'static str],
+            obsolete: Option<CacheCancellation>,
+            mutate: fn(&mut CacheCompletion),
+        },
         WrongRequestId,
         Crash(u32),
         CrashAfterPeerSuspends(std::sync::Arc<CacheEngine>, u32),
@@ -2314,6 +2542,53 @@ mod tests {
                 ),
                 Script::Malformed(mutate) => {
                     complete_with(command, &self.app_paths, CacheArtifactFormat::Jpeg, mutate)
+                }
+                Script::CompleteBatch {
+                    failed,
+                    obsolete,
+                    mutate,
+                } => {
+                    let ImagingCommand::BuildCache(request) = command else {
+                        panic!("the scripted transport accepts Cache only");
+                    };
+                    let mut batch = CacheCompletion {
+                        artifacts: Vec::new(),
+                        failures: Vec::new(),
+                        generated_count: 0,
+                        reused_count: 0,
+                        source_bytes: 0,
+                        preview_bytes: 0,
+                    };
+                    for job in &request.jobs {
+                        let single = ImagingCommand::BuildCache(CacheRequest {
+                            jobs: vec![job.clone()],
+                            ..request.clone()
+                        });
+                        let Ok(ImagingResponse::CacheCompleted { completion, .. }) =
+                            complete(&single, &self.app_paths, CacheArtifactFormat::Jpeg)
+                        else {
+                            unreachable!("the scripted job completes")
+                        };
+                        if failed.contains(&job.source.media_id()) {
+                            batch.failures.push(CacheJobFailure {
+                                media_id: job.source.media_id().to_owned(),
+                            });
+                            continue;
+                        }
+                        batch.generated_count += completion.generated_count;
+                        batch.reused_count += completion.reused_count;
+                        batch.source_bytes += completion.source_bytes;
+                        batch.preview_bytes += completion.preview_bytes;
+                        batch.artifacts.extend(completion.artifacts);
+                    }
+                    if let Some(obsolete) = obsolete {
+                        obsolete.cancel_obsolete();
+                    }
+                    mutate(&mut batch);
+                    Ok(ImagingResponse::cache_completed(
+                        request.request_id.clone(),
+                        batch,
+                    ))
                 }
                 Script::WrongRequestId => {
                     let response = complete(command, &self.app_paths, CacheArtifactFormat::Jpeg);
@@ -3245,6 +3520,188 @@ mod tests {
         });
     }
 
+    fn batch_of_three(
+        fixture: &Fixture,
+        engine: &CacheEngine,
+    ) -> (Vec<super::CacheFlightOwner>, super::CacheBatch) {
+        let sources = (0..3).map(|id| {
+            CacheMediaSource::new(
+                format!("photo-{id}"),
+                MediaKind::Photo,
+                fixture.work.source.source_path().to_path_buf(),
+            )
+            .unwrap()
+        });
+        let works = engine
+            .plan_works(
+                &fixture.app_paths,
+                &fixture.work.namespace,
+                &fixture.work.root_bindings,
+                sources,
+            )
+            .unwrap();
+        let mut owners = Vec::new();
+        let mut members = Vec::new();
+        for work in works {
+            let CacheFlightClaim::Owner(owner) = engine.claim_for_processing(&work) else {
+                panic!("new owner")
+            };
+            members.push(super::CacheBatchMember {
+                work,
+                cancellation: owner.cancellation(),
+            });
+            owners.push(owner);
+        }
+        (
+            owners,
+            super::CacheBatch {
+                request_id: "cache-batch-test".into(),
+                members,
+            },
+        )
+    }
+
+    fn candidate_count(fixture: &Fixture) -> usize {
+        std::fs::read_dir(fixture.work.namespace.paths().media_directory())
+            .map_or(0, |entries| entries.count())
+    }
+
+    #[test]
+    fn a_batch_publishes_its_prepared_members_and_isolates_failed_or_obsolete_ones() {
+        tauri::async_runtime::block_on(async {
+            let fixture = fixture();
+            let engine = CacheEngine::default();
+            let (owners, batch) = batch_of_three(&fixture, &engine);
+            let mut transport = ScriptedTransport {
+                app_paths: fixture.app_paths.clone(),
+                scripts: VecDeque::from([Script::CompleteBatch {
+                    failed: &["photo-1"],
+                    obsolete: Some(owners[2].cancellation()),
+                    mutate: |_| {},
+                }]),
+                attempts: Vec::new(),
+            };
+            let not_cancelled = std::sync::atomic::AtomicBool::new(false);
+
+            let mut results = engine
+                .prepare_batch(
+                    &mut transport,
+                    &fixture.app_paths,
+                    batch,
+                    &InvocationContext::new(
+                        "cache-batch-test",
+                        Some(fixture.work.namespace.project_id()),
+                    ),
+                    InvocationControl::controlled(&not_cancelled, &|_| {}),
+                )
+                .await;
+
+            assert_eq!(transport.attempts, [1], "one Processor serves the batch");
+            assert_eq!(
+                results[1].as_ref().err().map(|failure| failure.stage),
+                Some(CacheFailureStage::Processor(
+                    InvocationFailureStage::Processor(ImagingFailureStage::CacheProcessing)
+                )),
+                "the media the Processor could not prepare fails alone"
+            );
+            assert_eq!(
+                results[2].as_ref().err().map(|failure| failure.stage),
+                Some(CacheFailureStage::Cancelled),
+                "an obsolete member is withheld from publication"
+            );
+            assert_eq!(
+                candidate_count(&fixture),
+                1,
+                "rejected members discard their own candidates"
+            );
+            let prepared = results.remove(0).expect("the healthy member is prepared");
+            let published = engine.publish_prepared_batch(vec![prepared]);
+            assert_eq!(
+                published[0].as_ref().unwrap().artifact().media_id,
+                "photo-0"
+            );
+            let storage = fixture
+                .app_paths
+                .prepare_cache_storage(fixture.work.namespace.paths())
+                .unwrap();
+            assert_eq!(
+                super::load_metadata(&storage, fixture.work.namespace.paths())
+                    .expect("the index is published")
+                    .entries
+                    .len(),
+                1
+            );
+            drop(owners);
+        });
+    }
+
+    #[test]
+    fn a_batch_completion_that_loses_or_repeats_a_member_is_rejected_whole() {
+        type Malformation = fn(&mut CacheCompletion);
+        let cases: [(&str, Malformation); 4] = [
+            ("a member without outcome", |completion| {
+                let removed = completion.artifacts.pop().unwrap();
+                completion.generated_count -= 1;
+                completion.source_bytes -= removed.fingerprint.source_bytes;
+                completion.preview_bytes -= removed.preview_bytes;
+            }),
+            ("a member both prepared and failed", |completion| {
+                let media_id = completion.artifacts[0].media_id.clone();
+                completion.failures[0].media_id = media_id;
+            }),
+            ("a failure of an unrequested media", |completion| {
+                completion.failures[0].media_id = "photo-9".into();
+            }),
+            ("an extra failure", |completion| {
+                completion.failures.push(CacheJobFailure {
+                    media_id: "photo-1".into(),
+                });
+            }),
+        ];
+        tauri::async_runtime::block_on(async {
+            let mut wrong = Vec::new();
+            for (name, mutate) in cases {
+                let fixture = fixture();
+                let engine = CacheEngine::default();
+                let (owners, batch) = batch_of_three(&fixture, &engine);
+                let mut transport = ScriptedTransport {
+                    app_paths: fixture.app_paths.clone(),
+                    scripts: VecDeque::from([Script::CompleteBatch {
+                        failed: &["photo-1"],
+                        obsolete: None,
+                        mutate,
+                    }]),
+                    attempts: Vec::new(),
+                };
+                let not_cancelled = std::sync::atomic::AtomicBool::new(false);
+                let results = engine
+                    .prepare_batch(
+                        &mut transport,
+                        &fixture.app_paths,
+                        batch,
+                        &InvocationContext::new(
+                            "cache-batch-test",
+                            Some(fixture.work.namespace.project_id()),
+                        ),
+                        InvocationControl::controlled(&not_cancelled, &|_| {}),
+                    )
+                    .await;
+                if !results.iter().all(|result| {
+                    result
+                        .as_ref()
+                        .is_err_and(|failure| failure.stage == CacheFailureStage::ValidateResponse)
+                }) {
+                    wrong.push(format!("{name}: not rejected as a whole"));
+                }
+                if candidate_count(&fixture) != 0 {
+                    wrong.push(format!("{name}: kept candidates"));
+                }
+                drop(owners);
+            }
+            assert!(wrong.is_empty(), "{wrong:#?}");
+        });
+    }
+
     fn complete(
         command: &ImagingCommand,
         app_paths: &AppPaths,
@@ -3305,6 +3762,7 @@ mod tests {
             source_bytes: artifact.fingerprint.source_bytes,
             preview_bytes: artifact.preview_bytes,
             artifacts: vec![artifact],
+            failures: Vec::new(),
             generated_count: usize::from(!reused),
             reused_count: usize::from(reused),
         };
