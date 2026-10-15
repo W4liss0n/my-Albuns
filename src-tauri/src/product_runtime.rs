@@ -210,13 +210,8 @@ pub(crate) fn run(
                 return;
             }
             desktop_webview_policy::on_window_event(window, event);
-            if window.label() == PROJECT_WINDOW_LABEL
-                && let tauri::WindowEvent::DragDrop(event) = event
-                && let Some(payload) = window
-                    .state::<crate::media_file_drop::NativeMediaDrops>()
-                    .receive(event)
-            {
-                let _ = window.emit(crate::media_file_drop::MEDIA_FILE_DRAG_EVENT, payload);
+            if window.label() == PROJECT_WINDOW_LABEL {
+                crate::media_file_drop::on_project_window_event(window, event);
             }
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
                 if window.label() != PROJECT_WINDOW_LABEL {
@@ -1245,6 +1240,8 @@ impl ProjectStartupHandshake {
         presentation
             .recv()
             .map_err(|_| io::Error::other("the Project window was not presented"))??;
+        #[cfg(windows)]
+        crate::media_file_drop::complete_drop_targets(project_window.as_ref());
         #[cfg(windows)]
         let shown_quietly = quiet_show.is_some();
         #[cfg(not(windows))]
