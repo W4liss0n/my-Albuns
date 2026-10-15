@@ -12,10 +12,10 @@ export type MediaFolderPrompt = {
   | { kind: "move"; mediaIds: string[]; folderId: string | null });
 
 const nameMessages: Record<MediaFolderNameError, string> = {
-  empty: "Informe o nome da pasta.",
+  empty: "Informe o nome da coleção.",
   invalidCharactersOrLength: "Use até 80 caracteres, sem quebras de linha.",
   nameInUse: "Esse nome já está em uso nesta aba.",
-  folderNotFound: "A pasta não existe mais.",
+  folderNotFound: "A coleção não existe mais.",
 };
 const validationUnavailable = "Não foi possível validar o nome. Tente novamente.";
 
@@ -43,7 +43,7 @@ export function MediaFolderPopover({ prompt, folders, validationKey, onValidate,
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
   const titleId = useId();
   const fieldId = useId();
-  const title = prompt.kind === "create" ? "Nova pasta" : prompt.kind === "rename" ? "Renomear pasta" : "Mover para pasta";
+  const title = prompt.kind === "create" ? "Nova coleção" : prompt.kind === "rename" ? "Renomear coleção" : "Mover para coleção";
   const sameKind = folders.filter((folder) => folder.kind === prompt.mediaKind);
   const request: MediaFolderNameRequest = { mediaKind: prompt.mediaKind, name,
     folderId: prompt.kind === "rename" ? prompt.folder.id : null };
@@ -117,7 +117,7 @@ export function MediaFolderPopover({ prompt, folders, validationKey, onValidate,
         <label htmlFor={fieldId}>{prompt.kind === "move" ? "Destino" : "Nome"}</label>
         {prompt.kind === "move" ? <select id={fieldId} autoFocus className="ui-field-control" disabled={pending}
           value={folderId} onChange={(event) => setFolderId(event.target.value)}>
-          <option value="">Sem pasta</option>
+          <option value="">Sem coleção</option>
           {sameKind.map((folder) => <option key={folder.id} value={folder.id}>{folder.name}</option>)}
         </select> : <span className="media-folder-name-field"><TextInput id={fieldId} ref={input} autoFocus className="ui-field-control" disabled={pending}
           value={name} {...fieldValidationTooltipAttributes("name", attempted ? error ?? undefined : undefined, tooltip)}

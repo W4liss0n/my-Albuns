@@ -1269,7 +1269,8 @@ A arquitetura adotada reutiliza um núcleo Rust compartilhado atrás de uma pequ
 
 ## Pastas de organização do Painel de imagens
 
+- Na interface, a Pasta de organização chama-se Coleção.
 - Fotos e Decorativos possuem pastas independentes, planas, salvas no Projeto; cada mídia pertence a no máximo uma pasta.
-- Criar, renomear, excluir e mover a seleção são ações atômicas com Undo/Redo. Excluir pasta mantém as imagens em `Todas`; `Sem pasta` remove somente a associação.
+- Criar, renomear, excluir e mover a seleção são ações atômicas com Undo/Redo. Excluir coleção mantém as imagens em `Todas`; `Sem coleção` remove somente a associação.
 - O filtro de pasta cruza Busca, Filtro de uso e Ausentes, conserva a ordenação e permanece transitório. A organização não modifica arquivos originais nem a composição.
 - A interface e a validação seguem o [design 0035](../design/0035-pastas-de-organizacao-e-schema-v12.md); a persistência segue o [Contrato do Arquivo de Projeto](../design/0051-contrato-do-arquivo-de-projeto.md).

@@ -816,7 +816,7 @@ export function MediaPanel({
             onClick={() => { setContextMenu(null); onRemoveMedia([...selectedMediaIds]); panelHostRef.current?.focus({ preventScroll: true }); }} />],
         ]} />
       </ContextMenuSurface>}
-      {folderMenu && <ContextMenuSurface label={`Ações da pasta ${folderMenu.folder.name}`} position={folderMenu}
+      {folderMenu && <ContextMenuSurface label={`Ações da coleção ${folderMenu.folder.name}`} position={folderMenu}
         onDismiss={() => { folderMenu.anchor.focus({ preventScroll: true }); setFolderMenu(null); }}>
         <MenuItem label={projectCommandDescriptor("rename-media-folder").label}
           disabled={foldersDisabled}

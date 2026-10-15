@@ -171,7 +171,7 @@ test("matches the reference toolbar and disables folders when no mutation port i
     "true",
   );
   expect(
-    screen.getByRole("button", { name: "Nova pasta de organização" }),
+    screen.getByRole("button", { name: "Nova coleção" }),
   ).toBeDisabled();
   expect(
     screen.getByRole("button", { name: "Filtro, ordem e tamanho" }),

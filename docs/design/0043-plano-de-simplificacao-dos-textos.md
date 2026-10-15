@@ -155,6 +155,7 @@ A aplicação deve ser incremental: catálogo de comandos continua responsável 
 | Religar / Relinkar | Localizar imagem… / Localizar imagens… | A ajuda explica a escolha da pasta e o alcance da busca. |
 | Cache | Prévias temporárias | “Cache” pode continuar nos detalhes de suporte; não chamar de limpeza de fotos. |
 | Sobrescrever | Substituir | Explicitar quais arquivos, sem omitir consequências. |
+| Pasta de organização | Coleção | Pasta fica para as pastas do disco; mover para uma coleção não move o arquivo. Decisão de 14/10/2026. |
 | Revisão visível / Sessão | Alterações atuais / projeto aberto | O erro determina a frase; não converter os termos mecanicamente. |
 | Identidade física / arquivo regular | Explicação sobre o arquivo ou local escolhido | Detalhes do mecanismo ficam no diagnóstico. |
 | Escopo | Aplicar em / lado da lâmina | Preservar o objeto e as opções existentes. |

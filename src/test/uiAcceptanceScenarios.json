@@ -13904,7 +13904,7 @@
     },
     {
       "id": "media-folders-all",
-      "title": "Pastas — contagens, nome longo e faixa horizontal",
+      "title": "Coleções — contagens, nome longo e faixa horizontal",
       "implementationPath": "/previews/media-panel-preview.html?folders=1",
       "comparison": {
         "kind": "implementation-only",
@@ -13921,7 +13921,7 @@
     },
     {
       "id": "media-folders-filter",
-      "title": "Pastas — Fotos filtradas",
+      "title": "Coleções — Fotos filtradas",
       "implementationPath": "/previews/media-panel-preview.html?folders=1",
       "comparison": {
         "kind": "implementation-only",
@@ -13933,17 +13933,17 @@
         "width": 1100,
         "height": 400
       },
-      "readySelector": "[aria-label^=\"Pasta Retratos,\"][aria-pressed=\"true\"]",
+      "readySelector": "[aria-label^=\"Coleção Retratos,\"][aria-pressed=\"true\"]",
       "actions": [
         {
           "type": "click",
-          "selector": "[aria-label^=\"Pasta Retratos,\"]"
+          "selector": "[aria-label^=\"Coleção Retratos,\"]"
         }
       ]
     },
     {
       "id": "media-folders-empty",
-      "title": "Pastas — pasta vazia",
+      "title": "Coleções — coleção vazia",
       "implementationPath": "/previews/media-panel-preview.html?folders=1",
       "comparison": {
         "kind": "implementation-only",
@@ -13955,17 +13955,17 @@
         "width": 1100,
         "height": 400
       },
-      "readySelector": "[aria-label^=\"Pasta Famílias,\"][aria-pressed=\"true\"]",
+      "readySelector": "[aria-label^=\"Coleção Famílias,\"][aria-pressed=\"true\"]",
       "actions": [
         {
           "type": "click",
-          "selector": "[aria-label^=\"Pasta Famílias,\"]"
+          "selector": "[aria-label^=\"Coleção Famílias,\"]"
         }
       ]
     },
     {
       "id": "media-folders-create",
-      "title": "Pastas — criar",
+      "title": "Coleções — criar",
       "implementationPath": "/previews/media-panel-preview.html?folders=1",
       "comparison": {
         "kind": "implementation-only",
@@ -13981,13 +13981,13 @@
       "actions": [
         {
           "type": "click",
-          "selector": "[aria-label=\"Nova pasta de organização\"]"
+          "selector": "[aria-label=\"Nova coleção\"]"
         }
       ]
     },
     {
       "id": "media-folders-invalid",
-      "title": "Pastas — nome inválido em tooltip",
+      "title": "Coleções — nome inválido em tooltip",
       "implementationPath": "/previews/media-panel-preview.html?folders=1",
       "comparison": {
         "kind": "implementation-only",
@@ -14003,7 +14003,7 @@
       "actions": [
         {
           "type": "click",
-          "selector": "[aria-label=\"Nova pasta de organização\"]"
+          "selector": "[aria-label=\"Nova coleção\"]"
         },
         {
           "type": "click",
@@ -14013,7 +14013,7 @@
     },
     {
       "id": "media-folders-context",
-      "title": "Pastas — menu contextual",
+      "title": "Coleções — menu contextual",
       "implementationPath": "/previews/media-panel-preview.html?folders=1",
       "comparison": {
         "kind": "implementation-only",
@@ -14025,17 +14025,17 @@
         "width": 1100,
         "height": 400
       },
-      "readySelector": "[aria-label=\"Ações da pasta Retratos\"]",
+      "readySelector": "[aria-label=\"Ações da coleção Retratos\"]",
       "actions": [
         {
           "type": "context-click",
-          "selector": "[aria-label^=\"Pasta Retratos,\"]"
+          "selector": "[aria-label^=\"Coleção Retratos,\"]"
         }
       ]
     },
     {
       "id": "media-folders-rename",
-      "title": "Pastas — renomear",
+      "title": "Coleções — renomear",
       "implementationPath": "/previews/media-panel-preview.html?folders=1",
       "comparison": {
         "kind": "implementation-only",
@@ -14051,7 +14051,7 @@
       "actions": [
         {
           "type": "context-click",
-          "selector": "[aria-label^=\"Pasta Retratos,\"]"
+          "selector": "[aria-label^=\"Coleção Retratos,\"]"
         },
         {
           "type": "click",
@@ -14061,7 +14061,7 @@
     },
     {
       "id": "media-folders-move",
-      "title": "Pastas — mover seleção",
+      "title": "Coleções — mover seleção",
       "implementationPath": "/previews/media-panel-preview.html?folders=1",
       "comparison": {
         "kind": "implementation-only",
@@ -14091,7 +14091,7 @@
     },
     {
       "id": "media-folders-decorative",
-      "title": "Pastas — Decorativos",
+      "title": "Coleções — Decorativos",
       "implementationPath": "/previews/media-panel-preview.html?folders=1",
       "comparison": {
         "kind": "implementation-only",
@@ -14103,7 +14103,7 @@
         "width": 1100,
         "height": 400
       },
-      "readySelector": "[aria-label^=\"Pasta Fundos,\"][aria-pressed=\"true\"]",
+      "readySelector": "[aria-label^=\"Coleção Fundos,\"][aria-pressed=\"true\"]",
       "actions": [
         {
           "type": "click",
@@ -14111,13 +14111,13 @@
         },
         {
           "type": "click",
-          "selector": "[aria-label^=\"Pasta Fundos,\"]"
+          "selector": "[aria-label^=\"Coleção Fundos,\"]"
         }
       ]
     },
     {
       "id": "media-folders-drag-photo",
-      "title": "Pastas — Foto sobre a tag de destino",
+      "title": "Coleções — Foto sobre a tag de destino",
       "implementationPath": "/previews/media-panel-preview.html?folders=1",
       "comparison": {
         "kind": "implementation-only",
@@ -14142,7 +14142,7 @@
     },
     {
       "id": "media-folders-drag-decorative",
-      "title": "Pastas — Decorativo sobre a tag de destino",
+      "title": "Coleções — Decorativo sobre a tag de destino",
       "implementationPath": "/previews/media-panel-preview.html?folders=1",
       "comparison": {
         "kind": "implementation-only",
@@ -14171,7 +14171,7 @@
     },
     {
       "id": "media-folders-drag-cancel",
-      "title": "Pastas — cancelar arrasto com Esc",
+      "title": "Coleções — cancelar arrasto com Esc",
       "implementationPath": "/previews/media-panel-preview.html?folders=1",
       "comparison": {
         "kind": "implementation-only",

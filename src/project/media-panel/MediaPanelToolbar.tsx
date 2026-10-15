@@ -185,7 +185,7 @@ export function MediaPanelToolbar({
           {folders.map((folder) => <button key={folder.id} type="button"
             className={`media-folder-chip${activeFolderId === folder.id ? " active" : ""}${dropFolderId === folder.id ? " media-folder-chip--drop" : ""}`}
             data-media-folder-id={folder.id}
-            aria-label={`Pasta ${folder.name}, ${folder.mediaIds.length} imagens`}
+            aria-label={`Coleção ${folder.name}, ${folder.mediaIds.length} imagens`}
             aria-pressed={activeFolderId === folder.id} title={folder.name}
             onFocus={(event) => event.currentTarget.scrollIntoView?.({ block: "nearest", inline: "nearest" })}
             onClick={() => { setOpenPopup(null); onFolderChange(folder.id); }}
@@ -202,7 +202,7 @@ export function MediaPanelToolbar({
             }}><span className="media-folder-name">{folder.name}</span><small>{folder.mediaIds.length}</small></button>)}
         </div>
         <button
-          aria-label={`${projectCommandDescriptor("create-media-folder").label} de organização`}
+          aria-label={projectCommandDescriptor("create-media-folder").label}
           className="media-folder-add"
           disabled={foldersDisabled}
           title={projectCommandDescriptor("create-media-folder").label}

@@ -48,10 +48,10 @@ naquele estado desaparece sem deixar divisor sobrando (`MenuGroups`).
 
 | Menu | Grupos, na ordem |
 | --- | --- |
-| Imagem no painel | Visualizar imagem · Abrir no Photoshop, Mostrar na pasta · Localizar imagem…, Substituir imagem, Mover para pasta… · Remover |
+| Imagem no painel | Visualizar imagem · Abrir no Photoshop, Mostrar na pasta · Localizar imagem…, Substituir imagem, Mover para coleção… · Remover |
 | Quadro | Visualizar imagem · Abrir no Photoshop, Mostrar na pasta · comandos de ordem (editando a lâmina) · Trocar conteúdo dos quadros · Excluir |
 | Lâmina | Adicionar antes, Adicionar depois, Duplicar · Exportar lâmina…, Converter extremidade · Excluir |
-| Pasta do painel | Renomear… · Excluir pasta |
+| Coleção do painel | Renomear… · Excluir coleção |
 
 O menu Importar conserva sua apresentação compacta. Os catálogos continuam
 donos dos nomes, atalhos e identidades de comandos. Disponibilidade, execução

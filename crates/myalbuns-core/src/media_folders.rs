@@ -163,7 +163,7 @@ impl ProjectDocument {
                 next.media_folders
                     .iter_mut()
                     .find(|folder| &folder.id == folder_id)
-                    .ok_or_else(|| invalid("A pasta não existe mais."))?
+                    .ok_or_else(|| invalid("A coleção não existe mais."))?
                     .name = name.trim().into();
             }
             MediaFolderEdit::Delete { folder_id } => {
@@ -172,7 +172,7 @@ impl ProjectDocument {
                     .iter()
                     .any(|folder| &folder.id == folder_id)
                 {
-                    return Err(invalid("A pasta não existe mais."));
+                    return Err(invalid("A coleção não existe mais."));
                 }
                 next.media_folders.retain(|folder| &folder.id != folder_id);
             }
@@ -197,9 +197,9 @@ impl ProjectDocument {
                         .media_folders
                         .iter()
                         .find(|folder| &folder.id == id)
-                        .ok_or_else(|| invalid("A pasta não existe mais."))?;
+                        .ok_or_else(|| invalid("A coleção não existe mais."))?;
                     if kind.is_some_and(|kind| kind != folder.kind) {
-                        return Err(invalid("A pasta pertence a outra aba."));
+                        return Err(invalid("A coleção pertence a outra aba."));
                     }
                 }
                 let selected = media_ids.iter().copied().collect::<HashSet<_>>();
@@ -219,7 +219,7 @@ impl ProjectDocument {
         }
         if !next.media_folders_are_valid() {
             return Err(invalid(
-                "Use um nome de até 80 caracteres, diferente de Todas, Ausentes e das outras pastas desta aba.",
+                "Use um nome de até 80 caracteres, diferente de Todas, Ausentes e das outras coleções desta aba.",
             ));
         }
         Ok(next)

@@ -2,7 +2,7 @@
 status: accepted
 document: design
 date: 2026-09-15
-updated: 2026-09-24
+updated: 2026-10-14
 implementation-readiness: ready-for-agent
 ---
 
@@ -95,6 +95,15 @@ Projetos v1–v11 abrem com pastas vazias; só Salvar explícito grava v12. Salv
 como, Cópia externa, Recuperação e Projeto modelo conservam a organização.
 As identidades das pastas e mídias são locais ao Projeto e permanecem válidas
 quando a identidade do Projeto muda. As cópias seguem independentes.
+
+## Refinamento de 14/10/2026: nome na interface
+
+Na interface, a Pasta de organização passa a se chamar **Coleção**: `Nova coleção`,
+`Mover para coleção…`, `Renomear coleção`, `Excluir coleção`, `Sem coleção`,
+`Coleção vazia` e as mensagens de validação. A palavra pasta fica reservada às
+pastas do disco, como em `Mostrar na pasta` e na importação, para que mover uma
+imagem para uma coleção não pareça mover o arquivo. O modelo, os identificadores
+e o arquivo do Projeto não mudam.
 
 ## Verificação
 
